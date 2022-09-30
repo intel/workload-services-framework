@@ -1,0 +1,49 @@
+cloud_worker: &cloud_worker
+  AWS:
+    machine_type: m5.16xlarge
+    zone: us-east-2a
+    boot_disk_size: 500
+  
+cloud_disk_mount_1: &cloud_disk_mount_1
+  AWS:
+    mount_point: /mnt/disk1
+    disk_type: io2
+    disk_size: 512
+    iops: 25600
+    num_striped_disks: 1
+
+cloud_controller: &cloud_controller
+  AWS:
+    machine_type: m5.4xlarge
+    zone: us-east-2a
+    boot_disk_size: 500
+
+docker_pt:
+  vm_groups:
+    worker:
+      vm_count: 1
+      os_type: "ubuntu2204"
+      vm_spec: *cloud_worker
+      disk_spec: *cloud_disk_mount_1
+    controller:
+      vm_count: 1
+      os_type: "ubuntu2204"
+      vm_spec: *cloud_controller
+  flags:
+    dpt_docker_image: ""
+    dpt_docker_dataset: ""
+    dpt_docker_options: ""
+    dpt_kubernetes_yaml: ""
+    dpt_kubernetes_job: ""
+    dpt_logs_dir: ""
+    dpt_timeout: "28800,300"
+    dpt_name: ""
+    dpt_script_args: ""
+    dpt_cluster_yaml: ""
+    dpt_params: ""
+    dpt_tunables: ""
+    dpt_registry_map: ""
+    dpt_namespace: ""
+    ssh_options: "-o TCPKeepAlive=yes"
+    sar_flags: "-B -b -d -p -H -I ALL -m ALL -n ALL -q -r ALL -u ALL -P ALL -v -W -w"
+    cloud: AWS

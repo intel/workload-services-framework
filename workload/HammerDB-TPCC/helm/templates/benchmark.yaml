@@ -1,0 +1,107 @@
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: benchmark
+spec:
+  template:
+    metadata:
+      labels:
+        deployPolicy: standalone
+    spec:
+{{- if not .Values.RUN_SINGLE_NODE }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+{{- end }}
+      initContainers:
+      - name: wait-for-database-service
+        image: busybox:1.28
+        command: ["sh", "-c", "until nc -z -w5 {{ .Values.DB_SERVICE }} {{ .Values.DB_PORT }}; do echo waiting for database service; sleep 2; done"]
+      containers:
+      - name: benchmark
+        image: {{ .Values.REGISTRY }}tpcc-hammerdb{{ .Values.RELEASE }}
+        volumeMounts:
+          - mountPath: /dev/shm
+            name: shm-volume
+        imagePullPolicy: {{ include "imagepolicy" .Values }}
+        securityContext:
+          privileged: true
+        env:
+          - name: DEBUG
+            value: "{{ .Values.DEBUG }}"
+          - name: DB_TYPE
+            value: "{{ .Values.DB_TYPE }}"
+          - name: TPCC_NUM_WAREHOUSES
+            value: "{{ .Values.TPCC_NUM_WAREHOUSES }}"
+          - name: TPCC_THREADS_BUILD_SCHEMA
+            value: "{{ .Values.TPCC_THREADS_BUILD_SCHEMA }}"
+          - name: TPCC_HAMMER_NUM_VIRTUAL_USERS
+            value: "{{ .Values.TPCC_HAMMER_NUM_VIRTUAL_USERS }}"
+          - name: TPCC_HAMMER_NUM_VIRTUAL_USERS_GEN_ALGORITHM
+            value: "{{ .Values.TPCC_HAMMER_NUM_VIRTUAL_USERS_GEN_ALGORITHM }}"
+          - name: TPCC_VUSERS_STEPS
+            value: "{{ .Values.TPCC_VUSERS_STEPS }}"
+          - name: TPCC_TCL_SCRIPT_PATH
+            value: "{{ .Values.TPCC_TCL_SCRIPT_PATH }}"
+          - name: TPCC_MINUTES_OF_RAMPUP
+            value: "{{ .Values.TPCC_MINUTES_OF_RAMPUP }}"
+          - name: TPCC_MINUTES_OF_DURATION
+            value: "{{ .Values.TPCC_MINUTES_OF_DURATION }}"
+          - name: TPCC_TOTAL_ITERATIONS
+            value: "{{ .Values.TPCC_TOTAL_ITERATIONS }}"
+          - name: TPCC_RUNTIMER_SECONDS
+            value: "{{ .Values.TPCC_RUNTIMER_SECONDS }}"
+          - name: TPCC_WAIT_COMPLETE_MILLSECONDS
+            value: "{{ .Values.TPCC_WAIT_COMPLETE_MILLSECONDS }}"
+          - name: TPCC_INIT_MAX_WAIT_SECONDS
+            value: "{{ .Values.TPCC_INIT_MAX_WAIT_SECONDS }}"
+          - name: TPCC_ASYNC_SCALE
+            value: "{{ .Values.TPCC_ASYNC_SCALE }}"
+          - name: TPCC_CONNECT_POOL
+            value: "{{ .Values.TPCC_CONNECT_POOL }}"
+          - name: DB_HOST
+            value: "{{ .Values.DB_SERVICE }}"
+          - name: DB_PORT
+            value: "{{ .Values.DB_PORT }}"
+          - name: RUN_SINGLE_NODE
+            value: "{{ .Values.RUN_SINGLE_NODE }}"
+          - name: ENABLE_SOCKET_BIND
+            value: "{{ .Values.ENABLE_SOCKET_BIND }}"
+          - name: SOCKET_BIND_NODE
+            value: "{{ .Values.SOCKET_BIND_NODE }}"
+{{- if .Values.RUN_SINGLE_NODE}}
+          - name: SERVER_CORE_NEEDED_FACTOR
+            value: "{{ .Values.SERVER_CORE_NEEDED_FACTOR }}"
+{{- end }}
+          - name: ENABLE_RPSRFS_AFFINITY
+            value: "{{ .Values.ENABLE_RPSRFS_AFFINITY }}"
+          - name: RPS_SOCK_FLOW_ENTRIES
+            value: "{{ .Values.RPS_SOCK_FLOW_ENTRIES }}"
+          - name: ENABLE_IRQ_AFFINITY
+            value: "{{ .Values.ENABLE_IRQ_AFFINITY }}"
+          - name: EXCLUDE_IRQ_CORES
+            value: "{{ .Values.EXCLUDE_IRQ_CORES }}"
+          - name: NODE_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+{{- if eq .Values.DB_TYPE "mysql" }}
+          - name: MYSQL_USER
+            value: "{{ .Values.MYSQL_USER }}"
+          - name: MYSQL_ROOT_PASSWORD
+            value: "{{ .Values.MYSQL_ROOT_PASSWORD }}"
+          - name: MYSQL_STORAGE_ENGINE
+            value: "{{ .Values.MYSQL_STORAGE_ENGINE }}"
+{{- end }}
+      volumes:
+      - name: shm-volume
+        emptyDir:
+          medium: Memory
+      restartPolicy: Never
+{{- if not .Values.RUN_SINGLE_NODE }}
+      {{- $args := dict "key" "HAS-SETUP-DISK-MOUNT-1" "operator" "NotIn" "value" "yes" }}
+      {{- include "nodeAffinity" $args }}
+{{- else }}
+      {{- $args := dict "key" "app" "operator" "In" "value" "database" }}
+      {{- include "podAffinity" $args }}
+{{- end }}

@@ -1,0 +1,56 @@
+# syntax=docker/dockerfile:1
+# cumulus-static
+
+# Copyright (c) 2022 Intel Corporation
+# SPDX-License-Identifier: Apache License 2.0
+
+ARG OS_VER=22.04
+ARG OS_IMAGE=ubuntu
+
+FROM ${OS_IMAGE}:${OS_VER}
+## Security updates
+RUN apt-get update && apt-get upgrade -y libsqlite3-0 rsync perl-modules libgnutls30 tar passwd libpcre2-8-0 libpcre3 patch openssh-client libtinfo6 libk5crypto3 libgmp10 libc-bin git-man coreutils && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+## Prerequisites
+RUN apt-get update && apt-get install -y curl git rsync bzip2 openssl skopeo sudo file && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install miniconda
+ARG CONDA_DIR=/opt/conda
+ARG CONDA_VER=py39_4.12.0
+ARG CONDA_REPO=https://repo.anaconda.com/miniconda
+RUN curl -o ~/miniconda.sh ${CONDA_REPO}/Miniconda3-${CONDA_VER}-Linux-x86_64.sh && bash ~/miniconda.sh -b -p ${CONDA_DIR} && rm -f ~/miniconda.sh
+
+# Put conda in path so we can use python3 and pip3 installed in CONDA_DIR
+ENV PATH=${CONDA_DIR}/bin:$PATH
+
+## Cumulus patches
+COPY pkb/ /PerfKitBenchmarker/
+RUN python3 -m pip install --no-cache-dir -r PerfKitBenchmarker/requirements.txt kazoo paramiko lxml
+WORKDIR /home
+
+## svrinfo NDA
+## Download the package to script/cumulus/pkb/data/svrinfo
+RUN [ -e /PerfKitBenchmarker/perfkitbenchmarker/data/svrinfo/svrinfo* ] && \
+    sed -i "/DEFINE_string('svrinfo_tarball'/s|None|'$(ls -1 /PerfKitBenchmarker/perfkitbenchmarker/data/svrinfo/svrinfo*)'|" /PerfKitBenchmarker/perfkitbenchmarker/traces/svrinfo.py || true
+
+####
+ARG USER=pkb
+ARG GROUP=pkb
+RUN groupadd -f ${GROUP} && useradd -d /home -M ${USER} -g ${GROUP}
+RUN echo "${USER} ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers
+RUN groupadd -f docker && usermod -aG docker pkb
+####
+
+RUN apt-get update && apt-get install -y netcat gawk inetutils-ping && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install gosu
+ARG GOSU_VER=1.14
+ARG GOSU_REPO=https://github.com/tianon/gosu/releases/download/${GOSU_VER}/gosu-amd64
+RUN curl -o /usr/local/bin/gosu -SL ${GOSU_REPO} && \
+    curl -o /usr/local/bin/gosu.asc ${GOSU_REPO}.asc && \
+    chmod +x /usr/local/bin/gosu
+
+# entry point
+COPY entrypoint.sh /
+ENTRYPOINT [ "/entrypoint.sh" ]

@@ -1,0 +1,45 @@
+# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+Host *
+  Protocol=2
+  UserKnownHostsFile=/dev/null
+  StrictHostKeyChecking=no
+  IdentitiesOnly=yes
+  PreferredAuthentications=publickey
+  PasswordAuthentication=no
+  ConnectTimeout=5
+  GSSAPIAuthentication=no
+  ServerAliveInterval=30
+  ServerAliveCountMax=10
+  BatchMode=yes
+
+{# Numeric / name-based access -#}
+{% for vm in vms %}
+Host {{ vm.name }} vm{{ loop.index0 }}
+  HostName={{ vm.ip_address }}
+  User={{ vm.user_name }}
+  Port={{ vm.ssh_port }}
+  IdentityFile={{ vm.ssh_private_key }}
+{% endfor %}
+
+{# Group-based access -#}
+{% for group, group_vms in vm_groups.items() %}
+{% for vm in group_vms %}
+Host {{group}}-{{ loop.index0 }}
+  HostName={{ vm.ip_address }}
+  User={{ vm.user_name }}
+  Port={{ vm.ssh_port }}
+  IdentityFile={{ vm.ssh_private_key }}
+{% endfor -%}
+{% endfor -%}

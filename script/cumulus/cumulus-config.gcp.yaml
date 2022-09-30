@@ -1,0 +1,51 @@
+cloud_worker: &cloud_worker
+  GCP:
+    machine_type: n2-standard-16
+    zone: us-west1-b
+  
+cloud_disk_mount_1: &cloud_disk_mount_1
+  GCP:
+    mount_point: /mnt/disk1
+    disk_type: pd-ssd
+    disk_size: 500
+    num_striped_disks: 1
+
+cloud_controller: &cloud_controller
+  GCP:
+    machine_type: n2-standard-16
+    zone: us-west1-b
+  
+docker_pt:
+  vm_groups:
+    worker:
+      vm_count: 1
+      os_type: "ubuntu2204"
+      vm_spec: *cloud_worker
+      disk_spec: *cloud_disk_mount_1
+    controller:
+      vm_count: 1
+      os_type: "ubuntu2204"
+      vm_spec: *cloud_controller
+  flags:
+    dpt_docker_image: ""
+    dpt_docker_dataset: ""
+    dpt_docker_options: ""
+    dpt_kubernetes_yaml: ""
+    dpt_kubernetes_job: ""
+    dpt_logs_dir: ""
+    dpt_timeout: "28800,300"
+    dpt_name: ""
+    dpt_script_args: ""
+    dpt_cluster_yaml: ""
+    dpt_params: ""
+    dpt_tunables: ""
+    dpt_registry_map: ""
+    dpt_namespace: ""
+    gce_subnet_region: us-west1
+    gce_boot_disk_size: "500"
+# The GCP higher bandwidth feature works with N2, N2D, C2, or C2D series && >=32 VCPUs.
+#    gce_egress_bandwidth_tier: "TIER_1"
+#    gce_nic_type: "GVNIC"
+    ssh_options: "-o TCPKeepAlive=yes"
+    sar_flags: "-B -b -d -p -H -I ALL -m ALL -n ALL -q -r ALL -u ALL -P ALL -v -W -w"
+    cloud: GCP

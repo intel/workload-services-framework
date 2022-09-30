@@ -1,0 +1,13 @@
+# cumulus-tencent
+
+# Copyright (c) 2022 Intel Corporation
+# SPDX-License-Identifier: Apache License 2.0
+
+ARG RELEASE
+FROM cumulus-cloud${RELEASE}
+
+# Install TCCLI 
+RUN python3 -m pip install --no-cache-dir -r /PerfKitBenchmarker/perfkitbenchmarker/providers/tencent/requirements.txt
+
+# Add cleanup script
+COPY script/cleanup-tencent.sh /usr/local/bin/cleanup

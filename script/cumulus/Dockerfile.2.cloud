@@ -1,0 +1,11 @@
+## cumulus-cloud
+
+# Copyright (c) 2022 Intel Corporation
+# SPDX-License-Identifier: Apache License 2.0
+
+ARG RELEASE
+FROM cumulus-static${RELEASE}
+
+# Install docker CLI
+COPY --from=docker:20.10.17-dind /usr/local/bin/docker /usr/local/bin/
+

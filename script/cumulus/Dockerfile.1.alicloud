@@ -1,0 +1,14 @@
+# cumulus-alicloud
+
+# Copyright (c) 2022 Intel Corporation
+# SPDX-License-Identifier: Apache License 2.0
+
+ARG RELEASE
+FROM cumulus-cloud${RELEASE}
+
+ARG ALIYUN_CLI_VER=3.0.104
+ARG ALIYUN_CLI_PACKAGE=https://github.com/aliyun/aliyun-cli/releases/download/v${ALIYUN_CLI_VER}/aliyun-cli-linux-${ALIYUN_CLI_VER}-amd64.tgz
+RUN curl -L ${ALIYUN_CLI_PACKAGE} | tar -xz -C /usr/local/bin
+
+# Add cleanup script
+COPY script/cleanup-alicloud.sh /usr/local/bin/cleanup
