@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sm-nighthawk-server
+  labels:
+    app: sm-nighthawk-server
+    kubernetes.io/hostname: localhost
+spec:
+  replicas: 23
+  selector:
+    matchLabels:
+      app: sm-nighthawk-server
+  template:
+    metadata:
+      labels:
+        app: sm-nighthawk-server
+    spec:
+      containers:
+        - name: sm-nighthawk-server
+          image: envoyproxy/nighthawk-dev:2256da19d138866ca82adff2de7c5a5071cb430e
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: "1"
+              memory: 1Gi
+          command: [ "/usr/local/bin/nighthawk_test_server", "-c", "/etc/envoy/nighthawk-server-cm.yaml" ]
+          ports:
+          - containerPort: 10000
+            protocol: TCP
+          volumeMounts:
+          - name: config-volume
+            mountPath: /etc/envoy
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: nighthawk
+        name: config-volume
+      nodeSelector:
+        kubernetes.io/hostname: localhost
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sm-nighthawk-server
+spec:
+  selector:
+    app: sm-nighthawk-server
+  ports:
+    - name: nighthawk
+      protocol: TCP
+      port: 10000
+      targetPort: 10000

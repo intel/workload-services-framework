@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: intel-qat-plugin
+  labels:
+    app: intel-qat-plugin
+spec:
+  selector:
+    matchLabels:
+      app: intel-qat-plugin
+  template:
+    metadata:
+      labels:
+        app: intel-qat-plugin
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - name: intel-qat-plugin
+        image: intel/intel-qat-plugin:devel
+        securityContext:
+          seLinuxOptions:
+            type: "container_device_plugin_t"
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: devdir
+          mountPath: /dev/vfio
+          readOnly: true
+        - name: debugfsdir
+          mountPath: /sys/kernel/debug
+          readOnly: true
+        - name: pcidir
+          mountPath: /sys/bus/pci
+        - name: kubeletsockets
+          mountPath: /var/lib/kubelet/device-plugins
+      volumes:
+      - name: devdir
+        hostPath:
+          path: /dev/vfio
+      - name: debugfsdir
+        hostPath:
+          path: /sys/kernel/debug
+      - name: pcidir
+        hostPath:
+          path: /sys/bus/pci
+      - name: kubeletsockets
+        hostPath:
+          path: /var/lib/kubelet/device-plugins
+      nodeSelector:
+        kubernetes.io/arch: amd64

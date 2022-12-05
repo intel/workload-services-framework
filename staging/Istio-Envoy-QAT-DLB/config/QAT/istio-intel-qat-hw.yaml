@@ -1,0 +1,61 @@
+# Feature: TLS handshake accelera:tion using QAT2.0 crypto
+# Config: Envoy + BoringSSL + QAT2.0 
+# Requires: Sapphire Rapids CPU
+# Applies: Istio ingress gateway and sidecars
+
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: qat
+  namespace: istio-system
+spec:
+  profile: default
+  tag: 1.15.1-intel.0
+  hub: docker.io/intel
+  
+  components:
+    ingressGateways:
+    - name: istio-ingressgateway
+      enabled: true
+      k8s:
+        # Ingress gateway needs to have IPC_LOCK capability and the
+        # QAT resources manually added, because the template
+        # injection isn't supported for gateways.
+        overlays:
+        - kind: Deployment
+          name: istio-ingressgateway
+          patches:
+          - path: spec.template.spec.containers.[name:istio-proxy].securityContext.capabilities.add
+            value: [ "IPC_LOCK" ]
+        resources:
+          requests:
+            qat.intel.com/cy: '1'
+            cpu: 2000m
+            memory: 4096Mi
+          limits:
+            qat.intel.com/cy: '1'
+            cpu: 2000m
+            memory: 4096Mi
+        podAnnotations: # this controls the SDS service which configures ingress gateway
+          proxy.istio.io/config: |
+            privateKeyProvider:
+              qat:
+                pollDelay: 30ms
+  values:
+    # Annotate pods with either
+    #     inject.istio.io/templates: sidecar,qathw
+    sidecarInjectorWebhook:
+      templates:
+        qathw-crypto: |
+          spec:
+            containers:
+            - name: istio-proxy
+              securityContext:
+                capabilities:
+                  add:
+                  - IPC_LOCK
+              resources:
+                requests:
+                  qat.intel.com/cy: '1'
+                limits:
+                  qat.intel.com/cy: '1'
