@@ -419,15 +419,20 @@ get_info(){
 		exit 1
 	fi
 
+	echo "Getting the k8s interface..."
+    if ! k8s_int=$(sshpass -p "$NODE_PASS" ssh "$USER"@"$NODE_IP" "ip addr | grep --before-context=10 \"$NODE_IP\" | egrep \"^[0-9]+:\" | tail -n1 | cut -d: -f 2 | xargs"); then
+		echo "Something went wrong :("
+		exit 1
+	fi
+
 	echo "Getting the NIC driver version..."
-    if ! NIC_driver=$(sshpass -p "$NODE_PASS" ssh "$USER"@"$NODE_IP" "ethtool -i ens802 | egrep '^version' | cut -d' ' -f 2"); then
+    if ! NIC_driver=$(sshpass -p "$NODE_PASS" ssh "$USER"@"$NODE_IP" "ethtool -i \"$k8s_int\" | egrep '^version' | cut -d' ' -f 2"); then
 		echo "Something went wrong :("
 		exit 1
 	fi
 
 	echo "Getting the NIC firmware version..."
-    if ! NIC_firmware=$(sshpass -p "$NODE_PASS" ssh "$USER"@"$NODE_IP" "ethtool -i ens802 | egrep '^firmware' | cut -d' ' -f 2"); then
-		echo "Something went wrong :("
+    if ! NIC_firmware=$(sshpass -p "$NODE_PASS" ssh "$USER"@"$NODE_IP" "ethtool -i \"$k8s_int\" | egrep '^firmware' | cut -d' ' -f 2"); then		echo "Something went wrong :("
 		exit 1
 	fi
 
@@ -1292,6 +1297,21 @@ fi
 
 if ! [[ "$CON" =~ ^[0-9]+$ ]]; then
 	echo "Incorrectly specified number of connections (CON)"
+	exit 1
+fi
+
+if ! [[ "$RBS" =~ ^[0-9]+$ ]]; then
+	echo "Incorrectly specified request body size (RBS)"
+	exit 1
+fi
+
+if ! [[ "$MPR" =~ ^[0-9]+$ ]]; then
+	echo "Incorrectly specified max pending requests (MPR)"
+	exit 1
+fi
+
+if ! [[ "$MRPC" =~ ^[0-9]+$ ]]; then
+	echo "Incorrectly specified max requests per connection (MRPC)"
 	exit 1
 fi
 
