@@ -1,0 +1,21 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: ingressgateway-dlb
+  namespace: istio-system
+spec:
+  workloadSelector:
+    labels:
+      istio: ingressgateway
+  configPatches:
+  - applyTo: LISTENER
+    match:
+      context: GATEWAY
+    patch:
+      operation: MERGE
+      value:
+        connection_balance_config:
+          extend_balance:
+            name: envoy.network.connection_balance.dlb
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.network.connection_balance.dlb.v3alpha.Dlb

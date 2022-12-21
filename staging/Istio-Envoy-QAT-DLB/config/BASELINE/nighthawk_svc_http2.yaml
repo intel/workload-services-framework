@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sm-nighthawk-server
+spec:
+  selector:
+    app: sm-nighthawk-server
+  ports:
+    - name: http2
+      protocol: TCP
+      port: 10000
+      targetPort: 10000
