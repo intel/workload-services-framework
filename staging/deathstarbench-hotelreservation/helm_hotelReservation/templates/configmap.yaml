@@ -1,0 +1,38 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: configmap-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+data:
+  config.json: |
+    {
+      "consulAddress": "consul-{{ include "hotelres.fullname" . }}.{{ .Release.Namespace }}.svc.{{ .Values.serviceDnsDomain }}:8500",
+      "jaegerAddress": "jaeger-{{ include "hotelres.fullname" . }}.{{ .Release.Namespace }}.svc.{{ .Values.serviceDnsDomain }}:6831",
+      "FrontendPort": "5000",
+      "GeoPort": "8083",
+      "PprofGeoPort": "18083",
+      "GeoMongoAddress": "mongodb-geo-{{ include "hotelres.fullname" . }}.{{ .Release.Namespace }}.svc.{{ .Values.serviceDnsDomain }}:27017",
+      "ProfilePort": "8081",
+      "PprofProfilePort": "18081",
+      "ProfileMongoAddress": "mongodb-profile-{{ include "hotelres.fullname" . }}.{{ .Release.Namespace }}.svc.{{ .Values.serviceDnsDomain }}:27017",
+      "ProfileMemcAddress": "memcached-profile-{{ include "hotelres.fullname" . }}.{{ .Release.Namespace }}.svc.{{ .Values.serviceDnsDomain }}:11211",
+      "RatePort": "8084",
+      "PprofRatePort": "18084",
+      "RateMongoAddress": "mongodb-rate-{{ include "hotelres.fullname" . }}.{{ .Release.Namespace }}.svc.{{ .Values.serviceDnsDomain }}:27017",
+      "RateMemcAddress": "memcached-rate-{{ include "hotelres.fullname" . }}.{{ .Release.Namespace }}.svc.{{ .Values.serviceDnsDomain }}:11211",
+      "RecommendPort": "8085",
+      "PprofRecommendPort": "18085",
+      "RecommendMongoAddress": "mongodb-recommendation-{{ include "hotelres.fullname" . }}.{{ .Release.Namespace }}.svc.{{ .Values.serviceDnsDomain }}:27017",
+      "ReservePort": "8087",
+      "PprofReservePort": "18087",
+      "ReserveMongoAddress": "mongodb-reservation-{{ include "hotelres.fullname" . }}.{{ .Release.Namespace }}.svc.{{ .Values.serviceDnsDomain }}:27017",
+      "ReserveMemcAddress": "memcached-reserve-{{ include "hotelres.fullname" . }}.{{ .Release.Namespace }}.svc.{{ .Values.serviceDnsDomain }}:11211",
+      "SearchPort": "8082",
+      "PprofSearchPort": "18082",
+      "UserPort": "8086",
+      "PprofUserPort": "18086",
+      "UserMongoAddress": "mongodb-user-{{ include "hotelres.fullname" . }}.{{ .Release.Namespace }}.svc.{{ .Values.serviceDnsDomain }}:27017"
+    }

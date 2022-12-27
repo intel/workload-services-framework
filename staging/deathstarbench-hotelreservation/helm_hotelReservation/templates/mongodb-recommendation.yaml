@@ -1,0 +1,164 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-recommendation-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: mongodb-recommendation
+spec:
+  type: {{ include "hotelres.get" (list .Values "mongodb-recommendation" "service.type") }}
+  ports:
+    - name: "mongodb"
+      port: 27017
+      targetPort: 27017
+  selector:
+    {{- include "hotelres.selectorLabels" . | nindent 4 }}
+    app-name: mongodb-recommendation
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb-recommendation-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: mongodb-recommendation
+    db: mongo
+spec:
+  replicas: {{ include "hotelres.get" (list .Values "mongodb-recommendation" "replicaCount") }}
+  selector:
+    matchLabels:
+      {{- include "hotelres.selectorLabels" . | nindent 6 }}
+      app-name: mongodb-recommendation
+      db: mongo
+  template:
+    metadata:
+      annotations:
+        cri-resource-manager.intel.com/affinity: |
+          mongodb-recommendation:
+            - scope:
+                key: pod/namespace
+                operator: In
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+        cri-resource-manager.intel.com/anti-affinity: |
+          mongodb-recommendation:
+            - scope:
+                key: pod/namespace
+                operator: NotIn
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+      {{- with (include "hotelres.get" (list .Values "mongodb-recommendation" "podAnnotations" "json") | mustFromJson) }}
+        {{- toYaml . | nindent 8}}
+      {{- end }}
+      labels:
+        {{- include "hotelres.selectorLabels" . | nindent 8 }}
+        app-name: mongodb-recommendation
+        db: mongo
+    spec:
+      {{- if .Values.evenly_distributed }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "hotelres.selectorLabels" . | nindent 14 }}
+              db: mongo
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "mongodb-recommendation" "imagePullSecrets" "json") | mustFromJson) }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "hotelres.serviceAccountName" . }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "mongodb-recommendation" "podSecurityContext" "json") | mustFromJson) }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: mongodb-recommendation
+          {{- with (include "hotelres.get" (list .Values "mongodb-recommendation" "securityContext" "json") | mustFromJson) }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: {{ include "hotelres.get" (list .Values "mongodb-recommendation" "image.repository") }}:{{ include "hotelres.get" (list .Values "mongodb-recommendation" "image.tag") | default .Chart.AppVersion }}
+          imagePullPolicy: {{ include "hotelres.get" (list .Values "mongodb-recommendation" "image.pullPolicy") }}
+          ports:
+            - containerPort: 27017
+          {{- with (include "hotelres.get" (list .Values "mongodb-recommendation" "environments" "json") | mustFromJson) }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with (include "hotelres.get" (list .Values "mongodb-recommendation" "resources" "json") | mustFromJson) }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: recommendation
+              mountPath: /data/db
+      volumes:
+        - name: recommendation
+          {{- if (include "hotelres.get" (list .Values "mongodb-recommendation" "persistentVolume.enabled" "json") | mustFromJson) }}
+          persistentVolumeClaim:
+            claimName: recommendation-{{ include "hotelres.fullname" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with (include "hotelres.get" (list .Values "mongodb-recommendation" "nodeSelector" "json") | mustFromJson) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "mongodb-recommendation" "affinity" "json") | mustFromJson) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "mongodb-recommendation" "tolerations" "json") | mustFromJson) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+{{- if (include "hotelres.get" (list .Values "mongodb-recommendation" "persistentVolume.enabled" "json") | mustFromJson) }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: recommendation
+  name: recommendation-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests: {{ include "hotelres.get" (list .Values "mongodb-recommendation" "persistentVolume.size") }}
+  selector:
+    matchLabels:
+      {{- include "hotelres.labels" . | nindent 6 }}
+      app-name: recommendation
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: recommendation-{{ include "hotelres.fullname" . }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: recommendation
+spec:
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: {{ include "hotelres.get" (list .Values "mongodb-recommendation" "persistentVolume.size") }}
+  hostPath:
+    path: "/tmp/recommendation"
+{{- end }}

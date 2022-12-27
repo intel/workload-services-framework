@@ -1,0 +1,68 @@
+{{- if (include "hotelres.get" (list .Values "frontend" "service.type") | eq "ClusterIP") }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wrk-client-{{ include "hotelres.fullname" . }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: wrk-client
+spec:
+  replicas: {{ include "hotelres.get" (list .Values "wrk-client" "replicaCount") }}
+  selector:
+    matchLabels:
+      {{- include "hotelres.selectorLabels" . | nindent 6 }}
+      app-name: wrk-client
+  template:
+    metadata:
+      {{- with (include "hotelres.get" (list .Values "wrk-client" "podAnnotations" "json") | mustFromJson) }}
+      annotations:
+        {{- toYaml . | nindent 8}}
+      {{- end }}
+      labels:
+        {{- include "hotelres.selectorLabels" . | nindent 8 }}
+        app-name: wrk-client
+    spec:
+      {{- with (include "hotelres.get" (list .Values "wrk-client" "imagePullSecrets" "json") | mustFromJson) }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "hotelres.serviceAccountName" . }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "wrk-client" "podSecurityContext" "json") | mustFromJson) }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: wrk-client
+          {{- with (include "hotelres.get" (list .Values "wrk-client" "securityContext" "json") | mustFromJson) }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: {{ include "hotelres.get" (list .Values "wrk-client" "image.repository") }}:{{ include "hotelres.get" (list .Values "wrk-client" "image.tag") | default .Chart.AppVersion }}
+          imagePullPolicy: {{ include "hotelres.get" (list .Values "wrk-client" "image.pullPolicy") }}
+          command:
+            - "sleep"
+            - "infinity"
+          {{- with (include "hotelres.get" (list .Values "wrk-client" "environments" "json") | mustFromJson) }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with (include "hotelres.get" (list .Values "wrk-client" "resources" "json") | mustFromJson) }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with (include "hotelres.get" (list .Values "wrk-client" "nodeSelector" "json") | mustFromJson) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "wrk-client" "affinity" "json") | mustFromJson) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "wrk-client" "tolerations" "json") | mustFromJson) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

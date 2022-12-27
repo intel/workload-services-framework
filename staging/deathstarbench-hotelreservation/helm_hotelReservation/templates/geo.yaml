@@ -1,0 +1,203 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: geo-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: geo
+spec:
+  type: {{ include "hotelres.get" (list .Values "geo" "service.type") }}
+  ports:
+    - name: "8083"
+      port: 8083
+      targetPort: 8083
+  selector:
+    {{- include "hotelres.selectorLabels" . | nindent 4 }}
+    app-name: geo
+
+{{- if (include "hotelres.get" (list .Values "geo" "autoscaling.enabled" "json") | mustFromJson) }}
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: geo-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: geo
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: geo-{{ include "hotelres.fullname" . }}
+  minReplicas: {{ include "hotelres.get" (list .Values "geo" "autoscaling.minReplicas") }}
+  maxReplicas: {{ include "hotelres.get" (list .Values "geo" "autoscaling.maxReplicas") }}
+  metrics:
+    {{- if (include "hotelres.get" (list .Values "geo" "autoscaling.targetCPUUtilizationPercentage" "json") | mustFromJson) }}
+    - type: Resource
+      resource:
+        name: cpu
+        targetAverageUtilization: {{ include "hotelres.get" (list .Values "geo" "autoscaling.targetCPUUtilizationPercentage") }}
+    {{- end }}
+    {{- if (include "hotelres.get" (list .Values "geo" "autoscaling.targetMemoryUtilizationPercentage" "json") | mustFromJson) }}
+    - type: Resource
+      resource:
+        name: memory
+        targetAverageUtilization: {{ include "hotelres.get" (list .Values "geo" "autoscaling.targetMemoryUtilizationPercentage") }}
+    {{- end }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: geo-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: geo
+spec:
+  {{- if not (include "hotelres.get" (list .Values "geo" "autoscaling.enabled" "json") | mustFromJson) }}
+  replicas: {{ include "hotelres.get" (list .Values "geo" "replicaCount") }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "hotelres.selectorLabels" . | nindent 6 }}
+      app-name: geo
+  template:
+    metadata:
+      annotations:
+        cri-resource-manager.intel.com/affinity: |
+          geo:
+            - scope:
+                key: pod/namespace
+                operator: In
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+          init-mongodb:
+            - scope:
+                key: pod/namespace
+                operator: In
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+        cri-resource-manager.intel.com/anti-affinity: |
+          geo:
+            - scope:
+                key: pod/namespace
+                operator: NotIn
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+          init-mongodb:
+            - scope:
+                key: pod/namespace
+                operator: NotIn
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+ 
+      {{- with (include "hotelres.get" (list .Values "geo" "podAnnotations" "json") | mustFromJson) }}
+        {{- toYaml . | nindent 8}}
+      {{- end }}
+      labels:
+        {{- include "hotelres.selectorLabels" . | nindent 8 }}
+        app-name: geo
+    spec:
+      {{- if .Values.evenly_distributed }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "hotelres.selectorLabels" . | nindent 14 }}
+              app-name: geo
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "geo" "imagePullSecrets" "json") | mustFromJson) }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "hotelres.serviceAccountName" . }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "geo" "podSecurityContext" "json") | mustFromJson) }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: init-mongodb
+          image: lianhao/busybox-jq:14
+          command: ['sh', '-c', "service=$(cat /config.json | jq -r .GeoMongoAddress | cut -d : -f 1); until nslookup -type=a $service; do echo waiting for $service; sleep 2; done"]
+          volumeMounts:
+            - mountPath: /config.json
+              subPath: config.json
+              name: config-json
+      containers:
+        - name: geo
+          {{- with (include "hotelres.get" (list .Values "geo" "securityContext" "json") | mustFromJson) }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: {{ include "hotelres.get" (list .Values "geo" "image.repository") }}:{{ include "hotelres.get" (list .Values "geo" "image.tag") | default .Chart.AppVersion }}
+          imagePullPolicy: {{ include "hotelres.get" (list .Values "geo" "image.pullPolicy") }}
+          command:
+            - geo
+          ports:
+            - containerPort: 8083
+          env:
+            - name: TLS
+              value: {{ include "hotelres.get" (list .Values "geo" "features.tls") | quote }}
+            - name: JAEGER_SAMPLE_RATIO
+              value: {{ include "hotelres.get" (list .Values "geo" "features.jaegerSampleRatio") | quote }}
+            - name: GC
+              value: {{ include "hotelres.get" (list .Values "geo" "features.gcPercent") | quote }}
+          {{- with (include "hotelres.get" (list .Values "geo" "environments" "json") | mustFromJson) }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with (include "hotelres.get" (list .Values "geo" "resources" "json") | mustFromJson) }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - mountPath: /go/src/github.com/harlow/go-micro-services/config.json
+              subPath: config.json
+              name: config-json
+          {{- if include "hotelres.needhugepage" (list .Values "geo") }}
+            - mountPath: /hugepages
+              name: hugepage
+          {{- end }}
+      volumes:
+        - name: config-json
+          configMap:
+            name: configmap-{{ include "hotelres.fullname" . }}
+            items:
+            - key: config.json
+              path: config.json
+      {{- if include "hotelres.needhugepage" (list .Values "geo") }}
+        - name: hugepage
+          emptyDir:
+            medium: HugePages
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "geo" "nodeSelector" "json") | mustFromJson) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "geo" "affinity" "json") | mustFromJson) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "geo" "tolerations" "json") | mustFromJson) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

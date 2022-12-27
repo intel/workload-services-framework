@@ -1,0 +1,114 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: consul-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: consul
+spec:
+  type: {{ include "hotelres.get" (list .Values "consul" "service.type") }}
+  ports:
+    - name: "8300"
+      port: 8300
+      targetPort: 8300
+    - name: "8400"
+      port: 8400
+      targetPort: 8400
+    - name: "8500"
+      port: 8500
+      targetPort: 8500
+    - name: "8600"
+      port: 8600
+      protocol: UDP
+      targetPort: 53
+  selector:
+    {{- include "hotelres.selectorLabels" . | nindent 4 }}
+    app-name: consul
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consul-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: consul
+spec:
+  replicas: {{ include "hotelres.get" (list .Values "consul" "replicaCount") }}
+  selector:
+    matchLabels:
+      {{- include "hotelres.selectorLabels" . | nindent 6 }}
+      app-name: consul
+  template:
+    metadata:
+      annotations:
+        cri-resource-manager.intel.com/affinity: |
+          consul:
+            - scope:
+                key: pod/namespace
+                operator: In
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+        cri-resource-manager.intel.com/anti-affinity: |
+          consul:
+            - scope:
+                key: pod/namespace
+                operator: NotIn
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+      {{- with (include "hotelres.get" (list .Values "consul" "podAnnotations" "json") | mustFromJson) }}
+        {{- toYaml . | nindent 8}}
+      {{- end }}
+      labels:
+        {{- include "hotelres.selectorLabels" . | nindent 8 }}
+        app-name: consul
+    spec:
+      {{- with (include "hotelres.get" (list .Values "consul" "imagePullSecrets" "json") | mustFromJson) }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "hotelres.serviceAccountName" . }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "consul" "podSecurityContext" "json") | mustFromJson) }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: consul
+          {{- with (include "hotelres.get" (list .Values "consul" "securityContext" "json") | mustFromJson) }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: {{ include "hotelres.get" (list .Values "consul" "image.repository") }}:{{ include "hotelres.get" (list .Values "consul" "image.tag") | default .Chart.AppVersion }}
+          imagePullPolicy: {{ include "hotelres.get" (list .Values "consul" "image.pullPolicy") }}
+          ports:
+            - containerPort: 8300
+            - containerPort: 8400
+            - containerPort: 8500
+            - containerPort: 53
+              protocol: UDP
+          {{- with (include "hotelres.get" (list .Values "consul" "resources" "json") | mustFromJson) }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with (include "hotelres.get" (list .Values "consul" "nodeSelector" "json") | mustFromJson) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "consul" "affinity" "json") | mustFromJson) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "consul" "tolerations" "json") | mustFromJson) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
