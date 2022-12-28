@@ -1,0 +1,121 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: memcached-rate-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: memcached-rate
+spec:
+  type: {{ include "hotelres.get" (list .Values "memcached-rate" "service.type") }}
+  ports:
+    - name: "memcached"
+      port: 11211
+      targetPort: 11211
+  selector:
+    {{- include "hotelres.selectorLabels" . | nindent 4 }}
+    app-name: memcached-rate
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: memcached-rate-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: memcached-rate
+    db: memcached
+spec:
+  replicas: {{ include "hotelres.get" (list .Values "memcached-rate" "replicaCount") }}
+  selector:
+    matchLabels:
+      {{- include "hotelres.selectorLabels" . | nindent 6 }}
+      app-name: memcached-rate
+      db: memcached
+  template:
+    metadata:
+      annotations:
+        cri-resource-manager.intel.com/affinity: |
+          memcached-rate:
+            - scope:
+                key: pod/namespace
+                operator: In
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+        cri-resource-manager.intel.com/anti-affinity: |
+          memcached-rate:
+            - scope:
+                key: pod/namespace
+                operator: NotIn
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+      {{- with (include "hotelres.get" (list .Values "memcached-rate" "podAnnotations" "json") | mustFromJson) }}
+        {{- toYaml . | nindent 8}}
+      {{- end }}
+      labels:
+        {{- include "hotelres.selectorLabels" . | nindent 8 }}
+        app-name: memcached-rate
+        db: memcached
+    spec:
+      {{- if .Values.evenly_distributed }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "hotelres.selectorLabels" . | nindent 14 }}
+              db: memcached
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "memcached-rate" "imagePullSecrets" "json") | mustFromJson) }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "hotelres.serviceAccountName" . }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "memcached-rate" "podSecurityContext" "json") | mustFromJson) }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: memcached-rate
+          {{- with (include "hotelres.get" (list .Values "memcached-rate" "securityContext" "json") | mustFromJson) }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: {{ include "hotelres.get" (list .Values "memcached-rate" "image.repository") }}:{{ include "hotelres.get" (list .Values "memcached-rate" "image.tag") | default .Chart.AppVersion }}
+          imagePullPolicy: {{ include "hotelres.get" (list .Values "memcached-rate" "image.pullPolicy") }}
+          ports:
+            - containerPort: 11211
+          command:
+            - "memcached"
+            - "-c"
+            - "65536"
+          {{- with (include "hotelres.get" (list .Values "memcached-rate" "environments" "json") | mustFromJson) }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with (include "hotelres.get" (list .Values "memcached-rate" "resources" "json") | mustFromJson) }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with (include "hotelres.get" (list .Values "memcached-rate" "nodeSelector" "json") | mustFromJson) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "memcached-rate" "affinity" "json") | mustFromJson) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "memcached-rate" "tolerations" "json") | mustFromJson) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

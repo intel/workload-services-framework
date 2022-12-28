@@ -1,0 +1,202 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: user
+spec:
+  type: {{ include "hotelres.get" (list .Values "user" "service.type") }}
+  ports:
+    - name: "8086"
+      port: 8086
+      targetPort: 8086
+  selector:
+    {{- include "hotelres.selectorLabels" . | nindent 4 }}
+    app-name: user
+
+{{- if (include "hotelres.get" (list .Values "user" "autoscaling.enabled" "json") | mustFromJson) }}
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: user-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: user
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: user-{{ include "hotelres.fullname" . }}
+  minReplicas: {{ include "hotelres.get" (list .Values "user" "autoscaling.minReplicas") }}
+  maxReplicas: {{ include "hotelres.get" (list .Values "user" "autoscaling.maxReplicas") }}
+  metrics:
+    {{- if (include "hotelres.get" (list .Values "user" "autoscaling.targetCPUUtilizationPercentage" "json") | mustFromJson) }}
+    - type: Resource
+      resource:
+        name: cpu
+        targetAverageUtilization: {{ include "hotelres.get" (list .Values "user" "autoscaling.targetCPUUtilizationPercentage") }}
+    {{- end }}
+    {{- if (include "hotelres.get" (list .Values "user" "autoscaling.targetMemoryUtilizationPercentage" "json") | mustFromJson) }}
+    - type: Resource
+      resource:
+        name: memory
+        targetAverageUtilization: {{ include "hotelres.get" (list .Values "user" "autoscaling.targetMemoryUtilizationPercentage") }}
+    {{- end }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: user
+spec:
+  {{- if not (include "hotelres.get" (list .Values "user" "autoscaling.enabled" "json") | mustFromJson) }}
+  replicas: {{ include "hotelres.get" (list .Values "user" "replicaCount") }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "hotelres.selectorLabels" . | nindent 6 }}
+      app-name: user
+  template:
+    metadata:
+      annotations:
+        cri-resource-manager.intel.com/affinity: |
+          user:
+            - scope:
+                key: pod/namespace
+                operator: In
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+          init-mongodb:
+            - scope:
+                key: pod/namespace
+                operator: In
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+        cri-resource-manager.intel.com/anti-affinity: |
+          user:
+            - scope:
+                key: pod/namespace
+                operator: NotIn
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+          init-mongodb:
+            - scope:
+                key: pod/namespace
+                operator: NotIn
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+      {{- with (include "hotelres.get" (list .Values "user" "podAnnotations" "json") | mustFromJson) }}
+        {{- toYaml . | nindent 8}}
+      {{- end }}
+      labels:
+        {{- include "hotelres.selectorLabels" . | nindent 8 }}
+        app-name: user
+    spec:
+      {{- if .Values.evenly_distributed }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "hotelres.selectorLabels" . | nindent 14 }}
+              app-name: user
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "user" "imagePullSecrets" "json") | mustFromJson) }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "hotelres.serviceAccountName" . }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "user" "podSecurityContext" "json") | mustFromJson) }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: init-mongodb
+          image: lianhao/busybox-jq:14
+          command: ['sh', '-c', "service=$(cat /config.json | jq -r .UserMongoAddress | cut -d : -f 1); until nslookup -type=a $service; do echo waiting for $service; sleep 2; done"]
+          volumeMounts:
+            - mountPath: /config.json
+              subPath: config.json
+              name: config-json
+      containers:
+        - name: user
+          {{- with (include "hotelres.get" (list .Values "user" "securityContext" "json") | mustFromJson) }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: {{ include "hotelres.get" (list .Values "user" "image.repository") }}:{{ include "hotelres.get" (list .Values "user" "image.tag") | default .Chart.AppVersion }}
+          imagePullPolicy: {{ include "hotelres.get" (list .Values "user" "image.pullPolicy") }}
+          command:
+            - user
+          ports:
+            - containerPort: 8086
+          env:
+            - name: TLS
+              value: {{ include "hotelres.get" (list .Values "user" "features.tls") | quote }}
+            - name: JAEGER_SAMPLE_RATIO
+              value: {{ include "hotelres.get" (list .Values "user" "features.jaegerSampleRatio") | quote }}
+            - name: GC
+              value: {{ include "hotelres.get" (list .Values "user" "features.gcPercent") | quote }}
+          {{- with (include "hotelres.get" (list .Values "user" "environments" "json") | mustFromJson) }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with (include "hotelres.get" (list .Values "user" "resources" "json") | mustFromJson) }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - mountPath: /go/src/github.com/harlow/go-micro-services/config.json
+              subPath: config.json
+              name: config-json
+          {{- if include "hotelres.needhugepage" (list .Values "user") }}
+            - mountPath: /hugepages
+              name: hugepage
+          {{- end }}
+      volumes:
+        - name: config-json
+          configMap:
+            name: configmap-{{ include "hotelres.fullname" . }}
+            items:
+            - key: config.json
+              path: config.json
+      {{- if include "hotelres.needhugepage" (list .Values "user") }}
+        - name: hugepage
+          emptyDir:
+            medium: HugePages
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "user" "nodeSelector" "json") | mustFromJson) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "user" "affinity" "json") | mustFromJson) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "user" "tolerations" "json") | mustFromJson) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

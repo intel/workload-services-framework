@@ -1,0 +1,202 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: recommendation-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: recommendation
+spec:
+  type: {{ include "hotelres.get" (list .Values "recommendation" "service.type") }}
+  ports:
+    - name: "8085"
+      port: 8085
+      targetPort: 8085
+  selector:
+    {{- include "hotelres.selectorLabels" . | nindent 4 }}
+    app-name: recommendation
+
+{{- if (include "hotelres.get" (list .Values "recommendation" "autoscaling.enabled" "json") | mustFromJson) }}
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: recommendation-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: recommendation
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: recommendation-{{ include "hotelres.fullname" . }}
+  minReplicas: {{ include "hotelres.get" (list .Values "recommendation" "autoscaling.minReplicas") }}
+  maxReplicas: {{ include "hotelres.get" (list .Values "recommendation" "autoscaling.maxReplicas") }}
+  metrics:
+    {{- if (include "hotelres.get" (list .Values "recommendation" "autoscaling.targetCPUUtilizationPercentage" "json") | mustFromJson) }}
+    - type: Resource
+      resource:
+        name: cpu
+        targetAverageUtilization: {{ include "hotelres.get" (list .Values "recommendation" "autoscaling.targetCPUUtilizationPercentage") }}
+    {{- end }}
+    {{- if (include "hotelres.get" (list .Values "recommendation" "autoscaling.targetMemoryUtilizationPercentage" "json") | mustFromJson) }}
+    - type: Resource
+      resource:
+        name: memory
+        targetAverageUtilization: {{ include "hotelres.get" (list .Values "recommendation" "autoscaling.targetMemoryUtilizationPercentage") }}
+    {{- end }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recommendation-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: recommendation
+spec:
+  {{- if not (include "hotelres.get" (list .Values "recommendation" "autoscaling.enabled" "json") | mustFromJson) }}
+  replicas: {{ include "hotelres.get" (list .Values "recommendation" "replicaCount") }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "hotelres.selectorLabels" . | nindent 6 }}
+      app-name: recommendation
+  template:
+    metadata:
+      annotations:
+        cri-resource-manager.intel.com/affinity: |
+          recommendation:
+            - scope:
+                key: pod/namespace
+                operator: In
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+          init-mongodb:
+            - scope:
+                key: pod/namespace
+                operator: In
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+        cri-resource-manager.intel.com/anti-affinity: |
+          recommendation:
+            - scope:
+                key: pod/namespace
+                operator: NotIn
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+          init-mongodb:
+            - scope:
+                key: pod/namespace
+                operator: NotIn
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+      {{- with (include "hotelres.get" (list .Values "recommendation" "podAnnotations" "json") | mustFromJson) }}
+        {{- toYaml . | nindent 8}}
+      {{- end }}
+      labels:
+        {{- include "hotelres.selectorLabels" . | nindent 8 }}
+        app-name: recommendation
+    spec:
+      {{- if .Values.evenly_distributed }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "hotelres.selectorLabels" . | nindent 14 }}
+              app-name: recommendation
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "recommendation" "imagePullSecrets" "json") | mustFromJson) }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "hotelres.serviceAccountName" . }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "recommendation" "podSecurityContext" "json") | mustFromJson) }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: init-mongodb
+          image: lianhao/busybox-jq:14
+          command: ['sh', '-c', "service=$(cat /config.json | jq -r .RecommendMongoAddress | cut -d : -f 1); until nslookup -type=a $service; do echo waiting for $service; sleep 2; done"]
+          volumeMounts:
+            - mountPath: /config.json
+              subPath: config.json
+              name: config-json
+      containers:
+        - name: recommendation
+          {{- with (include "hotelres.get" (list .Values "recommendation" "securityContext" "json") | mustFromJson) }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: {{ include "hotelres.get" (list .Values "recommendation" "image.repository") }}:{{ include "hotelres.get" (list .Values "recommendation" "image.tag") | default .Chart.AppVersion }}
+          imagePullPolicy: {{ include "hotelres.get" (list .Values "recommendation" "image.pullPolicy") }}
+          command:
+            - recommendation
+          ports:
+            - containerPort: 8085
+          env:
+            - name: TLS
+              value: {{ include "hotelres.get" (list .Values "recommendation" "features.tls") | quote }}
+            - name: JAEGER_SAMPLE_RATIO
+              value: {{ include "hotelres.get" (list .Values "recommendation" "features.jaegerSampleRatio") | quote }}
+            - name: GC
+              value: {{ include "hotelres.get" (list .Values "recommendation" "features.gcPercent") | quote }}
+          {{- with (include "hotelres.get" (list .Values "recommendation" "environments" "json") | mustFromJson) }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with (include "hotelres.get" (list .Values "recommendation" "resources" "json") | mustFromJson) }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - mountPath: /go/src/github.com/harlow/go-micro-services/config.json
+              subPath: config.json
+              name: config-json
+          {{- if include "hotelres.needhugepage" (list .Values "recommendation") }}
+            - mountPath: /hugepages
+              name: hugepage
+          {{- end }}
+      volumes:
+        - name: config-json
+          configMap:
+            name: configmap-{{ include "hotelres.fullname" . }}
+            items:
+            - key: config.json
+              path: config.json
+      {{- if include "hotelres.needhugepage" (list .Values "recommendation") }}
+        - name: hugepage
+          emptyDir:
+            medium: HugePages
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "recommendation" "nodeSelector" "json") | mustFromJson) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "recommendation" "affinity" "json") | mustFromJson) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "recommendation" "tolerations" "json") | mustFromJson) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

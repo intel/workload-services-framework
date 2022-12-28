@@ -1,0 +1,164 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-profile-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: mongodb-profile
+spec:
+  type: {{ include "hotelres.get" (list .Values "mongodb-profile" "service.type") }}
+  ports:
+    - name: "mongodb"
+      port: 27017
+      targetPort: 27017
+  selector:
+    {{- include "hotelres.selectorLabels" . | nindent 4 }}
+    app-name: mongodb-profile
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb-profile-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: mongodb-profile
+    db: mongo
+spec:
+  replicas: {{ include "hotelres.get" (list .Values "mongodb-profile" "replicaCount") }}
+  selector:
+    matchLabels:
+      {{- include "hotelres.selectorLabels" . | nindent 6 }}
+      app-name: mongodb-profile
+      db: mongo
+  template:
+    metadata:
+      annotations:
+        cri-resource-manager.intel.com/affinity: |
+          mongodb-profile:
+            - scope:
+                key: pod/namespace
+                operator: In
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+        cri-resource-manager.intel.com/anti-affinity: |
+          mongodb-profile:
+            - scope:
+                key: pod/namespace
+                operator: NotIn
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+      {{- with (include "hotelres.get" (list .Values "mongodb-profile" "podAnnotations" "json") | mustFromJson) }}
+        {{- toYaml . | nindent 8}}
+      {{- end }}
+      labels:
+        {{- include "hotelres.selectorLabels" . | nindent 8 }}
+        app-name: mongodb-profile
+        db: mongo
+    spec:
+      {{- if .Values.evenly_distributed }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "hotelres.selectorLabels" . | nindent 14 }}
+              db: mongo
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "mongodb-profile" "imagePullSecrets" "json") | mustFromJson) }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "hotelres.serviceAccountName" . }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "mongodb-profile" "podSecurityContext" "json") | mustFromJson) }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: mongodb-profile
+          {{- with (include "hotelres.get" (list .Values "mongodb-profile" "securityContext" "json") | mustFromJson) }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: {{ include "hotelres.get" (list .Values "mongodb-profile" "image.repository") }}:{{ include "hotelres.get" (list .Values "mongodb-profile" "image.tag") | default .Chart.AppVersion }}
+          imagePullPolicy: {{ include "hotelres.get" (list .Values "mongodb-profile" "image.pullPolicy") }}
+          ports:
+            - containerPort: 27017
+          {{- with (include "hotelres.get" (list .Values "mongodb-profile" "environments" "json") | mustFromJson) }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with (include "hotelres.get" (list .Values "mongodb-profile" "resources" "json") | mustFromJson) }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: profile
+              mountPath: /data/db
+      volumes:
+        - name: profile
+          {{- if (include "hotelres.get" (list .Values "mongodb-profile" "persistentVolume.enabled" "json") | mustFromJson) }}
+          persistentVolumeClaim:
+            claimName: profile-{{ include "hotelres.fullname" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with (include "hotelres.get" (list .Values "mongodb-profile" "nodeSelector" "json") | mustFromJson) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "mongodb-profile" "affinity" "json") | mustFromJson) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "mongodb-profile" "tolerations" "json") | mustFromJson) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+{{- if (include "hotelres.get" (list .Values "mongodb-profile" "persistentVolume.enabled" "json") | mustFromJson) }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: profile
+  name: profile-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests: {{ include "hotelres.get" (list .Values "mongodb-profile" "persistentVolume.size") }}
+  selector:
+    matchLabels:
+      {{- include "hotelres.labels" . | nindent 6 }}
+      app-name: profile
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: profile-{{ include "hotelres.fullname" . }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: profile
+spec:
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: {{ include "hotelres.get" (list .Values "mongodb-profile" "persistentVolume.size") }}
+  hostPath:
+    path: "/tmp/profile"
+{{- end }}

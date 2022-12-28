@@ -1,0 +1,164 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-reservation-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: mongodb-reservation
+spec:
+  type: {{ include "hotelres.get" (list .Values "mongodb-reservation" "service.type") }}
+  ports:
+    - name: "mongodb"
+      port: 27017
+      targetPort: 27017
+  selector:
+    {{- include "hotelres.selectorLabels" . | nindent 4 }}
+    app-name: mongodb-reservation
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb-reservation-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: mongodb-reservation
+    db: mongo
+spec:
+  replicas: {{ include "hotelres.get" (list .Values "mongodb-reservation" "replicaCount") }}
+  selector:
+    matchLabels:
+      {{- include "hotelres.selectorLabels" . | nindent 6 }}
+      app-name: mongodb-reservation
+      db: mongo
+  template:
+    metadata:
+      annotations:
+        cri-resource-manager.intel.com/affinity: |
+          mongodb-reservation:
+            - scope:
+                key: pod/namespace
+                operator: In
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+        cri-resource-manager.intel.com/anti-affinity: |
+          mongodb-reservation:
+            - scope:
+                key: pod/namespace
+                operator: NotIn
+                values:
+                  - {{ .Release.Namespace }}
+              match:
+                operator: AlwaysTrue
+              weight: 111
+      {{- with (include "hotelres.get" (list .Values "mongodb-reservation" "podAnnotations" "json") | mustFromJson) }}
+        {{- toYaml . | nindent 8}}
+      {{- end }}
+      labels:
+        {{- include "hotelres.selectorLabels" . | nindent 8 }}
+        app-name: mongodb-reservation
+        db: mongo
+    spec:
+      {{- if .Values.evenly_distributed }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "hotelres.selectorLabels" . | nindent 14 }}
+              db: mongo
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "mongodb-reservation" "imagePullSecrets" "json") | mustFromJson) }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "hotelres.serviceAccountName" . }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "mongodb-reservation" "podSecurityContext" "json") | mustFromJson) }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: mongodb-reservation
+          {{- with (include "hotelres.get" (list .Values "mongodb-reservation" "securityContext" "json") | mustFromJson) }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: {{ include "hotelres.get" (list .Values "mongodb-reservation" "image.repository") }}:{{ include "hotelres.get" (list .Values "mongodb-reservation" "image.tag") | default .Chart.AppVersion }}
+          imagePullPolicy: {{ include "hotelres.get" (list .Values "mongodb-reservation" "image.pullPolicy") }}
+          ports:
+            - containerPort: 27017
+          {{- with (include "hotelres.get" (list .Values "mongodb-reservation" "environments" "json") | mustFromJson) }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with (include "hotelres.get" (list .Values "mongodb-reservation" "resources" "json") | mustFromJson) }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: reservation
+              mountPath: /data/db
+      volumes:
+        - name: reservation
+          {{- if (include "hotelres.get" (list .Values "mongodb-reservation" "persistentVolume.enabled" "json") | mustFromJson) }}
+          persistentVolumeClaim:
+            claimName: reservation-{{ include "hotelres.fullname" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with (include "hotelres.get" (list .Values "mongodb-reservation" "nodeSelector" "json") | mustFromJson) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "mongodb-reservation" "affinity" "json") | mustFromJson) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "mongodb-reservation" "tolerations" "json") | mustFromJson) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+{{- if (include "hotelres.get" (list .Values "mongodb-reservation" "persistentVolume.enabled" "json") | mustFromJson) }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: reservation
+  name: reservation-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests: {{ include "hotelres.get" (list .Values "mongodb-reservation" "persistentVolume.size") }}
+  selector:
+    matchLabels:
+      {{- include "hotelres.labels" . | nindent 6 }}
+      app-name: reservation
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: reservation-{{ include "hotelres.fullname" . }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: reservation
+spec:
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: {{ include "hotelres.get" (list .Values "mongodb-reservation" "persistentVolume.size") }}
+  hostPath:
+    path: "/tmp/reservation"
+{{- end }}

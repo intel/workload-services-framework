@@ -1,0 +1,130 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaegerout-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: jaeger
+spec:
+  type: NodePort
+  ports:
+    - port: 16686
+  selector:
+    {{- include "hotelres.selectorLabels" . | nindent 4 }}
+    app-name: jaeger
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: jaeger
+spec:
+  type: ClusterIP
+  ports:
+    - name: "14267"
+      port: 14267
+      targetPort: 14267
+    - name: "14268"
+      port: 14268
+      targetPort: 14268
+    - name: "14269"
+      port: 14269
+      targetPort: 14269
+    - name: "5778"
+      port: 5778
+      targetPort: 5778
+    - name: "5775"
+      port: 5775
+      targetPort: 5775
+      protocol: UDP
+    - name: "6831"
+      port: 6831
+      targetPort: 6831
+      protocol: UDP
+    - name: "6832"
+      port: 6832
+      targetPort: 6832
+      protocol: UDP
+  selector:
+    {{- include "hotelres.selectorLabels" . | nindent 4 }}
+    app-name: jaeger
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger-{{ include "hotelres.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hotelres.labels" . | nindent 4 }}
+    app-name: jaeger
+spec:
+  replicas: {{ include "hotelres.get" (list .Values "jaeger" "replicaCount") }}
+  selector:
+    matchLabels:
+      {{- include "hotelres.selectorLabels" . | nindent 6 }}
+      app-name: jaeger
+  template:
+    metadata:
+      {{- with (include "hotelres.get" (list .Values "jaeger" "podAnnotations" "json") | mustFromJson) }}
+      annotations:
+        {{- toYaml . | nindent 8}}
+      {{- end }}
+      labels:
+        {{- include "hotelres.selectorLabels" . | nindent 8 }}
+        app-name: jaeger
+    spec:
+      {{- with (include "hotelres.get" (list .Values "jaeger" "imagePullSecrets" "json") | mustFromJson) }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "hotelres.serviceAccountName" . }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "jaeger" "podSecurityContext" "json") | mustFromJson) }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: jaeger
+          {{- with (include "hotelres.get" (list .Values "jaeger" "securityContext" "json") | mustFromJson) }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: {{ include "hotelres.get" (list .Values "jaeger" "image.repository") }}:{{ include "hotelres.get" (list .Values "jaeger" "image.tag") | default .Chart.AppVersion }}
+          imagePullPolicy: {{ include "hotelres.get" (list .Values "jaeger" "image.pullPolicy") }}
+          ports:
+            - containerPort: 14267
+            - containerPort: 14268
+            - containerPort: 14269
+            - containerPort: 5778
+            - containerPort: 5775
+              protocol: UDP
+            - containerPort: 6831
+              protocol: UDP
+            - containerPort: 6832
+              protocol: UDP
+          {{- with (include "hotelres.get" (list .Values "jaeger" "environments" "json") | mustFromJson) }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with (include "hotelres.get" (list .Values "jaeger" "resources" "json") | mustFromJson) }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with (include "hotelres.get" (list .Values "jaeger" "nodeSelector" "json") | mustFromJson) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "jaeger" "affinity" "json") | mustFromJson) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hotelres.get" (list .Values "jaeger" "tolerations" "json") | mustFromJson) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

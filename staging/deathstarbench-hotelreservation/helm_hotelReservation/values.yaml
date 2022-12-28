@@ -1,0 +1,236 @@
+# Default values for hotelres.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+serviceDnsDomain: "cluster.local"
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: false
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+  # role rules
+  rules: []
+  # the following rules are for OpenShift specific, uncomment it if necessary
+  #rules:
+  #  - apiGroups: ["security.openshift.io"]
+  #    resources: ["securitycontextconstraints"]
+  #    resourceNames: ["privileged"]
+  #    verbs: ["use"]
+
+# Beginning of ommon default settings for all microservices in hotelReservation
+# May be overwritten by each misroservice's own setting
+replicaCount: 1
+
+image:
+  repository: lianhao/dsbpp_hotel_reserv
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+# capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+evenly_distributed: true
+
+environments: {}
+
+persistentVolume:
+  enabled: false
+  size: "100Mi"
+
+features:
+  # TLS enablement
+  #  - 0: Disable
+  #  - 1: Enabled, using default cipher suite based on golang runtime
+  #  - TLS_XXX: Enabled, using the specified Cipher suite, see tls/options.go#L22
+  tls: 0
+  # Ratio of request will be traced by Jaeger
+  jaegerSampleRatio: "0.0"
+  # golang GCPercent value
+  gcPercent: 100
+  # memcached client timeout value in seconds
+  memcTimeout: 2
+# End of common default settings
+
+# Beginning of microservice specific settings
+consul:
+  replicaCount: 1
+  image:
+    repository: consul
+    tag: "1.9.2"
+  # The following container securityContext is for OpenShift specific. Uncomment it if necessary
+  #securityContext:
+  #  runAsUser: 0
+  #resources:
+  #  request:
+  #    cpu: "500m"
+  #    memory: "512MiB"
+  #  limits:
+  #    cpu: "1"
+  #    memory: "1GiB"
+
+jaeger:
+  replicaCount: 1
+  image:
+    repository: jaegertracing/all-in-one
+    tag: "1.21.0"
+  # put jaeger into master node
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+            - key: node-role.kubernetes.io/master
+              operator: Exists
+  tolerations:
+    - key: node-role.kubernetes.io/master
+      operator: Exists
+      effect: NoSchedule
+
+frontend:
+  service:
+    type: NodePort
+
+#geo:
+#profile:
+#rate:
+#recommendation:
+#reservation:
+#search:
+#user
+
+memcached-profile:
+  replicaCount: 1
+  image:
+    repository: memcached
+    tag: "1.6.8"
+  environments:
+    - name: MEMCACHED_CACHE_SIZE
+      value: "128"
+    - name: MEMCACHED_THREADS
+      value: "2"
+
+memcached-rate:
+  replicaCount: 1
+  image:
+    repository: memcached
+    tag: "1.6.8"
+  environments:
+    - name: MEMCACHED_CACHE_SIZE
+      value: "128"
+    - name: MEMCACHED_THREADS
+      value: "2"
+
+memcached-reserve:
+  replicaCount: 1
+  image:
+    repository: memcached
+    tag: "1.6.8"
+  environments:
+    - name: MEMCACHED_CACHE_SIZE
+      value: "128"
+    - name: MEMCACHED_THREADS
+      value: "2"
+
+mongodb-geo:
+  replicaCount: 1
+  image:
+    repository: mongo
+    tag: "4.4.3"
+
+mongodb-profile:
+  replicaCount: 1
+  image:
+    repository: mongo
+    tag: "4.4.3"
+
+mongodb-rate:
+  replicaCount: 1
+  image:
+    repository: mongo
+    tag: "4.4.3"
+
+mongodb-recommendation:
+  replicaCount: 1
+  image:
+    repository: mongo
+    tag: "4.4.3"
+
+mongodb-reservation:
+  replicaCount: 1
+  image:
+    repository: mongo
+    tag: "4.4.3"
+
+mongodb-user:
+  replicaCount: 1
+  image:
+    repository: mongo
+    tag: "4.4.3"
+
+wrk-client:
+  replicaCount: 1
+  image:
+    repository: aenniwang/wrk-client
+    tag: "latest"
+  # put wrk-client into master node
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+            - key: node-role.kubernetes.io/master
+              operator: Exists
+  tolerations:
+    - key: node-role.kubernetes.io/master
+      operator: Exists
+      effect: NoSchedule
+
+# End of microservice specific settings
+
+
