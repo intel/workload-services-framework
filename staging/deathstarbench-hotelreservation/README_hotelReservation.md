@@ -56,6 +56,9 @@ When install the Cilium, please use the following helm command on the Kubernetes
 helm repo add cilium https://helm.cilium.io/
 helm install cilium cilium/cilium --version 1.11.7 -n kube-system --set kubeProxyReplacement=strict,k8sServiceHost=<Kubernetes master node ip address>,k8sServicePort=6443,hubble.enabled=false,bpf.masquerade=true,devices='{east_west_bound_nic_name,north_south_bound_nic_name}',nodePort.directRoutingDevice=<east_west_bound_nic_nameE>,ipam.operator.clusterPoolIPv4PodCIDRList="10.244.0.0/16" --wait
 ```
++NOTE:
++  - east_west_bound_nic_name: the name of the NIC which is used for inter-nodes communication between all the Kubernetes nodes.
++  - north_south_bound_nic_name: the name of the NIC which is used for pod to access the network outside the Kubernetes cluster, i.e. Internet, etc.
 
 ## 2. Deploy DSB hotelReservation Workload
 To deploy the DSB HotelReservation, please do the following steps on the k8s master node:
@@ -76,7 +79,6 @@ git clone https://github.com/delimitrou/DeathStarBench
 cd DeathStarBench/hotelReservation
 git checkout 526c6e8fea517d06d165d824338041548f1af301
 ```
-NOTE: the above git commit id needs to be changed if the pending github [PR](https://github.com/delimitrou/DeathStarBench/pull/255) is merged.
 
 2. Build the container image and push it to DockerHub
 ```
@@ -122,7 +124,7 @@ To run the benchmark against the 4 DSB hotelReservation instances which are depl
 1. On the Kubernetes master node, get the wrk2 source code.
 When this document is being created, there is still a pending github [PR](https://github.com/delimitrou/DeathStarBench/pull/255) of wrk2. Please check the github [PR](https://github.com/delimitrou/DeathStarBench/pull/255) status.
 
-If this PR is in 'Open' status, run the following command to get the source code:
+Run the following command to get the source code:
 ```
 # Assuming have already git clone the DSB code in Step 2.
 cd DeathStarBench
@@ -131,7 +133,6 @@ git checkout wrk
 ls
 # Once the PR is feteched to local directory, a new directory named wrk2 should be in the current directory.
 ```
-NOTE: the above steps is not needed any more after that PR is merged.
 
 2. Build wrk2 on Kubenetes master node:
 ```
