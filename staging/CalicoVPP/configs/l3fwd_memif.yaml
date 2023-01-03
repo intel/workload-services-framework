@@ -1,0 +1,36 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: vpp-l3fwd
+  name: vpp-l3fwd
+  annotations:
+    "cni.projectcalico.org/vpp.memif.ports":  "tcp:4444-20000,udp:4444-20000"
+    "cni.projectcalico.org/vpp.tuntap.ports": "default"
+spec:
+  containers:
+  - env:
+    - name: is_memif
+      value: "true"
+    - name: mtu
+      value: "MTU_TMP_VALUE"
+    - name: l3fwd_cores_start
+      value: "L3FWD_CORES_START_TMP_VALUE"
+    - name: core_nums
+      value: "CORE_NUMS_TMP_VALUE"
+    name: vpp-l3fwd
+    image: calicovpp_dsa_vppl3fwd_memif:v1
+    resources:
+      limits:
+        hugepages-1Gi: 8Gi
+      requests:
+        cpu: 8
+        memory: 8Gi
+    command: ["/root/start_l3fwd.sh"]
+    imagePullPolicy: IfNotPresent
+    securityContext:
+      privileged: true
+    ports:
+    - containerPort: 4444
+      protocol: UDP
