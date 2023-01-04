@@ -1,0 +1,49 @@
+diff --git a/src/examples/sample-plugin/sample/node.c b/src/examples/sample-plugin/sample/node.c
+index a9d8b66d7..ea33d227c 100644
+--- a/src/examples/sample-plugin/sample/node.c
++++ b/src/examples/sample-plugin/sample/node.c
+@@ -111,6 +111,7 @@ VLIB_NODE_FN (sample_node) (vlib_main_t * vm, vlib_node_runtime_t * node,
+ 	  u32 sw_if_index0, sw_if_index1;
+ 	  u8 tmp0[6], tmp1[6];
+ 	  ethernet_header_t *en0, *en1;
++	  ip4_header_t *h0, *h1;
+ 	  u32 bi0, bi1;
+ 	  vlib_buffer_t *b0, *b1;
+ 
+@@ -166,6 +167,22 @@ VLIB_NODE_FN (sample_node) (vlib_main_t * vm, vlib_node_runtime_t * node,
+ 	  foreach_mac_address_offset;
+ #undef _
+ 
++	  if (clib_net_to_host_u16 (en0->type) == ETHERNET_TYPE_IP4)
++	  {
++	    ip4_header_t *h0 = vlib_buffer_get_current (b0) + sizeof(ethernet_header_t);
++	    u32 tmp = h0->src_address.data_u32;
++	    h0->src_address.data_u32 = h0->dst_address.data_u32;
++	    h0->dst_address.data_u32 = tmp;
++          }
++
++	  if (clib_net_to_host_u16 (en1->type) == ETHERNET_TYPE_IP4)
++	  {
++	    ip4_header_t *h1 = vlib_buffer_get_current (b1) + sizeof(ethernet_header_t);
++	    u32 tmp = h1->src_address.data_u32;
++	    h1->src_address.data_u32 = h1->dst_address.data_u32;
++	    h1->dst_address.data_u32 = tmp;
++          }
++
+ 	  sw_if_index0 = vnet_buffer (b0)->sw_if_index[VLIB_RX];
+ 	  sw_if_index1 = vnet_buffer (b1)->sw_if_index[VLIB_RX];
+ 
+@@ -244,6 +261,13 @@ VLIB_NODE_FN (sample_node) (vlib_main_t * vm, vlib_node_runtime_t * node,
+ #define _(a) en0->dst_address[a] = tmp0[a];
+ 	  foreach_mac_address_offset;
+ #undef _
++	  if (clib_net_to_host_u16 (en0->type) == ETHERNET_TYPE_IP4)
++	  {
++	    ip4_header_t *h0 = vlib_buffer_get_current (b0) + sizeof(ethernet_header_t);
++	    u32 tmp = h0->src_address.data_u32;
++	    h0->src_address.data_u32 = h0->dst_address.data_u32;
++	    h0->dst_address.data_u32 = tmp;
++          }
+ 
+ 	  sw_if_index0 = vnet_buffer (b0)->sw_if_index[VLIB_RX];
+ 

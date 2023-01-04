@@ -1,0 +1,57 @@
+FROM ubuntu:20.04 AS build
+
+RUN apt-get update && \
+    apt-get install -y git gcc automake autoconf libtool make wget python3 \
+    bison byacc check chrpath flex sudo meson nasm python3-pip && \
+    pip3 install pyelftools
+
+COPY ./vpp /vpp
+COPY ./patch/vppl3fwd_tun.patch /
+
+RUN cd /vpp && \
+    git apply /vppl3fwd_tun.patch
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG TZ=Etc/UTC
+RUN cd /vpp && \
+    sh -c '/bin/echo -e "y\ny" | ./extras/vagrant/build.sh' && \
+    sh -c '/bin/echo -e "y\n" | make install-dep' && \
+    cd build-root && \
+    mkdir -p ./build-vpp-native/vpp/lib/x86_64-linux-gnu/vpp_plugin/ && \
+    make V=0 PLATFORM=vpp TAG=vpp sample-plugin-install && \
+    cp ./install-vpp-native/sample-plugin/lib/vpp_plugins/sample_plugin.so /
+
+# Build VPPL3FWD image
+FROM calicovpp/vpp:v3.23.0
+
+RUN apt-get update && \
+    apt-get install -y ca-certificates net-tools vim openssl e2fsprogs
+
+COPY --from=build /sample_plugin.so /usr/lib/x86_64-linux-gnu/vpp_plugins/
+
+COPY ./dockerfile/payloads/start_l3fwd.sh /root/
+
+RUN mkdir -p /run/vpp && \
+echo "\
+create host-interface name eth0 \n\
+set int state host-eth0 up \n\
+set int ip address host-eth0 172.17.0.4/16 \n\
+sample macswap host-eth0 \n\
+" > /run/vpp/vppstartup.conf && \
+echo "\
+unix { \n\
+  cli-listen /run/vpp/cli-vpp-l3fwd.sock \n\
+  exec /run/vpp/vppstartup.conf \n\
+} \n\
+buffers { \n\
+  default data-size 2048 \n\
+} \n\
+cpu { \n\
+  main-core 16 \n\
+  corelist-workers 17-17 \n\
+} \n\
+plugins { \n\
+  plugin default { enable } \n\
+  plugin dpdk_plugin.so { disable } \n\
+} \
+" > /etc/vpp/vpp.conf
