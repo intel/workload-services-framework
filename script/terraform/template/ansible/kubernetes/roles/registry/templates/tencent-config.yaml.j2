@@ -1,0 +1,17 @@
+version: 0.1
+log:
+  accesslog:
+    disabled: true
+storage:
+  s3:
+    accesskey: "{{ k8s_registry_tencent_storage_access_key | b64decode }}"
+    secretkey: "{{ k8s_registry_tencent_storage_secret_key | b64decode }}"
+    region: "{{ k8s_registry_tencent_storage_region }}"
+    bucket: "{{ k8s_registry_tencent_storage_bucket }}"
+http:
+  addr: :5000
+  headers:
+    X-Content-Type-Options: [nosniff]
+  tls:
+    certificate: /certs/tls.crt
+    key: /certs/tls.key

@@ -1,8 +1,8 @@
 #!/usr/bin/gawk
 
 BEGIN {
-    if (var1 == "default") var1="batch_size"
-    if (var2 == "default") var2="cores_per_instance"
+    if (var1 == "default") var1="BATCH_SIZE"
+    if (var2 == "default") var2="CORES_PER_INSTANCE"
     if (var3 == "default") var3="*Throughput"
     if (var4 == "default") var4="Throughput_"
 }
@@ -19,8 +19,8 @@ function get_value() {
 }
 
 /\/itr-[0-9]*:$/{
-    name=gensub(/^.*-logs-(.*)\/itr-.*$/,"\\1",1)
-    itr=gensub(/^.*\/itr-([0-9]+):$/,"\\1",1)
+    name=gensub(/^.*logs-([^/]*)[/].*$/,"\\1",1)
+    itr=gensub(/^.*[/]itr-([0-9]+):$/,"\\1",1)
 }
 
 index($0,var1)==1 || ($1=="#" && index($2,var1)==1) {

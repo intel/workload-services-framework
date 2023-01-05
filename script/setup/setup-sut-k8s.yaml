@@ -1,0 +1,29 @@
+
+- name: 
+  import_playbook: ../terraform/template/ansible/kubernetes/installation.yaml
+  vars:
+    k8s_enable_registry: false
+    k8s_reset: false
+    k8s_node_labels: []
+    k8s_enable_nfd: true
+    k8s_cni: "flannel"
+    wl_enable_reboot: true
+    wl_namespace: "install-k8s"
+
+- hosts: cluster_hosts
+  any_errors_fatal: true
+  become: yes
+  gather_facts: no
+  tasks:
+
+    - name: Check Intel Certificate
+      stat:
+        path: "{{ playbook_dir }}/roles/intel-ca"
+      register: intelca
+      delegate_to: localhost
+
+    - name: Intall Intel Certificate
+      include_role:
+        name: intel-ca
+      when: intelca.stat.exists
+

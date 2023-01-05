@@ -1,0 +1,24 @@
+
+  - name: find all certificates
+    find:
+      paths: "{{ dev_cert_conf_dir }}"
+      patterns: "*.crt"
+    register: certs
+    delegate_to: localhost
+
+  - name: Detect OS
+    shell: 
+      cmd: '. /etc/os-release; echo $ID'
+      executable: /bin/bash
+    register: os
+
+  - name: Install cert
+    include_tasks:
+      file: 'install-{{ os.stdout }}.yaml'
+
+  - name: restart containerd
+    systemd:
+      name: containerd
+      state: restarted
+    ignore_errors: yes
+

@@ -1,6 +1,9 @@
 #!/usr/bin/gawk
 
-/^#svrinfo[:-]/ {
+/^#svrinfo[:-] / {
+    if (!svrinfo) next
+}
+/^#inventory- / || /^#config- / {
     next
 }
 {   

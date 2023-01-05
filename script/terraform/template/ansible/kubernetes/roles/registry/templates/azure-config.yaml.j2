@@ -1,0 +1,16 @@
+version: 0.1
+log:
+  accesslog:
+    disabled: true
+storage:
+  azure:
+    accountname: "{{ k8s_registry_azure_storage_account_name }}"
+    accountkey: "{{ k8s_registry_azure_storage_account_key | b64decode }}"
+    container: "{{ k8s_registry_azure_storage_container_name }}"
+http:
+  addr: :5000
+  headers:
+    X-Content-Type-Options: [nosniff]
+  tls:
+    certificate: /certs/tls.crt
+    key: /certs/tls.key

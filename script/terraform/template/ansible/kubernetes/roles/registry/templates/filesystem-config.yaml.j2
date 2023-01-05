@@ -1,0 +1,14 @@
+version: 0.1
+log:
+  accesslog:
+    disabled: true
+storage:
+  filesystem:
+    rootdirectory: /var/lib/registry
+http:
+  addr: :5000
+  headers:
+    X-Content-Type-Options: [nosniff]
+  tls:
+    certificate: /certs/tls.crt
+    key: /certs/tls.key

@@ -1,0 +1,20 @@
+
+  - name: copy registry cert to workers
+    include_role:
+      name: registry
+      tasks_from: install
+    when:
+    - k8s_enable_registry | bool
+
+  - name: Join workers
+    include_role:
+      name: kubeadm
+      tasks_from: join
+    when:
+    - hostvars['controller-0']['ansible_facts']['install_k8s']
+    - ansible_host != hostvars['controller-0']['ansible_facts']['ip_address']
+
+  - name: wait for all nodes ready
+    shell: "kubectl wait --for=condition=Ready node $(kubectl get nodes -o='custom-columns=name:.metadata.name,ip:.status.addresses[?(@.type==\"InternalIP\")].address' --no-headers | grep -F \"{{ private_ip }}\" | cut -f1 -d' ') --timeout=600s"
+    delegate_to: controller-0
+

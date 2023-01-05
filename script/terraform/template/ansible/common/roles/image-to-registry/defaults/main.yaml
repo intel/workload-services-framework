@@ -1,0 +1,2 @@
+local_registry_url: "localhost:16666"
+control_path: "/tmp/registry-forwarding-%h-%p-%r"

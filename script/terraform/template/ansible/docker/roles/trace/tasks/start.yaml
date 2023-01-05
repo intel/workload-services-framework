@@ -1,0 +1,54 @@
+
+- name: "wait for the starting phrase: {{ wl_trace_mode.split(',')[1] }}"
+  shell: |
+    timeout "{{ wl_timeout[2] | int }}"s bash -c "while true; do 
+      docker logs {{ container_id }} | grep -q -F \"{{ wl_trace_mode.split(',')[1] }}\" && exit 0
+      sleep 1s
+    done"
+  args:
+    executable: /bin/bash
+  register: trace_started
+  when: wl_trace_mode | split(',') | first == "roi"
+  ignore_errors: yes
+
+- name: "wait for timeout {{ wl_trace_mode.split(',')[1] }}s"
+  command: "sleep {{ wl_trace_mode.split(',')[1] | int }}"
+  when: 
+  - wl_trace_mode | split(',') | first == "time"
+  ignore_errors: yes
+
+- name: start trace
+  include_tasks:
+    file: start-block.yaml
+  loop: "{{ wl_trace_modules | default() | split(',') | product([inventory_hostname]) | list }}"
+  loop_control:
+    loop_var: trace_node
+  ignore_errors: yes
+
+- name: "wait for the stop phrase: {{ wl_trace_mode.split(',')[2] }}"
+  shell: |
+    timeout {{ wl_timeout[2] | int }}s bash -c "while true; do 
+      docker logs {{ container_id }} | grep -q -F \"{{ wl_trace_mode.split(',')[2] }}\" && exit 0
+      sleep 1s
+    done"
+  args:
+    executable: /bin/bash
+  ignore_errors: yes
+  when: 
+  - wl_trace_mode | split(',') | first == "roi"
+  - trace_started.rc == 0
+
+- name: "wait for timeout {{ wl_trace_mode.split(',')[2] }}s"
+  command: "sleep {{ wl_trace_mode.split(',')[2] | int }}"
+  when: wl_trace_mode | split(',') | first == "time"
+  ignore_errors: yes
+
+- name: stop trace
+  include_tasks:
+    file: stop-block.yaml
+  loop: "{{ wl_trace_modules | default() | split(',') | product([inventory_hostname]) | list }}"
+  loop_control:
+    loop_var: trace_node
+  when: wl_trace_mode | split(',') | length >= 3
+  ignore_errors: yes
+

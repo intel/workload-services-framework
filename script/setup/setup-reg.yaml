@@ -1,0 +1,22 @@
+
+- hosts: localhost
+  connection: local
+  gather_facts: no
+  become: yes
+  tasks:
+    
+    - name: Create Certificate
+      include_role:
+        name: dev-cert
+        tasks_from: create
+
+    - name: Install certificate
+      include_role:
+        name: dev-cert
+        tasks_from: install
+
+    - name: Install docker registry
+      include_role:
+        name: dev-cert
+        tasks_from: registry
+      

@@ -1,0 +1,7 @@
+
+collectd_interval: "10"
+collectd_csv_path: "/var/lib/collectd/csv"
+collectd_plugin_path: "/var/lib/collectd/plugins"
+collectd_ubuntu2204_debs:
+  x86_64: "https://launchpad.net/ubuntu/+source/collectd/5.12.0-9/+build/23189375/+files/collectd-core_5.12.0-9_amd64.deb"
+  aarch64: "https://launchpad.net/ubuntu/+source/collectd/5.12.0-9/+build/23189376/+files/collectd-core_5.12.0-9_arm64.deb"

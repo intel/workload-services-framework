@@ -1,0 +1,47 @@
+
+- hosts: cluster_hosts
+  become: true
+  gather_facts: no
+  tasks:
+
+    - name: Wait for system to become reachable
+      wait_for_connection:
+        connect_timeout: 1
+        sleep: 1
+        delay: 1
+        timeout: 1800
+
+- hosts: localhost
+  gather_facts: no
+  tasks:
+
+    - name: Breakpoint at provisioning
+      include_role:
+        name: breakpoint
+      vars:
+        breakpoint: PrepareStage
+
+- hosts: workload_hosts
+  become: true
+  any_errors_fatal: true
+  gather_facts: no
+  tasks:
+
+    - name: Startup sequence
+      include_role:
+        name: startup
+
+- hosts: trace_hosts
+  become: yes
+  gather_facts: no
+  tasks:
+
+    - name: Install trace module
+      include_role:
+        name: startup
+        tasks_from: trace-block
+      when: trace_module != "gprofiler" and trace_module != ""
+      loop: "{{ wl_trace_modules | default('') | split(',') }}"
+      loop_control:
+        loop_var: trace_module
+

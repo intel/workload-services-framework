@@ -16,6 +16,10 @@ END {
 
 # args: job-filter
 kubernetes_run () {
+    if [ -r "$SCRIPT/kubernetes/preswa-hook.sh" ]; then
+        . "$SCRIPT/kubernetes/preswa-hook.sh"
+    fi
+
     export LOGSDIRH NAMESPACE
 
     [[ "$CTESTSH_OPTIONS" = *"--dry-run"* ]] && exit 0
@@ -28,18 +32,18 @@ kubernetes_run () {
 
     # upload docker registry secret
     config_json="$HOME/.docker/config.json"
-    if [ "$REGISTRY_AUTH" = "docker" ] && [ -n "$(grep auths "$config_json" 2> /dev/null)" ]; then
+    if [ -n "$(grep auths "$config_json" 2> /dev/null)" ] && [ "$REGISTRY_AUTH" = "docker" ]; then
         secret_name="docker-registry-secret"
         kubectl create secret docker-registry $secret_name --from-file=.dockerconfigjson="$config_json" -n $NAMESPACE
         kubectl patch serviceaccount default -p "{\"imagePullSecrets\": [{\"name\": \"$secret_name\"}]}" -n $NAMESPACE
     fi
-
+        
     stop_kubernetes () {
         kubectl get node -o json
         kubectl --namespace=$NAMESPACE describe pod 2> /dev/null || true
         kubectl delete -f "$KUBERNETES_CONFIG" --namespace=$NAMESPACE --ignore-not-found=true || true
         kubectl delete namespace $NAMESPACE --wait --timeout=0 --ignore-not-found=true || (kubectl replace --raw "/api/v1/namespaces/$NAMESPACE/finalize" -f <(kubectl get ns $NAMESPACE -o json | grep -v '"kubernetes"')) || true
-    }
+	}
 
     # set trap for cleanup
     trap stop_kubernetes ERR SIGINT EXIT
@@ -65,7 +69,11 @@ kubernetes_run () {
         for pod1 in $@; do
             mkdir -p "$LOGSDIRH/$pod1"
             kubectl logs -f --namespace=$NAMESPACE $pod1 -c $container &
-            kubectl exec --namespace=$NAMESPACE $pod1 -c $container -- cat /export-logs | tar -xf - -C "$LOGSDIRH/$pod1"
+            kubectl exec --namespace=$NAMESPACE $pod1 -c $container -- sh -c "cat /export-logs > /tmp/$NAMESPACE-logs.tar"
+            for r in 1 2 3 4 5; do
+                kubectl exec --namespace=$NAMESPACE $pod1 -c $container -- cat /tmp/$NAMESPACE-logs.tar | tar -xf - -C "$LOGSDIRH/$pod1" && break
+            done
+            kubectl exec --namespace=$NAMESPACE $pod1 -c $container -- rm -f /tmp/$NAMESPACE-logs.tar
         done
     }
 

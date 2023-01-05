@@ -1,0 +1,11 @@
+
+- name: Detect OS
+  shell:
+    cmd: ". /etc/os-release; echo $ID"
+    executable: /bin/bash
+  register: os
+
+- name: Install sysstat
+  include_tasks:
+    "install-{{ os.stdout }}.yaml"
+

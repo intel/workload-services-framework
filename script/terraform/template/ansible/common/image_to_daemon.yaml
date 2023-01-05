@@ -1,0 +1,9 @@
+- hosts: workload_hosts
+  any_errors_fatal: true
+  gather_facts: no
+  tasks:
+
+    - name: Transfer image(s) to docker daemon
+      include_role:
+        name: image-to-daemon
+

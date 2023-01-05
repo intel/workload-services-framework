@@ -1,1 +1,0 @@
-# Update this file if you need limit cloud VMs access source IP addresses to certain CIDRs only such as 3.140.220.0/24

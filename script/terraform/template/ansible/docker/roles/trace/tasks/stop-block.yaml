@@ -1,0 +1,12 @@
+
+- block:
+
+    - name: stop trace
+      include_role:
+        name: "{{ trace_node.0 }}"
+        tasks_from: stop
+      vars:
+        trace_from: docker
+
+  ignore_errors: yes
+

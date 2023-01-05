@@ -1,0 +1,5 @@
+
+k8s_registry_conf_dir: "/usr/local/etc/wsf/certs"
+k8s_registry_port: 20668
+k8s_registry_storage: "filesystem"
+

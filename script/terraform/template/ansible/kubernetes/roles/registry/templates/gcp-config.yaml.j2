@@ -1,0 +1,15 @@
+version: 0.1
+log:
+  accesslog:
+    disabled: true
+storage:
+  gcs:
+    bucket: "{{ k8s_registry_gcp_storage_bucket }}"
+    keyfile: /etc/docker/registry/gcp.json
+http:
+  addr: :5000
+  headers:
+    X-Content-Type-Options: [nosniff]
+  tls:
+    certificate: /certs/tls.crt
+    key: /certs/tls.key

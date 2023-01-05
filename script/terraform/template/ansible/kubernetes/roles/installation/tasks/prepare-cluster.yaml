@@ -1,0 +1,51 @@
+
+  - name: Mark IP addresses
+    set_fact:
+      ip_address: "{{ ansible_host }}"
+      cacheable: yes
+
+  - name: Install prerequisite
+    include_role:
+      name: prerequisite
+    when:
+    - hostvars['controller-0']['ansible_facts']['install_k8s']
+    - ((ansible_host != hostvars['controller-0']['ansible_facts']['ip_address'] and inventory_hostname != "controller-0") or inventory_hostname == "controller-0")
+
+  - name: Install containerd
+    include_role:
+      name: containerd
+    when:
+    - hostvars['controller-0']['ansible_facts']['install_k8s']
+    - ((ansible_host != hostvars['controller-0']['ansible_facts']['ip_address'] and inventory_hostname != "controller-0") or inventory_hostname == "controller-0")
+
+  - name: Check containerd cgroup setting
+    include_role:
+      name: containerd
+      tasks_from: check
+    when:
+    - hostvars['controller-0']['ansible_facts']['install_k8s']
+    - ((ansible_host != hostvars['controller-0']['ansible_facts']['ip_address'] and inventory_hostname != "controller-0") or inventory_hostname == "controller-0")
+
+  - name: Install k8s packages
+    include_role:
+      name: packages
+    when:
+    - hostvars['controller-0']['ansible_facts']['install_k8s']
+    - ((ansible_host != hostvars['controller-0']['ansible_facts']['ip_address'] and inventory_hostname != "controller-0") or inventory_hostname == "controller-0")
+
+  - name: Reset k8s
+    include_role:
+      name: kubeadm
+      tasks_from: reset.yaml
+    when:
+    - hostvars['controller-0']['ansible_facts']['install_k8s']
+    - ((ansible_host != hostvars['controller-0']['ansible_facts']['ip_address'] and inventory_hostname != "controller-0") or inventory_hostname == "controller-0")
+
+  - name: Add no-proxy
+    include_role:
+      name: kubeadm
+      tasks_from: no-proxy.yaml
+    when:
+    - hostvars['controller-0']['ansible_facts']['install_k8s']
+    - ((ansible_host != hostvars['controller-0']['ansible_facts']['ip_address'] and inventory_hostname != "controller-0") or inventory_hostname == "controller-0")
+

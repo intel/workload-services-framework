@@ -1,0 +1,8 @@
+
+k8s_calico_version: "v3.23"
+k8s_calico_options: ""
+k8s_calico_vxlan_manifest: "https://projectcalico.docs.tigera.io/archive/{{ k8s_calico_version }}/manifests/calico-vxlan.yaml"
+k8s_calico_manifest: "https://projectcalico.docs.tigera.io/archive/{{ k8s_calico_version }}/manifests/calico.yaml"
+
+k8s_calicoctl_version: "v3.23.5"
+k8s_calicoctl: "https://github.com/projectcalico/calico/releases/download/{{ k8s_calicoctl_version }}/calicoctl-linux-amd64"

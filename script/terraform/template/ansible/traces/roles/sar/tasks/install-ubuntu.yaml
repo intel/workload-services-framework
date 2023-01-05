@@ -1,0 +1,12 @@
+
+- name: Install sysstat
+  apt:
+    name: 
+      - sysstat
+    state: present
+  become: yes
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+

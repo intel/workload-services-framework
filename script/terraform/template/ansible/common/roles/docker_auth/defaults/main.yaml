@@ -1,0 +1,4 @@
+
+docker_auth_reuse: false
+docker_auth_config_json: ".docker/config.json"
+docker_auth_secret_name: "wsf-registry-secret"

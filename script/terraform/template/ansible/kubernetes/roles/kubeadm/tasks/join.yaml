@@ -1,0 +1,8 @@
+
+- name: Join workers
+  command: "{{ hostvars['controller-0']['ansible_facts']['join_cmd'] }}"
+  become: true
+
+- name: Customize kubelet
+  include_tasks:
+    file: customize-kubelet.yaml

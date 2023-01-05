@@ -1,0 +1,9 @@
+
+- name: collect trace data
+  include_tasks:
+    file: collect-block.yaml
+  loop: "{{ wl_trace_modules | default() | split(',') | product(groups['trace_hosts']) | list }}"
+  loop_control:
+    loop_var: trace_node
+  ignore_errors: yes
+

@@ -1,0 +1,58 @@
+
+- hosts: controller-0
+  gather_facts: no
+  tasks:
+
+  - name: Check cluster status
+    include_role:
+      name: installation
+      tasks_from: check-cluster
+
+- hosts: cluster_hosts
+  any_errors_fatal: true
+  gather_facts: no
+  tasks:
+
+  - name: Prepare the cluster
+    include_role:
+      name: installation
+      tasks_from: prepare-cluster
+
+- hosts: controller-0
+  gather_facts: no
+  tasks:
+
+  - name: Create the cluster
+    include_role:
+      name: installation
+      tasks_from: create-cluster
+
+- hosts: workload_hosts
+  any_errors_fatal: true
+  gather_facts: no
+  tasks:
+
+  - name: Join workers
+    include_role:
+      name: installation
+      tasks_from: join-workers
+
+- hosts: controller-0
+  gather_facts: no
+  tasks:
+  
+  - name: Finalize controller
+    include_role:
+      name: installation
+      tasks_from: finalize-controller
+
+- hosts: workload_hosts
+  any_errors_fatal: true
+  gather_facts: no
+  tasks:
+
+  - name: Finalize workers
+    include_role:
+      name: installation
+      tasks_from: finalize-workers
+

@@ -1,0 +1,30 @@
+
+- hosts: localhost
+  connection: local
+  become: yes
+  gather_facts: no
+  tasks:
+
+    - name: Check Intel certificate exists
+      stat:
+        path: "{{ playbook_dir }}/roles/intel-ca"
+      register: intelca
+
+    - name: Intall Intel Certificate
+      include_role:
+        name: intel-ca
+      when: intelca.stat.exists
+
+    - name: Install utils
+      include_role:
+        name: utils
+
+    - name: Install docker
+      include_role:
+        name: installation
+
+    - name: ctest alias
+      include_role:
+        name: alias
+        tasks_from: ctest
+

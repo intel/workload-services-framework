@@ -1,9 +1,9 @@
 
 ### Introduction
 
-A private docker registry is optional in most of the validation senarios except if you want to run the workloads on an on-premesis Kubernetes cluster, or you explicitly setup a docker registry to store any newly built workload images. 
+A private docker registry is optional in most of the validation scenarios except if you want to run the workloads on an On-Premises  Kubernetes cluster, or you explicitly setup a docker registry to store any newly built workload images. 
 
-This document describes how to authenticate to a docker registry if the registry requires authentication. Skip this document if there is no authentication requriement.   
+This document describes how to authenticate to a docker registry if the registry requires authentication. Skip this document if there is no authentication requirement.   
 
 ### `REGISTRY_AUTH`
 
@@ -15,9 +15,9 @@ Enable the `REGISTRY_AUTH` option:
 cmake -DREGISTRY=<url> -DREGISTRY_AUTH=docker ..
 ```
 
-With the above command, the validation scripts will upload the docker authentication information specified in `.docker/config.json` as a Kubernetes `imagePullSecret` to the validation cluster, on-premesis or in Cloud.  
+With the above command, the validation scripts will upload the docker authentication information specified in `.docker/config.json` as a Kubernetes `imagePullSecret` to the validation cluster, On-Premises or in Cloud.  
 
-> `CredHelpers` or `CredStore` in `.docker/config.json` is not suppoerted. 
+> `CredHelpers` or `CredStore` in `.docker/config.json` is not supported. 
 
 ### Authenticate to Cloud Private Registry
 

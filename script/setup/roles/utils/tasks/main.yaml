@@ -1,0 +1,13 @@
+
+- name: Install prerequisites
+  package:
+    name: 
+    - cmake
+    - make
+    - m4
+    - gawk
+    state: present
+  register: pkgrc
+  until: pkgrc is success
+  retries: 10
+  delay: 10

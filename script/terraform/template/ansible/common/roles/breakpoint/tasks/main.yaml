@@ -1,0 +1,10 @@
+
+
+- name: "Breakpoint: {{ breakpoint }}"
+  wait_for:
+    path: "{{ wl_logs_dir }}/Resume{{ breakpoint }}"
+    state: present
+    timeout: "{{ wl_debug_timeout }}"
+  when: breakpoint in wl_debug
+  delegate_to: localhost
+

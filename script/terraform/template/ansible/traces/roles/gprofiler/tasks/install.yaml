@@ -1,0 +1,12 @@
+
+- name: Preload gprofile docker image with docker
+  command: "docker pull {{ gprofiler_image }}:{{ gprofiler_version }}"
+  when: trace_from == "docker"
+  ignore_errors: yes
+
+- name: Preload gprofile docker image with ctr
+  command: "ctr -n k8s.io i pull {{ gprofiler_image }}:{{ gprofiler_version }}"
+  when: trace_from == "kubernetes"
+  become: yes
+  ignore_errors: yes
+

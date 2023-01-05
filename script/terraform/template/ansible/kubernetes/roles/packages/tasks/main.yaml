@@ -1,0 +1,19 @@
+
+- name: Detect OS
+  shell:
+    cmd: ". /etc/os-release; echo $ID"
+    executable: /bin/bash
+  register: os
+
+- name: Install k8s
+  include_tasks:
+    file: "install-{{ os.stdout }}.yaml"
+
+- name: Start kubelet
+  systemd:
+    name: kubelet
+    daemon_reload: yes
+    enabled: yes
+    state: started
+  become: yes
+

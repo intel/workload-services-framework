@@ -1,0 +1,11 @@
+
+  - name: Check if k8s is already installed
+    command: kubectl get pod
+    register: k8scheck
+    failed_when: false
+
+  - name: Set fact
+    set_fact:
+      install_k8s: "{{ (k8scheck.rc != 0) or (k8s_reset | default('no') | bool) }}"
+      cacheable: yes
+

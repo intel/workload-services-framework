@@ -1,0 +1,25 @@
+
+  - name: Detect OS version
+    shell:
+      cmd: . /etc/os-release; echo $VERSION_ID
+      executable: /bin/bash
+    register: osver
+
+  - name: Install docker repo
+    get_url:
+      url: "{{ docker_dist_repo }}/linux/centos/docker-ce.repo"
+      dest: "/etc/yum.repos.d/docker-ce.repo"
+    when: osver.stdout | int >= 8
+
+  - name: install containerd
+    yum:
+      name:
+      - "containerd.io-{{ containerd_version | default(containerd_default_version['centos']) }}"
+      state: present
+      update_cache: true
+    become: yes
+    register: yumrc
+    until: yumrc is success
+    retries: 10
+    delay: 10
+

@@ -11,4 +11,3 @@ function(add_testcase name)
     add_component_testcase(stack ${stack} ${name} ${ARGN})
 endfunction()
 
-

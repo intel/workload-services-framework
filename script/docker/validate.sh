@@ -11,6 +11,9 @@ docker_run () {
         docker rm -f -v ${containers[@]} >/dev/null 2>/dev/null || true
     }
 
+    # show EVENT_TRACE_PARAMS
+    echo "EVENT_TRACE_PARAMS=$EVENT_TRACE_PARAMS"
+
     # set trap
     trap stop_docker ERR SIGINT EXIT
 
@@ -27,11 +30,21 @@ docker_run () {
         containers+=($(for ds in ${DATASET[@]}; do [ -n "$REGISTRY" ] && docker pull $ds > /dev/null; docker create $ds -; done))
         options1="$options1$(echo;for ds in ${containers[@]}; do echo "--volumes-from $ds"; done)"
     fi
+
+    if [ -r "$SCRIPT/docker/preswa-hook.sh" ]; then
+        . "$SCRIPT/docker/preswa-hook.sh"
+    fi
+
     (set -x; docker run $options1 --name $NAMESPACE --rm --detach "${@}" $image)
     containers+=($NAMESPACE)
 
-    # show the logs
-    docker logs -f $NAMESPACE 2>/dev/null &
+    # Indicate workload beginning on the first log line
+    docker logs -f $NAMESPACE | (
+        IFS= read _line;
+        echo "===begin workload==="
+        while echo "$_line" && IFS= read _line; do :; done
+        echo "===end workload==="
+    ) 2>/dev/null &
 
     # extract logs
     timeout ${TIMEOUT/,*/}s bash -c "docker exec $NAMESPACE cat /export-logs | tar xf - -C '$LOGSDIRH/$NAMESPACE'"
@@ -44,4 +57,4 @@ docker_run () {
 IMAGE=$(image_name "$DOCKER_IMAGE")
 DATASET=($(dataset_images))
 docker_run $IMAGE $DOCKER_OPTIONS
- 
+

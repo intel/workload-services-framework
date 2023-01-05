@@ -1,0 +1,28 @@
+
+- name: Check if sysctl restore available
+  stat:
+    path: "{{ startup_restore_path }}/sysctl"
+  register: sysctlsav
+
+- name: Restore sysctl settings
+  command: "sysctl -p{{ startup_restore_path }}/sysctls -q"
+  when: 
+  - sysctlsav.stat.exists
+  - ((csp | default('static')) == 'static')
+  failed_when: false
+
+- name: Save sysctl values
+  shell: "sysctl -e {{ ((wl_default_sysctls.keys() | list) + (wl_sysctls.keys() | list)) | join(' ')}} > {{ startup_restore_path }}/sysctl"
+  failed_when: false
+  when: ((csp | default('static')) == 'static')
+
+- name: Add sysctls to /etc/sysctl.d
+  template:
+    src: 99-wsf-sysctls.conf.j2
+    dest: /etc/sysctl.d/99-wsf-sysctls.conf
+  failed_when: false
+
+- name: Apply sysctls
+  command: "sysctl -p -q"
+  failed_when: false
+

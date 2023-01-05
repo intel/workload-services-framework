@@ -11,11 +11,11 @@ BEGIN {
 }
 
 /^#svrinfo: / {
-    name=gensub("^.*logs-(.*)[/]runs[/].*$","\\1",1,$2)
+    name=gensub("^.*logs-([^/]*)[/].*$","\\1",1,$2)
 }
 
 /[/]itr-[0-9]*:$/ {
-    name=gensub("^.*logs-(.*)[/]itr-.*$","\\1",1)
+    name=gensub("^.*logs-([^/]*)[/].*$","\\1",1)
 }
 
 index($0,var1)==1 || ($1=="#" && index($2,var1)==1) {

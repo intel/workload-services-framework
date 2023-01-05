@@ -1,0 +1,14 @@
+
+  - name: "Start sar on {{ trace_node.1 }}"
+    shell:
+      cmd: |
+        sar {{ sar_options }} > /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar.logs 2>&1 &
+        echo $! > /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar.pid
+        disown
+      executable: /bin/bash
+    async: 5
+    poll: 0
+    become: yes
+    delegate_to: "{{ trace_node.1 }}"
+    ignore_errors: yes
+

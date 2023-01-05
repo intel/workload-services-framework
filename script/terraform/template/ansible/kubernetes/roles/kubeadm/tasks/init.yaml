@@ -1,0 +1,61 @@
+
+- name: Merge the configrations
+  set_fact:
+    kubeadm_options: "{{ k8s_kubeadm_options_default | combine(k8s_kubeadm_options, recursive=True) }}"
+
+- name: Create the kubeadm config file
+  copy:
+    content: "{{ kubeadm_options.values() | map('to_nice_yaml') | join('---\n') }}"
+    dest: "/tmp/{{ wl_namespace }}-kubeadm-config.yaml"
+
+- name: kubeadm init
+  command: "kubeadm init --config /tmp/{{ wl_namespace }}-kubeadm-config.yaml"
+  become: yes
+
+- name: find out the home directory
+  shell:
+    cmd: "echo ~{{ ansible_user }}"
+    executable: /bin/bash
+  register: home
+
+- name: create .kube
+  become_user: "{{ ansible_user }}"
+  become: yes
+  file:
+    path: "{{ home.stdout }}/.kube"
+    state: directory
+    mode: 0755
+
+- name: copy admin.conf
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: "{{ home.stdout }}/.kube/config"
+    remote_src: yes
+    owner: "{{ ansible_user }}"
+  become: yes
+
+- name: Remove the kubeadm config file
+  file:
+    path: "/tmp/{{ wl_namespace }}-kubeadm-config.yaml"
+    state: absent
+  become: yes
+
+- name: Customize kubelet
+  include_tasks:
+    file: customize-kubelet.yaml
+
+- name: Wait for all control-plane pods become created
+  shell: "kubectl get po --namespace=kube-system --selector tier=control-plane --output=jsonpath='{.items[*].metadata.name}'"
+  register: pods
+  until: item in pods.stdout
+  retries: 10
+  delay: 30
+  with_items:
+    - etcd
+    - kube-apiserver
+    - kube-controller-manager
+    - kube-scheduler
+
+- name: Wait for control-plane pods become ready
+  shell: "kubectl wait --namespace=kube-system --for=condition=Ready pods --selector tier=control-plane --timeout=600s"
+

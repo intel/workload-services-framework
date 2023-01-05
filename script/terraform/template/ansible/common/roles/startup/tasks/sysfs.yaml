@@ -1,0 +1,39 @@
+
+- name: Check if sysfs restore available
+  stat:
+    path: "{{ startup_restore_path }}/sysfs"
+  register: sysfssav
+
+- name: Restore sysfs settings
+  shell: "cat {{ startup_restore_path }}/sysfs | bash"
+  when: 
+  - sysfssav.stat.exists
+  - ((csp | default('static')) == 'static')
+  failed_when: false
+
+- name: Save sysfs values
+  shell:
+    cmd: |
+      for p in {{ ((wl_default_sysfs.keys() | list) + (wl_sysfs.keys() | list)) | join(" ") }}; do 
+        if [ -e $p ]; then
+            echo "echo $(cat $p) > $p"
+        fi
+      done > {{ startup_restore_path }}/sysfs
+    executable: /bin/bash
+  failed_when: false
+  when: ((csp | default('static')) == 'static')
+
+- name: Create wsf-sysfs-settings.service
+  template:
+    src: wsf-sysfs-settings.service.j2
+    dest: /etc/systemd/system/wsf-sysfs-settings.service
+  failed_when: false
+
+- name: Apply sysfs
+  systemd:
+    name: wsf-sysfs-settings
+    enabled: yes
+    daemon_reload: yes
+    state: restarted
+  failed_when: false
+

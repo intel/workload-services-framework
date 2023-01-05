@@ -1,0 +1,30 @@
+
+  - name: wait for CNI ready
+    include_role:
+      name: "cni-{{ k8s_cni }}"
+      tasks_from: wait-ready
+    when: install_k8s
+
+  - name: check if plugin exists
+    stat:
+      path: "{{ playbook_dir }}/roles/{{ item }}"
+    register: plugin_check
+    loop: "{{ k8s_plugins + ['nfd'] }}"
+    delegate_to: localhost
+
+  - name: Install k8s plugins
+    include_role:
+      name: "{{ plugin_stat.item }}"
+    when: plugin_stat.stat.exists | default(false) | bool
+    loop: "{{ plugin_check.results }}"
+    loop_control:
+      loop_var: plugin_stat
+
+  - name: label nodes
+    include_role:
+      name: label
+
+  - name: Create cluster info
+    include_role:
+      name: cluster-info
+

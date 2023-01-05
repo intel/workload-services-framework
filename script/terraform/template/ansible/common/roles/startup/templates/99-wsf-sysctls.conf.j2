@@ -1,0 +1,2 @@
+# WSF sysctl settings
+{{ ((wl_default_sysctls.keys() | list) + (wl_sysctls.keys() | list)) | zip((wl_default_sysctls.values() | list) + (wl_sysctls.values() | list)) | map('join', '=') | join('\n') }}

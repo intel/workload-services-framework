@@ -1,0 +1,21 @@
+
+
+- name: uname -r
+  command: uname -r
+  register: unamer
+
+- name: Install perf
+  apt:
+    name:
+      - linux-tools-common
+      - linux-tools-generic
+      - "linux-tools-{{ unamer.stdout }}"
+    state: present
+  become: yes
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+
+
+

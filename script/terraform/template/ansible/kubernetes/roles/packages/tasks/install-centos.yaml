@@ -1,0 +1,23 @@
+
+- name: add the k8s repository
+  yum_repository:
+    name: k8s
+    description: k8s installation
+    baseurl: "{{ k8s_repo_url['centos'] }}"
+    gpgkey: "{{ k8s_repo_key_url['centos'] }}"
+  become: true
+
+- name: install kubeadm, kubelet, and kubectl
+  yum:
+    name: 
+    - "kubeadm-{{ k8s_version }}"
+    - "kubelet-{{ k8s_version }}"
+    - "kubectl-{{ k8s_version }}"
+    allow_downgrade: yes
+    state: present
+  become: true
+  register: yumrc
+  until: yumrc is success
+  retries: 10
+  delay: 10
+

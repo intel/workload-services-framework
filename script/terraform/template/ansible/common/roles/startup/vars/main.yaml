@@ -1,0 +1,17 @@
+
+startup_restore_path: /usr/local/etc/wsf-restore
+startup_hugepage_actions:
+  "ubuntu":
+    grub_path: /etc/default/grub.d/99-wsf-settings.cfg
+    update_grub_cmd: |
+        update-grub
+  "debian":
+    grub_path: /etc/default/grub.d/99-wsf-settings.cfg
+    update_grub_cmd: |
+        update-grub
+  "centos":
+    grub_path: /etc/default/grub
+    update_grub_cmd: |
+        grub2-mkconfig -o /boot/grub2/grub.cfg
+        grub2-mkconfig -o /etc/grub2.cfg
+

@@ -1,0 +1,9 @@
+
+perf_record_options: "-a -g"
+perf_report_options: "--header"
+perf_fetch_data: no
+perf_script_options: ""
+perf_flamegraph: no
+perf_flamegraph_collapse_options: "--all"
+perf_flamegraph_svg_options: "--color=java --hash"
+

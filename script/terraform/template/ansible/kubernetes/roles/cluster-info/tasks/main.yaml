@@ -1,0 +1,11 @@
+
+  - name: Export cluster info
+    command: kubectl get node -o json
+    register: info
+
+  - name: Create cluster info
+    copy:
+      dest: "{{ wl_logs_dir }}/cluster-info.json"
+      content: "{{ info.stdout }}"
+    delegate_to: localhost
+

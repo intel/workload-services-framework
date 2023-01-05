@@ -1,0 +1,18 @@
+# terraform-azure
+
+ARG RELEASE
+FROM csp-common${RELEASE} as csp
+FROM terraform-static${RELEASE}
+
+# Install AZure CLI
+RUN apt-get update && apt-get install -y ca-certificates curl apt-transport-https gnupg && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN curl -sL https://packages.microsoft.com/keys/microsoft.asc | \
+    gpg --dearmor > /etc/apt/trusted.gpg.d/microsoft.gpg && \
+    echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $(grep VERSION_CODENAME /etc/os-release | cut -f2 -d=) main" > /etc/apt/sources.list.d/azure-cli.list
+RUN apt-get update && apt-get install -y azure-cli && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Add cleanup script
+COPY --from=csp /opt/script/cleanup-azure.sh /usr/local/bin/cleanup
+COPY --from=csp /opt/script/cleanup-common.sh /usr/local/bin/

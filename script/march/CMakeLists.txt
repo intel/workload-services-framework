@@ -1,3 +1,0 @@
-if(ENABLE_BUILD)
-    add_custom_target(build_march bash -c "PLATFORM=${PLATFORM} BACKEND=${BACKEND} RELEASE=${RELEASE} REGISTRY=${REGISTRY} CUMULUS_SUT='${CUMULUS_SUT}' '${CMAKE_CURRENT_SOURCE_DIR}/setup.sh'")
-endif()

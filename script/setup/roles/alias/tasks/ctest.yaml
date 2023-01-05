@@ -1,0 +1,14 @@
+
+- name: Detect home shell
+  getent:
+    database: passwd
+    key: "{{ ansible_user }}"
+  
+- name:
+  blockinfile:
+    path: ~/.bashrc
+    block: |
+      alias ctest=./ctest.sh
+  when: ('/bin/bash' in getent_passwd[ansible_user][-1])
+  become: no
+     

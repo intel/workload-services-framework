@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-awk -vtest_case="$1" '
+awk -v test_case="$1" '
 function kvformat(key, value) {
     unit=gensub(/^[0-9+-.]+ *(.*)/,"\\1",1, value);
     value=gensub(/^([0-9+-.]+).*/,"\\1",1, value);
@@ -20,7 +20,15 @@ function kvformat(key, value) {
 }
 /^evp/ {
     for (i=2;i<=NF;i++) {
-        if (test_case~"sw_aes-gcm")
+        if (test_case~"qathw_aes-sha_bkc")
+        {
+            primary=((algorithm~/aes-128-.*-sha1/)&&(options[i]~/bn/))?"*":""
+        }
+        else if (test_case~"qathw_aes-gcm_bkc")
+        {
+            primary=((algorithm~/aes-128-gcm/)&&(options[i]~/bn/))?"*":""
+        }
+        else if (test_case~"_aes-gcm")
         {
             primary=((algorithm~/aes-256-gcm/)&&(options[i]~/aes/))?"*":""
         }
@@ -40,7 +48,7 @@ function kvformat(key, value) {
 }
 /ecdh/ && NF==6 {
     if (!($0~/infs/)) {
-        primary=($4~"X25519")?"*":""     # x25519 is the only common tested algorithm for qatsw/sw test cases
+        primary=($4~"X25519")?"*":""     # x25519 is the only common tested algorithm for qathw/qatsw/sw test cases
 
         print kvformat($3"-"$1" "$4" op",$5)
         print primary kvformat($3"-"$1" "$4" op/s",$6)
@@ -48,7 +56,14 @@ function kvformat(key, value) {
 }
 /ecdsa/ && NF==8 {
     if (!($0~/infs/)) {
-        primary=($4~"nistp256")?"*":""
+        if (test_case~"qathw_ecdsa_bkc")
+        {
+            primary=($4~"nistp256")?"*":""
+        }
+        else
+        {
+            primary=($4~"nistp256")?"*":""
+        }
         print kvformat($3"-"$1" "$4" sign",$5)
         print kvformat($3"-"$1" "$4" verify",$6)
         print primary kvformat($3"-"$1" "$4" sign/s",$7)

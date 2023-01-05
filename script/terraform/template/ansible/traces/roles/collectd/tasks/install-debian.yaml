@@ -1,0 +1,23 @@
+
+- name: Install collectd for ubuntu2004
+  apt:
+    name: collectd
+  become: yes
+  when: not collectd.stat.exists
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+
+- name: Make sure /etc/collectd exists
+  file:
+    path: /etc/collectd
+    state: directory
+  become: yes
+
+- name: Install collectd.conf
+  template:
+    src: collectd.conf.j2
+    dest: /etc/collectd/collectd.conf
+  become: yes
+

@@ -1,0 +1,10 @@
+
+- hosts: controller-0
+  become: true
+  gather_facts: no
+  tasks:
+
+    - name: Cleanup k8s
+      include_role:
+        name: cleanup
+

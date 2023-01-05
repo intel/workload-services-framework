@@ -1,0 +1,98 @@
+
+- name: Check if istio installed
+  shell:
+    cmd: "which istioctl"
+  ignore_errors: true
+  register: istio_installed
+  when:
+  - k8s_istio_profile | trim != ""
+
+- name: Download istio install script
+  get_url:
+    url: "{{ k8s_istio_install_dist_repo }}"
+    dest: "/tmp/downloadIstio"
+    mode: +rx
+  when: 
+  - k8s_istio_profile | trim != ""
+  - istio_installed.rc != 0
+
+- name: Download istio into /tmp directory
+  shell:
+    cmd: "ISTIO_VERSION={{ k8s_istio_version }} /tmp/downloadIstio"
+  args:
+    chdir: "/tmp"
+  when: 
+  - k8s_istio_profile | trim != ""
+  - istio_installed.rc != 0
+
+- name: Create parent install directory if not exist
+  become: true
+  file:
+    path: "{{ k8s_istio_install_parent_dir }}"
+    state: directory
+    mode: '0755'
+  when: 
+  - k8s_istio_profile | trim != ""
+  - istio_installed.rc != 0
+
+- name: Copy to parent install directory
+  become: true
+  copy:
+    src: "/tmp/istio-{{ k8s_istio_version }}"
+    dest: "{{ k8s_istio_install_parent_dir }}"
+    remote_src: true
+  when: 
+  - k8s_istio_profile | trim != ""
+  - istio_installed.rc != 0
+
+- name: Change install directory permissions recursively
+  become: true
+  file:
+    path: "{{ k8s_istio_install_dir }}"
+    state: directory
+    mode: '0755'
+    recurse: yes
+  when: 
+  - k8s_istio_profile | trim != ""
+  - istio_installed.rc != 0
+
+- name: Link istioctl to /usr/local/bin
+  become: true
+  file:
+    src: "{{ k8s_istio_install_dir }}/bin/istioctl"
+    dest: '/usr/local/bin/istioctl'
+    state: link
+  when: 
+  - k8s_istio_profile | trim != ""
+  - istio_installed.rc != 0
+
+- name: Cleanup temp install resources
+  file:
+    path: "{{ item }}"
+    state: absent
+  with_items: 
+    - "/tmp/downloadIstio"
+    - "/tmp/istio-{{ k8s_istio_version }}"
+  ignore_errors: true
+  when: 
+  - k8s_istio_profile | trim != ""
+  - istio_installed.rc != 0
+
+- name: Istio precheck for pod install
+  become: true
+  become_user: "{{ ansible_user }}"
+  shell:
+    cmd: "istioctl x precheck"
+  register: istio_precheck
+  when: 
+  - k8s_istio_profile | trim != ""
+
+- name: Install istio pods by specified profile name
+  become: true
+  become_user: "{{ ansible_user }}"
+  shell: 
+    cmd: "istioctl install --set profile={{ k8s_istio_profile }} -y"
+  when: 
+  - k8s_istio_profile | trim != ""
+  - istio_precheck.rc == 0
+

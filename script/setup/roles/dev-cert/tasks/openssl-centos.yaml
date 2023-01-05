@@ -1,0 +1,11 @@
+
+- name: Install openssl
+  yum:
+    name: openssl
+    state: present
+    update_cache: yes
+  register: yumrc
+  until: yumrc is success
+  retries: 10
+  delay: 10
+

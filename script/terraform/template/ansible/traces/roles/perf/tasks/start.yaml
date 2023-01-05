@@ -1,0 +1,14 @@
+
+  - name: "Start perf on {{ trace_node.1 }}"
+    shell:
+      cmd: |
+        perf record {{ perf_record_options }} --output /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.record > /dev/null 2>&1 &
+        echo $! > /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.pid
+        disown
+      executable: /bin/bash
+    async: 5
+    poll: 0
+    become: yes
+    delegate_to: "{{ trace_node.1 }}"
+    ignore_errors: yes
+

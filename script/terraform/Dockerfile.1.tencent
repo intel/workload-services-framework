@@ -1,0 +1,12 @@
+# terraform-tencent
+
+ARG RELEASE
+FROM csp-common${RELEASE} as csp
+FROM terraform-static${RELEASE}
+
+# Install TCCLI 
+RUN python3 -m pip install --no-cache-dir tccli>=3.0.68.1
+
+# Add cleanup script
+COPY --from=csp /opt/script/cleanup-tencent.sh /usr/local/bin/cleanup
+COPY --from=csp /opt/script/cleanup-common.sh /usr/local/bin/

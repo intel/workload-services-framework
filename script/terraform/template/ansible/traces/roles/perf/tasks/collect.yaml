@@ -1,0 +1,64 @@
+
+- name: Create the perf directory
+  file:
+    path: "{{ wl_logs_dir}}/{{ trace_node.1 }}-{{ itr | default(1) }}-perf"
+    state: directory
+  delegate_to: localhost
+  become: no
+  ignore_errors: yes
+
+- name: Process perf records
+  shell: "perf report {{ perf_report_options }} -i /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.record > /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.report"
+  delegate_to: "{{ trace_node.1 }}"
+  register: report
+  become: yes
+  ignore_errors: yes
+
+- name: Fetch perf files
+  fetch:
+    src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.report"
+    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-perf/perf.report"
+    flat: yes
+  delegate_to: "{{ trace_node.1 }}"
+  become: yes
+  ignore_errors: yes
+
+- name: Fetch perf raw data
+  fetch:
+    src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.record"
+    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-perf/perf.data"
+    flat: yes
+  delegate_to: "{{ trace_node.1 }}"
+  become: yes
+  ignore_errors: yes
+  when: perf_fetch_data
+
+- name: Create flame graph
+  include_tasks:
+    file: flamegraph.yaml
+  when: perf_flamegraph
+
+- name: Remove any collection files
+  file:
+    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.record"
+    state: absent
+  become: yes
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: yes
+
+- name: Remove any collection files
+  file:
+    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.report"
+    state: absent
+  become: yes
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: yes
+
+- name: Remove any collection files
+  file:
+    path: "/tmp/{{ wl_namespace }}-{{ trace_node | default(inventory_hostname) }}-perf.pid"
+    state: absent
+  become: yes
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: yes
+

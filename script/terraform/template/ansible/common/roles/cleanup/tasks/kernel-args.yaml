@@ -1,0 +1,26 @@
+
+- name: Check OS
+  shell:
+    cmd: ". /etc/os-release; echo $ID"
+    executable: /bin/bash
+  register: os
+
+- name: Remove any changes
+  blockinfile:
+    path: "{{ cleanup_hugepage_actions[os.stdout]['grub_path'] }}"
+    state: absent
+  register: grubsts
+  ignore_errors: yes
+
+- name: Update grub if updated
+  shell: "{{ cleanup_hugepage_actions[os.stdout]['update_grub_cmd'] }}"
+  when: grubsts.msg == "Block removed"
+  ignore_errors: yes
+
+- name: reboot
+  command: "reboot"
+  async: 1
+  poll: 0
+  ignore_errors: yes
+  when: grubsts.msg == "Block removed"
+

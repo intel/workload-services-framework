@@ -1,0 +1,58 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: registry
+  labels:
+    app: registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: registry
+  template:
+    metadata:
+      labels:
+        app: registry
+    spec:
+      volumes:
+      - name: cert
+        secret:
+          secretName: wsf-registry-cert
+      - name: config
+        secret:
+          secretName: wsf-registry-config
+      containers:
+        - image: registry:2
+          name: registry
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+          volumeMounts:
+          - name: cert
+            mountPath: /certs
+          - name: config
+            mountPath: /etc/docker/registry
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wsf-registry-service
+  labels:
+    app: wsf-registry-service
+spec:
+  ports:
+    - port: {{ k8s_registry_port | int }}
+      targetPort: 5000
+  externalIPs:
+    - "{{ k8s_registry_ip }}"
+  selector:
+    app: registry
+

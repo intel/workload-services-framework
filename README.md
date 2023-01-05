@@ -1,33 +1,57 @@
-## Introduction
 
-This is the **Workload Services Framework** repository. The repository contains a set of workloads that can be used to exercise multiple platforms. Each workload is a complete and standalone implementation that can be built and run collectively or individually. See the list of supported workloads under the [workload](workload/README.md) directory.  
+### Introduction
 
-### Prerequisite
+This is the **Workload Services Framework** repository. The repository contains a set of workloads optimized for Intel(R) Xeon(R) platforms. See the list of supported workloads under the [workload](workload) directory.  
 
-- Sync your system date/time. It is required by docker credential authorization.  
-- Install `cmake`, `make`, `m4`, and `gawk`.  
-- Setup [docker](doc/setup-docker.md), [Kubernetes](doc/setup-kubernetes.md), or [cumulus](doc/setup-cumulus.md). [docker](doc/setup-docker.md) is the minimum requirement and can be used for single-container workload validation. [Kubernetes](doc/setup-kubernetes.md) can be used for multiple-node workload validation. Setup [cumulus](doc/setup-cumulus.md) for remote worker validation.  
+### Setup
 
-### Build & Evaluate Workload
+- Sync your system date/time. This is required by any credential authorization.  
+- If you are behind a corporate firewall, please setup `http_proxy`, `https_proxy` and `no_proxy` in `/etc/environment`.
+- Run the [`setup-dev.sh`](doc/setup-wsf.md#setup-devsh) script to setup the development host for Cloud and On-Premises workload development and evaluation. See [Cloud and On-Premises Setup](doc/setup-wsf.md) for more details on the setup.     
+  
+### Evaluate Workload
 
-Evaluate a workload as follows:
+Evaluate any workload as follows:  
+
+```
+mkdir build 
+cd build
+cmake ..                               # .. is required here
+cd workload/OpenSSL-RSAMB              # Go to any workload folder
+./ctest.sh -N                          # List all test cases
+./ctest.sh -R test_openssl_rsamb_sw_rsa -V  # Evaluate a specific test case
+./list-kpi.sh logs*                    # Show KPIs
+```
+
+---
+
+- The WSF supports multiple validation backends. By default, the [`docker`](doc/setup-docker.md) backend, or the [`Kubernetes`](doc/setup-kubernetes.md) backend if available, is used to evaluate any workload locally. To evaluate workloads on Cloud or in an on-premises cluster, please use the [terraform](doc/setup-terraform.md) backend. Additional setup required such as configuring Cloud account credentials.   
+
+---
+
+### Build Workload
 
 ```
 mkdir -p build
 cd build
-cmake ..
-cd workload/dummy
+cmake -DREGISTRY= -DBENCHMARK=ResNet-50 ..
+cd workload/ResNet-50
 make
-ctest -V
-./list-kpi.sh logs*
+./ctest.sh -N
 ```
 
-> It takes a long time to rebuild all workload images. It is recommended that you only rebuild the workloads of interest by going to the workload sub-directory to make and test.  
+> TIP: You can specify `BENCHMARK` to limit the repository scope to the specified workload. The build and test operations on all other workloads are disabled. See [Build Options](doc/cmake.md) for details.  
 
-You can optionally specify a `REGISTRY` value, `cmake -DREGISTRY=XYZ ..` to ask the build process to push the images to the docker registry. Please `docker login` beforehand if your docker registry requires authentication. A docker registry is optional except in the case of Kubernetes on-premises validation.   
+```
+cd build
+cmake -DBENCHMARK=ResNet-50
+make
+./ctest.sh -N
+```
 
 ### See Also
 
 - [Build Options](doc/cmake.md)   
 - [Test Options](doc/ctest.md)   
-- [Develop New Workload](doc/workload.md)  
+- [Setup Terraform](doc/setup-terraform.md)  
+

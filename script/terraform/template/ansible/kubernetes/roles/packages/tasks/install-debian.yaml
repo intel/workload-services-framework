@@ -1,0 +1,43 @@
+
+- name: install gpg
+  apt:
+    name:
+    - gpg
+    update_cache: yes
+  become: true
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+
+- name: add GPG key
+  apt_key:
+    url: "{{ k8s_repo_key_url['debian'] }}"
+    state: present
+  become: true
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+
+- name: add k8s repository to apt
+  apt_repository:
+    repo: "deb {{ k8s_repo_url['debian'] }} kubernetes-xenial main"
+    state: present
+  become: true
+
+- name: install kubeadm, kubelet, and kubectl
+  apt:
+    name:
+    - "kubeadm={{ k8s_version }}"
+    - "kubelet={{ k8s_version }}"
+    - "kubectl={{ k8s_version }}"
+    update_cache: yes
+    allow_downgrade: yes
+  become: true
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+
+

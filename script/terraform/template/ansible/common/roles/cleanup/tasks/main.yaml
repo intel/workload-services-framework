@@ -1,0 +1,45 @@
+
+- name: Restore sysctls
+  include_tasks:
+    file: sysctl.yaml
+
+- name: Restore sysfs
+  include_tasks:
+    file: sysfs.yaml
+
+- name: Remove restore path
+  file:
+    path: "{{ cleanup_restore_path }}"
+    state: absent
+  failed_when: false
+
+- name: check label stat
+  stat:
+    path: "{{ playbook_dir }}/roles/{{ item.split('=')[0].split('-')[2] | lower }}/tasks/cleanup.yaml"
+  when:
+  - item.startswith("HAS-SETUP-")
+  - not item.startswith("HAS-SETUP-HUGEPAGE-")
+  register: label_check
+  loop: "{{ k8s_node_labels | default([]) }}"
+  delegate_to: localhost
+
+- name: provision "{{ label_result.item }}"
+  include_role:
+    name: "{{ label_result.item.split('=')[0].split('-')[2]|lower }}"
+    tasks_from: cleanup
+  vars:
+    label_name: "{{ label_result.item }}"
+  when:
+    - wl_enable_reboot | default(true) | bool
+    - label_result.stat.exists | default(false) | bool
+  loop: "{{ label_check.results }}"
+  loop_control:
+    loop_var: label_result
+
+- name: Restore kernel args
+  include_tasks:
+    file: kernel-args.yaml
+  when: 
+  - wl_enable_reboot | default(true) | bool
+  - not ansible_host in my_ip_list.split(',')
+

@@ -1,7 +1,7 @@
 
 ### Run Test
 
-Use `ctest` to run a single test or batch of tests. You can do this at the top level `build` directory or under each workload directory. In the latter case, only the tests of the workload will be executed. 
+Use `ctest` to run a single test or batch of tests. You can do this at the top-level `build` directory or under each workload directory. In the latter case, only the tests of the workload will be executed. 
 
 ```
 cd build
@@ -11,7 +11,7 @@ ctest
 
 ### CTest Options
 
-There are extensive list of options in `ctest` to control how tests can be executed. See the `ctest` manpage. The followings are most common options.  
+There is extensive list of options in `ctest` to control how tests can be executed. See the `ctest` manpage. The followings are most common options.  
 
 - *`-R`*: Select tests based on a regular expression string.   
 - *`-E`*: Exclude tests based on a regular expression string.  
@@ -43,15 +43,18 @@ The configuration file uses the following format:
 ```
 *_dummy_pi:
     SCALE: 3000
+
 ```
 
 where `*_dummy_pi` specifies the test case name. You can use `*` to specify a wildcard match. The subsection underneath specifies the configuration variables and values. Any parameters specified in each test case [`validate.sh`](validate.md) can be overwritten. 
 
-Use with caution as overwritting configuration parameters may lead to invalid parameter combinations.  
+Use with caution as overwriting configuration parameters may lead to invalid parameter combinations.  
 
 ### Benchmark Scripts
 
 A set of utility scripts are linked under your workload build directory to make it easy for workload benchmark activities.  
+
+#### `ctest.sh`
 
 - **`ctest.sh`**: This is an extended ctest script extending the following features, besides what ctest supports:
 
@@ -61,7 +64,8 @@ Usage: [options]
 --loop           Run the benchmark multiple times sequentially.
 --run            Run the benchmark multiple times on the same SUT(s), only for cumulus.  
 --burst          Run the benchmark multiple times simultaneously.
---test-config    Specify the test-config file.  
+--config         Specify the test-config file.  
+--options        Specify additioanl validation backend options.  
 --set            Set the workload parameter values during loop and burst iterations.  
 --stop           Kill all ctest sessions.  
 --continue       Ignore any errors and continue the loop and burst iterations.  
@@ -107,7 +111,7 @@ The followings are some examples:
 ./ctest.sh -R aws --set "SCALE=1000 1500 1700" --burst=6 --nohup
 
 # run aws test cases 6 times simultaneously with the SCALE and BATCH_SIZE values
-# enumerated seperately as (1000,1), (1500,2), (1700,4), (1000,8) in each 
+# enumerated separately as (1000,1), (1500,2), (1700,4), (1000,8) in each 
 # iteration. Values are repeated as needed.   
 ./ctest.sh -R aws --set "SCALE=1000 1500 1700" --set BATCH_SIZE="1 2 4 8" --burst=6 --nohup
 
@@ -119,9 +123,18 @@ The followings are some examples:
 # for cloud instances, it is possible to test different machine types by 
 # enumerating the AWS_MACHINE_TYPE values (or similar GCP_MACHINE_TYPE):
 ./ctest.sh -R aws --set "AWS_MACHINE_TYPE=m6i.xlarge m6i.2xlarge m6i.4xlarge" --loop 3 --nohup
+
+# for aws disk type/disk size/iops/num_striped_disks
+./ctest.sh -R aws --set "AWS_DISK_TYPE=io1 io2" --loop 2 --nohup
+./ctest.sh -R aws --set "AWS_DISK_SIZE=500 1000" --loop 2 --nohup
+./ctest.sh -R aws --set "AWS_IOPS=16000 32000" --loop 2 --nohup
+./ctest.sh -R aws --set "AWS_NUM_STRIPED_DISKS=1 2" --loop 2 --nohup
+
 ```
 
 See Also: [Cloud SUT Reuse](#cloud-sut-reuse)
+
+#### `list-kpi.sh`
 
 - **`list-kpi.sh`**: Scan the ctest logs files and export the KPI data.  
 
@@ -131,15 +144,10 @@ Usage: [options] [logs-directory]
 --all                 List all KPIs.  
 --outlier <n>         Remove outliers beyond N-stdev.  
 --params              List workload configurations.  
---format list|xls-ai|xls-inst  
+--svrinfo             List svrinfo information.   
+--format list|xls-ai|xls-inst|xls-table  
                       Specify the output format.
---var1 <value>        Specify the spread sheet variable 1. 
---var2 <value>        Specify the spread sheet variable 2. 
---var3 <value>        Specify the spread sheet variable 3. 
---var4 <value>        Specify the spread sheet variable 4. 
---phost node1         Specify the hostname for identifying the primary instance type, in the multi-node workload scenario.  
---pinst CPU.Microarchitecture
-                      Specify the SVRInfo field name for identifying the primary instance name. 
+--var[1-9] <value>    Specify the spread sheet variables.   
 --filter _(real|throughput)
                       Specify a trim filter to shorten spreadsheet name.  
 --file <filename>     Specify the spread sheet filename. 
@@ -155,13 +163,11 @@ Usage: [options] [logs-directory]
 
 <IMG SRC="image/ss-inst.png" width="50%">
     
-> where `--phost=node1`.  
-
 > The `xls-table` option writes the KPI data in the `kpi-report.xls` spread sheet as follows:
 
 <IMG SRC="image/ss-table.png" width="40%">
-
-> where `--var1=scale`, `--var2=sleep_time`. Optionally, you can specify `--var3` and `--var4` variables for multiple tables in the same spreadsheet.
+    
+> where `--var1=scale`, `--var2=sleep_time`. Optionally, you can specify `--var3` and `--var4` variables for multiple tables in the same spreadsheet.  
 
 ### Cloud SUT Reuse
 
@@ -199,7 +205,6 @@ SUT reuse is subject to the following limitations:
 
 ---
 
-Please cleanup the Cloud instances after use. You can also use the cumulus [cloud cleanup](setup-cumulus.md#cleanup-cloud-resources) procedure to completely cleanup any Cloud resources.  
+Please cleanup the Cloud instances after use. 
 
 --- 
-

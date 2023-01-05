@@ -1,0 +1,34 @@
+
+- name: Create the sar directory
+  file:
+    path: "{{ wl_logs_dir}}/{{ trace_node.1 }}-{{ itr | default(1) }}-sar"
+    state: directory
+  delegate_to: localhost
+  become: no
+  ignore_errors: yes
+
+- name: Fetch sar files
+  fetch:
+    src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar.logs"
+    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-sar/sar.logs"
+    flat: yes
+  become: no
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: yes
+
+- name: Remove any collection files
+  file:
+    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar.logs"
+    state: absent
+  become: yes
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: yes
+
+- name: Remove any collection files
+  file:
+    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar.pid"
+    state: absent
+  become: yes
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: yes
+

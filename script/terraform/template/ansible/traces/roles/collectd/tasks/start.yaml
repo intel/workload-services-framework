@@ -1,0 +1,10 @@
+
+  - name: "Start collectd on {{ trace_node.1 }}"
+    service:
+      name: collectd
+      state: started
+    become: yes
+    delegate_to: "{{ trace_node.1 }}"
+    ignore_errors: yes
+    async: 5
+    poll: 0

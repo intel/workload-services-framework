@@ -1,0 +1,64 @@
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: granulate
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: granulate-gprofiler
+  namespace: granulate
+  labels:
+    app: granulate-gprofiler
+spec:
+  selector:
+    matchLabels:
+      app: granulate-gprofiler
+  template:
+    metadata:
+      labels:
+        app: granulate-gprofiler
+    spec:
+      hostPID: true
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+      restartPolicy: Always
+      containers:
+        - name: granulate-gprofiler
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          image: "{{ gprofiler_image }}:{{ gprofiler_version }}"
+          imagePullPolicy: IfNotPresent
+          args: {{ ('-c -o /opt/data --dont-send-logs ' + gprofiler_options) | split(' ') }}
+          env:
+            - name: GPROFILER_TOKEN
+              value: "{{ gprofiler_token | default() }}"
+            - name: GPROFILER_SERVICE
+              value: "{{ gprofiler_service | default() }}"
+            - name: GPROFILER_IN_K8S
+              value: "1"
+          volumeMounts:
+            - mountPath: /opt/data
+              name: datadir
+      volumes:
+        - name: datadir
+          hostPath:
+            path: /tmp/{{ wl_namespace }}-gprofiler
+            type: DirectoryOrCreate
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values: {{ trace_nodes.stdout_lines }}

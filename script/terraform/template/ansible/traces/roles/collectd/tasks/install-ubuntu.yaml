@@ -1,0 +1,45 @@
+
+- name: Check OS Version
+  shell:
+    cmd: ". /etc/os-release; echo $VERSION_ID"
+    executable: /bin/bash
+  register: os_version  
+
+- name: uname -i
+  command: uname -i
+  register: arch
+  when: os_version.stdout == "22.04"
+
+- name: Install collectd for ubuntu2204
+  apt:
+    deb: "{{ collectd_ubuntu2204_debs[arch.stdout] }}"
+  when: os_version.stdout == "22.04" and not collectd.stat.exists
+  become: yes
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+
+- name: Install collectd for ubuntu2004
+  apt:
+    name: collectd
+  when: os_version.stdout == "20.04" and not collectd.stat.exists
+  become: yes
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+
+- name: Make sure /etc/collectd exists
+  file:
+    path: /etc/collectd
+    state: directory
+  become: yes
+
+- name: Install collectd.conf
+  template:
+    src: collectd.conf.j2
+    dest: /etc/collectd/collectd.conf
+  become: yes
+
+

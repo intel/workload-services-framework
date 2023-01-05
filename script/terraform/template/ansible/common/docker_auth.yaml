@@ -1,0 +1,10 @@
+
+- hosts: cluster_hosts
+  become: no
+  any_errors_fatal: true
+  gather_facts: no
+  tasks:
+
+    - name: Copy Docker Auth
+      include_role:
+        name: docker_auth

@@ -1,0 +1,58 @@
+
+- name: Create the collectd directory
+  file:
+    path: "{{ wl_logs_dir}}/{{ trace_node.1 }}-{{ itr | default(1) }}-collectd"
+    state: directory
+  delegate_to: localhost
+  become: no
+  ignore_errors: yes
+
+- name: Archive collectd files
+  command:
+    cmd: "tar cfz /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.tgz ."
+    chdir: "{{ collectd_csv_path }}"
+  become: no
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: yes
+
+- name: Fetch collectd files
+  fetch:
+    src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.tgz"
+    dest: "{{ wl_logs_dir }}/"
+    flat: yes
+  become: no
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: yes
+
+- name: Untar collectd files
+  command: 
+    cmd: "tar xfz {{ wl_logs_dir }}/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.tgz --strip-components=2"
+    chdir: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-collectd"
+  delegate_to: localhost
+  become: no
+  ignore_errors: yes
+
+- name: Remove any collection files
+  file:
+    path: "{{ collectd_csv_path }}/"
+    state: absent
+  become: yes
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: yes
+
+- name: Remove any collectd tar files
+  file:
+    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.tgz"
+    state: absent
+  become: no
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: yes
+
+- name: Remove any collectd tar files
+  file:
+    path: "{{ wl_logs_dir }}/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.tgz"
+    state: absent
+  delegate_to: localhost
+  become: no
+  ignore_errors: yes
+

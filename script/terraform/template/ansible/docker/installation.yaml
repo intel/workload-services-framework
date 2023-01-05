@@ -1,0 +1,25 @@
+- hosts: workload_hosts
+  become: yes
+  any_errors_fatal: true
+  gather_facts: no
+  tasks:
+
+    - name: Install docker
+      include_role:
+        name: installation
+
+- hosts: trace_hosts
+  become: yes
+  gather_facts: no
+  tasks:
+
+    - name: Install trace module
+      include_role:
+        name: installation
+        tasks_from: trace-block
+      when: trace_module == "gprofiler"
+      loop: "{{ wl_trace_modules | default('') | split(',') }}"
+      loop_control:
+        loop_var: trace_module
+      ignore_errors: yes
+

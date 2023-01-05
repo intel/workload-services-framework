@@ -1,0 +1,15 @@
+
+- name: print node info
+  command: "kubectl --namespace {{ wl_namespace }} describe node"
+  failed_when: false
+
+- name: print pod info
+  command: "kubectl --namespace {{ wl_namespace }} describe pod"
+  failed_when: false
+
+- name: print logs
+  shell: 
+    cmd: "for p in $(kubectl --namespace {{ wl_namespace }} get pod -o name); do kubectl --namespace {{ wl_namespace }} logs --all-containers=true --prefix=true $p; done"
+    executable: /bin/bash
+  failed_when: false
+

@@ -1,0 +1,8 @@
+
+- block:
+    - name: Install trace module
+      include_role:
+        name: "{{ trace_module }}"
+        tasks_from: install
+  ignore_errors: yes
+

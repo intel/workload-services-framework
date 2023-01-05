@@ -1,0 +1,60 @@
+
+  - name: disable named
+    service:
+      name: named
+      state: stopped
+      enabled: no
+    ignore_errors: yes
+    become: yes
+
+  - name: Disable SWAP
+    command: swapoff -a
+    become: yes
+
+  - name: Get local time
+    command: date -Ins
+    register: datetime
+    delegate_to: localhost
+    when: k8s_sync_time | default('true') | bool
+
+  - name: Syncronize date time
+    command: "date -Ins -s '{{ datetime.stdout }}'"
+    become: yes
+    when: k8s_sync_time | default('true') | bool
+
+  - name: Disable SWAP in fstab
+    replace:
+      path: /etc/fstab
+      regexp: '^([^#].*\s+swap\s+sw\s+.*)$'
+      replace: '# \1'
+    become: yes
+
+  - name: modprobe overlay and br_netfilter
+    shell: |
+      modprobe overlay
+      modprobe br_netfilter
+    become: yes
+
+  - name: Add conf for containerd
+    blockinfile:
+      path: "/etc/modules-load.d/containerd.conf"
+      block: |
+        overlay
+        br_netfilter
+      create: yes
+    become: yes
+
+  - name: Add conf for containerd
+    blockinfile:
+      path: "/etc/sysctl.d/99-kubernetes-cri.conf"
+      block: |
+        net.bridge.bridge-nf-call-iptables = 1
+        net.ipv4.ip_forward = 1
+        net.bridge.bridge-nf-call-ip6tables = 1
+      create: yes
+    become: yes
+
+  - name: Apply new settings
+    command: sysctl --system
+    become: yes
+

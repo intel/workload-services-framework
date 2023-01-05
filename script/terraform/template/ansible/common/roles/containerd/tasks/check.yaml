@@ -1,0 +1,11 @@
+
+  - name: Detect OS
+    shell:
+      cmd: ". /etc/os-release; echo $ID"
+      executable: /bin/bash
+    register: os
+
+  - name: ensure containerd runs with systemd cgroup
+    command: grep -q -E 'SystemdCgroup\s*=\s*true' {{ containerd_config_toml }}
+    when: os.stdout != "debian"
+

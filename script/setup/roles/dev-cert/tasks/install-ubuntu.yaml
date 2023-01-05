@@ -1,0 +1,10 @@
+
+  - name: copy cert to workers
+    copy:
+      src: "{{ item.path }}"
+      dest: "/usr/local/share/ca-certificates/wsf-{{ item.path | basename }}"
+    loop: "{{ certs.files }}"
+
+  - name: update certificates
+    command: update-ca-certificates
+

@@ -1,0 +1,14 @@
+
+- name: reset kubernetes
+  command: "kubeadm reset -f"
+  ignore_errors: yes
+  become: yes
+
+- name: delete ip links
+  command: "ip link delete {{ item }}"
+  become: yes
+  ignore_errors: yes
+  loop:
+    - cni0
+    - flannel.1
+    - vxlan.calico

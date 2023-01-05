@@ -1,0 +1,9 @@
+Include /opt/workspace/ssh_config
+
+Host *
+  UserKnownHostsFile /dev/null
+  StrictHostKeyChecking no
+  TCPKeepAlive yes
+  ServerAliveInterval 30
+  ServerAliveCountMax 10
+

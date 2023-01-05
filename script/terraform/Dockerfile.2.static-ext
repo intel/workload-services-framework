@@ -1,0 +1,7 @@
+# terraform-static
+
+ARG RELEASE
+FROM terraform-base${RELEASE}
+
+COPY data/ /usr/local/src/
+

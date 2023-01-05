@@ -1,0 +1,10 @@
+
+containerd_default_version: 
+  ubuntu: "1.5.9-*"
+  centos: "1.6.10-*"
+  debian: "1.4.13~*"
+containerd_data_root: "/var/lib/containerd"
+containerd_config_toml: "/etc/containerd/config.toml"
+containerd_proxy_conf: "/etc/systemd/system/containerd.service.d/proxy.conf"
+containerd_pause_registry: "k8s.gcr.io"
+docker_dist_repo: "https://download.docker.com"

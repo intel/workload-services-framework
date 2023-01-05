@@ -1,0 +1,109 @@
+
+- name: "Check if certificates already exists"
+  stat:
+    path: "{{ k8s_registry_conf_dir }}/{{ k8s_registry_ip }}:{{ k8s_registry_port }}.crt"
+  register: cert
+
+- name: Fetch cert crt from controller
+  fetch:
+    src: "{{ k8s_registry_conf_dir }}/{{ k8s_registry_ip }}:{{ k8s_registry_port }}.crt"
+    dest: "/tmp/{{ wl_namespace }}-registry-cert-{{ k8s_registry_ip }}:{{ k8s_registry_port }}.crt"
+    flat: yes
+  when: cert.stat.exists
+  become: yes
+
+- name: Fetch cert key from controller
+  fetch:
+    src: "{{ k8s_registry_conf_dir }}/{{ k8s_registry_ip }}:{{ k8s_registry_port }}.key"
+    dest: "/tmp/{{ wl_namespace }}-registry-cert-{{ k8s_registry_ip }}:{{ k8s_registry_port }}.key"
+    flat: yes
+  when: cert.stat.exists
+  become: yes
+
+- name: create self-generated certificates
+  shell: "openssl req -newkey rsa:4096 -nodes -sha256 -keyout /tmp/{{ wl_namespace }}-registry-cert-{{ k8s_registry_ip }}:{{ k8s_registry_port }}.key --addext 'subjectAltName = IP:{{ k8s_registry_ip }}' -x509 -days 365 -out /tmp/{{ wl_namespace }}-registry-cert-{{ k8s_registry_ip }}:{{ k8s_registry_port }}.crt -subj /CN={{ k8s_registry_ip }}"
+  delegate_to: localhost
+  when: not cert.stat.exists
+
+- name: Save certificate status
+  set_fact:
+    cert_updated: yes
+    cacheable: yes
+  when: not cert.stat.exists
+
+- name: "Ensure {{ k8s_registry_conf_dir }} exists"
+  file:
+    path: "{{ k8s_registry_conf_dir }}"
+    state: directory
+  when: not cert.stat.exists
+  become: yes
+
+- name: copy key to controller
+  copy:
+    src: "/tmp/{{ wl_namespace }}-registry-cert-{{ k8s_registry_ip }}:{{ k8s_registry_port }}.key"
+    dest: "{{ k8s_registry_conf_dir }}/{{ k8s_registry_ip }}:{{ k8s_registry_port }}.key"
+    mode: "0400"
+  when: not cert.stat.exists
+  become: yes
+
+- name: copy crt to controller
+  copy:
+    src: "/tmp/{{ wl_namespace }}-registry-cert-{{ k8s_registry_ip }}:{{ k8s_registry_port }}.crt"
+    dest: "{{ k8s_registry_conf_dir }}/{{ k8s_registry_ip }}:{{ k8s_registry_port }}.crt"
+  when: not cert.stat.exists
+  become: yes
+
+- name: get home
+  shell:
+    cmd: "echo $HOME"
+    executable: /bin/bash
+  register: home
+
+- name: delete the wsf-registry namespace
+  command: kubectl delete ns wsf-registry
+  when: not cert.stat.exists
+  ignore_errors: yes
+
+- name: create wsf-registry namespace
+  command: kubectl create namespace wsf-registry
+  register: regns 
+  ignore_errors: yes
+ 
+- name: create cert secret
+  shell: "kubectl create --kubeconfig={{ home.stdout }}/.kube/config --namespace=wsf-registry secret tls wsf-registry-cert --cert {{ k8s_registry_conf_dir }}/{{ k8s_registry_ip }}:{{ k8s_registry_port }}.crt --key {{ k8s_registry_conf_dir }}/{{ k8s_registry_ip }}:{{ k8s_registry_port }}.key"
+  when: regns.rc == 0
+  become: yes
+
+- name: read storage credentials
+  include_tasks:
+    file: "config-{{ k8s_registry_storage }}.yaml"
+  when: regns.rc == 0
+
+- name: copy registry.yaml
+  template:
+    src: create-registry.yaml.j2
+    dest: "/tmp/{{ wl_namespace }}-registry.yaml"
+    owner: "{{ ansible_user }}"
+    mode: 0400
+  become: true
+  when: regns.rc == 0
+
+- name: kubectl create registry.yaml
+  command: kubectl create --namespace=wsf-registry -f "/tmp/{{ wl_namespace }}-registry.yaml"
+  when: regns.rc == 0
+
+- name: remove registry.yaml
+  file:
+    path: "/tmp/{{ wl_namespace }}-registry.yaml"
+    state: absent
+  become: yes
+  when: regns.rc == 0
+
+- name: wait for registry to be deployed
+  command: kubectl wait --namespace=wsf-registry pod --for=condition=ready -l app=registry
+  retries: 50
+  delay: 10
+  register: result
+  until: result.rc == 0
+  when: (regns.rc == 0) or (not cert.stat.exists)
+

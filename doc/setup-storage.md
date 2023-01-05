@@ -1,10 +1,11 @@
 
 ### Storage Setup
 
-#### SSD Disks
+Certain workloads require to use data disk(s) as cache storage. The SUT workers must be equipped with the SSD or NVME disks specified by the disk specification. 
+A workload can request data disk storage as follows:
+- `HAS-SETUP-DISK-SPEC-1`: The worker node must have a set of SSD or NVME disks, whose specification, `disk_spec_1`, is specified in the `cumulus`/`terraform` configuration files. The data disk is mounted under `/mnt/disk1.../mnt/diskN`, where `N` is the data disk count.    
 
-Certain workloads require to use scratch disk(s) as cache storage. The workers must be equipped with the right SSD disks.  
+### Node Labels:
 
-Label the worker nodes with the following node labels:
-- `HAS-SETUP-DISK-MOUNT-1`: The worker node must have a SSD disk with the size of at least 500GB. The SSD disk must be mounted under `/mnt/disk1`.  
-
+Label the worker nodes with the following node labels: 
+- `HAS-SETUP-DISK-SPEC-1=yes`: The worker node is equipped with the data storage disks described in `disk_spec_1`.  

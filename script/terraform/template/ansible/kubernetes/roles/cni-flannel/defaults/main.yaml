@@ -1,0 +1,4 @@
+
+k8s_flannel_version: "v0.18.1"
+k8s_flannel_repo: "https://raw.githubusercontent.com/flannel-io/flannel/{{ k8s_flannel_version }}/Documentation/kube-flannel.yml"
+

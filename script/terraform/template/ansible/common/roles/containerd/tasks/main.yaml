@@ -1,0 +1,113 @@
+
+  - name: check if containerd is installed
+    command: containerd --version
+    register: containerd
+    ignore_errors: yes
+    become: yes
+
+  - name: Detect OS
+    shell:
+      cmd: ". /etc/os-release; echo $ID"
+      executable: /bin/bash
+    register: os
+    when: containerd.rc != 0
+
+  - name: install containerd
+    include_tasks:
+      file: "install-{{ os.stdout }}.yaml"
+    when: containerd.rc != 0
+
+  - name: check containerd configuration
+    command: containerd config dump
+    register: config
+    ignore_errors: yes
+
+  - name: check if containerd must be reconfigured
+    set_fact:
+      reconfigure: "{{ not (('SystemdCgroup = true' in config.stdout) and (containerd_pause_registry in config.stdout) and (containerd_data_root in config.stdout)) }}"
+
+  - name: "Ensure {{ containerd_config_toml | dirname }} exists"
+    file:
+      path: "{{ containerd_config_toml | dirname }}"
+      state: directory
+    when: reconfigure
+    become: yes
+
+  - name: configure containerd
+    shell: "containerd config default > {{ containerd_config_toml }}"
+    when: reconfigure
+    become: yes
+
+  - name: Configure SystemdCgroup=true
+    lineinfile:
+      path: "{{ containerd_config_toml }}"
+      regexp: '^(\s*)SystemdCgroup\s*='
+      line: '\1SystemdCgroup = true'
+      backrefs: yes
+    when: reconfigure
+    become: yes
+
+  - name: Configure sandbox_image
+    lineinfile:
+      path: "{{ containerd_config_toml }}"
+      regexp: '^(\s*)sandbox_image\s*=\s*".*(/.*)"'
+      line: '\1sandbox_image = "{{ containerd_pause_registry }}\2"'
+      backrefs: yes
+    when: reconfigure
+    become: yes
+
+  - name: "Ensure {{ containerd_data_root }} exists"
+    file:
+      path: "{{ containerd_data_root }}"
+      state: directory
+    when: reconfigure
+    become: yes
+
+  - name: configure containerd root
+    lineinfile:
+      path: "{{ containerd_config_toml }}"
+      regexp: '^(\s*)root\s*='
+      line: '\1root = "{{ containerd_data_root }}"'
+      backrefs: yes
+    when: reconfigure
+    become: yes
+
+  - name: check proxy value
+    shell: "echo :$http_proxy$https_proxy$no_proxy:"
+    register: proxy
+
+  - name: check proxy configuration
+    stat:
+      path: "{{ containerd_proxy_conf }}"
+    register: proxy_conf
+
+  - name: "Ensure {{ containerd_proxy_conf | dirname }} exists"
+    file:
+      path: "{{ containerd_proxy_conf | dirname }}"
+      state: directory
+      recurse: yes
+    when: proxy != "::" and not proxy_conf.stat.exists
+    become: yes
+
+  - name: configure proxy
+    shell: |
+      printf "[Service]\nEnvironment=\"HTTP_PROXY=$http_proxy\" \"HTTPS_PROXY=$https_proxy\" \"NO_PROXY=$no_proxy\"\n" > {{ containerd_proxy_conf }}
+    when: proxy != "::" and not proxy_conf.stat.exists
+    become: yes
+    
+  - name: Abort if containerd must be restarted
+    fail:
+      msg: "Failed to restart containerd. Please manually sudo systemctl restart containerd"
+    when:
+      - ansible_host in my_ip_list.split(",")
+      - reconfigure or containerd.rc != 0 or (proxy != "::" and not proxy_conf.stat.exists)
+
+  - name: retart containerd
+    systemd:
+      name: containerd
+      daemon_reload: yes
+      enabled: yes
+      state: restarted
+    when: reconfigure or containerd.rc != 0 or (proxy != "::" and not proxy_conf.stat.exists)
+    become: yes
+

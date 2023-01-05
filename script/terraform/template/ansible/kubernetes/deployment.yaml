@@ -1,0 +1,37 @@
+- hosts: localhost
+  gather_facts: no
+  tasks:
+
+    - name: RunStage break point
+      include_role:
+        name: breakpoint
+      vars:
+        breakpoint: RunStage
+
+- hosts: controller-0
+  gather_facts: no
+  tasks:
+
+    - name: Check if On-Premesis Kubernetes
+      fail:
+        msg: "A valid REGISTRY value must be specified for On-Premesis Kubernetes Deployment"
+      when: wl_registry_map[1] == ""
+
+    - name: copy deployment script to controller
+      copy:
+        src: "{{ wl_logs_dir }}/{{ wl_kubernetes_yaml }}"
+        dest: "/tmp/{{ wl_namespace }}-{{ wl_kubernetes_yaml }}"
+        owner: "{{ ansible_user }}"
+
+    - name: perform k8s validation over iterations
+      include_role:
+        name: deployment
+      loop: "{{ range(1, run_stage_iterations | default(1) |int+1, 1) | list }}"
+      loop_control:
+        loop_var: itr
+
+    - name: remove the deployment script
+      file:
+        path: "/tmp/{{ wl_namespace }}-{{ wl_kubernetes_yaml }}"
+        state: absent
+

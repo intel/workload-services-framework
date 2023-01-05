@@ -1,0 +1,35 @@
+
+- name: Obtain Azure storage account keys
+  command: "az storage account keys list --resource-group {{ k8s_registry_azure_storage_resource_group }} --account-name {{ k8s_registry_azure_storage_account_name }}"
+  register: acctkeys
+  delegate_to: localhost
+
+- block:
+    - name: create config.yaml
+      template:
+        src: "{{ k8s_registry_storage }}-config.yaml.j2"
+        dest: "/tmp/{{ wl_namespace }}-registry-config.yaml"
+        owner: root
+        mode: "0400"
+      vars:
+        k8s_registry_azure_storage_account_key: "{{ (acctkeys.stdout | from_json)[0].value | b64encode | b64encode }}"
+      become: yes
+
+    - name: find home
+      shell:
+        cmd: "echo ~{{ ansible_user }}"
+        executable: /bin/bash
+      register: home
+
+    - name: create config.yaml secret
+      command: "kubectl create --kubeconfig={{ home }}/.kube/config --namespace=wsf-registry secret generic wsf-registry-config --from-file=config.yml=/tmp/{{ wl_namespace }}-registry-config.yaml"
+      become: yes
+
+  always:
+
+    - name: delete config.yaml
+      file:
+        path: "/tmp/{{ wl_namespace }}-registry-config.yaml"
+        state: absent
+      become: yes
+

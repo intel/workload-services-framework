@@ -1,12 +1,12 @@
 #!/usr/bin/gawk
 
 /^#svrinfo: / {
-    name=gensub(/^.*-logs-(.*)\/runs\/.*$/,"\\1",1,$2)
+    name=gensub(/^.*logs-([^/]*)[/].*$/,"\\1",1,$2)
     product=$3
 }
 
 /\/itr-[0-9]*:$/ {
-    name=gensub(/^.*-logs-(.*)\/itr-.*$/,"\\1",1)
+    name=gensub(/^.*logs-([^/]*)[/].*$/,"\\1",1)
 }
 
 (!/^#/) && /.*: *[0-9.-]+ *$/ {

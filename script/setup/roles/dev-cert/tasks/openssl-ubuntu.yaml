@@ -1,0 +1,11 @@
+
+- name: Install openssh-client
+  apt:
+    name: openssh-client
+    state: present
+    update_cache: yes
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+

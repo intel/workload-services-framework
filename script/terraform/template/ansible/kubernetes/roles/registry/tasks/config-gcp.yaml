@@ -1,0 +1,50 @@
+
+- name: Find GCP storage account adc.json
+  find:
+    paths: /home/.config/gcloud
+    patterns: 'adc.json'
+    recurse: yes
+  register: adcjson
+  delegate_to: localhost
+
+- block:
+
+    - name: create config.yaml
+      template:
+        src: "{{ k8s_registry_storage }}-config.yaml.j2"
+        dest: "/tmp/{{ wl_namespace }}-registry-config.yaml"
+        owner: root
+        mode: "0400"
+      become: yes
+
+    - name: copy key file
+      copy:
+        src: "/home/.config/gcloud/{{ k8s_registry_gcp_storage_key_file }}"
+        dest: "/tmp/{{ wl_namespace }}-registry-gcp.json"
+        owner: root
+        mode: "0400"
+      become: yes
+
+    - name: find home
+      shell:
+        cmd: "echo ~{{ ansible_user }}"
+        executable: /bin/bash
+      register: home
+
+    - name: create config.yaml secret
+      command: "kubectl create --kubeconfig={{ home.stdout }}/.kube/config --namespace=wsf-registry secret generic wsf-registry-config --from-file=config.yml=/tmp/{{ wl_namespace }}-registry-config.yaml --from-file=gcp.json=/tmp/{{ wl_namespace }}-registry-gcp.json"
+      become: yes
+
+  always:
+
+    - name: delete config.yaml
+      file:
+        path: "/tmp/{{ wl_namespace }}-registry-config.yaml"
+        state: absent
+      become: yes
+
+    - name: delete adc
+      file:
+        path: "/tmp/{{ wl_namespace }}-registry-gcp.json"
+        state: absent
+      become: yes

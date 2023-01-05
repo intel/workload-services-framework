@@ -1,0 +1,25 @@
+
+- import_playbook: ../terraform/template/ansible/docker/installation.yaml
+  vars:
+    wl_enable_reboot: true
+    wl_trace_modules: ''
+    wl_namespace: "install-docker"
+    k8s_node_labels: []
+
+- hosts: workload_hosts
+  become: yes
+  any_errors_fatal: true
+  gather_facts: no
+  tasks:
+
+  - name: Check Intel Certificate
+    stat:
+      path: "{{ playbook_dir }}/roles/intel-ca"
+    register: intelca
+    delegate_to: localhost
+
+  - name: Intall Intel Certificate
+    include_role:
+      name: intel-ca
+    when: intelca.stat.exists
+

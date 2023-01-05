@@ -1,0 +1,37 @@
+
+- name: "Ensure {{ dev_cert_conf_dir }} exists"
+  file:
+    path: "{{ dev_cert_conf_dir }}"
+    state: directory
+
+- name: Check if certificate exists
+  stat:
+    path: "{{ dev_cert_conf_dir }}/{{ dev_cert_host }}:{{ dev_registry_port }}.key"
+  register: cert
+
+- name: Detect OS
+  shell:
+    cmd: ". /etc/os-release; echo $ID"
+    executable: /bin/bash
+  register: os
+  when: not cert.stat.exists
+
+- name: Install OpenSSL
+  include_tasks:
+    file: "openssl-{{ os.stdout }}.yaml"
+  when: not cert.stat.exists
+
+- name: Create self-generated certificates
+  shell: 
+    cmd: |
+      openssl req -newkey rsa:4096 -nodes -sha256 -keyout {{ dev_cert_conf_dir }}/{{ dev_cert_host }}:{{ dev_registry_port }}.key --addext "subjectAltName = $(echo {{ dev_cert_host }} | grep -q -E '[0-9]*[.][0-9]*[.][0-9]*[.][0-9]*' && echo IP || echo DNS):{{ dev_cert_host }}" -x509 -days 365 -out {{ dev_cert_conf_dir }}/{{ dev_cert_host }}:{{ dev_registry_port }}.crt -subj /CN={{ dev_cert_host }}
+    executable: /bin/bash
+  when: not cert.stat.exists
+
+- name: fix permission
+  file:
+    path: "{{ dev_cert_conf_dir }}/{{ dev_cert_host }}:{{ dev_registry_port }}.key"
+    state: touch
+    mode: "400"
+  when: not cert.stat.exists
+

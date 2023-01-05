@@ -20,9 +20,11 @@ The `cluster.labels` section describes any must have system level setup that a w
 
 | Label | Description |
 |:-----:|:------------|
-| <pre>`HAS-SETUP-DISK</pre> | This set of labels specify that SSD disks be mounted on the worker node(s).<br>See also: [Storage Setup](setup-storage.md). | 
+| <pre>`HAS-SETUP-QAT`</pre> | This label specifies that the QAT kernel driver must be installed and configured on the system.<br>See also: [QAT Setup](setup-qat.md). |   
+| <pre>`HAS-SETUP-DISK-SPEC`</pre> | This set of labels specify that NVME disks be mounted on the worker node(s).<br>See also: [Storage Setup](setup-storage.md). | 
 | <pre>`HAS-SETUP-MODULE`</pre> | This set of labels specify the kernel modules that the workload must use.<br>See also: [Module Setup](setup-module.md). |
 | <pre>`HAS-SETUP-HUGEPAGE`</pre> | This set of labels specify the kernel hugepage settings.<br>See also: [Hugepage Setup](setup-hugepage.md) | 
+| <pre>`HAS-SETUP-GRAMINE-SGX`</pre> | This label specifies the SGX is enabled and GRAMINE software is installed on the system.<br>See also: [Gramine-SGX Setup](setup-gramine-sgx.md) |
 
 The label value is either `required` or `preferred` as follows:
 
@@ -32,47 +34,46 @@ cluster:
     HAS-SETUP-HUGEPAGE-2048kB-2048: required
 ```
 
-### cluster.cpuinfo
+### cluster.vm_group
 
-The `cluster.cpuinfo` section describes any CPU-related constraints that a workload must use. The cpuinfo section is currently declarative and is not enforced.  
-
-```
-cluster:
-- cpuinfo:
-    flags:
-    - "avx512f"
-```
-
-where the CPU flags must match what are shown by `lscpu` or `cat /proc/cpuinfo`.  
-
-### cluster.meminfo
-
-The `cluster.meminfo` section describes any memory constraints that a workload must use. The meminfo section is currently declarative and is not enforced. 
-
-> Please also use the Kubernetes [resource constraints](https://kubernetes.io/docs/tasks/configure-pod-container/assign-memory-resource) to specify the workload memory requirements.)   
+The `cluster.vm_group` section describes the worker group that this worker node belongs to. If not specified, assume it is the `worker` group.
 
 ```
 cluster:
-- meminfo:
-    available: 128
+- labels: {}
+  vm_group: client
 ```
 
-where the available memory is in the unit of GBytes. 
+### cluster.sysctls
 
-### kubernetes
-
-The `kubernetes` section describes the Kubernetes configurations. This section is currently optionally enforced.  
-- `cni`: Specify the CNI plugin: `flannel` or `calico`.  
-- `cni-options`: Specify the CNI option: `vxlan` (calico).  
-- `kubelet-options`: Specify the kubelet options as described in [`KubeletConfiguration`](https://kubernetes.io/docs/reference/config-api/kubelet-config.v1beta1/#kubelet-config-k8s-io-v1beta1-KubeletConfiguration).  
-- `kubevirt`: Specify whether to enable kubevirt: `true/false`.  
+The `cluster.sysctls` section describes the sysctls that the workload expects to use. The sysctls are specified per worker group. Multiple sysctls are merged together and applied to all the worker nodes in the same workgroup.  
 
 ```
-kubernetes:
-  cni: flannel
-  kubelet-options:
-    runtimeRequestTimeout: 10m
+cluster:
+- labels: {}
+  sysctls:
+    net.bridge.bridge-nf-call-iptables: 1
 ```
 
-> Note that CNIs may behave differently on CSPs. Calico BGP and VXLAN work on AWS but only VXLAN works on GCP and AZure.   
+### cluster.sysfs
+
+The `cluster.sysfs` section describes the `sysfs` controls that the workload expects to use. The `sysfs` controls are specified per worker group. Multiple controls are merged together and applied to all the worker nodes in the same workgroup.  
+
+```
+cluster:
+- labels: {}
+  sysfs:
+    /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor: performance
+```
+
+### terraform
+
+The `terraform` section overwrites the default configuration parameters of the terraform validation backend default. See [Terraform Options](`terraform-options#ansible-configuration-parameters`) for specific options.  
+
+```
+terraform:
+  k8s_cni: flannel
+```
+
+> Note that any specified options in `TERRAFORM_OPTIONS` take precedent. They will not be overriden by the parameters specified in this section.  
 

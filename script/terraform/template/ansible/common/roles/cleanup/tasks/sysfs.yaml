@@ -1,0 +1,24 @@
+
+- name: Remove sysfs service
+  systemd:
+    name: wsf-sysfs-settings
+    enabled: no
+    state: stopped
+  failed_when: false
+
+- name: Remove wsf-sysfs-settings.service
+  file:
+    path: /etc/systemd/system/wsf-sysfs-settings.service
+    state: absent
+  failed_when: false
+
+- name: Check if sysfs restore available
+  stat:
+    path: "{{ cleanup_restore_path }}/sysfs"
+  register: sysfssav
+
+- name: Restore sysfs settings
+  shell: "cat {{ cleanup_restore_path }}/sysfs | bash"
+  when: sysfssav.stat.exists
+  failed_when: false
+

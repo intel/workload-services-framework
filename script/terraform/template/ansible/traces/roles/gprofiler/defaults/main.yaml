@@ -1,0 +1,5 @@
+
+gprofiler_options: "--profiling-frequency=11 --profiling-duration=2"
+gprofiler_version: "latest"
+gprofiler_image: "docker.io/granulate/gprofiler"
+

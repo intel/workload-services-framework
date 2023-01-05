@@ -1,5 +1,5 @@
 
-The `docker` engine is a prerequsite to build the workload images. It is also one of the validation backends that can be used to run single-container workloads on your local machine.
+The `docker` engine is a prerequisite to build the workload images. It is also one of the validation backends that can be used to run single-container workloads on your local machine.  
 
 ### Setup Docker
 

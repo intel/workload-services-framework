@@ -13,7 +13,6 @@ then
     exit 3
 fi
 
-
 FIRST_CORE_SOCKET2=$(lscpu | grep "NUMA node0 CPU(s):" | awk '{print $4}' | awk '{split($1, arr, ","); print arr[2]}' | awk '{split($1, arr, "-"); print arr[1]}')
 if [ "$BIND_CORE" == "1c1t" ] ; then
     LAST_CORE=$(( $PROCESSES - 1 ))
@@ -36,32 +35,47 @@ if [ "$BIND" == "true" ] ; then
 fi
 
 case $CONFIG in
-qatsw-rsa)
+qathw-rsa | qatsw-rsa)
     $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} rsa512
     $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} rsa1024
     $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} rsa2048
     $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} rsa3072
     $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} rsa4096
     ;;
-qatsw-dsa)
+qathw-rsa-bkc)
+    $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} rsa2048
+    $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} rsa3072
+    ;;
+qathw-dsa | qatsw-dsa | qathw-dsa-bkc)
     $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} dsa
     ;;
-qatsw-ecdsa)
+qathw-ecdsa | qatsw-ecdsa | qathw-ecdsa-bkc)
     $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} ecdsap256
     ;;
-qatsw-ecdh)
+qatsw-ecdh | qathw-ecdh)
     $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} ecdhx25519
     $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} ecdhp256
     ;;
-qatsw-aes-sha)
+qathw-ecdh-bkc)
+    $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} ecdhp256
+    $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} ecdhx448
+    $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} ecdhx25519
+    ;;
+qathw-aes-sha | qatsw-aes-sha)
     $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} -evp aes-128-cbc-hmac-sha1
     $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} -evp aes-128-cbc-hmac-sha256
     $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} -evp aes-256-cbc-hmac-sha1
     $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} -evp aes-256-cbc-hmac-sha256
     ;;
-qatsw-aes-gcm)
+qathw-aes-gcm | qatsw-aes-gcm)
     $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} -evp aes-128-gcm
     $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} -evp aes-256-gcm
+    ;;
+qathw-aes-sha-bkc)
+    $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} -bytes 1024 -evp aes-128-cbc-hmac-sha1
+    ;;
+qathw-aes-gcm-bkc)
+    $BIND_CMD openssl speed -engine qatengine -async_jobs ${ASYNC_JOBS} -multi ${PROCESSES} -bytes 1024 -evp aes-128-gcm
     ;;
 sw-rsa)
     $BIND_CMD openssl speed -multi ${PROCESSES} rsa

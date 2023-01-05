@@ -22,7 +22,5 @@ spec:
           value: "BIND"
         - name: `ASYNC_JOBS'
           value: "ASYNC_JOBS"
-        securityContext:
-          privileged: true
       restartPolicy: Never
   backoffLimit: 4

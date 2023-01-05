@@ -1,0 +1,12 @@
+
+- block:
+
+    - name: collect trace data
+      include_role:
+        name: "{{ trace_node.0 }}"
+        tasks_from: collect
+      vars:
+        trace_from: kubernetes
+
+  ignore_errors: yes
+

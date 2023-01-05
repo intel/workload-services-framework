@@ -1,0 +1,2 @@
+local_daemon_url: "localhost:12222"
+control_path: "/tmp/daemon-forwarding-%h-%p-%r"

@@ -1,0 +1,8 @@
+[Unit]
+Description=WSF workload sysfs settings
+
+[Service]
+ExecStart=/bin/bash -c 'echo {{ ((wl_default_sysfs.values() | list) + (wl_sysfs.values() | list)) | zip((wl_default_sysfs.keys() | list) + (wl_sysfs.keys() | list)) | map("join", " | tee ") | join(";echo ") }};exit 0'
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+
+- name: Turn off incompatible services
+  systemd:
+    name: "{{ item }}"
+    enabled: no
+    state: stopped
+  loop:
+  - tuned
+  - ondemand
+  failed_when: false
+

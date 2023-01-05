@@ -1,5 +1,12 @@
 #!/bin/bash -e
 
+if [ -r "$SCRIPT/$BACKEND/vars.sh" ]; then
+    for _k in $(compgen -e); do
+        eval "_v=\"\$$_k\""
+        . "$SCRIPT/$BACKEND/vars.sh" "$_k" "$_v"
+    done
+fi
+
 if [ -r "$TEST_CONFIG" ]; then
     TESTCASE_CUSTOMIZED=""
     _insection=0
@@ -19,11 +26,13 @@ if [ -r "$TEST_CONFIG" ]; then
                 _insection=0;;
             esac
         elif [ $_insection -gt 0 ] && [ ${#_prefix1} -gt $_prefix ]; then
-            eval "_tmp2=\"\${$_k}\""
             if [ "$_v" != "$_tmp2" ]; then
+                TESTCASE_CUSTOMIZED="_customized"
                 eval "export $_k=\"$_v\""
                 echo "OVERWRITE: $_k=$_v"
-                TESTCASE_CUSTOMIZED="_customized"
+            fi
+            if [ -r "$SCRIPT/$BACKEND/vars.sh" ]; then
+                . "$SCRIPT/$BACKEND/vars.sh" "$_k" "$_v"
             fi
         fi
     done < <(cat "$TEST_CONFIG"; echo)

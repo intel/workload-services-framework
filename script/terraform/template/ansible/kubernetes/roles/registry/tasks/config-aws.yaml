@@ -1,0 +1,32 @@
+
+- block:
+
+    - name: create config.yaml
+      template:
+        src: "{{ k8s_registry_storage }}-config.yaml.j2"
+        dest: "/tmp/{{ wl_namespace }}-registry-config.yaml"
+        owner: root
+        mode: "0400"
+      vars:
+        k8s_registry_aws_storage_access_key: "{{ lookup('ini', 'aws_access_key_id', section='default', file='/home/.aws/credentials') | b64encode }}" 
+        k8s_registry_aws_storage_secret_key: "{{ lookup('ini', 'aws_secret_access_key', section='default', file='/home/.aws/credentials') | b64encode }}"
+      become: yes
+
+    - name: find home
+      shell:
+        cmd: "echo ~{{ ansible_user }}"
+        executable: /bin/bash
+      register: home
+
+    - name: create config.yaml secret
+      command: "kubectl create --kubeconfig={{ home.stdout }}/.kube/config --namespace=wsf-registry secret generic wsf-registry-config --from-file=config.yml=/tmp/{{ wl_namespace }}-registry-config.yaml"
+      become: yes
+
+  always:
+
+    - name: delete config.yaml
+      file:
+        path: "/tmp/{{ wl_namespace }}-registry-config.yaml"
+        state: absent
+      become: yes
+

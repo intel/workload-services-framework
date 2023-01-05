@@ -1,0 +1,12 @@
+
+- name: Install perf
+  yum:
+    name: 
+      - perf
+    state: present
+  become: yes
+  register: yumrc
+  until: yumrc is success
+  retries: 10
+  delay: 10
+

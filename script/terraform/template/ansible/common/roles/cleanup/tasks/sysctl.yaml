@@ -1,0 +1,17 @@
+
+- name: Remove sysctls from /etc/sysctl.d
+  file:
+    path: /etc/sysctl.d/99-wsf-sysctls.conf
+    state: absent
+  failed_when: false
+
+- name: Check if sysctl restore available
+  stat:
+    path: "{{ cleanup_restore_path }}/sysctls"
+  register: sysctlssav
+
+- name: Restore sysctl settings
+  command: "sysctl -p{{ cleanup_restore_path }}/sysctls -q"
+  when: sysctlssav.stat.exists
+  failed_when: false
+

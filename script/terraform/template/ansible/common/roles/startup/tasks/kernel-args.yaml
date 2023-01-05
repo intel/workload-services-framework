@@ -1,0 +1,51 @@
+
+    - name: Detect OS
+      shell: 
+        cmd: ". /etc/os-release; echo $ID"
+        executable: /bin/bash
+      register: os
+
+    - name: Ensure file exists
+      file:
+        path: "{{ startup_hugepage_actions[os.stdout]['grub_path'] }}"
+        state: touch
+      ignore_errors: yes
+
+    - name: add kernel parameters
+      blockinfile:
+        path: "{{ startup_hugepage_actions[os.stdout]['grub_path'] }}"
+        block: |
+          GRUB_CMDLINE_LINUX_DEFAULT="${GRUB_CMDLINE_LINUX_DEFAULT} {{ wl_kernel_args.values() | join(' ') }} {{ wl_set_default_hugepagesz | ternary(wl_kernel_args.keys() | select('regex', '^hugepagesz=') | first | default('') | replace('hugepagesz=', 'default_hugepagesz='), '') }}"
+      register: kargs
+      ignore_errors: yes
+
+    - name: update grub
+      shell: "{{ startup_hugepage_actions[os.stdout]['update_grub_cmd'] }}"
+      when: kargs.msg == "Block inserted"
+      ignore_errors: yes
+
+    - name: reboot
+      command: "reboot"
+      async: 1
+      poll: 0
+      ignore_errors: yes
+      when: kargs.msg == "Block inserted"
+
+    - name: wait for the machine to come back
+      wait_for_connection:
+        connect_timeout: 1
+        sleep: 1
+        delay: 1
+        timeout: 1800
+      ignore_errors: yes
+      when: kargs.msg == "Block inserted"
+
+    - name: force hugepage allocation
+      shell:
+        cmd: |
+          echo {{ item.value | regex_replace('.*=', '') }} > /sys/kernel/mm/hugepages/hugepages-{{ item.key | regex_replace('.*=', '') }}B/nr_hugepages
+        executable: /bin/bash
+      when: item.key.startswith("hugepagesz=")
+      with_dict: "{{ wl_kernel_args }}"
+      ignore_errors: yes
+

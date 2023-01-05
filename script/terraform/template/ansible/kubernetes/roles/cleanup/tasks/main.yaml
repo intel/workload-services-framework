@@ -1,0 +1,8 @@
+
+- name: Uninstall Istio if installed
+  include_role:
+    name: istio
+    tasks_from: uninstall
+  when:
+  - k8s_istio_profile is defined
+  - k8s_istio_profile | trim != ""

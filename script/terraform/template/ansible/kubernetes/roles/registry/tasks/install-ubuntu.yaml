@@ -1,0 +1,11 @@
+
+  - name: copy cert to workers
+    copy:
+      src: "/tmp/{{ wl_namespace }}-registry-cert-{{ k8s_registry_ip }}:{{ k8s_registry_port }}-{{ ansible_host }}.crt"
+      dest: "/usr/local/share/ca-certificates/wsf-certificate.crt"
+    become: yes
+
+  - name: update certificates
+    command: update-ca-certificates
+    become: yes
+

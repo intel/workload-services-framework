@@ -3,7 +3,7 @@
 
 ### Prerequisite
 
-Starting Kubernetes v1.20, Kubernetes deprecated docker as a runtime and used containerd instead. Follow the [instructions](setup-containerd.md) to install and configure `containerd` on your system. 
+Starting Kubernetes v1.20, Kubernetes deprecated docker as a runtime and used containerd instead. Follow the [instructions](setup-containerd.md) to install and configure `containerd` on your system.
 
 ### Setup Kubernetes
 
@@ -20,7 +20,7 @@ kubectl taint node --all node-role.kubernetes.io/control-plane-  # >= v1.20
 
 ---
 
-### Setup Node Feature Discovery
+### Setup Node Feature Discovery (Manually)
 
 Install node feature discovery as follows:
 
@@ -28,18 +28,3 @@ Install node feature discovery as follows:
 kubectl apply -k https://github.com/kubernetes-sigs/node-feature-discovery/deployment/overlays/default
 ```
 
-### Setup arm64 Emulation
-
-You can setup any worker node as an arm64 emulator. To do so, run the [`setup.sh`](../script/march/setup.sh) script on each worker node to setup the arm64 emulation. 
-
-```
-script/march/setup.sh
-```
-
-### See Also
-
-- [Docker Setup](setup-docker.md)  
-- [Kubernetes Setup](setup-kubernetes.md)  
-- [Private Registry Authentication](setup-auth.md)
-- [Cumulus Setup](setup-cumulus.md)  
-- [`cluster-config.yaml`](cluster-config.md)  

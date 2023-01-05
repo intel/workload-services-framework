@@ -1,0 +1,18 @@
+
+- hosts: all
+  any_errors_fatal: true
+  gather_facts: no
+  tasks:
+
+    - name: Create the svrinfo directory
+      file:
+        path: "{{ wl_logs_dir }}/{{ inventory_hostname }}-svrinfo"
+        state: directory
+      delegate_to: localhost
+      ignore_errors: yes
+
+    - name: Run svrinfo
+      command: "/usr/local/src/svr-info/svr-info -format json,html -ip {{ ansible_host }} -port {{ ansible_port | default(22) }} -user {{ ansible_user }} -key {{ ansible_ssh_private_key_file }} -output {{ wl_logs_dir }}/{{ inventory_hostname }}-svrinfo"
+      delegate_to: localhost
+      ignore_errors: yes
+

@@ -1,0 +1,98 @@
+---
+### build / configure Intel Device Plugins Operator before Intel QAT Device Plugin
+- name: apply default Intel Device Plugins Operator configuration
+  command:
+    cmd: "kubectl apply -k https://github.com/intel/intel-device-plugins-for-kubernetes//deployments/operator/default?ref={{ dp_operator_ref }}"
+  changed_when: true
+
+- debug:
+    msg: "Wait for Intel Device Plugin Operator to become fully available. Maximum wait time is 120 Sec..."
+
+- name: wait for Intel Device Plugin Operator to become fully available
+  k8s_info:
+    kind: Deployment
+    name: inteldeviceplugins-controller-manager
+    namespace: "{{ dp_operator_namespace }}"
+    wait: yes
+    wait_condition:
+      reason: MinimumReplicasAvailable
+      type: Available
+    wait_timeout: 120
+  failed_when: false
+
+- name: verify default Intel Device Plugin Operator after configured
+  shell:
+     cmd: "kubectl get pods --all-namespaces | grep 'inteldeviceplugins-controller-manager'"
+  register: verify_dp_operator_status
+
+- debug:
+    var: verify_dp_operator_status.stdout_lines
+
+### build / configure Intel DSA Device Plugin
+- name: create configuration directory if it does not exist for DSA Device Plugin
+  file:
+    path: "{{ dsa_device_plugin_dir }}"
+    state: directory
+    mode: '0700'
+
+- name: set nodes names for NFD labels
+  shell: kubectl get nodes | grep -v -i NAME | awk '{print $1}' | tr "\n" " "
+  args:
+     executable: /bin/bash
+  register: set_node_names_for_labels
+
+- name: add DSA Device Plugin labels to nodes
+  command:
+    cmd: "kubectl label nodes  {{ set_node_names_for_labels.stdout  }} {{ dsa_dp_labels }} --overwrite"
+  loop_control:
+    loop_var: dsa_dp_labels
+  loop: "{{ dsa_device_plugin_nodeselector }}"
+  changed_when: true
+
+- name: transfer Intel DSA Device Plugin yaml file and push to controller
+  template:
+    src: "dsa-intel-device-plugin.yml.j2"
+    dest: "{{ dsa_device_plugin_dir }}/dsa-intel-device-plugin.yml"
+    force: yes
+    mode: preserve
+
+- name: Intel DSA Device Plugin deploy with the Intel Device Plugin Operator
+  k8s:
+   state: present
+   src: "{{ dsa_device_plugin_dir }}/dsa-intel-device-plugin.yml"
+
+- debug:
+    msg: "Wait for Intel DSA Device Plugin Operator to become fully available. Maximum wait time is 45 sec"
+
+- name: wait for DSA Device Plugin to become fully available
+  k8s_info:
+    kind: Deployment
+    name: intel-dsa-plugin
+    namespace: "{{ intel_dsa_dp_namespace }}"
+    wait: yes
+    wait_condition:
+      reason: MinimumReplicasAvailable
+      type: Available
+    wait_timeout: 45
+  failed_when: false
+
+- name: verify DSA DP presence with NFD
+  shell:
+    cmd: "kubectl get no -o json | jq .items[].metadata.labels | grep dsa"
+  args:
+     executable: /bin/bash
+  changed_when: true
+  register: verify_nfd_output_for_dsa
+
+- debug:
+    var: verify_nfd_output_for_dsa.stdout_lines
+    
+- name: verify DSA presence on all namespaces
+  shell:
+    cmd: "kubectl get pods --all-namespaces | grep inteldeviceplugins"
+  args:
+     executable: /bin/bash
+  register: verify_dsa_dp_status
+
+- debug:
+    var: verify_dsa_dp_status.stdout_lines

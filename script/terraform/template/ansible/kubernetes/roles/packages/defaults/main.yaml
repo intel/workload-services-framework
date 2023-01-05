@@ -1,0 +1,15 @@
+
+k8s_version: "1.24.4-*"
+
+k8s_repo_key_url: 
+  ubuntu: "https://packages.cloud.google.com/apt/doc/apt-key.gpg"
+  debian: "https://packages.cloud.google.com/apt/doc/apt-key.gpg"
+  centos:
+    - "https://packages.cloud.google.com/yum/doc/yum-key.gpg"
+    - "https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg"
+
+k8s_repo_url: 
+  ubuntu: "http://apt.kubernetes.io/"
+  debian: "http://apt.kubernetes.io/"
+  centos: "https://packages.cloud.google.com/yum/repos/kubernetes-el7-$basearch"
+

@@ -5,7 +5,8 @@ if [ "$#" -eq 0 ]; then
     echo "--loop <number>       Run the ctest commands sequentially."
     echo "--burst <number>      Run the ctest commands simultaneously."
     echo "--run <number>        Run the ctest commands on same SUT (only with cumulus)."
-    echo "--test-config <yaml>  Specify the test-config yaml."
+    echo "--config <yaml>       Specify the test-config yaml."
+    echo "--options <options>   Specify additional backend options."
     echo "--nohup               Run the script as a daemon."
     echo "--stop                Kill all ctest sessions."
     echo "--set <vars>          Set variable values between burst and loop iterations."
@@ -13,7 +14,7 @@ if [ "$#" -eq 0 ]; then
     echo "--prepare-sut         Prepare cloud SUT for reuse."
     echo "--reuse-sut           Reuse the cloud SUT previously prepared."
     echo "--cleanup-sut         Cleanup cloud SUT."
-    echo "--dry-run             Generate the testcase configurations and then exit."  
+    echo "--dry-run             Generate the testcase configurations and then exit."
     echo "ctest options apply"
     echo ""
     echo "<vars> accepts the following formats:"
@@ -61,19 +62,26 @@ sut=()
 cleanup_sut=0
 reuse_sut=0
 dry_run=0
+run_as_ctest=1
+options=""
+empty_vars=()
 for var in "$@"; do
     case "$var" in
     --loop=*)
         loop="${var/--loop=/}"
+        run_as_ctest=0
         ;;
     --loop)
         loop="-1"
+        run_as_ctest=0
         ;;
     --burst=*)
         burst="${var/--burst=/}"
+        run_as_ctest=0
         ;;
     --burst)
         burst="-1"
+        run_as_ctest=0
         ;;
     --run=*)
         run="${var/--run=/}"
@@ -83,18 +91,29 @@ for var in "$@"; do
         ;;
     --prepare-sut)
         prepare_sut=1
+        run_as_sut=0
         ;;
     --set=*)
-        steps+=("${var/--set=/}")
+        if [[ "$var" =~ ^--set=[A-Za-z0-9_]*=$ ]]; then
+          empty_vars+=(${var/--set=/})
+        else 
+          steps+=("${var/--set=/}")
+        fi
         ;;
     --set)
         step="-1"
         ;;
-    --test-config=*)
-        test_config="$(readlink -f "${var/--test-config=/}")"
+    --test-config=*|--config=*)
+        export TEST_CONFIG="${var/*=/}"
         ;;
-    --test-config)
+    --test-config|--config)
         test_config="-1"
+        ;;
+    --options=*)
+        export CTESTSH_OPTIONS="$CTESTSH_OPTIONS ${var/--options=/}"
+        ;;
+    --options)
+        options="-1"
         ;;
     --continue)
         contf=1
@@ -116,10 +135,17 @@ for var in "$@"; do
         elif [ "$run" = "-1" ]; then
             run="$var"
         elif [ "$step" = "-1" ]; then
-            steps+=("$var")
+            if [[ "$var" =~ ^[A-Za-z0-9_]*=$ ]]; then
+              empty_vars+=("$var")
+            else
+              steps+=("$var")
+            fi
             step=1
         elif [ "$test_config" = "-1" ]; then
-            test_config="$(readlink -f "$var")"
+            export TEST_CONFIG="$var"
+        elif [ "$options" = "-1" ]; then
+            export CTESTSH_OPTIONS="$CTESTSH_OPTIONS $var"
+            options=""
         else
             args+=("$var")
         fi
@@ -150,9 +176,13 @@ if [ $reuse_sut = 1 ]; then
 fi
 
 readarray -t values < <(for step1 in "${steps[@]}"; do
-    echo "$step1" | tr '/' '\n' | awk '{
-        split($1,kv,"=")
-        $1=kv[2]
+    if [ $(echo "$step1" | tr '/' '\n' | wc -l) -lt $(echo "$step1" | tr '=' '\n' | wc -l) ]; then
+        echo "$step1" | tr '/' '\n'
+    else
+        echo "$step1"
+    fi | awk '{
+        kk=gensub(/^([^=]*)=.*/,"\\1",1,$1)
+        $1=gensub(/^[^=]*=(.*)/,"\\1",1,$1)
         if ($NF~/^\|[0-9]+$/ || $NF~/^[0-9]+\|$/) {
             modstr=$NF
             NF=NF-1
@@ -205,7 +235,7 @@ readarray -t values < <(for step1 in "${steps[@]}"; do
             NF=j
         }
         for(k=1;k<=NF;k++)
-            vars[kv[1]][k]=$k
+            vars[kk][k]=$k
     }
     END {
         nk=1
@@ -235,15 +265,15 @@ remove_tmp_files () {
 }
 trap 'remove_tmp_files' ERR EXIT
 
-
+test_config="$(readlink -f "$TEST_CONFIG" || echo "")"
 for loop1 in $(seq 1 $loop); do
     loop_prefix="$(date +%m%d-%H%M%S)-"
     while [ -d "$loop_prefix"* ]; do
         sleep 1s
         loop_prefix="$(date +%m%d-%H%M%S)-"
     done
+    [ $cleanup_sut = 1 ] || [ $dry_run = 1 ] || [ $run_as_ctest = 1 ] && loop_prefix=""
     [ $prepare_sut = 1 ] && loop_prefix="sut-"
-    [ $cleanup_sut = 1 ] && loop_prefix=""
     pids=()
     for burst1 in $(seq 1 $burst); do
         echo "Loop: $loop1 Burst: $burst1 Run: $run"
@@ -253,7 +283,7 @@ for loop1 in $(seq 1 $loop); do
             export TEST_PREFIX="${loop_prefix}r$burst1-"
         fi
         export TEST_CONFIG="$test_config"
-        if [ ${#values[@]} -gt 0 ]; then
+        if [ ${#values[@]} -gt 0 ] || [ ${#empty_vars[@]} -gt 0 ]; then
             tmp="$(mktemp)"
             if [ -n "$TEST_CONFIG" ]; then
                 cp -f "$TEST_CONFIG" $tmp
@@ -267,11 +297,15 @@ for loop1 in $(seq 1 $loop); do
                 echo "$key1: $val1"
                 echo "  $key1: \"$val1\"" >> $tmp
             done
+            for var1 in "${empty_vars[@]}"; do
+                echo "${var1%=}:"
+                echo "  ${var1%=}: \"\"" >> $tmp 
+            done
             tmp_files+=($tmp)
         fi
         (   
             export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --run_stage_iterations=$run"
-            [ $prepare_sut = 1 ] && export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --run_stage=provision,prepare"
+            [ $prepare_sut = 1 ] && export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --prepare-sut"
             [ $cleanup_sut = 1 ] && export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --cleanup-sut"
             [ $reuse_sut = 1 ] && export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --reuse-sut"
             [ $dry_run = 1 ] && export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --dry-run"

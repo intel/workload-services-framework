@@ -1,0 +1,56 @@
+
+- name: detect if nfd should be installed or not
+  command: "grep -q -F feature.node.kubernetes.io {{ wl_logs_dir }}/kubernetes-config.yaml"
+  register: install_nfd
+  delegate_to: localhost
+  failed_when: false
+
+- name: verify NFD configuration
+  shell: "kubectl get node -o jsonpath --template='{.items[*].metadata.labels}' | grep -q -F feature.node.kubernetes.io"
+  register: nfd_check
+  when:
+  - (install_nfd.rc == 0) or (k8s_enable_nfd | default('false') | bool)
+  ignore_errors: yes
+
+- name: install git prerequisite
+  package:
+    name: 
+    - git
+  become: yes
+  when: 
+  - (install_nfd.rc == 0) or (k8s_enable_nfd | default('false') | bool)
+  - nfd_check != 0
+  register: pkgrc
+  until: pkgrc is success
+  retries: 10
+  delay: 10
+   
+- name: apply default NFD configuration
+  shell: "kubectl kustomize '{{ k8s_nfd_url }}' | sed 's|k8s.gcr.io/nfd|{{ k8s_nfd_registry }}|g' | kubectl apply -f -"
+  register: nfd_applied
+  until: nfd_applied is success
+  retries: 10
+  delay: 10
+  when: 
+  - (install_nfd.rc == 0) or (k8s_enable_nfd | default('false') | bool)
+  - nfd_check != 0
+
+- name: wait for NFD to become fully available
+  shell: "kubectl get node -o jsonpath --template='{.items[*].metadata.labels}' | grep -q -F feature.node.kubernetes.io"
+  register: nfd_info
+  until: nfd_info.rc == 0
+  retries: "{{ k8s_nfd_retries }}"
+  delay: 10
+  when:
+  - (install_nfd.rc == 0) or (k8s_enable_nfd | default('false') | bool)
+  - nfd_check != 0
+
+- name: Install NFD plugins
+  include_role:
+    name: "nfd-dp-{{ plugin }}"
+  loop: "{{ k8s_nfd_dp_plugins | default([]) }}"
+  loop_control:
+    loop_var: plugin
+  when: 
+  - (install_nfd.rc == 0) or (k8s_enable_nfd | default('false') | bool)
+

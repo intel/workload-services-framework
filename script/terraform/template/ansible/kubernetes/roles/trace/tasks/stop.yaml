@@ -1,0 +1,10 @@
+
+- name: stop trace
+  include_tasks:
+    file: stop-block.yaml
+  loop: "{{ wl_trace_modules | default() | split(',') | product(groups['trace_hosts']) | list }}"
+  loop_control:
+    loop_var: trace_node
+  when: wl_trace_mode | split(',') | length < 3
+  ignore_errors: yes
+

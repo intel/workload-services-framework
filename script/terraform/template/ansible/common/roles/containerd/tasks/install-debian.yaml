@@ -1,0 +1,16 @@
+
+
+  - name: install containerd
+    apt:
+      name:
+      - "containerd={{ containerd_version | default(containerd_default_version['debian']) }}"
+      state: present
+      update_cache: yes
+    become: yes
+    register: aptrc
+    until: aptrc is success
+    retries: 10
+    delay: 10
+
+
+

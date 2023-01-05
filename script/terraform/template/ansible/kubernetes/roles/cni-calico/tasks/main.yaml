@@ -1,0 +1,85 @@
+
+# - name: Debug variables
+#   debug: 
+#     msg: |
+#       Module Variables ("vars"):
+#       --------------------------------
+#       {{ vars }} 
+#       Host Variables ("hostvars"):
+#       --------------------------------
+#       {{ hostvars }} 
+
+- block:
+  - name: Download calico file locally
+    delegate_to: localhost
+    get_url:
+      url: "{{ k8s_calico_manifest }}"
+      dest: "{{ inventory_dir }}/calico-customized.yaml"
+      mode: 0755
+    when: k8s_calico_options | trim == ""
+
+  - name: Download calico vxlan file
+    delegate_to: localhost
+    get_url:
+      url: "{{ k8s_calico_vxlan_manifest }}"
+      dest: "{{ inventory_dir }}/calico-customized.yaml"
+      mode: 0755
+    when: k8s_calico_options | trim == "vxlan"
+
+  - name: Replace CALICO_IPV4POOL_CIDR and append IP_AUTODETECTION_METHOD
+    delegate_to: localhost
+    lineinfile:
+      dest: "{{ inventory_dir }}/calico-customized.yaml"
+      insertafter: '#   value: "192.168.0.0/16"'
+      line: "            - name: CALICO_IPV4POOL_CIDR\n              value: \"{{ hostvars['controller-0']['kubeadm_options']['ClusterConfiguration']['networking']['podSubnet'] }}\"\n            - name: IP_AUTODETECTION_METHOD\n              value: \"can-reach={{ private_ip }}\""
+
+  - name: Replace CrossSubnet with Always if vxlan
+    delegate_to: localhost
+    ansible.builtin.replace:
+      path: "{{ inventory_dir }}/calico-customized.yaml"
+      after: '- name: CALICO_IPV4POOL_VXLAN'
+      regexp: 'CrossSubnet'
+      replace: 'Always'
+    when: k8s_calico_options | trim == "vxlan"
+
+# - name: Debug calico-customized.yaml
+#   debug:
+#     msg: "{{ item }}"
+#   with_file:
+#     - "/tmp/calico-customized.yaml"
+
+- name: Copy calico-customized.yaml to remote 
+  ansible.builtin.copy:
+    src: "{{ inventory_dir }}/calico-customized.yaml"
+    dest: /tmp/calico-customized.yaml
+
+- name: Install Calico Pod Network
+  become_user: "{{ ansible_user }}"
+  become_method: sudo
+  become: yes
+  command: "{{ item }}"
+  with_items:
+    - kubectl apply -f /tmp/calico-customized.yaml
+
+# calicoctl is helpful to diagnose calico networking
+- name: Download calicoctl locally
+  delegate_to: localhost
+  get_url:
+    url: "{{ k8s_calicoctl }}"
+    dest: "{{ inventory_dir }}/calicoctl"
+    mode: +rx
+
+- name: Copy calicoctl to remote
+  ansible.builtin.copy:
+    src: "{{ inventory_dir }}/calicoctl"
+    dest: /usr/local/bin/calicoctl
+    mode: +rx
+  become: true
+
+- name: Delete calico resource files
+  file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - "{{ inventory_dir }}/calico-customized.yaml"
+    - "{{ inventory_dir }}/calicoctl"
