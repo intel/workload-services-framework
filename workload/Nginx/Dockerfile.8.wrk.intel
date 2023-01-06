@@ -1,0 +1,39 @@
+# nginx-client-wrk
+
+FROM rockylinux:8.6 as build
+RUN dnf install -y git make gcc-c++ unzip && dnf -y update
+
+ARG OPENSSL_VER="1_1_1n"
+ARG OPENSSL_REPO=https://github.com/openssl/openssl.git
+RUN git clone -b OpenSSL_${OPENSSL_VER} --depth 1 ${OPENSSL_REPO}
+RUN cd /openssl && \
+    ./config && \
+    make depend && \
+    make -j && \
+    make install_sw
+
+ARG WRK_VER=4.2.0
+ARG WRK_REPO=https://github.com/wg/wrk.git
+RUN git clone --depth 1 -b ${WRK_VER} ${WRK_REPO} && \
+    cd wrk && \
+    sed -i "s/-O2/-O3/g" Makefile && \
+    make -j WITH_OPENSSL=/usr/local && \
+    strip wrk && \
+    cp wrk /usr/local/bin
+
+FROM rockylinux:8.6
+RUN dnf install -y wget && dnf -y update
+
+COPY --from=build /usr/local/ /usr/local/
+COPY run_wrk.sh /
+
+ENV  OPENSSL_ENGINES=/usr/local/lib64/engines-1.1
+
+RUN rm -rf /usr/share/man/* && \
+echo "/usr/local/lib64" >> /etc/ld.so.conf.d/all-libs.conf && ldconfig && \
+strip /usr/bin/*; strip /usr/sbin/*; strip /usr/local/bin/*; strip /usr/local/sbin/* || exit 0;
+
+RUN mkfifo /export-logs
+CMD (ldconfig && /run_wrk.sh;echo $? > status) | tee output.log && \
+    tar cf /export-logs status output.log && \
+    sleep infinity

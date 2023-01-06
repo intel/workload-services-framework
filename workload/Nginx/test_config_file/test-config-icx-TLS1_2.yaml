@@ -1,0 +1,16 @@
+# test-config-icx.yaml
+# Overwrite the test cases for performance tunning on ICX 8358
+
+*_qatsw_off*:
+  NGINX_WORKERS: 4
+  CLIENT_CPU_NUM: 4
+  CONCURRENCY: 100
+  PROTOCOL: "TLSv1.2"
+  CIPHER: "AES128-GCM-SHA256"
+
+*_qatsw_async*:
+  NGINX_WORKERS: 4
+  CLIENT_CPU_NUM: 4
+  CONCURRENCY: 100
+  PROTOCOL: "TLSv1.2"
+  CIPHER: "AES128-GCM-SHA256"

@@ -1,0 +1,68 @@
+# nginx-original
+
+FROM rockylinux:8.6 AS build
+
+RUN dnf -y install epel-release dnf-plugins-core
+RUN dnf config-manager --set-enabled powertools
+RUN dnf group -y install "Development Tools"
+RUN dnf -y install cpuid cmake numactl wget pcre pcre-devel libarchive nasm
+RUN dnf -y update
+
+ARG OPENSSL_VER="1_1_1n"
+ARG OPENSSL_REPO=https://github.com/openssl/openssl.git
+RUN git clone -b OpenSSL_${OPENSSL_VER} --depth 1 ${OPENSSL_REPO}
+RUN cd /openssl && \
+    ./config && \
+    make depend && \
+    make -j && \
+    make install
+
+ARG NGINX_VER="1.20.2"
+ARG NGINX_PACKAGE=http://nginx.org/download/nginx-${NGINX_VER}.tar.gz
+RUN wget ${NGINX_PACKAGE} && tar xf nginx-${NGINX_VER}.tar.gz && \
+    cd nginx-${NGINX_VER} && \
+    ./configure \
+      --prefix=/var/www \
+      --conf-path=/usr/local/share/nginx/conf/nginx.conf \
+      --sbin-path=/usr/local/bin/nginx \
+      --pid-path=/run/nginx.pid \
+      --lock-path=/run/lock/nginx.lock \
+      --modules-path=/var/www/modules/ \
+      --without-http_rewrite_module \
+      --with-http_ssl_module \
+      --with-pcre \
+      --with-cc-opt="-O3 -I/usr/local/include/openssl \
+	  -Wno-error=deprecated-declarations -Wimplicit-fallthrough=0" \
+      --with-ld-opt="-Wl,-rpath=/usr/local/lib64 -L/usr/local/lib64" && \
+    make -j && \
+    make install
+
+FROM rockylinux:8.6
+RUN dnf -y install epel-release dnf-plugins-core && \
+    dnf config-manager --set-enabled powertools && \
+    dnf -y install ufw && \
+    dnf install -y numactl iptables && dnf -y update
+
+ENV  OPENSSL_ENGINES=/usr/local/lib64/engines-1.1
+
+COPY --from=build /usr/local/ /usr/local/
+COPY --from=build /var/www/ /var/www/
+
+RUN echo "/usr/local/lib64" >> /etc/ld.so.conf.d/all-libs.conf && ldconfig
+
+COPY conf/*.conf /usr/local/share/nginx/conf/
+COPY prepare_nginx.sh /
+
+RUN rm -f /var/www/html/index.html && touch /var/www/html/index.html && \
+dd bs=1 count=1024 if=/dev/urandom of=/var/www/html/random_content_1KB && \
+dd bs=1 count=2048 if=/dev/urandom of=/var/www/html/random_content_2KB && \
+dd bs=1 count=4096 if=/dev/urandom of=/var/www/html/random_content_4KB && \
+dd bs=512 count=1024 if=/dev/urandom of=/var/www/html/random_content_512KB && \
+dd bs=1024 count=1024 if=/dev/urandom of=/var/www/html/random_content_1MB && \
+dd bs=1024 count=4096 if=/dev/urandom of=/var/www/html/random_content_4MB && \
+strip /usr/bin/*; strip /usr/sbin/*; strip /usr/local/bin/*; strip /usr/local/sbin/* || exit 0;
+
+RUN mkfifo /export-logs
+CMD (ldconfig && /prepare_nginx.sh; echo $? > status) 2>&1 | tee output.logs && \
+    tar cf /export-logs status output.logs && \
+    sleep infinity
