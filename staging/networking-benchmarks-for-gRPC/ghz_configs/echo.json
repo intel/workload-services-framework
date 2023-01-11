@@ -1,0 +1,20 @@
+{
+    "proto": "protos/main.proto",
+    "call": "benchmarks.EchoServer.SayHello",
+    "metadata": {
+        "trace_id": "{{.RequestNumber}}",
+        "timestamp": "{{.TimestampUnix}}"
+    },
+    "import-paths": [
+        "protos"
+    ],
+    "insecure": true,
+    "duration": "60s",
+    "format": "summary",
+    "concurrency" : 1000,
+    "connections" : 50,
+    "host": "127.0.0.1:9030",
+    "data": {
+        "name": "Echo"
+    }
+}

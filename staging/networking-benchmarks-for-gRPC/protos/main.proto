@@ -1,0 +1,31 @@
+// Copyright 2015 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto2";
+
+// Change made to the original code
+package benchmarks;
+option go_package = "main/build/benchmarks";
+import "echo/echo.proto";
+import "hyper_proto_bench/bench1/benchmark.proto";
+
+
+service EchoServer {
+
+  rpc SayHello (benchmarks.echo.EchoRequest) returns (benchmarks.echo.EchoRequest) {}
+
+  // Change made to the original code
+  // HyperProtoBench message: https://github.com/google/HyperProtoBench/blob/main/bench1/benchmark.proto#L19
+  rpc GetM1Bench1 (benchmarks.bench1.M1) returns (benchmarks.bench1.M1) {}
+}
