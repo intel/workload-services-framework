@@ -1,0 +1,37 @@
+From e792a9184433bf648c86ef98cc3207ac1f06f2ae Mon Sep 17 00:00:00 2001
+From: "Meng, Fino" <fino.meng@intel.com>
+Date: Sat, 29 Oct 2022 09:15:49 +0000
+Subject: [PATCH 4/6] rebase to libdlb 7.0.0 external release version.
+
+Signed-off-by: Meng, Fino <fino.meng@intel.com>
+---
+ src/core/ngx_thread_pool.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/core/ngx_thread_pool.c b/src/core/ngx_thread_pool.c
+index 785dd363..3ecf3301 100755
+--- a/src/core/ngx_thread_pool.c
++++ b/src/core/ngx_thread_pool.c
+@@ -154,8 +154,8 @@ static int create_sched_domain(
+         args.num_credit_pools = 1;
+     }
+ 
+-    args.num_sn_slots[0] = ldb_p->rsrcs.num_sn_slots[0] * p_rsrsc / 100;
+-    args.num_sn_slots[1] = ldb_p->rsrcs.num_sn_slots[1] * p_rsrsc / 100;
++    //args.num_sn_slots[0] = ldb_p->rsrcs.num_sn_slots[0] * p_rsrsc / 100;
++    //args.num_sn_slots[1] = ldb_p->rsrcs.num_sn_slots[1] * p_rsrsc / 100;
+ 
+     return dlb_create_sched_domain(dlb, &args);
+ }
+@@ -265,7 +265,7 @@ ngx_loadbalance_init(ngx_thread_pool_t *tp, int index)
+           return NGX_ERROR;
+       }
+ 
+-      domain_id = create_sched_domain(ldb_p->dlb, ldb_p, tp->threads);
++      domain_id = create_sched_domain(ldb_p->dlb, ldb_p);
+       if (domain_id < 0) {
+           ngx_log_error(NGX_LOG_ERR,tp->log, 0, "create_sched_domain errno %d, index %d ", errno, index);
+           goto retry;
+-- 
+2.25.1
+

@@ -1,0 +1,27 @@
+From 96ba29ade327f2aac2a1f95765dcea85c2beb5d7 Mon Sep 17 00:00:00 2001
+From: "Meng, Fino" <fino.meng@intel.com>
+Date: Sat, 29 Oct 2022 09:15:22 +0000
+Subject: [PATCH 3/6] do not hardcode libdlb path
+
+Signed-off-by: Meng, Fino <fino.meng@intel.com>
+---
+ auto/threads | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/auto/threads b/auto/threads
+index 970ac89b..60ee4946 100755
+--- a/auto/threads
++++ b/auto/threads
+@@ -16,7 +16,7 @@ END
+     have=NGX_THREADS . auto/have
+     CORE_DEPS="$CORE_DEPS $THREAD_POOL_DEPS"
+     CORE_SRCS="$CORE_SRCS $THREAD_POOL_SRCS"
+-    CORE_INCS="$CORE_INCS /home/media/renzhi/CDN/dlb/dlb/libdlb"
+-    CORE_LIBS="$CORE_LIBS -L /home/media/renzhi/CDN/dlb/dlb/libdlb/ -lpthread -ldlb -lrt"
++    CORE_INCS="$CORE_INCS $LIBDLB_LOCAL_PATH"
++    CORE_LIBS="$CORE_LIBS -L $LIBDLB_LOCAL_PATH -lpthread -ldlb -lrt"
+     NGX_LIBPTHREAD="-lpthread"
+ fi
+-- 
+2.25.1
+

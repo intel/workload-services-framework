@@ -1,0 +1,37 @@
+From 5d664d450579fd36272dad1da7fae0f3424ad3a6 Mon Sep 17 00:00:00 2001
+From: "Meng, Fino" <fino.meng@intel.com>
+Date: Fri, 4 Nov 2022 02:48:03 +0000
+Subject: [PATCH 5/6] update dlb demo in Nginx 1.16.1 with DLB 7.7.0 and 7.8.0
+
+dlb_create_port_t updated since DLB 7.7.0, member:
+num_ldb_credits, num_dir_credits, num_credits are removed.
+
+Signed-off-by: Meng, Fino <fino.meng@intel.com>
+---
+ src/core/ngx_thread_pool.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/src/core/ngx_thread_pool.c b/src/core/ngx_thread_pool.c
+index 3ecf3301..0c4155ff 100755
+--- a/src/core/ngx_thread_pool.c
++++ b/src/core/ngx_thread_pool.c
+@@ -178,11 +178,13 @@ static int create_ldb_port(
+     if (1) {
+         args.ldb_credit_pool_id = ldb_pool;
+         args.dir_credit_pool_id = dir_pool;
+-        args.num_ldb_credits = 32;
+-        args.num_dir_credits = 32;
++	// dlb_create_port_t updated since DLB 7.7.0
++        //args.num_ldb_credits = 32;
++        //args.num_dir_credits = 32;
+     } else {
+         args.credit_pool_id = ldb_pool;
+-        args.num_credits = 32;
++	// dlb_create_port_t updated since DLB 7.7.0
++	//args.num_credits = 32;
+     }
+     args.cq_depth = CQ_DEPTH;
+     args.num_ldb_event_state_entries = CQ_DEPTH*2;
+-- 
+2.25.1
+
