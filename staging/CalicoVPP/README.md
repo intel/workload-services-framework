@@ -185,23 +185,23 @@ K8S controller IP address: 192.168.0.11
 NIC interface: ens785f0
 NIC interface pci: 0000:38:00.0
 MTU: 1500
-K8S pod CIDR: 10.244.0.0/16
+K8S pod CIDR: **.***.0.0/16
 DSA device: 6a:01.0
 Core numbers: 1
 VPP cores start: 0
 L3FWD cores start: 16
-VPP neighbor ip: 10.10.11.1
-VPP L3FWD pod ipv4 address: 10.244.158.134
-Calico VPP MAC address: b4:96:91:d5:bf:b8
-Packet source IPs range: 10.10.10.1/24
+VPP neighbor ip: **.**.**.1
+VPP L3FWD pod ipv4 address: ***.***.***.***
+Calico VPP MAC address: b4:96:**:**:**:**
+Packet source IPs range: **.**.10.1/24
 Packet source MAC address: 10:00:00:00:00:00
 ```
 
 Below parameters will be used for the testing on IXIA side,
 ```
-VPP L3FWD pod ipv4 address: 10.244.158.134
-Calico VPP MAC address: b4:96:91:d5:bf:b8
-Packet source IPs range: 10.10.10.1/24
+VPP L3FWD pod ipv4 address: ***.***.***.***
+Calico VPP MAC address: b4:96:**:**:**:**
+Packet source IPs range: **.**.10.1/24
 Packet source MAC address: 10:00:00:00:00:00
 ```
 
