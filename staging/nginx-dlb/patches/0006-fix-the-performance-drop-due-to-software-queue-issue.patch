@@ -1,0 +1,234 @@
+From b62a4afcd01a7d6cb6bb8178061f39966cea6509 Mon Sep 17 00:00:00 2001
+From: "Jiang,Renzhi" <renzhi.jiang@intel.com>
+Date: Thu, 12 Jan 2023 13:30:08 +0800
+Subject: [PATCH 6/6] fix the performance drop due to software queue issue
+
+each priority will have a seperate software queue
+---
+ src/core/ngx_thread_pool.c | 153 +++++++++++++------------------------
+ 1 file changed, 54 insertions(+), 99 deletions(-)
+ mode change 100755 => 100644 src/core/ngx_thread_pool.c
+
+diff --git a/src/core/ngx_thread_pool.c b/src/core/ngx_thread_pool.c
+old mode 100755
+new mode 100644
+index 0c4155ff..fc05ad26
+--- a/src/core/ngx_thread_pool.c
++++ b/src/core/ngx_thread_pool.c
+@@ -48,6 +48,9 @@ struct ngx_thread_pool_s {
+ 
+ #if (AIO_LOADBALANCE)
+     ngx_ldb_t                 loadbal_queue;
++    ngx_thread_pool_queue_t   p_queue[8]; //sw priority queue
++    ngx_atomic_uint_t         p_recieved[8];
++    ngx_atomic_uint_t         p_send[8];
+ #endif
+ };
+ 
+@@ -154,8 +157,8 @@ static int create_sched_domain(
+         args.num_credit_pools = 1;
+     }
+ 
+-    //args.num_sn_slots[0] = ldb_p->rsrcs.num_sn_slots[0] * p_rsrsc / 100;
+-    //args.num_sn_slots[1] = ldb_p->rsrcs.num_sn_slots[1] * p_rsrsc / 100;
++    args.num_sn_slots[0] = ldb_p->rsrcs.num_sn_slots[0] * p_rsrsc / 100;
++    args.num_sn_slots[1] = ldb_p->rsrcs.num_sn_slots[1] * p_rsrsc / 100;
+ 
+     return dlb_create_sched_domain(dlb, &args);
+ }
+@@ -259,7 +262,6 @@ ngx_loadbalance_init(ngx_thread_pool_t *tp, int index)
+ 
+ 
+       //UNORDER need 0 SN
+-      //ret = dlb_set_ldb_sequence_number_allocation(ldb_p->dlb, 0, 128);
+       unsigned int sns_per_queue;
+       ret = dlb_get_ldb_sequence_number_allocation(ldb_p->dlb, 0, &sns_per_queue);
+       if (ret < 0 ) {
+@@ -428,6 +430,12 @@ ngx_thread_pool_init(ngx_thread_pool_t *tp, ngx_log_t *log, ngx_pool_t *pool)
+ 
+ #if (AIO_LOADBALANCE)
+ 
++    for(int n = 0; n < 8; n++) {
++        ngx_thread_pool_queue_init(&tp->p_queue[n]);
++        tp->p_recieved[n] = 0;
++        tp->p_send[n] = 0;
++    }
++
+     thread_param = (ngx_thread_param_t*)malloc(sizeof(ngx_thread_param_t)*tp->threads);
+     //construct thread param
+     for (n = 0; n < tp->threads; n++) {
+@@ -498,20 +506,6 @@ ngx_thread_pool_destroy(ngx_thread_pool_t *tp)
+         ngx_log_error(NGX_LOG_ERR, tp->log, 0,
+                     "dlb_detach_port() tx_port failed with errno %d", errno);
+ 
+-    //remove retry queue
+-    // //retry queue
+-    // if (dlb_disable_port(retry_queue.rx_port))
+-    //     ngx_log_error(NGX_LOG_ERR, tp->log, 0,
+-    //                 "dlb_disable_port() rx_port failed with errno %d", errno);
+-
+-    // if (dlb_detach_port(retry_queue.rx_port) == -1)
+-    //     ngx_log_error(NGX_LOG_ERR, tp->log, 0,
+-    //                 "dlb_detach_port() rx_port failed with errno %d", errno);
+-
+-    // if (dlb_detach_port(retry_queue.tx_port) == -1)
+-    //     ngx_log_error(NGX_LOG_ERR, tp->log, 0,
+-    //                 "dlb_detach_port() tx_port failed with errno %d", errno);
+-
+     if (dlb_detach_sched_domain(tp->loadbal_queue.domain) == -1)
+         ngx_log_error(NGX_LOG_ERR, tp->log, 0,
+                         "dlb_detach_sched_domain() failed with errno %d", errno);
+@@ -561,7 +555,6 @@ ngx_thread_task_alloc(ngx_pool_t *pool, size_t size)
+ }
+ 
+ #if (AIO_LOADBALANCE)
+-
+ ngx_int_t
+ ngx_thread_task_post(ngx_thread_pool_t *tp, ngx_thread_task_t *task)
+ {
+@@ -573,91 +566,53 @@ ngx_thread_task_post(ngx_thread_pool_t *tp, ngx_thread_task_t *task)
+     task->id = ngx_thread_pool_task_id++;
+     task->next = NULL;
+ 
+-    //send stored task first
+-    while(tp->queue.first != NULL) {
+-        task = tp->queue.first;
+-        tp->queue.first = task->next;
+-        if (tp->queue.first == NULL) {
+-            tp->queue.last = &tp->queue.first;
+-        }
+-        tp->waiting --;
+-
+-        dlb_events[0].send.queue_id = tp->loadbal_queue.queue_id[task->priority%QUEUE_NUM];
+-        dlb_events[0].send.sched_type = SCHED_UNORDERED;
+-        dlb_events[0].send.priority = task->priority * 2;    //priority map to 0/2/4/6
+-        dlb_events[0].send.udata64 = (uint64_t)task;
+-          dlb_events[0].send.udata64 = (uint64_t)task;            
+-        dlb_events[0].send.udata64 = (uint64_t)task;
+-        dlb_events[0].send.udata16 = (uint16_t)++i;
+-        ret = dlb_send(tp->loadbal_queue.tx_port, 1, &dlb_events[0]);
+-        if (ret <= 0) {
+-            //dlb_send failed case, just put the task in one software queue
+-            if (tp->waiting >= tp->max_queue) {
+-                ngx_log_error(NGX_LOG_ERR, tp->log, 0,
+-                            "thread pool \"%V\" queue overflow: %i tasks waiting",
+-                            &tp->name, tp->waiting);
+-                return NGX_ERROR;
++    //simply processing, put the task in the sw queue first
++    *(tp->p_queue[task->priority].last) = task;
++    tp->p_queue[task->priority].last = &task->next;
++    tp->p_recieved[task->priority] ++;
++
++    //send the task by priority
++    for (int j = 0; j < 8; j++) {
++        while(tp->p_queue[j].first != NULL) {
++            ngx_thread_task_t *stored_task = tp->p_queue[j].first;
++            ngx_thread_task_t **last = tp->p_queue[j].last;
++            tp->p_queue[j].first = stored_task->next;
++            if (tp->p_queue[j].first == NULL) {
++                tp->p_queue[j].last = &tp->p_queue[j].first;
+             }
+-            //put the task in the queue again
+-            *tp->queue.last = task;
+-            tp->queue.last = &task->next;
+-            tp->waiting++;
+-            ngx_log_error(NGX_LOG_ALERT, tp->log, 0, "resend task %u failed with ret %d errno %d",task->id, ret, errno);
+-            return NGX_OK;
+-        }
+-    }
+-
+-    /* Initialize the static fields in the send events */
+-    //dlb_events[0].send.queue_id = tp->loadbal_queue.queue_id[(i++)%QUEUE_NUM]; 
+-    dlb_events[0].send.queue_id = tp->loadbal_queue.queue_id[task->priority%QUEUE_NUM];
+-    dlb_events[0].send.sched_type = SCHED_UNORDERED;
+-    dlb_events[0].send.priority = task->priority * 2;    //priority map to 0/2/4/6
+-    //dlb_events[0].send.flow_id =  http_args.conn_fd; 
+-    dlb_events[0].send.udata64 = (uint64_t)task;
+-    dlb_events[0].send.udata16 = (uint16_t)++i;
+-/*
+-    struct timeval  tv;
+-    time_t           sec;
+-    ngx_uint_t       usec;
+-    
+-    ngx_gettimeofday(&tv);
+ 
+-    sec = tv.tv_sec;
+-    usec = tv.tv_usec ;
+-   
+-    ngx_log_error(NGX_LOG_ALERT, tp->log, 0,
+-                "DLB prepare tast %ui priority %i at sequence %i at timestamp %d %d",task->id, task->priority, i, sec, usec);
+-*/ 
+-    //put in ldb queue
+-    ret = dlb_send(tp->loadbal_queue.tx_port, 1, &dlb_events[0]);
+-    if (ret <= 0) {
+-        //dlb_send failed case, just put the task in one software queue
+-        if (tp->waiting >= tp->max_queue) {
+-            ngx_log_error(NGX_LOG_ERR, tp->log, 0,
+-                        "thread pool \"%V\" queue overflow: %i tasks waiting",
+-                        &tp->name, tp->waiting);
+-            return NGX_ERROR;
++            dlb_events[0].send.queue_id = tp->loadbal_queue.queue_id[stored_task->priority%QUEUE_NUM];
++            dlb_events[0].send.sched_type = SCHED_UNORDERED;
++            dlb_events[0].send.priority = stored_task->priority * 2;    //priority map to 0/2/4/6
++            dlb_events[0].send.udata64 = (uint64_t)stored_task;
++            dlb_events[0].send.udata16 = (uint16_t)++i;
++            ret = dlb_send(tp->loadbal_queue.tx_port, 1, &dlb_events[0]);
++
++            if (ret <= 0) {
++                //restore the queue
++                tp->p_queue[j].first = stored_task;
++                tp->p_queue[j].last = last;
++
++                if(stored_task->priority != j)
++                    ngx_log_error(NGX_LOG_ALERT, tp->log, 0, "send task %d (p:%d, %d) failed with ret %d errno %d, waiting task:%d(%d, %d), %d(%d, %d), %d(%d, %d), %d(%d, %d)",
++                        stored_task->id, stored_task->priority, j, ret, errno, tp->p_recieved[0] - tp->p_send[0], tp->p_recieved[0], tp->p_send[0],
++                        tp->p_recieved[1] - tp->p_send[1], tp->p_recieved[1], tp->p_send[1],
++                        tp->p_recieved[2] - tp->p_send[2], tp->p_recieved[2], tp->p_send[2],
++                        tp->p_recieved[3] - tp->p_send[3], tp->p_recieved[3], tp->p_send[3]);
++                return NGX_OK;
++            } else {
++                tp->p_send[j] ++;
++
++                if(stored_task->priority != j)
++                    ngx_log_error(NGX_LOG_ALERT, tp->log, 0, "send task %d (p:%d, %d) succeed with ret %d errno %d, waiting task:%d(%d, %d), %d(%d, %d), %d(%d, %d), %d(%d, %d)",
++                        stored_task->id, stored_task->priority, j, ret, errno, tp->p_recieved[0] - tp->p_send[0], tp->p_recieved[0], tp->p_send[0],
++                        tp->p_recieved[1] - tp->p_send[1], tp->p_recieved[1], tp->p_send[1],
++                        tp->p_recieved[2] - tp->p_send[2], tp->p_recieved[2], tp->p_send[2],
++                        tp->p_recieved[3] - tp->p_send[3], tp->p_recieved[3], tp->p_send[3]);
++            }
+         }
+-        *tp->queue.last = task;
+-        tp->queue.last = &task->next;
+-        tp->waiting++;
+-        ngx_log_error(NGX_LOG_ALERT, tp->log, 0,
+-                        "task %lu send failed, store in the sw queue first", task->id);
+     }
+ 
+-    // ngx_log_error(NGX_LOG_ERR, tp->log, 0,
+-    //                     "send task %lu successfully it via dlb", task->id);
+-    /*
+-    ngx_gettimeofday(&tv);
+-
+-    sec = tv.tv_sec;
+-    usec = tv.tv_usec ;
+-
+-    ngx_log_error(NGX_LOG_ALERT, tp->log, 0,
+-                "DLB send tast %ui priority %i at sequence %i at timestamp %d %d",task->id, task->priority, i, sec, usec);
+-*/
+-
+-
+     return NGX_OK;
+ }
+ 
+@@ -754,7 +709,7 @@ ngx_thread_pool_cycle(void *data)
+ 
+         ret = dlb_recv(rx_port,
+                     NUM_EVENTS_PER_BATCH,
+-                    (wait_mode == POLL),      //INTERRUPT),
++                    true,      //INTERRUPT),
+                      events);    //&events[0]);
+ 
+         /* The port was disabled, indicating the thread should return */
+-- 
+2.25.1
+

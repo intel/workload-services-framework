@@ -1,0 +1,503 @@
+From be21cc7a767231e4f423d89ecd8e804646be9ae6 Mon Sep 17 00:00:00 2001
+From: "Jiang, Renzhi" <renzhi.jiang@intel.com>
+Date: Thu, 28 Jul 2022 13:40:22 +0800
+Subject: [PATCH 2/6] remove retry queue, use sw queue instead
+
+---
+ src/core/ngx_thread_pool.c | 320 +++++++++++--------------------------
+ 1 file changed, 97 insertions(+), 223 deletions(-)
+
+diff --git a/src/core/ngx_thread_pool.c b/src/core/ngx_thread_pool.c
+index 7925fcc4..785dd363 100755
+--- a/src/core/ngx_thread_pool.c
++++ b/src/core/ngx_thread_pool.c
+@@ -58,25 +58,12 @@ typedef struct {
+   ngx_thread_pool_t* tp;
+ }ngx_thread_param_t;
+ 
+-typedef struct {
+-    int queue_id;
+-    dlb_port_hdl_t tx_port;
+-    dlb_port_hdl_t rx_port;
+-    ngx_thread_pool_t* tp;          
+-} retry_queue_t;
+-
+-static retry_queue_t retry_queue;
+ 
+ enum wait_mode_t {
+     POLL,
+     INTERRUPT,
+ } wait_mode = POLL;
+ 
+-typedef struct {
+-    dlb_port_hdl_t      rx_port;
+-    ngx_thread_pool_t*  tp;
+-}thread_param_t;
+-
+ #endif
+ 
+ static ngx_int_t ngx_thread_pool_init(ngx_thread_pool_t *tp, ngx_log_t *log,
+@@ -205,42 +192,6 @@ static int create_ldb_port(
+     return dlb_create_ldb_port(domain, &args);
+ }
+ 
+-
+-static int create_dir_queue(
+-    dlb_domain_hdl_t domain,
+-    int port_id)
+-{
+-    return dlb_create_dir_queue(domain, port_id);
+-}
+-
+-static int create_dir_port(
+-    dlb_domain_hdl_t domain,
+-    int ldb_pool,
+-    int dir_pool,
+-    int queue_id)
+-{
+-    dlb_create_port_t args;
+-
+-    //if (!cap.combined_credits) {
+-    if (1){
+-        args.ldb_credit_pool_id = ldb_pool;
+-        args.dir_credit_pool_id = dir_pool;
+-        args.num_ldb_credits = 32;
+-        args.num_dir_credits = 32;
+-    } else {
+-        args.credit_pool_id = ldb_pool;
+-        args.num_credits = 8;
+-    }
+-
+-    args.ldb_credit_pool_id = ldb_pool;
+-    args.dir_credit_pool_id = dir_pool;
+-    args.cq_depth = CQ_DEPTH;
+-
+-    return dlb_create_dir_port(domain, &args, queue_id);
+-}
+-
+-
+-
+ static ngx_int_t
+ ngx_loadbalance_init(ngx_thread_pool_t *tp, int index)
+ {
+@@ -263,47 +214,46 @@ ngx_loadbalance_init(ngx_thread_pool_t *tp, int index)
+     ldb_p->dev_id = index % DLB_NUM;
+ 
+     while( index < DLB_NUM ) {
+-  
+       ngx_log_error(NGX_LOG_ALERT,tp->log, 0, "ngx_loadbalance_init index %d dlb_indx %d ldb_p %lx", index, dlb_index, ldb_p);
+-  
++
+       ret = dlb_open(ldb_p->dev_id, &ldb_p->dlb);
+       if (ret < 0) {
+         ngx_log_error(NGX_LOG_ERR,tp->log, 0, "dlb_open fail %d errno %d", ret, errno);
+         goto retry;
+         //return NGX_ERROR;
+       }
+-      
++
+       if (dlb_get_dev_capabilities(ldb_p->dlb, &ldb_p->cap)) {
+           ngx_log_error(NGX_LOG_ERR,tp->log, 0, "dlb_get_dev_capabilities errno %u, return", errno);
+           return NGX_ERROR;
+       }
+-      
++
+         if (dlb_get_num_resources(ldb_p->dlb, &ldb_p->rsrcs)) {
+             ngx_log_error(NGX_LOG_ERR,tp->log, 0, "dlb_get_dev_capabilities errno %u, return", errno);
+             return NGX_ERROR;
+         }
+ 
+         //print resource
+-        ngx_log_error(NGX_LOG_ERR,tp->log, 0, "DLB %d's available resources:\n", ldb_p->dev_id);
+-        ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tDomains:           %d", ldb_p->rsrcs.num_sched_domains);
+-        ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tLDB queues:        %d", ldb_p->rsrcs.num_ldb_queues);
+-        ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tLDB queues:        %d", ldb_p->rsrcs.num_ldb_queues);
+-        ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tLDB ports:         %d", ldb_p->rsrcs.num_ldb_ports);
+-        ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tDIR ports:         %d", ldb_p->rsrcs.num_dir_ports);
+-        ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tSN slots:          %d,%d", ldb_p->rsrcs.num_sn_slots[0], ldb_p->rsrcs.num_sn_slots[1]);
+-        ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tES entries:        %d", ldb_p->rsrcs.num_ldb_event_state_entries);
+-        ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tContig ES entries: %d", ldb_p->rsrcs.max_contiguous_ldb_event_state_entries);
+-        if (!ldb_p->cap.combined_credits) {
+-            ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tLDB credits:       %d", ldb_p->rsrcs.num_ldb_credits);
+-            ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tContig LDB cred:   %d", ldb_p->rsrcs.max_contiguous_ldb_credits);
+-            ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tDIR credits:       %d", ldb_p->rsrcs.num_dir_credits);
+-            ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tContig DIR cred:   %d", ldb_p->rsrcs.max_contiguous_dir_credits);
+-            ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tLDB credit pls:    %d", ldb_p->rsrcs.num_ldb_credit_pools);
+-            ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tDIR credit pls:    %d", ldb_p->rsrcs.num_dir_credit_pools);
+-        } else {
+-            ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tCredits:           %d", ldb_p->rsrcs.num_credits);
+-            ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tCredit pools:      %d", ldb_p->rsrcs.num_credit_pools);
+-        }
++        // ngx_log_error(NGX_LOG_ERR,tp->log, 0, "DLB %d's available resources:\n", ldb_p->dev_id);
++        // ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tDomains:           %d", ldb_p->rsrcs.num_sched_domains);
++        // ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tLDB queues:        %d", ldb_p->rsrcs.num_ldb_queues);
++        // ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tLDB queues:        %d", ldb_p->rsrcs.num_ldb_queues);
++        // ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tLDB ports:         %d", ldb_p->rsrcs.num_ldb_ports);
++        // ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tDIR ports:         %d", ldb_p->rsrcs.num_dir_ports);
++        // ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tSN slots:          %d,%d", ldb_p->rsrcs.num_sn_slots[0], ldb_p->rsrcs.num_sn_slots[1]);
++        // ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tES entries:        %d", ldb_p->rsrcs.num_ldb_event_state_entries);
++        // ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tContig ES entries: %d", ldb_p->rsrcs.max_contiguous_ldb_event_state_entries);
++        // if (!ldb_p->cap.combined_credits) {
++        //     ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tLDB credits:       %d", ldb_p->rsrcs.num_ldb_credits);
++        //     ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tContig LDB cred:   %d", ldb_p->rsrcs.max_contiguous_ldb_credits);
++        //     ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tDIR credits:       %d", ldb_p->rsrcs.num_dir_credits);
++        //     ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tContig DIR cred:   %d", ldb_p->rsrcs.max_contiguous_dir_credits);
++        //     ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tLDB credit pls:    %d", ldb_p->rsrcs.num_ldb_credit_pools);
++        //     ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tDIR credit pls:    %d", ldb_p->rsrcs.num_dir_credit_pools);
++        // } else {
++        //     ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tCredits:           %d", ldb_p->rsrcs.num_credits);
++        //     ngx_log_error(NGX_LOG_ERR,tp->log, 0, "\tCredit pools:      %d", ldb_p->rsrcs.num_credit_pools);
++        // }
+ 
+ 
+       //UNORDER need 0 SN
+@@ -314,8 +264,8 @@ ngx_loadbalance_init(ngx_thread_pool_t *tp, int index)
+           ngx_log_error(NGX_LOG_ERR,tp->log, 0, "dlb_set_ldb_sequence_number_allocation errno %d, return", ret, errno);
+           return NGX_ERROR;
+       }
+-  
+-      domain_id = create_sched_domain(ldb_p->dlb, ldb_p);
++
++      domain_id = create_sched_domain(ldb_p->dlb, ldb_p, tp->threads);
+       if (domain_id < 0) {
+           ngx_log_error(NGX_LOG_ERR,tp->log, 0, "create_sched_domain errno %d, index %d ", errno, index);
+           goto retry;
+@@ -352,14 +302,14 @@ ngx_loadbalance_init(ngx_thread_pool_t *tp, int index)
+                 goto retry;
+             }
+         }
+-        
++
+         break;
+       }
+-              
+-retry:        
++
++retry:
+       ldb_p->dev_id = ++index;
+     }
+-    
++
+     if (index >= DLB_NUM)  {
+         ngx_log_error(NGX_LOG_ERR,tp->log, 0, "no DLB resource left, used up to %d", index);
+         return NGX_ERROR;
+@@ -402,6 +352,7 @@ retry:
+             return NGX_ERROR;
+         }
+ 
++        //link the rx port to the dlb queue
+         for ( j=0; j < QUEUE_NUM; j++) {
+           //if (dlb_link_queue(ldb_p->rx_port[i], ldb_p->queue_id[j], priority) == -1)
+           //priority map to 0/2/4/6
+@@ -410,31 +361,10 @@ retry:
+               return NGX_ERROR;
+           }
+         }
++
++        // ngx_log_error(NGX_LOG_ERR,tp->log, 0, "create rx port %p succeed\n", ldb_p->rx_port[i]);
+     }
+     
+-    //create retry queue
+-    retry_queue.queue_id = create_dir_queue(ldb_p->domain, -1);
+-    if (retry_queue.queue_id == -1)
+-        ngx_log_error(NGX_LOG_ERR,tp->log, 0, "dlb_create_dir_queue err %d", errno);
+-
+-    tx_port_id = create_dir_port(ldb_p->domain, ldb_p->ldb_pool_id, ldb_p->dir_pool_id, -1);
+-    if (tx_port_id == -1)
+-        ngx_log_error(NGX_LOG_ERR,tp->log, 0,"dlb_create_dir_port %d", errno);
+-
+-    retry_queue.tx_port = dlb_attach_dir_port(ldb_p->domain, tx_port_id);
+-    if (retry_queue.tx_port == NULL)
+-        ngx_log_error(NGX_LOG_ERR,tp->log, 0, "dlb_attach_dir_port %d", errno);
+-
+-    rx_port_id = create_dir_port(ldb_p->domain, ldb_p->ldb_pool_id, ldb_p->dir_pool_id, retry_queue.queue_id);
+-    if (rx_port_id == -1)
+-        ngx_log_error(NGX_LOG_ERR,tp->log, 0, "dlb_create_dir_port %d", errno);
+-
+-    retry_queue.rx_port = dlb_attach_dir_port(ldb_p->domain, rx_port_id);
+-    if (retry_queue.rx_port == NULL)
+-        ngx_log_error(NGX_LOG_ERR,tp->log, 0, "dlb_attach_dir_port %d", errno);    
+-    
+-    retry_queue.tp = tp;
+-    
+     if (dlb_launch_domain_alert_thread(ldb_p->domain, NULL, NULL)) {
+         ngx_log_error(NGX_LOG_ERR,tp->log, 0, "dlb_launch_domain_alert_thread errno %d", errno);
+         return NGX_ERROR;
+@@ -495,7 +425,7 @@ ngx_thread_pool_init(ngx_thread_pool_t *tp, ngx_log_t *log, ngx_pool_t *pool)
+     }
+ 
+ #if (AIO_LOADBALANCE)
+-  
++
+     thread_param = (ngx_thread_param_t*)malloc(sizeof(ngx_thread_param_t)*tp->threads);
+     //construct thread param
+     for (n = 0; n < tp->threads; n++) {
+@@ -506,15 +436,6 @@ ngx_thread_pool_init(ngx_thread_pool_t *tp, ngx_log_t *log, ngx_pool_t *pool)
+ 
+ #endif
+ 
+-#if 0
+-    err = pthread_attr_setstacksize(&attr, PTHREAD_STACK_MIN);
+-    if (err) {
+-        ngx_log_error(NGX_LOG_ALERT, log, err,
+-                      "pthread_attr_setstacksize() failed");
+-        return NGX_ERROR;
+-    }
+-#endif
+-
+     for (n = 0; n < tp->threads; n++) {
+ #if (AIO_LOADBALANCE)
+         err = pthread_create(&tid, &attr, ngx_thread_pool_cycle, &thread_param[n]);
+@@ -525,14 +446,12 @@ ngx_thread_pool_init(ngx_thread_pool_t *tp, ngx_log_t *log, ngx_pool_t *pool)
+             ngx_log_error(NGX_LOG_ALERT, log, err,
+                           "pthread_create() failed");
+ 
+-            free(thread_param);
+             return NGX_ERROR;
+         }
+     }
+ 
+     (void) pthread_attr_destroy(&attr);
+ 
+-    free(thread_param);
+     return NGX_OK;
+ }
+ 
+@@ -577,18 +496,19 @@ ngx_thread_pool_destroy(ngx_thread_pool_t *tp)
+         ngx_log_error(NGX_LOG_ERR, tp->log, 0,
+                     "dlb_detach_port() tx_port failed with errno %d", errno);
+ 
+-    //retry queue
+-    if (dlb_disable_port(retry_queue.rx_port))
+-        ngx_log_error(NGX_LOG_ERR, tp->log, 0,
+-                    "dlb_disable_port() rx_port failed with errno %d", errno);
++    //remove retry queue
++    // //retry queue
++    // if (dlb_disable_port(retry_queue.rx_port))
++    //     ngx_log_error(NGX_LOG_ERR, tp->log, 0,
++    //                 "dlb_disable_port() rx_port failed with errno %d", errno);
+ 
+-    if (dlb_detach_port(retry_queue.rx_port) == -1)
+-        ngx_log_error(NGX_LOG_ERR, tp->log, 0,
+-                    "dlb_detach_port() rx_port failed with errno %d", errno);
++    // if (dlb_detach_port(retry_queue.rx_port) == -1)
++    //     ngx_log_error(NGX_LOG_ERR, tp->log, 0,
++    //                 "dlb_detach_port() rx_port failed with errno %d", errno);
+ 
+-    if (dlb_detach_port(retry_queue.tx_port) == -1)
+-        ngx_log_error(NGX_LOG_ERR, tp->log, 0,
+-                    "dlb_detach_port() tx_port failed with errno %d", errno);
++    // if (dlb_detach_port(retry_queue.tx_port) == -1)
++    //     ngx_log_error(NGX_LOG_ERR, tp->log, 0,
++    //                 "dlb_detach_port() tx_port failed with errno %d", errno);
+ 
+     if (dlb_detach_sched_domain(tp->loadbal_queue.domain) == -1)
+         ngx_log_error(NGX_LOG_ERR, tp->log, 0,
+@@ -640,71 +560,6 @@ ngx_thread_task_alloc(ngx_pool_t *pool, size_t size)
+ 
+ #if (AIO_LOADBALANCE)
+ 
+-static void
+-ngx_thread_task_retry(ngx_event_t *lev)
+-{
+-    dlb_event_t        dlb_events[NUM_EVENTS_PER_BATCH];
+-
+-    ngx_thread_task_t  *task;
+-    int ret;
+-    ngx_thread_pool_t *tp = retry_queue.tp;
+-    ngx_event_t                  *ev;
+-    
+-    ngx_log_debug0(NGX_LOG_DEBUG_CORE, lev->log, 0, "thread pool task retry");
+-    ngx_free(lev);
+-    ret = dlb_recv(retry_queue.rx_port,
+-                NUM_EVENTS_PER_BATCH,
+-                (wait_mode == POLL),      //INTERRUPT),
+-                 dlb_events);
+-
+-    for (int i =0; i < ret; i++){
+-      task = (ngx_thread_task_t*)dlb_events[i].recv.udata64;
+-
+-      ngx_log_debug(NGX_LOG_DEBUG_CORE, tp->log, 0,
+-                     "run task #%ui in ldb thread pool ",
+-                     task->id);
+-                     
+-      ngx_log_error(NGX_LOG_WARN, tp->log, 0,
+-                  "DLB retry task %ui ",task->id);
+-                     
+-
+-      dlb_events[i].send.queue_id = (int)dlb_events[i].recv.udata16;
+-      dlb_events[i].send.sched_type = SCHED_UNORDERED;
+-      dlb_events[i].send.priority = task->priority * 2;    //priority map to 0/2/4/6
+-      //dlb_events[0].send.flow_id =  http_args.conn_fd; 
+-      dlb_events[i].send.udata64 = (uint64_t)task;
+-      dlb_events[i].send.udata16 = 0;
+-      ret = dlb_send(tp->loadbal_queue.tx_port, 1, &dlb_events[i]);
+-      if (ret <= 0){
+-          //error handle
+-  	      ngx_log_error(NGX_LOG_WARN, tp->log, 0,
+-                  "DLB retry senfail task %ui priority %i at sequence %i with errno %d",task->id, task->priority, i, errno);
+-                  
+-          //retry  
+-          dlb_events[i].send.udata16 = dlb_events[i].send.queue_id;
+-          dlb_events[0].send.flow_id = 0;
+-          dlb_events[0].send.queue_id = retry_queue.queue_id;
+-          dlb_events[0].send.sched_type = SCHED_DIRECTED;
+-          dlb_events[0].send.priority = 0;
+-          dlb_events[0].send.udata64 = (uint64_t)task;            
+-          ret = dlb_send(retry_queue.tx_port, 1, &dlb_events[i]);
+-          if (ret <= 0){
+-              ngx_log_error(NGX_LOG_ERR, tp->log, 0,
+-                  "DLB sendfail and retry fail tast %ui ret %i sequence %i with errno %d",task->id, ret, i, errno);
+-          }
+-          //(void) ngx_notify(ngx_thread_task_retry);
+-          ev = ngx_alloc(sizeof(ngx_event_t) , tp->log);
+-          ev->handler = ngx_thread_task_retry;
+-          ev->log = tp->log;
+-          ev->timer_set = 0;
+-          //ngx_post_event(ev, &ngx_posted_events);
+-          ngx_add_timer(ev, 200);
+-          return;
+-      }      
+-    }
+-}
+-
+-
+ ngx_int_t
+ ngx_thread_task_post(ngx_thread_pool_t *tp, ngx_thread_task_t *task)
+ {
+@@ -716,6 +571,40 @@ ngx_thread_task_post(ngx_thread_pool_t *tp, ngx_thread_task_t *task)
+     task->id = ngx_thread_pool_task_id++;
+     task->next = NULL;
+ 
++    //send stored task first
++    while(tp->queue.first != NULL) {
++        task = tp->queue.first;
++        tp->queue.first = task->next;
++        if (tp->queue.first == NULL) {
++            tp->queue.last = &tp->queue.first;
++        }
++        tp->waiting --;
++
++        dlb_events[0].send.queue_id = tp->loadbal_queue.queue_id[task->priority%QUEUE_NUM];
++        dlb_events[0].send.sched_type = SCHED_UNORDERED;
++        dlb_events[0].send.priority = task->priority * 2;    //priority map to 0/2/4/6
++        dlb_events[0].send.udata64 = (uint64_t)task;
++          dlb_events[0].send.udata64 = (uint64_t)task;            
++        dlb_events[0].send.udata64 = (uint64_t)task;
++        dlb_events[0].send.udata16 = (uint16_t)++i;
++        ret = dlb_send(tp->loadbal_queue.tx_port, 1, &dlb_events[0]);
++        if (ret <= 0) {
++            //dlb_send failed case, just put the task in one software queue
++            if (tp->waiting >= tp->max_queue) {
++                ngx_log_error(NGX_LOG_ERR, tp->log, 0,
++                            "thread pool \"%V\" queue overflow: %i tasks waiting",
++                            &tp->name, tp->waiting);
++                return NGX_ERROR;
++            }
++            //put the task in the queue again
++            *tp->queue.last = task;
++            tp->queue.last = &task->next;
++            tp->waiting++;
++            ngx_log_error(NGX_LOG_ALERT, tp->log, 0, "resend task %u failed with ret %d errno %d",task->id, ret, errno);
++            return NGX_OK;
++        }
++    }
++
+     /* Initialize the static fields in the send events */
+     //dlb_events[0].send.queue_id = tp->loadbal_queue.queue_id[(i++)%QUEUE_NUM]; 
+     dlb_events[0].send.queue_id = tp->loadbal_queue.queue_id[task->priority%QUEUE_NUM];
+@@ -739,39 +628,23 @@ ngx_thread_task_post(ngx_thread_pool_t *tp, ngx_thread_task_t *task)
+ */ 
+     //put in ldb queue
+     ret = dlb_send(tp->loadbal_queue.tx_port, 1, &dlb_events[0]);
+-    if (ret <= 0){
+-        ngx_event_t                  *ev;
+-        //error handle
+-	      ngx_log_error(NGX_LOG_WARN, tp->log, 0,
+-                "DLB senfail task %ui priority %i at sequence %i with errno %d",task->id, task->priority, i, errno);
+-                
+-        //retry  
+-        //TODO, replace with epoll event      
+-        //usleep(200);
+-        //ret = dlb_send(tp->loadbal_queue.tx_port, 1, &dlb_events[0]);
+-        dlb_events[0].send.udata16 = dlb_events[0].send.queue_id;
+-        dlb_events[0].send.flow_id = 0;
+-        dlb_events[0].send.queue_id = retry_queue.queue_id;
+-        dlb_events[0].send.sched_type = SCHED_DIRECTED;
+-        dlb_events[0].send.priority = 0;
+-        dlb_events[0].send.udata64 = (uint64_t)task;        
+-        ret = dlb_send(retry_queue.tx_port, 1, &dlb_events[0]);
+-        if (ret <= 0){
++    if (ret <= 0) {
++        //dlb_send failed case, just put the task in one software queue
++        if (tp->waiting >= tp->max_queue) {
+             ngx_log_error(NGX_LOG_ERR, tp->log, 0,
+-                "DLB sendfail and retry fail tast %ui ret %i sequence %i with errno %d",task->id, ret, i, errno);
+-
++                        "thread pool \"%V\" queue overflow: %i tasks waiting",
++                        &tp->name, tp->waiting);
+             return NGX_ERROR;
+         }
+-        //(void) ngx_notify(ngx_thread_task_retry);
+-        ev = ngx_alloc(sizeof(ngx_event_t), tp->log);
+-        ev->handler = ngx_thread_task_retry;
+-        ev->log = tp->log;
+-        ev->timer_set = 0;
+-        //ngx_post_event(ev, &ngx_posted_events);
+-        ngx_add_timer(ev, 100);        
++        *tp->queue.last = task;
++        tp->queue.last = &task->next;
++        tp->waiting++;
++        ngx_log_error(NGX_LOG_ALERT, tp->log, 0,
++                        "task %lu send failed, store in the sw queue first", task->id);
+     }
+ 
+-
++    // ngx_log_error(NGX_LOG_ERR, tp->log, 0,
++    //                     "send task %lu successfully it via dlb", task->id);
+     /*
+     ngx_gettimeofday(&tv);
+ 
+@@ -782,7 +655,8 @@ ngx_thread_task_post(ngx_thread_pool_t *tp, ngx_thread_task_t *task)
+                 "DLB send tast %ui priority %i at sequence %i at timestamp %d %d",task->id, task->priority, i, sec, usec);
+ */
+ 
+-    return NGX_OK;    
++
++    return NGX_OK;
+ }
+ 
+ #else
+@@ -842,7 +716,7 @@ ngx_thread_task_post(ngx_thread_pool_t *tp, ngx_thread_task_t *task)
+ static void *
+ ngx_thread_pool_cycle(void *data)
+ {
+-    thread_param_t* thread_param = (thread_param_t*)data;
++    ngx_thread_param_t* thread_param = (ngx_thread_param_t*)data;
+     ngx_thread_task_t  *task;
+     sigset_t            set;
+     int ret;
+@@ -878,16 +752,16 @@ ngx_thread_pool_cycle(void *data)
+ 
+         ret = dlb_recv(rx_port,
+                     NUM_EVENTS_PER_BATCH,
+-                    (wait_mode == POLL),      //INTERRUPT),  
+-                     events);    //&events[0]);    
++                    (wait_mode == POLL),      //INTERRUPT),
++                     events);    //&events[0]);
+ 
+         /* The port was disabled, indicating the thread should return */
+         if (ret == -1 && errno == EACCES){
+         
+             ngx_log_error(NGX_LOG_ALERT, tp->log, ret, "dlb_recv() error");
+             exit(1);
+-		    }
+-
++        }
++        // ngx_log_error(NGX_LOG_ALERT, tp->log, ret, "dlb_recv() get one event");
+ /*
+         struct timeval  tv;
+         //time_t           sec;
+-- 
+2.25.1
+
