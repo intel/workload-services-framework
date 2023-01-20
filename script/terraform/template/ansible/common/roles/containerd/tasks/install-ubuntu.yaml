@@ -1,13 +1,48 @@
 
-  - name: install containerd
-    apt:
-      name:
-      - "containerd={{ containerd_version | default(containerd_default_version['ubuntu']) }}"
-      state: present
-      update_cache: yes
-    become: yes
-    register: aptrc
-    until: aptrc is success
-    retries: 10
-    delay: 10
+- name: add software dependencies
+  apt:
+    name:
+    - ca-certificates
+    - gnupg
+    state: present
+  ignore_errors: yes
+  become: yes
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+
+
+- name: add docker GPG key
+  apt_key:
+    url: "{{ docker_dist_repo }}/linux/ubuntu/gpg"
+    state: present
+  register: aptrc
+  become: yes
+  until: aptrc is success
+  retries: 10
+  delay: 10
+
+- name: get os codename
+  shell:
+    cmd: ". /etc/os-release; echo $VERSION_CODENAME"
+    executable: /bin/bash
+  register: codename
+
+- name: add docker repository to apt
+  apt_repository:
+    repo: "deb {{ docker_dist_repo }}/linux/ubuntu {{ codename.stdout | lower }} stable"
+    state: present
+  become: yes
+
+- name: install containerd.io
+  apt:
+    name:
+    - "containerd.io={{ containerd_default_version['ubuntu'] }}"
+    update_cache: yes
+  register: aptrc
+  become: yes
+  until: aptrc is success
+  retries: 10
+  delay: 10
 
