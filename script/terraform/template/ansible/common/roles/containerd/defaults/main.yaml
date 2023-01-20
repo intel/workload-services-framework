@@ -1,6 +1,7 @@
 
+docker_dist_repo: "https://download.docker.com"
 containerd_default_version: 
-  ubuntu: "1.5.9-*"
+  ubuntu: "1.6.15-*"
   centos: "1.6.10-*"
   debian: "1.4.13~*"
 containerd_data_root: "/var/lib/containerd"
