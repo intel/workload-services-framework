@@ -1,0 +1,29 @@
+# stream-repo
+
+ARG OS_VER=22.04
+ARG OS_IMAGE=ubuntu
+
+FROM ${OS_IMAGE}:${OS_VER} as clone
+
+RUN apt-get update -y && \
+apt-get install -y git && \
+apt-get clean && rm -rf /var/lib/apt/lists/*
+
+ARG STREAM_INSTALL_DIR=/opt/stream_repo
+
+WORKDIR ${STREAM_INSTALL_DIR}
+
+ARG STREAM_VER="39d7b1627c46e9024a18f789f89ec087a4ba2060"
+ARG STREAM_REPO=https://github.com/jeffhammond/STREAM.git
+
+RUN git clone  ${STREAM_REPO} ${STREAM_INSTALL_DIR} && \
+     cd ${STREAM_INSTALL_DIR} && \
+     git checkout ${STREAM_VER}  
+
+FROM scratch
+ARG STREAM_INSTALL_DIR=/opt/stream_repo
+
+WORKDIR ${STREAM_INSTALL_DIR}
+
+COPY --from=clone /opt/stream_repo ${STREAM_INSTALL_DIR}/
+COPY run_stream.sh ${STREAM_INSTALL_DIR}/run_stream.sh

@@ -13,6 +13,7 @@
   register: report
   become: yes
   ignore_errors: yes
+  when: perf_action == "record"
 
 - name: Fetch perf files
   fetch:
@@ -22,6 +23,7 @@
   delegate_to: "{{ trace_node.1 }}"
   become: yes
   ignore_errors: yes
+  when: perf_action == "record"
 
 - name: Fetch perf raw data
   fetch:
@@ -31,12 +33,12 @@
   delegate_to: "{{ trace_node.1 }}"
   become: yes
   ignore_errors: yes
-  when: perf_fetch_data
+  when: perf_fetch_data or perf_action == "stat"
 
 - name: Create flame graph
   include_tasks:
     file: flamegraph.yaml
-  when: perf_flamegraph
+  when: perf_flamegraph and perf_action == "record"
 
 - name: Remove any collection files
   file:

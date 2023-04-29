@@ -65,6 +65,10 @@ variable "wl_job_filter" {
   default = ""
 }
 
+variable "wl_export_logs" {
+  default = "/export-logs"
+}
+
 variable "wl_timeout" {
   default = "28800,300"
 }
@@ -151,10 +155,12 @@ module "wsf" {
   sg_whitelist_cidr_blocks = compact(split("\n",file("proxy-ip-list.txt")))
   ssh_pub_key = file("ssh_access.key.pub")
 
-  common_tags = merge(var.custom_tags, {
-    owner: var.owner,
-    workload: var.wl_name,
-  })
+  common_tags = {
+    for k,v in merge(var.custom_tags, {
+      owner: var.owner,
+      workload: var.wl_name,
+    }) : k => substr(replace(lower(v), "/[^a-z0-9_-]/", ""), 0, 63)
+  }
 
   instance_profiles = [
     merge(var.worker_profile, {
@@ -181,6 +187,7 @@ output "options" {
     wl_docker_image : var.wl_docker_image,
     wl_docker_options : var.wl_docker_options,
     wl_job_filter : var.wl_job_filter,
+    wl_export_logs: var.wl_export_logs,
     wl_timeout : var.wl_timeout,
     wl_registry_map : var.wl_registry_map,
     wl_namespace : var.wl_namespace,

@@ -44,7 +44,20 @@ resource "azurerm_network_security_group" "default" {
   }
 
   security_rule {
-    name                       = "Local Network Traffic"
+    name                       = "WINRM"
+    description                = "WINRM"
+    priority                   = 155
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "${var.winrm_port}"
+    source_address_prefixes    = var.sg_whitelist_cidr_blocks
+    destination_address_prefix = local.subnet_cidr_block
+  }
+
+  security_rule {
+    name                       = "local_network_traffic"
     description                = "Allow local traffic"
     priority                   = 140
     direction                  = "Inbound"

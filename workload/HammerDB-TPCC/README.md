@@ -132,13 +132,12 @@ ctest -R <testcase>
 ```
 
 ### KPI
-Run the [`kpi.sh`](kpi.sh) script to parse the KPIs from the validation logs. 
+Run the [`list-kpi.sh`](../../doc/ctest.md#list-kpish) script to parse the KPIs from the validation logs. 
 
 The expected output will be similar to this. Please note that the numbers might be slightly different. 
 Primary KPI is `Peak New Orders Per Minute (orders/min)` which has a * as prefix
 
 ```
-make kpi_static_hammerdb_tpcc_mysql_disk_hugepage_off_pkm
 New Orders Per Minute xxx (orders/min): xxxxx
 Transactions Per Minute xxx (trans/min): xxxxx
 Peak Num of Virtual Users: xxx

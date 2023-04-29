@@ -3,7 +3,7 @@
 # Copyright (c) 2022 Intel Corporation
 # SPDX-License-Identifier: Apache License 2.0
 
-ARG OS_VER=20.04
+ARG OS_VER=22.04
 ARG OS_IMAGE=ubuntu
 
 FROM ${OS_IMAGE}:${OS_VER}
@@ -19,11 +19,14 @@ FROM ${OS_IMAGE}:${OS_VER}
 # Db2 Windows	DB2CLI64.DLL
 # MySQL Linux	libmysqlclient.so
 # MySQL Windows	LIBMYSQL.DLL
+# PostgreSQL Linux	libpq.so
+# PostgreSQL Windows	LIBPQ.DLL
 # Redis	Built in library
 ###
 
 ### Install pkgs on ubuntu
 ## libmysqlclient-dev -> libmysqlclient.so.* -> mysql
+## libpq5 -> libpq.so.* -> postgresql
 ## netcat -> nc command used to test database service get started
 ###
 
@@ -44,6 +47,7 @@ COPY script/common.sh /
 RUN chmod +x /common.sh
 
 COPY src/mysql/mysqloltp_custom.tcl ${HAMMERDB_INSTALL_DIR}/src/mysql/mysqloltp.tcl
+COPY src/postgresql/pgoltp_custom.tcl ${HAMMERDB_INSTALL_DIR}/src/postgresql/pgoltp.tcl
 
 COPY script/prepare_common.sh /
 RUN chmod +x /prepare_common.sh
@@ -61,5 +65,9 @@ RUN chmod +x /network_rps_tuning.sh
 RUN mkfifo /export-logs
 CMD (/prepare_hammerdb.sh; /run_hammerdb.sh; echo $? > status) | tee output.log && \
     sleep 60s && \
-    tar cf /export-logs status output.log *_tcl.log && \
+    # prevent EOF caused by unstopped writing
+    cat *_tcl.log > all_tcl.log && \
+    ls /tmp/hdbxtprofile.log && TIME_PROFILE_LOG="/tmp/hdbxtprofile.log" || TIME_PROFILE_LOG="" && \
+    sync status output.log all_tcl.log $TIME_PROFILE_LOG && \
+    tar cf /export-logs status output.log all_tcl.log db.cnf $TIME_PROFILE_LOG && \
     sleep infinity

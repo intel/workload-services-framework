@@ -20,13 +20,15 @@ for argv in sys.argv:
     argv = argv[2:]
     if "=" in argv:
       k, _, v = argv.partition("=")
-      options[k.replace('-', '_')] = v
+      options[k.replace('-', '_')] = v.strip().replace('%20', ' ')
     elif argv.startswith("no"):
       options[argv[2:].replace('-', '_')] = False
     else:
       options[argv.replace('-', '_')] = True
 instances = tfoutput["values"]["outputs"]["instances"]["value"]
 options["wl_logs_dir"] = "/opt/workspace"
+options["wl_docker_options"] = " ".join([ '"{}"'.format(x.replace("%20", " ")) for x in options.get("wl_docker_options","").split(" ") if x])
+
 
 with open(INVENTORY) as fd:
   for doc in yaml.safe_load_all(fd):
@@ -54,25 +56,28 @@ def _WalkTo(node, name):
 
 
 def _AddNodeAffinity(spec, nodes):
-  if "affinity" not in spec:
-    spec["affinity"] = {}
+  static_nodes = [ n for n in nodes if nodes[n] == "static" ]
 
-  if "nodeAffinity" not in spec["affinity"]:
-    spec["affinity"]["nodeAffinity"] = {}
+  if static_nodes:
+    if "affinity" not in spec:
+      spec["affinity"] = {}
 
-  if "requiredDuringSchedulingIgnoredDuringExecution" not in spec["affinity"]["nodeAffinity"]:
-    spec["affinity"]["nodeAffinity"]["requiredDuringSchedulingIgnoredDuringExecution"] = {}
+    if "nodeAffinity" not in spec["affinity"]:
+      spec["affinity"]["nodeAffinity"] = {}
 
-  if "nodeSelectorTerms" not in spec["affinity"]["nodeAffinity"]["requiredDuringSchedulingIgnoredDuringExecution"]:
-    spec["affinity"]["nodeAffinity"]["requiredDuringSchedulingIgnoredDuringExecution"]["nodeSelectorTerms"] = []
+    if "requiredDuringSchedulingIgnoredDuringExecution" not in spec["affinity"]["nodeAffinity"]:
+      spec["affinity"]["nodeAffinity"]["requiredDuringSchedulingIgnoredDuringExecution"] = {}
 
-  spec["affinity"]["nodeAffinity"]["requiredDuringSchedulingIgnoredDuringExecution"]["nodeSelectorTerms"].append({
+    if "nodeSelectorTerms" not in spec["affinity"]["nodeAffinity"]["requiredDuringSchedulingIgnoredDuringExecution"]:
+      spec["affinity"]["nodeAffinity"]["requiredDuringSchedulingIgnoredDuringExecution"]["nodeSelectorTerms"] = []
+
+    spec["affinity"]["nodeAffinity"]["requiredDuringSchedulingIgnoredDuringExecution"]["nodeSelectorTerms"].append({
       "matchExpressions": [{
-          "key": "kubernetes.io/hostname",
-          "operator": "In",
-          "values": list(nodes.keys()),
+        "key": "kubernetes.io/hostname",
+        "operator": "In",
+        "values": list(set([ x.split(".")[0] for x in static_nodes ] + [ x for x in static_nodes ])),
       }],
-  })
+    })
 
 
 def _IsSUTAccessible(image):
@@ -87,7 +92,7 @@ def _RegistryEnabled():
   for h in inventories["cluster_hosts"]["hosts"]:
     if inventories["cluster_hosts"]["hosts"][h]["private_ip"] in my_ip_list:
       return False
-  return options.get("k8s_enable_registry", True)
+  return str(options.get("k8s_enable_registry", 'True')).lower() == 'true'
 
 
 def _ModifyImageRef(spec, registry_map):
@@ -95,6 +100,14 @@ def _ModifyImageRef(spec, registry_map):
     if not _IsSUTAccessible(c1["image"]):
       if registry_map[1] and c1["image"].startswith(registry_map[0]):
         c1["image"] = registry_map[1] + os.path.basename(c1["image"])
+        c1["imagePullPolicy"] = "Always"
+
+def _ModifyENVValue(spec):
+  if isinstance(spec[0], dict) and 'env' in spec[0]:
+    for envs in spec[0]['env']:
+      for k, v in envs.items():
+        if isinstance(v, str) and '%20' in v:
+          envs[k]=v.replace('%20', ' ')
 
 
 def _UpdateK8sConfig(nodes, registry_map):
@@ -110,9 +123,15 @@ def _UpdateK8sConfig(nodes, registry_map):
       _AddNodeAffinity(spec, nodes)
       _ModifyImageRef(spec["containers"], registry_map)
 
+    if spec and spec["containers"]:
+      _ModifyENVValue(spec["containers"])
+
     spec = _WalkTo(doc, "initContainers")
     if spec and spec["initContainers"]:
       _ModifyImageRef(spec["initContainers"], registry_map)
+
+    if spec and spec["initContainers"]:
+      _ModifyENVValue(spec["initContainers"])
 
   modified_filename = KUBERNETES_CONFIG+".mod.yaml"
   with open(modified_filename, "w") as fd:
@@ -145,14 +164,43 @@ if os.path.exists(CLUSTER_INFO):
           hostname = addr1["address"]
       for host in inventories["workload_hosts"]["hosts"]:
         if private_ip == inventories["workload_hosts"]["hosts"][host]["private_ip"]:
-          workload_nodes[hostname] = 1
+          workload_nodes[hostname] = inventories["workload_hosts"]["hosts"][host].get('csp', 'static')
 
-playbooks = []
+### override options with terraform options defined in cluster-config.yaml
+with open(CLUSTER_CONFIG) as fd:
+  for doc in yaml.safe_load_all(fd):
+    if doc and "terraform" in doc:
+      for option1 in doc["terraform"]:
+        if option1 not in options:
+          options[option1] = doc["terraform"][option1]
+
+playbooks = [{
+  "hosts": "localhost",
+  "gather_facts": "false",
+  "tasks": [{
+    "name": "Breakpoint at RunStage",
+    "include_role": {
+      "name": "breakpoint",
+    },
+    "vars": _ExtendOptions({
+      "breakpoint": "RunStage",
+    })
+  }]
+}]
+
 timeout = options.get("wl_timeout", "28800,600").split(",")
 if len(timeout)<2:
   timeout.append(timeout[0])
-if len(timeout)<3:
-  timeout.append(int(timeout[0])/2)
+
+# generic ansible
+if os.path.exists("/opt/workload/template/ansible/custom/deployment.yaml"):
+  playbooks.append({
+    "name": "deployment",
+    "import_playbook": "./template/ansible/custom/deployment.yaml",
+    "vars": _ExtendOptions({
+      "wl_tunables": _GetTunables(),
+    }),
+  })
 
 if options.get("wl_docker_image", None):
   playbooks.append({
@@ -160,6 +208,7 @@ if options.get("wl_docker_image", None):
     "import_playbook": "./template/ansible/docker/deployment.yaml",
     "vars": _ExtendOptions({
       "wl_timeout": timeout,
+      "wl_tunables": _GetTunables(),
     })
   })
 
@@ -167,7 +216,11 @@ elif os.path.exists(KUBERNETES_CONFIG):
   registry_map = options["wl_registry_map"].split(",")
   if _RegistryEnabled():
     k8s_registry_port = options.get("k8s_registry_port", "20668")
-    registry_map[1] = inventories["controller"]["hosts"]["controller-0"]["private_ip"] + ":" + k8s_registry_port + "/"
+    k8s_registry_ip = inventories["controller"]["hosts"]["controller-0"]["private_ip"] if "controller" in inventories else "127.0.0.1"
+    registry_map[1] = options.get("k8s_remote_registry_url", k8s_registry_ip + ":" + k8s_registry_port)
+    if not registry_map[1].endswith("/"):
+      registry_map[1] = registry_map[1] + "/"
+
   job_filter = options["wl_job_filter"].split("=")
   if len(job_filter)<2:
     job_filter.append(job_filter[0])
@@ -180,15 +233,6 @@ elif os.path.exists(KUBERNETES_CONFIG):
       "wl_timeout": timeout,
       "wl_job_filter": job_filter,
       "wl_registry_map": registry_map,
-    }),
-  })
-
-# generic ansible
-if os.path.exists("/opt/workload/template/ansible/custom/deployment.yaml"):
-  playbooks.append({
-    "name": "deployment",
-    "import_playbook": "./template/ansible/custom/deployment.yaml",
-    "vars": _ExtendOptions({
       "wl_tunables": _GetTunables(),
     }),
   })
@@ -205,6 +249,7 @@ if os.path.exists("/opt/workload/kpi.sh"):
         "name": "kpi",
       },
       "vars": _ExtendOptions({
+        "wl_tunables": _GetTunables(),
       }),
     }],
   })

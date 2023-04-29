@@ -7,18 +7,32 @@
     ignore_errors: yes
     become: yes
 
+  - name: Restart systemd-resolved.service
+    become: true
+    systemd:
+      name: systemd-resolved
+      daemon_reload: yes
+      enabled: yes
+      state: restarted
+    ignore_errors: yes
+    when: ((csp | default('static')) == 'alicloud')
+
   - name: Disable SWAP
     command: swapoff -a
     become: yes
 
   - name: Get local time
-    command: date -Ins
+    shell: |
+      cat /etc/timezone
+      date -Ins
     register: datetime
     delegate_to: localhost
     when: k8s_sync_time | default('true') | bool
 
   - name: Syncronize date time
-    command: "date -Ins -s '{{ datetime.stdout }}'"
+    shell:  |
+      timedatectl set-timezone '{{ datetime.stdout_lines | first }}'
+      date -Ins -s '{{ datetime.stdout_lines | last }}'
     become: yes
     when: k8s_sync_time | default('true') | bool
 
@@ -54,7 +68,17 @@
       create: yes
     become: yes
 
+  - name: Disable net.ipv4.ip_forward setting in sysctl.conf
+    replace:
+      path: /etc/sysctl.conf
+      regexp: '^\s*(net.ipv4.ip_forward\s*=\s*.*)$'
+      replace: '# \1'
+    become: yes
+
   - name: Apply new settings
     command: sysctl --system
     become: yes
 
+  - name: customize prerequisite
+    include_tasks:
+      file: customize-prerequisite.yaml

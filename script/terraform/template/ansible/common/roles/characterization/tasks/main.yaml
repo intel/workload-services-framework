@@ -1,0 +1,68 @@
+- name: Install msr-tool on Debian
+  apt:
+    name: msr-tools
+    update_cache: true
+  become: true
+  when: ansible_os_family == "Debian"
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+    ACCEPT_EULA: Y
+
+- name: Install msr-tool on RHL
+  yum:
+    name: 
+    - msr-tools
+    update_cache: true
+  become: true
+  when: ansible_os_family == "RedHat"
+
+- name: Add the msr module
+  modprobe:
+    name: msr
+    state: present
+
+- name: Run cmdline
+  command: "ssh -4 -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -i {{ ansible_private_key_file }} -o ControlPath={{ control_path }} sudo rdmsr --processor 0 {{ item['value']}}"
+  delegate_to: localhost
+  with_items: "{{ INTEL_MSR_ITEMS }}"
+  ignore_errors: true
+  register: p
+
+- name: Write variable to file
+  lineinfile:
+    dest: "{{ wl_logs_dir }}/{{ inventory_hostname }}-msrinfo/{{ ansible_host }}.json"
+    line: '{{ item["item"]["name"] | to_nice_json}}:{{ item["stdout"] | to_nice_json}},'
+    create: true
+  with_items: "{{ p.results }}"
+  delegate_to: localhost
+  ignore_errors: true
+
+# convert the file to json
+# 1. Remove comma from end of last line
+# 2. Add "{" before start file
+# 3. Add "}" endof file
+
+- name: Remove comma from end of last line
+  lineinfile:
+    path: "{{ wl_logs_dir }}/{{ inventory_hostname }}-msrinfo/{{ ansible_host }}.json"
+    regexp: "(.*)\\,$"
+    line: "\\1"
+    backrefs: yes
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: Add symbols to the beginning of the file 
+  lineinfile:
+    dest: "{{ wl_logs_dir }}/{{ inventory_hostname }}-msrinfo/{{ ansible_host }}.json"
+    line: '{'
+    insertbefore: BOF
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: Add the symbol at the end of the file
+  lineinfile:
+    dest: "{{ wl_logs_dir }}/{{ inventory_hostname }}-msrinfo/{{ ansible_host }}.json"
+    line: '}'
+    insertafter: EOF
+  delegate_to: localhost
+  ignore_errors: true

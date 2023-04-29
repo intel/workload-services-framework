@@ -1,0 +1,12 @@
+# specjbb-2015-scripts
+
+# Image that contains just the benchmark scripts
+# This speeds up the creation of the final images by placing the scripts 
+# in the final layer of each image
+FROM scratch
+
+LABEL name="specjbb-2015-scripts"
+
+COPY templates/ templates/
+COPY scripts/ scripts/
+COPY configs/ configs/

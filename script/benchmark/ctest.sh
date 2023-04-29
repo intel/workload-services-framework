@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-if [ "$#" -eq 0 ]; then
+print_help () {
     echo "Usage: [options]"
     echo "--loop <number>       Run the ctest commands sequentially."
     echo "--burst <number>      Run the ctest commands simultaneously."
@@ -15,7 +15,8 @@ if [ "$#" -eq 0 ]; then
     echo "--reuse-sut           Reuse the cloud SUT previously prepared."
     echo "--cleanup-sut         Cleanup cloud SUT."
     echo "--dry-run             Generate the testcase configurations and then exit."
-    echo "ctest options apply"
+    echo "--testcase            Run the test case exactly as specified."
+    echo "--noenv               Clean environment variables before proceeding with the tests."
     echo ""
     echo "<vars> accepts the following formats:"
     echo "VAR=str1 str2 str3    Enumerate the variable values."
@@ -23,15 +24,26 @@ if [ "$#" -eq 0 ]; then
     echo "VAR=1 2 4 ...32 [35|] Increment variable values exponentially, with mod optionally."
     echo "VAR1=n1 n2/VAR2=n1 n2 Permutate variable 1 and 2."
     echo "The values are repeated if insufficient to cover the loops."
+    echo ""
+    echo "Subset of the following ctest options apply:"
+    ctest --help | sed -n '/--progress/,/--help/{p}'
     exit 3
+}
+
+if [ "$#" -eq 0 ]; then
+    print_help
 fi
 
 run_as_nohup=""
+no_env=""
 args=()
 for var in "$@"; do
     case "$var" in
     --nohup)
         run_as_nohup="1"
+        ;;
+    --noenv)
+        no_env="1"
         ;;
     --stop)
         kill -9 -a $(ps auxwww | grep ctest | awk '{print$2}') 2> /dev/null || echo -n ""
@@ -44,8 +56,18 @@ for var in "$@"; do
 done
 
 if [ -n "$run_as_nohup" ]; then
-    nohup "$0" "${args[@]}" > nohup.out 2>&1 &
+    if [ -n "$no_env" ]; then
+        nohup env -i "HOME=$HOME" "http_proxy=$http_proxy" "https_proxy=$https_proxy" "no_proxy=$no_proxy" "PATH=$PATH" "$0" "${args[@]}" > nohup.out 2>&1 &
+        disown -h $!
+    else
+        nohup "$0" "${args[@]}" > nohup.out 2>&1 &
+        disown -h $!
+    fi
+    disown
     echo "tail -f nohup.out to monitor progress"
+    exit 0
+elif [ -n "$no_env" ]; then
+    env -i "HOME=$HOME" "http_proxy=$http_proxy" "https_proxy=$https_proxy" "no_proxy=$no_proxy" "PATH=$PATH" "$0" "${args[@]}" 
     exit 0
 fi
 
@@ -56,7 +78,6 @@ step=1
 args=()
 steps=()
 contf=0
-test_config="$(readlink -f "$TEST_CONFIG" || echo "")"
 prepare_sut=0
 sut=()
 cleanup_sut=0
@@ -65,6 +86,7 @@ dry_run=0
 run_as_ctest=1
 options=""
 empty_vars=()
+last_var=""
 for var in "$@"; do
     case "$var" in
     --loop=*)
@@ -72,7 +94,6 @@ for var in "$@"; do
         run_as_ctest=0
         ;;
     --loop)
-        loop="-1"
         run_as_ctest=0
         ;;
     --burst=*)
@@ -80,14 +101,12 @@ for var in "$@"; do
         run_as_ctest=0
         ;;
     --burst)
-        burst="-1"
         run_as_ctest=0
         ;;
     --run=*)
         run="${var/--run=/}"
         ;;
     --run)
-        run="-1"
         ;;
     --prepare-sut)
         prepare_sut=1
@@ -101,19 +120,16 @@ for var in "$@"; do
         fi
         ;;
     --set)
-        step="-1"
         ;;
     --test-config=*|--config=*)
         export TEST_CONFIG="${var/*=/}"
         ;;
     --test-config|--config)
-        test_config="-1"
         ;;
     --options=*)
         export CTESTSH_OPTIONS="$CTESTSH_OPTIONS ${var/--options=/}"
         ;;
     --options)
-        options="-1"
         ;;
     --continue)
         contf=1
@@ -124,33 +140,60 @@ for var in "$@"; do
     --reuse-sut)
         reuse_sut=1
         ;;
+    --testcase=*)
+        args+=("-R" "^${var#--testcase=}$")
+        ;;
+    --testcase)
+        ;;
     --dry-run)
         dry_run=1
         ;;
+    --help|-help|-h|-H|"/?")
+        print_help
+        ;;
+    -V|--verbose|-VV|--extra-verbose|--debug|--progress|--output-on-failure|-F|-Q|--quiet|-N|-U|--union|--rerun-failed|--schedule-random|--version|-version|-j|--parallel|-O|--output-log|-L|--label-regex|-R|--tests-regex|-E|--exclude-regex|-LE|--label-exclude|--repeat-until-fail|--max-width|-I|--tests-information|--timeout|--stop-time)
+        args+=("$var")
+        ;;
     *)
-        if [ "$loop" = "-1" ]; then
+        case "$last_var" in
+        --loop)
             loop="$var"
-        elif [ "$burst" = "-1" ]; then
+            ;;
+        --burst)
             burst="$var"
-        elif [ "$run" = "-1" ]; then
+            ;;
+        --run)
             run="$var"
-        elif [ "$step" = "-1" ]; then
+            ;;
+        --set)
             if [[ "$var" =~ ^[A-Za-z0-9_]*=$ ]]; then
               empty_vars+=("$var")
             else
               steps+=("$var")
             fi
             step=1
-        elif [ "$test_config" = "-1" ]; then
+            ;;
+        --test-config|--config)
             export TEST_CONFIG="$var"
-        elif [ "$options" = "-1" ]; then
+            ;;
+        --options)
             export CTESTSH_OPTIONS="$CTESTSH_OPTIONS $var"
             options=""
-        else
+            ;;
+        --testcase)
+            args+=("-R" "^$var$")
+            ;;
+        -j|--parallel|-O|--output-log|-L|--label-regex|-R|--tests-regex|-E|--exclude-regex|-LE|--label-exclude|--repeat-until-fail|--max-width|-I|--tests-information|--timeout|--stop-time)
             args+=("$var")
-        fi
+            ;;
+        *)
+            echo "Unknown option: $last_var $var"
+            exit 3
+            ;;
+        esac
         ;;
     esac
+    last_var="$var"
 done
 
 if [ "$loop" = "-1" ]; then
@@ -265,52 +308,69 @@ remove_tmp_files () {
 }
 trap 'remove_tmp_files' ERR EXIT
 
-test_config="$(readlink -f "$TEST_CONFIG" || echo "")"
+test_config=""
+if [ -n "$TEST_CONFIG" ]; then
+    if [ -r "$TEST_CONFIG" ]; then
+        test_config="$(readlink -f "$TEST_CONFIG")"
+    else
+        echo "$TEST_CONFIG not found"
+        exit 3
+    fi
+fi
+
+set_variable () {
+    if [ "$1" = "EVENT_TRACE_PARAMS" ]; then
+        export CTESTSH_EVENT_TRACE_PARAMS="${2//%20/ }"
+    else
+        echo "$1=$2"
+        echo "  $1: \"$2\"" >> "$3"
+    fi
+}
+
 for loop1 in $(seq 1 $loop); do
     loop_prefix="$(date +%m%d-%H%M%S)-"
     while [ -d "$loop_prefix"* ]; do
         sleep 1s
         loop_prefix="$(date +%m%d-%H%M%S)-"
     done
-    [ $cleanup_sut = 1 ] || [ $dry_run = 1 ] || [ $run_as_ctest = 1 ] && loop_prefix=""
+    [ $cleanup_sut = 1 ] || [ $run_as_ctest = 1 ] && loop_prefix=""
     [ $prepare_sut = 1 ] && loop_prefix="sut-"
     pids=()
     for burst1 in $(seq 1 $burst); do
         echo "Loop: $loop1 Burst: $burst1 Run: $run"
         if [ "$burst" = "1" ]; then
-            export TEST_PREFIX="$loop_prefix"
+            export CTESTSH_PREFIX="$loop_prefix"
         else
-            export TEST_PREFIX="${loop_prefix}r$burst1-"
+            export CTESTSH_PREFIX="${loop_prefix}r$burst1-"
         fi
         export TEST_CONFIG="$test_config"
+        export CTESTSH_EVENT_TRACE_PARAMS="undefined"
         if [ ${#values[@]} -gt 0 ] || [ ${#empty_vars[@]} -gt 0 ]; then
             tmp="$(mktemp)"
             if [ -n "$TEST_CONFIG" ]; then
                 cp -f "$TEST_CONFIG" $tmp
             fi
             export TEST_CONFIG="$tmp"
-            echo "*:" >> $tmp
+            echo -e "\n*:" >> $tmp
             for var1 in "${values[@]}"; do
                 values1=($(echo "$var1" | tr ' ' '\n'))
                 key1="${values1[0]}"
                 val1="${values1[$(( (((loop1-1)*burst+burst1-1) % (${#values1[@]}-1))+1 ))]}"
-                echo "$key1: $val1"
-                echo "  $key1: \"$val1\"" >> $tmp
+                set_variable "$key1" "$val1" "$tmp"
             done
             for var1 in "${empty_vars[@]}"; do
-                echo "${var1%=}:"
-                echo "  ${var1%=}: \"\"" >> $tmp 
+                set_variable "${var1%=}" "" "$tmp"
             done
             tmp_files+=($tmp)
         fi
-        (   
+        (
             export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --run_stage_iterations=$run"
             [ $prepare_sut = 1 ] && export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --prepare-sut"
             [ $cleanup_sut = 1 ] && export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --cleanup-sut"
             [ $reuse_sut = 1 ] && export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --reuse-sut"
             [ $dry_run = 1 ] && export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --dry-run"
             set -x
-            ctest "${args[@]}"
+            /usr/bin/ctest "${args[@]}"
         ) &
         pids+=($!)
     done

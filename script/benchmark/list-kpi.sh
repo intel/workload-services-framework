@@ -13,6 +13,7 @@ print_help () {
     echo "--var[1-9] value      Specify spreadsheet variables."
     echo "--file filename       Specify the spreadsheet filename."
     echo "--filter filter       Specify the trim filter to shorten the worksheet name."
+    echo "--uri                 Show WSF portal URI"
     exit 0
 }
 
@@ -28,7 +29,9 @@ var1="default"
 var2="default"
 var3="default"
 var4="default"
+uri=0
 filter="_(tensorflow|throughput|inference|benchmark|real)"
+last_var=""
 for var in "$@"; do
     case "$var" in
     --primary)
@@ -43,9 +46,6 @@ for var in "$@"; do
     --outlier=*)
         outlier="${var#--outlier=}"
         ;;
-    --outlier)
-        outlier="-1"
-        ;;
     --params|--params=true)
         params=1
         ;;
@@ -55,70 +55,64 @@ for var in "$@"; do
     --format=*)
         format="${var#--format=}"
         ;;
-    --format)
-        format="-1"
-        ;;
     --var1=*)
         var1="${var#--var1=}"
-        ;;
-    --var1)
-        var1="-1"
         ;;
     --var2=*)
         var2="${var#--var2=}"
         ;;
-    --var2)
-        var2="-1"
-        ;;
     --var3=*)
         var3="${var#--var3=}"
-        ;;
-    --var3)
-        var3="-1"
         ;;
     --var4=*)
         var4="${var#--var4=}"
         ;;
-    --var4)
-        var4="-1"
-        ;;
     --filter=*)
         filter="${var#--filter=}"
-        ;;
-    --filter)
-        filter="-1"
         ;;
     --file=*)
         xlsfile="${var#--file=}"
         ;;
-    --file)
-        xlsfile=""
+    --uri)
+        uri=1
         ;;
     --help)
         print_help
         ;;
-    *)
-        if [ "$outlier" = "-1" ]; then
-            outlier="$var"
-        elif [ "$format" = "-1" ]; then
-            format="$var"
-        elif [ "$var1" = "-1" ]; then
-            var1="$var"
-        elif [ "$var2" = "-1" ]; then
-            var2="$var"
-        elif [ "$var3" = "-1" ]; then
-            var3="$var"
-        elif [ "$var4" = "-1" ]; then
-            var4="$var"
-        elif [ "$filter" = "-1" ]; then
-            filter="$var"
-        elif [ -z "$xlsfile" ]; then
-            xlsfile="$var"
-        else
-            prefixes+=("$var")
-        fi
+    --var1|--var2|--var3|--var4|--filter|--file|--format|--outlier)
         ;;
+    *)
+        case "$last_var" in
+        --outlier)
+            outlier="$var"
+            ;;
+        --format)
+            format="$var"
+            ;;
+        --var1)
+            var1="$var"
+            ;;
+        --var2)
+            var2="$var"
+            ;;
+        --var3)
+            var3="$var"
+            ;;
+        --var4)
+            var4="$var"
+            ;;
+        --filter)
+            filter="$var"
+            ;;
+        --file)
+            xlsfile="$var"
+            ;;
+        *)
+            prefixes+=("$var")
+            ;;
+        esac
     esac
+    last_var="$var"
 done
 
 if [ "$outlier" = "-1" ]; then
@@ -160,11 +154,10 @@ for logsdir1 in ${prefixes[@]}; do
                 if [ $params -eq 1 ]; then
                     awk '/tunables:/{$1="";print gensub(/"/,"","g")}' "$logsdir1/workload-config.yaml" | tr ';' '\n' | sed 's/^ *\([^:]*\):\(.*\)$/# \1: "\2"/'
                 fi
-                chmod a+rx "$itrdir1/kpi.sh"
                 if [ -n "$primary" ]; then
-                    ( cd "$itrdir1" && ./kpi.sh $script_args | grep -E "^\*" ) || true
+                    ( cd "$itrdir1" && bash ./kpi.sh $script_args 2> /dev/null | grep -E "^\*" ) || true
                 else
-                    ( cd "$itrdir1" && ./kpi.sh $script_args ) || true
+                    ( cd "$itrdir1" && bash ./kpi.sh $script_args 2> /dev/null ) || true
                 fi
             done
         else
@@ -172,13 +165,15 @@ for logsdir1 in ${prefixes[@]}; do
             if [ $params -eq 1 ]; then
                 awk '/tunables:/{$1="";print gensub(/"/,"","g")}' "$logsdir1/workload-config.yaml" | tr ';' '\n' | sed 's/^ *\([^:]*\):\(.*\)$/# \1: "\2"/'
             fi
-            chmod a+rx "$logsdir1/kpi.sh"
             if [ -n "$primary" ]; then
-                ( cd "$logsdir1" && ./kpi.sh $script_args | grep -E "^\*" ) || true
+                ( cd "$logsdir1" && bash ./kpi.sh $script_args 2> /dev/null | grep -E "^\*" ) || true
             else
-                ( cd "$logsdir1" && ./kpi.sh $script_args ) || true
+                ( cd "$logsdir1" && bash ./kpi.sh $script_args 2> /dev/null ) || true
             fi
         fi
+    fi
+    if [ -r "$logsdir1/tfplan.logs" ] && [ "$uri" -eq 1 ]; then
+        sed -n '/WSF Portal URL:/{s/^[^:]*:/# portal:/;p;q}' "$logsdir1/tfplan.logs"
     fi
 done | (
     case "$format" in

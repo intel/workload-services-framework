@@ -32,6 +32,8 @@ EXPECTED_DB_BUFFER_BYTES=$(to_bytes "${EXPECTED_DB_BUFFER_GB}G")
 DB_TYPE=${1:-mysql}
 if [[ "$DB_TYPE" == "mysql" ]]; then
     CFG_DB_BUFFER_BYTES=$(to_bytes "$MYSQL_INNODB_BUFFER_POOL_SIZE")
+elif [[ "$DB_TYPE" == "postgresql" ]]; then
+    CFG_DB_BUFFER_BYTES=$(to_bytes "$PG_SHARED_BUFFERS")
 fi
 
 ACTUAL_DB_BUFFER_BYTES=$CFG_DB_BUFFER_BYTES

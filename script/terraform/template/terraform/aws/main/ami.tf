@@ -4,21 +4,27 @@ locals {
     "ubuntu2004": "099720109477" # CANONICAL
     "ubuntu2204": "099720109477" # CANONICAL
     "debian11"  : "136693071363" # Debian
+    "rhel9"    : "309956199498" #RHEL 9
   }
   os_image_filter = {
     "ubuntu2004": "ubuntu/images/*/ubuntu-focal-20.04-*64-server-20*",
     "ubuntu2204": "ubuntu/images/*/ubuntu-jammy-22.04-*64-server-20*",
     "debian11"  : "debian-11-*64-20220911-1135",
+    "rhel9"     : "RHEL-9*",
   }
   os_image_user = {
     "ubuntu2004": "ubuntu",
     "ubuntu2204": "ubuntu",
     "debian11"  : "admin",
+    "rhel9"     : "ec2-user",
   }
 }
 
 data "aws_ami" "search" {
-  for_each = local.profile_map
+  for_each = {
+    for k,v in local.profile_map : k => v
+      if v.vm_count > 0
+  }
 
   most_recent = true
 
@@ -38,16 +44,19 @@ data "aws_ami" "search" {
     name   = "virtualization-type"
     values = [ "hvm" ]
   }
-
-  filter {
-    name = "block-device-mapping.delete-on-termination"
-    values = [ "true" ]
-  }
-
-  filter {
-    name = "block-device-mapping.volume-type"
-    values = [ each.value.os_disk_type ]
-  }
 }
 
+data "aws_ami" "image" {
+  for_each = {
+    for k,v in local.instances : k => v 
+      if startswith((v.image!=null?v.image:"ami-"), "ami-")==false
+  }
+
+  filter {
+    name = "name"
+    values = [ each.value.image ]
+  }
+
+  most_recent = true
+}
 

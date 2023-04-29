@@ -1,0 +1,42 @@
+#!/bin/bash -e
+
+emon_options=""
+emon_bin_path="/usr/local/emon"
+emon_edp_config="config/edp/pyedp_config.txt"
+emon_sep_vars="$emon_bin_path/sep/sep_vars.sh"
+
+emon_start () {
+    if [ -e "$emon_sep_vars" ]; then
+        (
+            . "$emon_sep_vars" > /dev/null
+            mkdir -p "$LOGSDIRH/$NAMESPACE-emon"
+            emon $emon_options -collect-edp > "$LOGSDIRH/$NAMESPACE-emon/emon.dat" 2>&1 &
+            echo $! > "$LOGSDIRH/$NAMESPACE-emon/emon.pid"
+        )
+        echo "emon started"
+    fi
+}
+
+emon_stop () {
+    if [ -e "$emon_sep_vars" ] && [ -e "$LOGSDIRH/$NAMESPACE-emon/emon.pid" ]; then
+        (
+            . "$emon_sep_vars" > /dev/null
+            emon -stop
+            sleep 5s
+            sudo kill -9 $(cat "$LOGSDIRH/$NAMESPACE-emon/emon.pid" 2> /dev/null) > /dev/null 2>&1 || true
+            rm -f "$LOGSDIRH/$NAMESPACE-emon/emon.pid"
+        )
+        echo "emon stopped"
+    fi
+}
+
+emon_collect () {
+    if [ -e "$emon_sep_vars" ]; then
+        (
+            . "$emon_sep_vars" > /dev/null
+            cd "$LOGSDIRH/$NAMESPACE-emon"
+            emon -process-pyedp "$emon_bin_path/sep/$emon_edp_config"
+        )
+    fi
+}
+

@@ -1,4 +1,16 @@
 
+  - name: remove old versions
+    yum:
+      name:
+      - podman
+      - runc
+      - containerd
+      - containerd.io
+      state: absent
+    become: true
+    ignore_errors: true
+    when: ((csp | default('static')) == 'static' or (csp | default('static')) == 'alicloud')
+
   - name: Detect OS version
     shell:
       cmd: . /etc/os-release; echo $VERSION_ID
@@ -9,15 +21,19 @@
     get_url:
       url: "{{ docker_dist_repo }}/linux/centos/docker-ce.repo"
       dest: "/etc/yum.repos.d/docker-ce.repo"
+    become: true
     when: osver.stdout | int >= 8
+    register: getrc
+    until: getrc is success
+    retries: 10
+    delay: 5
 
   - name: install containerd
     yum:
       name:
       - "containerd.io-{{ containerd_version | default(containerd_default_version['centos']) }}"
-      state: present
       update_cache: true
-    become: yes
+    become: true
     register: yumrc
     until: yumrc is success
     retries: 10

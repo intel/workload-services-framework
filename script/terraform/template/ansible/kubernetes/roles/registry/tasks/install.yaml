@@ -18,16 +18,15 @@
       executable: /bin/bash
     register: os
     when: (hostvars['controller-0']['ansible_facts']['cert_updated'] | default('no') | bool) or (not cert.stat.exists)
-
+  
   - name: copy cert to workers
     include_tasks:
-      file: 'install-{{ os.stdout }}.yaml'
+      file: "install-{{ (os.stdout == 'rhel' or os.stdout =='anolis') | ternary('centos', os.stdout) }}.yaml"
     when: (hostvars['controller-0']['ansible_facts']['cert_updated'] | default('no') | bool) or (not cert.stat.exists)
 
   - name: restart containerd
-    systemd:
+    include_role:
       name: containerd
-      state: restarted
-    become: yes
+      tasks_from: restart
     when: (hostvars['controller-0']['ansible_facts']['cert_updated'] | default('no') | bool) or (not cert.stat.exists)
 

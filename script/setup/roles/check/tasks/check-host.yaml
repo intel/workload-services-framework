@@ -1,0 +1,10 @@
+
+- name: get short hostname
+  command: hostname -s
+  register: hostname
+
+- name: check if hostname conforms to RFC1178
+  fail:
+    msg: "Hostname {{ hostname.stdout }} not conformant to RFC1178."
+  when: (hostname.stdout | regex_findall('[^a-z0-9-]') | length > 0)
+

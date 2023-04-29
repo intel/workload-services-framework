@@ -16,16 +16,13 @@ END {
 
 # args: job-filter
 kubernetes_run () {
-    if [ -r "$SCRIPT/kubernetes/preswa-hook.sh" ]; then
-        . "$SCRIPT/kubernetes/preswa-hook.sh"
+    if [ -r "$PROJECTROOT/script/kubernetes/preswa-hook.sh" ]; then
+        . "$PROJECTROOT/script/kubernetes/preswa-hook.sh"
     fi
 
     export LOGSDIRH NAMESPACE
 
     [[ "$CTESTSH_OPTIONS" = *"--dry-run"* ]] && exit 0
-
-    # show EVENT_TRACE_PARAMS
-    echo "EVENT_TRACE_PARAMS=$EVENT_TRACE_PARAMS"
 
     # create namespace
     kubectl create namespace $NAMESPACE
@@ -69,7 +66,7 @@ kubernetes_run () {
         for pod1 in $@; do
             mkdir -p "$LOGSDIRH/$pod1"
             kubectl logs -f --namespace=$NAMESPACE $pod1 -c $container &
-            kubectl exec --namespace=$NAMESPACE $pod1 -c $container -- sh -c "cat /export-logs > /tmp/$NAMESPACE-logs.tar"
+            kubectl exec --namespace=$NAMESPACE $pod1 -c $container -- sh -c "cat $EXPORT_LOGS > /tmp/$NAMESPACE-logs.tar"
             for r in 1 2 3 4 5; do
                 kubectl exec --namespace=$NAMESPACE $pod1 -c $container -- cat /tmp/$NAMESPACE-logs.tar | tar -xf - -C "$LOGSDIRH/$pod1" && break
             done
@@ -79,6 +76,7 @@ kubernetes_run () {
 
     # copy logs
     export -pf extract_logs
+    export EXPORT_LOGS
     timeout ${TIMEOUT/,*/}s bash -c "extract_logs ${1/*=/} $(kubectl get pod --namespace=$NAMESPACE --selector="$1" -o=jsonpath="{.items[*].metadata.name}")"
 
     # cleanup
@@ -99,6 +97,8 @@ fi
 
 rebuild_config "$CLUSTER_CONFIG_M4" > "$CLUSTER_CONFIG"
 rebuild_kubernetes_config > "$KUBERNETES_CONFIG"
+# replace %20 to space 
+sed -i '/^\s*-\s*name:/,/^\s*/{/value:/s/%20/ /g}' "$KUBERNETES_CONFIG"
 print_labels "$KUBERNETES_CONFIG"
-kubernetes_run $JOB_FILTER
+kubernetes_run $JOB_FILTER 2>&1 | tee "$LOGSDIRH/k8s.logs"
 

@@ -1,5 +1,9 @@
 
 locals {
+  prohibit_set_iops_disktype = ["pd-standard", "pd-balanced", "pd-ssd"]
+}
+
+locals {
   pst_disks_flat = flatten([
     for k,v in local.vms : [
       for i in range(v.data_disk_spec!=null?(v.data_disk_spec.disk_type!="local"?v.data_disk_spec.disk_count:0):0) : {
@@ -17,7 +21,7 @@ locals {
       instance = dsk.instance
       disk_size = dsk.disk_size
       disk_type = dsk.disk_type
-      disk_iops = dsk.disk_iops
+      disk_iops = contains(local.prohibit_set_iops_disktype, dsk.disk_type) ? null : dsk.disk_iops
       lun       = dsk.lun
     }
   }

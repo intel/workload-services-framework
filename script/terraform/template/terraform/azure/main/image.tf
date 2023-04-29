@@ -4,21 +4,29 @@ locals {
     "ubuntu2004": "Canonical",
     "ubuntu2204": "Canonical",
     "debian11"  : "Debian",
+    "rhel9"     : "RedHat",
+    "windows2022" : "MicrosoftWindowsServer",
   }
   os_image_offer = {
     "ubuntu2004": "0001-com-ubuntu-server-focal",
     "ubuntu2204": "0001-com-ubuntu-server-jammy",
     "debian11"  : "debian-11",
+    "rhel9"     : "RHEL",
+    "windows2022" : "WindowsServer",
   }
   os_image_sku = {
     "ubuntu2004": "20_04-lts",
     "ubuntu2204": "22_04-lts",
     "debian11"  : "11",
+    "rhel9"     : "9-lvm",
+    "windows2022" : "2022-Datacenter",
   }
   os_image_user = {
     "ubuntu2004": "tfu",
     "ubuntu2204": "tfu",
     "debian11"  : "tfu",
+    "rhel9"     : "tfu",
+    "windows2022" : "tfu",
   }
   # https://docs.microsoft.com/en-us/azure/virtual-machines/generation-2
   gen1_instances = [
@@ -48,4 +56,12 @@ locals {
   os_image_sku_suffixes = {
     for k,v in local.instance_type_abvs : k => contains(local.arm64_instances, v)?"-arm64":contains(local.gen1_instances, v)?"":"-gen2"
   }
+}
+
+data "azurerm_resources" "image" {
+  for_each = {
+    for k,v in local.vms : k => v if (v.image!=null)
+  }
+  name = each.value.image
+  type = "Microsoft.Compute/images"
 }

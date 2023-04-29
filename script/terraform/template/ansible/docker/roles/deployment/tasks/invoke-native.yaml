@@ -1,0 +1,241 @@
+
+- name: set workspace
+  set_fact:
+    workspace: "/tmp/{{ wl_namespace }}-workspace"
+    cacheable: true
+
+- name: Create remote workspace
+  block:
+
+    - name: create the remote workspace
+      file:
+        path: "{{ workspace }}"
+        state: directory
+
+    - name: invoke docker create
+      command: "docker create {{ (wl_registry_map == ',') | ternary('','--pull always') }} {{ wl_docker_options }} {{ wl_docker_image }}"
+      register: container_id
+      delegate_to: localhost
+      become: true
+
+    - name: inspect docker container
+      command: "docker container inspect {{ container_id.stdout }} -f '{{ '{{' }}json .}}'"
+      register: container_info
+      delegate_to: localhost
+      become: true
+
+    - name: copy the workload file system
+      shell:
+        cmd: |
+          sudo -E -H docker container export {{ container_id.stdout }} | gzip | ssh -i {{ ansible_private_key_file }} -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} sudo tar xfz - -p -C {{ workspace }}
+        executable: /bin/bash
+      delegate_to: localhost
+
+  always:
+
+    - name: remove container
+      command: "docker rm -v -f {{ container_id.stdout }}"
+      delegate_to: localhost
+      become: true
+      ignore_errors: true
+
+- name: set container info (1)
+  set_fact:
+    container_info: "{{ container_info.stdout | from_json }}"
+    cacheable: true
+
+- name: set container info (2)
+  set_fact:
+    cacheable: true
+    user: "{{ container_info['Config']['User'] | default('root',true) }}"
+    dir: "{{ container_info['Config']['WorkingDir'] | default('/',true) }}"
+    env: "{{ container_info['Config']['Env'] | map('regex_replace','^(.*)$','export \\1') | join(';') }}"
+    cmd: |
+      \"{{ container_info['Config']['Cmd'] | map('replace','"','\\\\"') | join('\" \"') }}\"
+
+- name: get proxy strings
+  shell: 
+    cmd: |
+      for k in $(compgen -e | grep -iE '_proxy$'); do
+        eval 'v=$'$k
+        echo "export $k=\"${v//\"/\\\"}\""
+      done
+    executable: /bin/bash
+  register: proxies
+
+- name: get data disks
+  find:
+    path: "/mnt"
+    patterns: 'disk?'
+    file_type: directory
+    recurse: false
+  register: disks
+
+- name: workload execution procedure
+  block:
+
+    - name: mount /proc, /sys, /dev
+      shell: |
+        mount -t proc /proc {{ workspace }}/proc
+        mount --rbind /sys {{ workspace }}/sys
+        mount --make-rslave {{ workspace }}/sys
+        mount --rbind /dev {{ workspace }}/dev
+        mount --make-rslave {{ workspace }}/dev
+      become: true
+
+    - name: mount disks
+      shell: |
+        mount --bind {{ item.path }} {{ workspace }}{{ item.path }}
+      loop: "{{ disks.files }}"
+      become: true
+
+    - name: run the workload natively
+      shell:
+        executable: /bin/bash
+        cmd: |
+          chroot --userspec={{ user }} {{ workspace }} /bin/sh -c "cd {{ dir }};{{ env }};{{ proxies.stdout_lines | join(';') | default('true',true) }};{{ cmd }}" > /tmp/{{ wl_namespace }}-logs 2>&1 & echo $!
+      register: pid
+      become: true
+
+    - name: waitproc to wait for logs complete
+      shell:
+        cmd: |
+          timeout {{ wl_timeout[0] }}s cat {{ workspace }}{{ wl_export_logs }} > /tmp/{{ wl_namespace }}-logs.tar 2> /dev/null &
+          echo $!
+        executable: /bin/bash
+      register: waitproc
+
+    - name: "wait for the starting phrase: {{ wl_trace_mode.split(',')[1] }}"
+      shell:
+        cmd: |
+          grep -q -F "{{ wl_trace_mode.split(',')[1] }}" <(
+            while kill -0 {{ waitproc.stdout_lines | first }}; do
+              cat /tmp/{{ wl_namespace }}-logs
+              bash -c 'sleep 0.5'
+            done
+          )
+        executable: /bin/bash
+      when: (wl_trace_mode | split(',') | first == "roi")
+      ignore_errors: yes
+
+    - name: "wait for timeout {{ wl_trace_mode.split(',')[1] }}s"
+      command: "timeout {{ wl_trace_mode.split(',')[1] | int }}s tail --pid={{ waitproc.stdout_lines[0] }} -f /dev/null"
+      when: (wl_trace_mode | split(',') | first == "time")
+      ignore_errors: yes
+
+    - name: start trace
+      include_role:
+        name: trace
+        tasks_from: start
+      when: wl_trace_modules is defined
+
+    - name: "wait for the stop phrase: {{ wl_trace_mode.split(',')[2] }}"
+      shell:
+        cmd: |
+          grep -q -F "{{ wl_trace_mode.split(',')[2] }}" <(
+            while kill -0 {{ waitproc.stdout_lines | first }}; do
+              cat /tmp/{{ wl_namespace }}-logs
+              bash -c 'sleep 0.5'
+            done
+          )
+        executable: /bin/bash
+      when: (wl_trace_mode | split(',') | first == "roi")
+      ignore_errors: yes
+
+    - name: "wait for timeout {{ wl_trace_mode.split(',')[2] }}s"
+      command: "timeout {{ wl_trace_mode.split(',')[2] | int }}s tail --pid={{ waitproc.stdout_lines[0] }} -f /dev/null"
+      when: (wl_trace_mode | split(',') | first == "time")
+      ignore_errors: yes
+
+    - name: revoke trace
+      include_role:
+        name: trace
+        tasks_from: stop
+      when: 
+      - wl_trace_modules is defined
+      - (wl_trace_mode | split(',') | length == 3)
+
+    - name: wait until execution compete
+      command: "tail --pid={{ waitproc.stdout_lines | first }} -f /dev/null"
+      ignore_errors: yes
+
+  always:
+
+    - name: revoke trace
+      include_role:
+        name: trace
+        tasks_from: stop
+      when: wl_trace_modules is defined
+
+    - name: kill the worker process
+      command: "kill -9 {{ pid.stdout }}"
+      become: true
+      ignore_errors: true
+
+    - name: umount disks
+      shell: |
+        umount -R {{ workspace }}{{ item.path }}
+      loop: "{{ disks.files }}"
+      become: true
+      ignore_errors: true
+
+    - name: umount /proc, /sys, /dev
+      shell: |
+        umount -R {{ workspace }}/proc
+        umount -R {{ workspace }}/sys
+        umount -R {{ workspace }}/dev
+      become: true
+      ignore_errors: true
+
+    - name: remove workspace
+      file:
+        path: "{{ workspace }}"
+        state: absent
+      become: true
+      ignore_errors: true
+
+- name: collect trace data
+  include_role:
+    name: trace
+    tasks_from: collect
+  when: wl_trace_modules is defined
+  ignore_errors: yes
+
+- name: print logs
+  command: "cat /tmp/{{ wl_namespace }}-logs"
+  ignore_errors: true
+
+- name: create the iteration direcctory
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}/native"
+    state: directory
+  delegate_to: localhost
+
+- name: copy logs back to the itr directory
+  fetch:
+    src: "/tmp/{{ wl_namespace }}-logs.tar"
+    dest: "{{ wl_logs_dir }}/itr-{{ itr }}/"
+    flat: yes
+
+- name: untar the logs
+  unarchive:
+    src: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ wl_namespace }}-logs.tar"
+    dest: "{{ wl_logs_dir}}/itr-{{ itr }}/native"
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: remove remote logs
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+  - "/tmp/{{ wl_namespace }}-logs.tar"
+  - "/tmp/{{ wl_namespace }}-logs"
+  become: true
+
+- name: remove local logs tarfile
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ wl_namespace }}-logs.tar"
+    state: absent
+  delegate_to: localhost
+

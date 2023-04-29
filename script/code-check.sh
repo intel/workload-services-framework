@@ -208,6 +208,7 @@ build_sh() {
 }
 
 cmakelist() {
+	lt_len_func " GNR " "GNR" 3 ${3} "CMakeLists.txt" "m"
 	lt_len_func "add_workload\(.*?\)" "add_workload" 15 ${3} "CMakeLists.txt" "m"
 	lt_len_func "add_testcase\(.*?\)" "add_testcase" 15 ${3} "CMakeLists.txt" "m"
 	lt_len_func '_gated' "_gated" 1 ${3} "CMakeLists.txt" "w"

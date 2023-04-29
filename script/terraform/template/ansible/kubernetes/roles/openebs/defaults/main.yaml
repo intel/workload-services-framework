@@ -1,0 +1,2 @@
+k8s_openebs_operator: "https://openebs.github.io/charts/openebs-operator-lite.yaml"
+k8s_openebs_provisioner: "openebs.io/component-name=openebs-localpv-provisioner"

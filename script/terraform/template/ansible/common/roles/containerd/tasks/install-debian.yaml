@@ -1,16 +1,59 @@
 
+- name: remove old versions
+  apt:
+    name:
+    - containerd
+    - containerd.io
+    - runc
+    state: absent
+  become: true
+  ignore_errors: true
+  when: ((csp | default('static')) == 'static')
 
-  - name: install containerd
-    apt:
-      name:
-      - "containerd={{ containerd_version | default(containerd_default_version['debian']) }}"
-      state: present
-      update_cache: yes
-    become: yes
-    register: aptrc
-    until: aptrc is success
-    retries: 10
-    delay: 10
+- name: install prerequisite
+  apt:
+    name: gnupg
+    state: present
+    update_cache: true
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 5
+  become: true
 
+- name: add docker GPG key
+  get_url:
+    url: "{{ docker_dist_repo }}/linux/debian/gpg"
+    dest: /etc/apt/trusted.gpg.d/docker.asc
+    mode: '0644'
+    force: true
+  become: true
+  register: getrc
+  until: getrc is success
+  retries: 10
+  delay: 5
 
+- name: get os codename
+  shell:
+    cmd: ". /etc/os-release; echo $VERSION_CODENAME"
+    executable: /bin/bash
+  register: codename
+
+- name: add docker repository to apt
+  apt_repository:
+    repo: "deb {{ docker_dist_repo }}/linux/debian {{ codename.stdout | lower }} stable"
+    state: present
+    update_cache: false
+  become: true
+
+- name: install containerd.io
+  apt:
+    name:
+    - "containerd.io={{ containerd_default_version['debian'] }}"
+    update_cache: true
+  register: aptrc
+  become: true
+  until: aptrc is success
+  retries: 10
+  delay: 10
 

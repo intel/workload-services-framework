@@ -12,11 +12,21 @@ variable "profile" {
 variable "region" {
   type = string
   default = null
+
+  validation {
+    condition = var.region==null?true:can(regex("^([a-z]+)-([a-z]+)-[0-9]$", var.region))
+    error_message = "Failed region syntax: ^([a-z]+)-([a-z]+)-[0-9]$"
+  }
 }
 
 variable "zone" {
   type = string
   nullable = false
+
+  validation {
+    condition = can(regex("^([a-z]+)-([a-z]+)-[0-9][a-z]$", var.zone))
+    error_message = "Failed zone syntax: ^([a-z]+)-([a-z]+)-[0-9][a-z]$"
+  }
 }
 
 variable "ssh_pub_key" {
@@ -51,6 +61,8 @@ variable "instance_profiles" {
     os_type = string
     os_disk_type = string
     os_disk_size = number
+    os_disk_iops = number
+    os_disk_throughput = number
     image = string
 
     data_disk_spec = list(object({
@@ -59,6 +71,7 @@ variable "instance_profiles" {
       disk_size = number
       disk_format = string
       disk_iops = number
+      disk_throughput = number
     }))
 
     network_spec = list(object({

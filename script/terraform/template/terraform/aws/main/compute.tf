@@ -2,13 +2,9 @@ resource "aws_key_pair" "default" {
   key_name   = "wsf-${var.job_id}-key"
   public_key = var.ssh_pub_key
 
-  tags = merge(
-    var.common_tags,
-    {
-      Name  = "wsf-${var.job_id}-key"
-      JobId = var.job_id
-    },
-  )
+  tags = {
+    Name  = "wsf-${var.job_id}-key"
+  }
 }
 
 resource "aws_instance" "default" {
@@ -19,7 +15,7 @@ resource "aws_instance" "default" {
   cpu_core_count = each.value.cpu_core_count
   cpu_threads_per_core = each.value.threads_per_core
 
-  ami = each.value.image!=null?each.value.image:data.aws_ami.search[each.value.profile].id
+  ami = each.value.image==null?data.aws_ami.search[each.value.profile].id:(startswith(each.value.image,"ami-")?each.value.image:data.aws_ami.image[each.key].image_id)
 
   key_name = "wsf-${var.job_id}-key"
   vpc_security_group_ids = [aws_default_security_group.default.id]
@@ -30,9 +26,13 @@ resource "aws_instance" "default" {
   user_data_base64 = "${data.template_cloudinit_config.default[each.key].rendered}"
 
   root_block_device {
-    tags = var.common_tags
+    tags = {
+      Name = "wsf-${var.job_id}-${each.key}-root-disk"
+    }
     volume_size = each.value.os_disk_size
     volume_type = each.value.os_disk_type
+    iops = each.value.os_disk_iops
+    throughput = each.value.os_disk_throughput
   }
 
   dynamic "ephemeral_block_device" {
@@ -43,13 +43,12 @@ resource "aws_instance" "default" {
     }
   }
 
-  tags = merge(
-    var.common_tags,
-    {
-      Name    = "wsf-${var.job_id}-instance-${each.key}"
-      JobId   = var.job_id
-    },
-  )
+  tags = {
+    Name = "wsf-${var.job_id}-instance-${each.key}"
+  }
+}
+
+data "aws_region" "default" {
 }
 
 resource "aws_spot_instance_request" "default" {
@@ -57,7 +56,9 @@ resource "aws_spot_instance_request" "default" {
 
   availability_zone = aws_subnet.default.availability_zone
   instance_type = each.value.instance_type
-  ami = each.value.image!=null?each.value.image:data.aws_ami.search[each.value.profile].id
+  cpu_core_count = each.value.cpu_core_count
+  cpu_threads_per_core = each.value.threads_per_core
+  ami = each.value.image==null?data.aws_ami.search[each.value.profile].id:(startswith(each.value.image,"ami-")?each.value.image:data.aws_ami.image[each.key].image_id)
 
   key_name = "wsf-${var.job_id}-key"
   vpc_security_group_ids = [aws_default_security_group .default.id]
@@ -73,7 +74,9 @@ resource "aws_spot_instance_request" "default" {
   user_data_base64 = "${data.template_cloudinit_config.default[each.key].rendered}"
 
   root_block_device {
-    tags = var.common_tags
+    tags = {
+      Name = "wsf-${var.job_id}-${each.key}-root-disk"
+    }
     volume_size = each.value.os_disk_size
     volume_type = each.value.os_disk_type
   }
@@ -86,12 +89,15 @@ resource "aws_spot_instance_request" "default" {
     }
   }
 
-  tags = merge(
-    var.common_tags,
-    {
-      Name    = "wsf-${var.job_id}-instance-${each.key}"
-      JobId   = var.job_id
-    },
-  )
-}
+  tags = {
+    Name = "wsf-${var.job_id}-spot-request-${each.key}"
+  }
 
+  provisioner "local-exec" {
+    command = format("aws ec2 create-tags --color=off --region %s --resources %s --tags %s", data.aws_region.default.name, self.spot_instance_id, join(" ", [
+      for k,v in merge(var.common_tags, {
+        Name = "wsf-${var.job_id}-instance-${each.key}"
+      }): format("Key=%s,Value=%s", k, v)
+    ]))
+  }
+}

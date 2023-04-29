@@ -33,7 +33,7 @@ resource "alicloud_ecs_disk" "default" {
   zone_id = var.zone
   category = each.value.disk_type
   delete_auto_snapshot = true
-  delete_with_instance = true
+  delete_with_instance = false
   performance_level = each.value.disk_performance
   resource_group_id = var.resource_group_id
   size = each.value.disk_size
@@ -45,7 +45,6 @@ resource "alicloud_ecs_disk_attachment" "default" {
   for_each    = local.disks
   instance_id = alicloud_instance.default[each.value.instance].id
   disk_id     = alicloud_ecs_disk.default[each.key].id
-  delete_with_instance = true
 }
 
 data "template_cloudinit_config" "default" {
@@ -57,7 +56,7 @@ data "template_cloudinit_config" "default" {
     content_type = "text/x-shellscript"
     content = templatefile("./template/terraform/alicloud/main/cloud-init.sh", {
       disks = [ for k,v in local.disks: {
-        serial = each.value.data_disk_spec!=null?(each.value.data_disk_spec.disk_type!="local"?alicloud_ecs_disk.default[k].id:""):""
+        serial = each.value.data_disk_spec!=null?(each.value.data_disk_spec.disk_type!="local"?replace(alicloud_ecs_disk.default[k].id, "d-", ""):""):""
         mount_path = "/mnt/disk${v.lun+1}"
       } if v.instance == each.key ]
       disk_format = each.value.data_disk_spec!=null?each.value.data_disk_spec.disk_format:"ext4"

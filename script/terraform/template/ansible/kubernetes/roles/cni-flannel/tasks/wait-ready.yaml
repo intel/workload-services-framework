@@ -1,3 +1,0 @@
-
-- name: Wait for flannel pod ready
-  shell: "kubectl wait --namespace=kube-system pod --for=condition=Ready -l app=flannel --timeout=600s"

@@ -1,4 +1,9 @@
 
+- name: Restore node labels
+  include_role:
+    name: label
+    tasks_from: unset
+
 - name: Uninstall Istio if installed
   include_role:
     name: istio

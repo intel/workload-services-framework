@@ -3,25 +3,30 @@
     include_role:
       name: kubeadm
       tasks_from: init
-    when: install_k8s
+    when: hostvars['localhost']['ansible_facts']['install_k8s']
+
+  - name: Untaint k8s
+    shell: "kubectl taint node $(kubectl get nodes -o='custom-columns=name:.metadata.name,ip:.status.addresses[?(@.address==\"{{ private_ip }}\")].address' --no-headers | cut -f1 -d' ') --overwrite {{ item }}"
+    with_items:
+      - "node-role.kubernetes.io/master-"
+      - "node-role.kubernetes.io/control-plane-"
+    ignore_errors: true
+    when:
+    - hostvars['localhost']['ansible_facts']['install_k8s']
+    - ansible_host in (groups['workload_hosts'] | map('extract', hostvars, ['ansible_host']))
 
   - name: Install k8s CNI
     include_role:
       name: "cni-{{ k8s_cni }}"
-    when: install_k8s
-
-  - name: Untaint k8s
-    shell: "kubectl taint node $(kubectl get nodes -o='custom-columns=name:.metadata.name,ip:.status.addresses[?(@.address==\"{{ private_ip }}\")].address' --no-headers | cut -f1 -d' ') --overwrite node-role.kubernetes.io/master- node-role.kubernetes.io/control-plane-"
-    when:
-    - install_k8s
-    - ansible_host in (groups['workload_hosts'] | map('extract', hostvars, ['ansible_host']))
+    when: hostvars['localhost']['ansible_facts']['install_k8s']
 
   - name: Abort if registry must be created
     fail:
       msg: Failed to create a docker registry. Please create a docker registry for Kubernetes execution.
     when:
     - k8s_enable_registry | bool
-    - install_k8s
+    - not (k8s_enable_csp_registry | bool)
+    - hostvars['localhost']['ansible_facts']['install_k8s']
     - ansible_host in my_ip_list.split(',')
 
   - name: Create registry
@@ -30,6 +35,7 @@
       tasks_from: create
     when:
     - k8s_enable_registry | bool
+    - not (k8s_enable_csp_registry | bool)
 
   - name: Update CA certificate
     include_role:
@@ -37,12 +43,13 @@
       tasks_from: install
     when:
     - k8s_enable_registry | bool
+    - not (k8s_enable_csp_registry | bool)
     - cert_updated | default('no') | bool
 
   - name: Create Join Command
     command: kubeadm token create --print-join-command
     register: join_cmd
-    when: install_k8s
+    when: hostvars['localhost']['ansible_facts']['install_k8s']
 
   - name: Set fact
     set_fact:

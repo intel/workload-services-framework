@@ -6,7 +6,7 @@ The terraform backend can be used to validation workloads on a remote cluster, O
 ### Setup Terraform for Cloud Validation
 
 - Follow the instructions in the [WSF Cloud Setup](setup-wsf.md#cloud-development-setup) to setup the development host.  
-- The terraform backend supports Cloud vendors such as `aws`, `gcp`, `azure`, and `tencent`. Each vendor has a corresponding configuration file: `script/terraform/terraform-config.<SUT>.tf`, where `<SUT>` is the Cloud vendor name. You can customize as needed.  
+- The terraform backend supports Cloud vendors such as `aws`, `gcp`, `azure`, `tencent`, `alicloud`, and `oracle`. Each vendor has a corresponding configuration file: `script/terraform/terraform-config.<SUT>.tf`, where `<SUT>` is the Cloud vendor name. You can customize as needed.  
 
 #### Configure Cloud Account
 
@@ -28,13 +28,16 @@ $ exit
 ```
 make azure         # or make -C ../.. azure, if under build/workload/<workload>
 $ az login
+# if you have multiple subscriptions in your account, please set
+# az account set --subscription="<subscription-id>"
 $ exit
 ```
 
 ```
 make gcp           # or make -C ../.. gcp, if under build/workload/<workload>
 $ gcloud init --no-launch-browser
-$ gcloud auth application-default login --no-launch-browser
+$ gcloud auth application-default login --no-launch-browser # Please make sure quota-project-id is set
+$ gcloud auth activate-service-account --key-file <keyfile> # required only for running workloads in Google Kubernetes Engine
 $ exit
 ```
 
@@ -47,6 +50,12 @@ $ exit
 ```
 make alicloud      # make -C ../.. alicloud, if under build/workload/<workload>
 $ aliyun configure # please specify a region
+$ exit
+```
+
+```
+make oracle        # make -C ../.. oracle, if under build/workload/<workload>
+$ oci setup config # please specify a compartment id and upload public key to the oracle cloud console 
 $ exit
 ```
 
@@ -72,6 +81,19 @@ $ exit
 
 - Follow the instructions in the [WSF On-Premises Setup](setup-wsf.md#on-premises-development-setup) to setup the On-Premises hosts.   
 - Customize [`terraform-config.static.tf`](../script/terraform/terraform-config.static.tf) to specify your cluster information.  
+
+Now you can run any workload as follows:    
+
+```
+cd workload/<workload>
+make
+./ctest.sh -N
+```
+
+### Setup Terraform for KVM Validation
+
+- Follow the instructions in the [WSF KVM Setup](setup-wsf.md#kvm-development-setup) to setup the KVM environment.   
+- Customize [`terraform-config.kvm.tf`](../script/terraform/terraform-config.kvm.tf) to specify your KVM host information.  
 
 Now you can run any workload as follows:    
 
@@ -132,6 +154,15 @@ $ cat inventory.yaml
           ansible_user: ubuntu
 ...
 $ ssh -i ssh_access.key ubuntu@35.92.225.114
+```
+
+**HINT:** while working within the terraform container, if you need to ssh or scp data to public VMs, use the ssh identity ssh_access.key. If you are not under the default directory /opt/workspace, please use the absolute path.
+
+For Example:
+```
+$ scp -r -i ssh_access.key /tmp/test.log <username>@<public_ip>:/tmp/
+Warning: Permanently added '<public_ip>' (ED25519) to the list of known hosts.
+test.log                                                                                                                                                                                                                                                    100%    5     0.1KB/s   00:00
 ```
 
 #### Setting Breakpoint(s)

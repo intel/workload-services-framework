@@ -7,7 +7,6 @@ function(add_workload name)
     set(sut_reqs "${sut_reqs}" PARENT_SCOPE)
 endfunction()
 
-function(add_testcase name)
-    add_component_testcase(workload ${workload} ${name} ${ARGN})
+function(add_testcase name)    
+    add_component_testcase(workload ${workload} ${name} ${ARGN})    
 endfunction()
-

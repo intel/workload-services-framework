@@ -1,8 +1,8 @@
 
 - name: "Stop collectd on {{ trace_node.1 }}"
-  service:
-    name: collectd
-    state: stopped
+  shell:
+    cmd: "kill -9 $(cat /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.pid)"
+    executable: /bin/bash
   become: yes
   delegate_to: "{{ trace_node.1 }}"
   ignore_errors: yes

@@ -3,9 +3,12 @@
     command: kubectl get pod
     register: k8scheck
     failed_when: false
+    delegate_to: "{{ ('controller' in groups) | ternary('controller-0','localhost') }}"
 
   - name: Set fact
     set_fact:
-      install_k8s: "{{ (k8scheck.rc != 0) or (k8s_reset | default('no') | bool) }}"
+      install_k8s: "{{ ((k8scheck.rc != 0) or (k8s_reset | default('no') | bool)) and ('controller' in groups) }}"
       cacheable: yes
+      delegate_to: localhost
+      delegate_facts: true
 

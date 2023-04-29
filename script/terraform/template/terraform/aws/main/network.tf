@@ -3,25 +3,17 @@ resource "aws_vpc" "default" {
   enable_dns_hostnames = true
   enable_dns_support   = true
 
-  tags = merge(
-    var.common_tags,
-    {
-      Name  = "wsf-${var.job_id}-vpc"
-      JobId = var.job_id
-    },
-  )
+  tags = {
+    Name = "wsf-${var.job_id}-vpc"
+  }
 }
 
 resource "aws_internet_gateway" "default" {
   vpc_id = aws_vpc.default.id
 
-  tags = merge(
-    var.common_tags,
-    {
-      Name  = "wsf-${var.job_id}-igw"
-      JobId = var.job_id
-    },
-  )
+  tags = {
+    Name = "wsf-${var.job_id}-igw"
+  }
 }
 
 resource "aws_subnet" "default" {
@@ -30,13 +22,9 @@ resource "aws_subnet" "default" {
   availability_zone       = var.zone
   map_public_ip_on_launch = true
 
-  tags = merge(
-    var.common_tags,
-    {
-      Name  = "wsf-${var.job_id}-subnet"
-      JobId = var.job_id
-    },
-  )
+  tags = {
+    Name = "wsf-${var.job_id}-subnet"
+  }
 }
 
 resource "aws_default_route_table" "default" {
@@ -46,13 +34,9 @@ resource "aws_default_route_table" "default" {
     gateway_id = aws_internet_gateway.default.id
   }
 
-  tags = merge(
-    var.common_tags,
-    {
-      Name  = "wsf-${var.job_id}-rt"
-      JobId = var.job_id
-    },
-  )
+  tags = {
+    Name = "wsf-${var.job_id}-rt"
+  }
 }
 
 resource "aws_default_security_group" "default" {
@@ -88,13 +72,9 @@ resource "aws_default_security_group" "default" {
     cidr_blocks      = ["0.0.0.0/0"]
   }
 
-  tags = merge(
-    var.common_tags,
-    {
-      Name  = "wsf-${var.job_id}-sg"
-      JobId = var.job_id
-    },
-  )
+  tags = {
+    Name  = "wsf-${var.job_id}-sg"
+  }
 }
 
 locals {
@@ -124,7 +104,9 @@ resource "aws_network_interface" "secondary" {
   description     = "vm-${var.job_id}-${each.key}"
   interface_type  = each.value.network_type
   security_groups = [aws_default_security_group.default.id]
-  tags            = var.common_tags
+  tags            = {
+    Name = "wsf-${var.job_id}-${each.key}"
+  }
 
   attachment {
     instance = var.spot_instance?aws_spot_instance_request.default[each.value.instance].spot_instance_id:aws_instance.default[each.value.instance].id

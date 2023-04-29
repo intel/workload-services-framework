@@ -1,15 +1,5 @@
 
-- hosts: localhost
-  gather_facts: no
-  tasks:
-
-    - name: Breakpoint at cleanup
-      include_role:
-        name: breakpoint
-      vars:
-        breakpoint: CleanupStage
-
-- hosts: workload_hosts
+- hosts: all
   become: true
   gather_facts: no
   tasks:
@@ -17,5 +7,7 @@
     - name: Cleanup sequence
       include_role:
         name: cleanup
-      when: ((csp | default('static')) == 'static')
+      when: 
+      - ((csp | default('static')) == 'static')
+      - ansible_connection != 'winrm'
 

@@ -1,39 +1,10 @@
----
-### build / configure Intel Device Plugins Operator before Intel QAT Device Plugin
 - name: apply default Intel Device Plugins Operator configuration
-  command:
-    cmd: "kubectl apply -k https://github.com/intel/intel-device-plugins-for-kubernetes//deployments/operator/default?ref={{ dp_operator_ref }}"
+  command: "kubectl apply -k https://github.com/intel/intel-device-plugins-for-kubernetes//deployments/operator/default?ref={{ dp_operator_ref }}"
   changed_when: true
 
-- debug:
-    msg: "Wait for Intel Device Plugin Operator to become fully available. Maximum wait time is 120 Sec..."
-
 - name: wait for Intel Device Plugin Operator to become fully available
-  k8s_info:
-    kind: Deployment
-    name: inteldeviceplugins-controller-manager
-    namespace: "{{ dp_operator_namespace }}"
-    wait: yes
-    wait_condition:
-      reason: MinimumReplicasAvailable
-      type: Available
-    wait_timeout: 120
+  command: "kubectl wait deployment inteldeviceplugins-controller-manager --namespace={{ dp_operator_namespace }} --for=condition=Available --timeout=120"
   failed_when: false
-
-- name: verify default Intel Device Plugin Operator after configured
-  shell:
-     cmd: "kubectl get pods --all-namespaces | grep 'inteldeviceplugins-controller-manager'"
-  register: verify_dp_operator_status
-
-- debug:
-    var: verify_dp_operator_status.stdout_lines
-
-### build / configure Intel SGX Device Plugin
-- name: create configuration directory if it does not exist for SGX Device Plugin
-  file:
-    path: "{{ sgx_device_plugin_dir }}"
-    state: directory
-    mode: '0700'
 
 - name: set nodes names for NFD labels
   shell: kubectl get nodes | grep -v -i NAME | awk '{print $1}' | tr "\n" " "
@@ -52,47 +23,19 @@
 - name: transfer Intel SGX Device Plugin yaml file and push to controller
   template:
     src: "sgx-intel-device-plugin.yml.j2"
-    dest: "{{ sgx_device_plugin_dir }}/sgx-intel-device-plugin.yml"
+    dest: "/tmp/{{ wl_namespace }}-sgx-intel-device-plugin.yml"
     force: yes
     mode: preserve
 
 - name: Intel SGX Device Plugin deploy with the Intel Device Plugin Operator
-  k8s:
-   state: present
-   src: "{{ sgx_device_plugin_dir }}/sgx-intel-device-plugin.yml"
-
-- debug:
-    msg: "Wait for Intel SGX Device Plugin Operator to become fully available. Maximum wait time is 45 sec"
+  command: "kubectl apply -f /tmp/{{ wl_namespace }}-sgx-intel-device-plugin.yml"
 
 - name: wait for SGX Device Plugin to become fully available
-  k8s_info:
-    kind: Deployment
-    name: intel-sgx-plugin
-    namespace: "{{ intel_sgx_dp_namespace }}"
-    wait: yes
-    wait_condition:
-      reason: MinimumReplicasAvailable
-      type: Available
-    wait_timeout: 45
+  command: "kubectl wait deployment intel-sgx-plugin --namespace={{ intel_sgx_dp_namespace }} --for=condition=Available --timeout=45"
   failed_when: false
 
-- name: verify SGX DP presence with NFD
-  shell:
-    cmd: "kubectl get no -o json | jq .items[].metadata.labels | grep sgx"
-  args:
-     executable: /bin/bash
-  changed_when: true
-  register: verify_nfd_output_for_sgx
+- name: remove script
+  file:
+    path: "/tmp/{{ wl_namespace }}-sgx-intel-device-plugin.yml"
+    state: absent
 
-- debug:
-    var: verify_nfd_output_for_sgx.stdout_lines
-
-- name: verify SGX presence on all namespaces
-  shell:
-    cmd: "kubectl get pods --all-namespaces | grep inteldeviceplugins"
-  args:
-     executable: /bin/bash
-  register: verify_sgx_dp_status
-
-- debug:
-    var: verify_sgx_dp_status.stdout_lines

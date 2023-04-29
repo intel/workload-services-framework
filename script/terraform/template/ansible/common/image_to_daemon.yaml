@@ -6,4 +6,7 @@
     - name: Transfer image(s) to docker daemon
       include_role:
         name: image-to-daemon
+      when: 
+      - ansible_connection != 'winrm'
+      - (native | default(false) | bool) == false
 

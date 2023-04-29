@@ -1,0 +1,29 @@
+# amd64-mongodb441-base
+
+ARG OS_IMAGE=ubuntu
+ARG OS_VER=22.04
+
+FROM ${OS_IMAGE}:${OS_VER} as builder
+RUN apt update \
+    && apt install -y numactl libcurl4 libgssapi-krb5-2 libldap-common libwrap0 libsasl2-2 libsasl2-modules libsasl2-modules-gssapi-mit snmp liblzma5 wget netcat redis openssl libssl-dev libcurl4-openssl-dev \
+    && DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get -y install tzdata
+
+ARG OPENSSL_VER="1.1.1t"
+ARG OPENSSL_PACKAGE="https://www.openssl.org/source/openssl-${OPENSSL_VER}.tar.gz"
+
+WORKDIR /usr/src
+RUN wget -O - ${OPENSSL_PACKAGE} | tar xfz - -C /usr/src \
+  && mv openssl* /usr/src/openssl
+WORKDIR /usr/src/openssl
+RUN apt update && apt install -y gcc make \
+    && ./config \
+    && make install
+ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+
+#install Mongodb
+ARG MONGODB_VER="4.4.1"
+ARG MONGODB_PACKAGE="https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2004-${MONGODB_VER}.tgz"
+
+WORKDIR /usr/src
+RUN wget -O - ${MONGODB_PACKAGE} | tar xfz - -C /usr/src \
+  && mv mongodb* /usr/src/mongodb

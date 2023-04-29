@@ -1,9 +1,7 @@
 
-k8s_version: "1.24.4-*"
-
 k8s_repo_key_url: 
-  ubuntu: "https://packages.cloud.google.com/apt/doc/apt-key.gpg"
-  debian: "https://packages.cloud.google.com/apt/doc/apt-key.gpg"
+  ubuntu: "https://dl.k8s.io/apt/doc/apt-key.gpg"
+  debian: "https://dl.k8s.io/apt/doc/apt-key.gpg"
   centos:
     - "https://packages.cloud.google.com/yum/doc/yum-key.gpg"
     - "https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg"

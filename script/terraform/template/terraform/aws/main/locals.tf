@@ -11,6 +11,8 @@ locals {
         os_type = profile.os_type
         os_disk_type = profile.os_disk_type
         os_disk_size = profile.os_disk_size
+        os_disk_iops = profile.os_disk_iops
+        os_disk_throughput = profile.os_disk_throughput
         data_disk_spec = profile.data_disk_spec!=null?profile.data_disk_spec[i]:null
         network_spec = profile.network_spec!=null?profile.network_spec[i]:null
       }
@@ -29,6 +31,8 @@ locals {
       os_type = vm.os_type
       os_disk_type = vm.os_disk_type
       os_disk_size = vm.os_disk_size
+      os_disk_iops = vm.os_disk_iops
+      os_disk_throughput = vm.os_disk_throughput
       data_disk_spec = vm.data_disk_spec
       network_spec = vm.network_spec
     }

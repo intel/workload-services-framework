@@ -8,6 +8,5 @@ dp_operator_namespace: "inteldeviceplugins-system"
 dsa_device_plugin: true
 dsa_device_plugin_ver: "0.24.0"
 intel_dsa_dp_namespace: "inteldeviceplugins-system"
-dsa_device_plugin_dir: "/opt/dsa_device_plugin"
 dsa_device_plugin_nodeselector:
   - "intel.feature.node.kubernetes.io/dsa=true"

@@ -6,8 +6,8 @@ if [ -n "$csp" ]; then
   region1="$2,$3"
   region2="$4,$5"
   
-  REGION_DIR="$BUILD_ROOT/.regions"
-  REGION_DIR_LOCK="$BUILD_ROOT/.regions.lock"
+  REGION_DIR="$BUILDROOT/.regions"
+  REGION_DIR_LOCK="$BUILDROOT/.regions.lock"
 
   flock "$REGION_DIR_LOCK" bash -c "
     mkdir -p '$REGION_DIR';

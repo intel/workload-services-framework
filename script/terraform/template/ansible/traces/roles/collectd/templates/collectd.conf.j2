@@ -39,10 +39,10 @@ LoadPlugin "aggregation"
     StoreRates true
 </Plugin>
 <Plugin disk>
-    Disk "/^[hs]d[a-z][0-9]+?$/"
-    Disk "/^xvd[a-z][a-z0-9]+?$/"
-    Disk "/^vd[a-z]?$/"
-    Disk "/^nvme[0-9c]+n[0-9]+$/"
+    Disk "/[hs]d[a-z][0-9]+?$/"
+    Disk "/xvd[a-z][a-z0-9]+?$/"
+    Disk "/vd[a-z]?$/"
+    Disk "/nvme[0-9c]+n[0-9]+$/"
     IgnoreSelected false
     UseBSDName false
     UdevNameAttr "DEVNAME"
@@ -114,5 +114,12 @@ LoadPlugin "aggregation"
     GroupBy "TypeInstance"
     CalculateAverage true
   </Aggregation>
+  <Aggregation>
+     Plugin "cpufreq"
+     Type "cpufreq"
+     GroupBy "Host"
+     GroupBy "TypeInstance"
+     CalculateAverage true
+   </Aggregation>
 </Plugin>
 

@@ -1,5 +1,5 @@
 add_workload("malconv")
-foreach (option 
+foreach (option  
         "tf_fp32_avx_single_1" 
         "tf_int8_avx_single_1" 
         "onnx_int8_avx_single_1" 

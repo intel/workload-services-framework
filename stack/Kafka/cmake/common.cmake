@@ -1,0 +1,6 @@
+if (NOT BACKEND STREQUAL "docker")
+    foreach(JDKVER 17 11 8)
+        add_stack("kafka-jdk${JDKVER}")
+        add_testcase(${stack}_version_check)
+    endforeach()
+endif()

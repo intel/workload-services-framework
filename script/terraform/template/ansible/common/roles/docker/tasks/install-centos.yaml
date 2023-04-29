@@ -1,0 +1,38 @@
+
+- name: remove old versions
+  yum:
+    name:
+    - docker
+    - docker-client
+    - docker-client-latest
+    - docker-common
+    - docker-latest
+    - docker-latest-logrotate
+    - docker-logrotate
+    - docker-engine
+    - docker-ce
+    - docker-ce-cli
+    state: absent
+  when: ((csp | default('static')) == 'static')
+  ignore_errors: yes
+
+- name: Install docker repo
+  get_url:
+    url: "{{ docker_dist_repo }}/linux/centos/docker-ce.repo"
+    dest: "/etc/yum.repos.d/docker-ce.repo"
+  register: getrc
+  until: getrc is success
+  retries: 10
+  delay: 5
+
+- name: install docker
+  yum:
+    name:
+      - "docker-ce-{{ docker_version | default(docker_default_version['centos']) }}"
+      - "docker-ce-cli-{{ docker_cli_version | default(docker_cli_default_version['centos']) }}"
+    update_cache: true
+  register: yumrc
+  until: yumrc is success
+  retries: 10
+  delay: 10
+

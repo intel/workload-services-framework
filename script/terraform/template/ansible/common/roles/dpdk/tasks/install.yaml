@@ -1,0 +1,39 @@
+
+- name: Check if dpdk-devbind.py installed
+  shell: |
+    {{ dpdk_devbind }} -s
+  register: check_file
+  ignore_errors: true
+
+- name: Set fact for dpdk_installed
+  set_fact:
+    dpdk_installed: "{{ check_file.rc == 0 }}"
+    cacheable: yes
+
+- block:
+  - name: Download dpdk and Extract into /usr/local
+    become: true
+    ansible.builtin.unarchive:
+      src: "{{ dpdk_repo }}"
+      dest: /usr/local
+      remote_src: yes
+
+  - name: Find all python user tool files
+    become: true
+    find:
+      paths: "{{ dpdk_install_dir }}/usertools"
+      patterns: '*.py'
+      file_type: "file"
+    register: get_usertool_files
+
+  - name: Create a symbolic link for usertools files
+    become: true
+    file:
+      src: "{{ item.path }}"
+      dest: "/usr/local/bin/{{ item.path | basename }}"
+      state: link
+      force: true
+    loop: "{{ get_usertool_files.files }}"
+    loop_control:
+      label: "{{ item.path | basename }}"
+  when: not dpdk_installed

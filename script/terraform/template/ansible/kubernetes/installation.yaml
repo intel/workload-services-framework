@@ -1,5 +1,6 @@
 
-- hosts: controller-0
+# global k8s facts stored in localhost
+- hosts: localhost
   gather_facts: no
   tasks:
 
@@ -7,6 +8,7 @@
     include_role:
       name: installation
       tasks_from: check-cluster
+    when: ansible_connection != 'winrm'
 
 - hosts: cluster_hosts
   any_errors_fatal: true
@@ -17,8 +19,9 @@
     include_role:
       name: installation
       tasks_from: prepare-cluster
+    when: ansible_connection != 'winrm'
 
-- hosts: controller-0
+- hosts: "{{ ('controller' in groups) | ternary('controller','localhost') }}"
   gather_facts: no
   tasks:
 
@@ -26,6 +29,7 @@
     include_role:
       name: installation
       tasks_from: create-cluster
+    when: ansible_connection != 'winrm'
 
 - hosts: workload_hosts
   any_errors_fatal: true
@@ -36,8 +40,9 @@
     include_role:
       name: installation
       tasks_from: join-workers
+    when: ansible_connection != 'winrm'
 
-- hosts: controller-0
+- hosts: "{{ ('controller' in groups) | ternary('controller','localhost') }}"
   gather_facts: no
   tasks:
   
@@ -45,6 +50,7 @@
     include_role:
       name: installation
       tasks_from: finalize-controller
+    when: ansible_connection != 'winrm'
 
 - hosts: workload_hosts
   any_errors_fatal: true
@@ -55,4 +61,5 @@
     include_role:
       name: installation
       tasks_from: finalize-workers
+    when: ansible_connection != 'winrm'
 

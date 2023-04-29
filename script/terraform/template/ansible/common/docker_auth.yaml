@@ -1,10 +1,10 @@
-
-- hosts: cluster_hosts
-  become: no
+---
+- name: "Docker credential helper setup"
+  hosts: "localhost"
   any_errors_fatal: true
-  gather_facts: no
+  gather_facts: false
   tasks:
-
-    - name: Copy Docker Auth
-      include_role:
+    - name: "Prepare correct Docker Auth"
+      ansible.builtin.include_role:
         name: docker_auth
+        tasks_from: main

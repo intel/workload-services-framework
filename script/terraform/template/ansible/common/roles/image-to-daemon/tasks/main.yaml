@@ -1,6 +1,6 @@
 
     - name: setup port forwarding
-      command: "ssh -4 {{ ansible_user }}@{{ ansible_host }} -fNL {{ local_daemon_url }}:/var/run/docker.sock -i {{ ansible_private_key_file }} -o ControlPath={{ control_path }} -M"
+      command: "ssh -4 -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -fNL {{ local_daemon_url }}:/var/run/docker.sock -i {{ ansible_private_key_file }} -o ControlPath={{ control_path }} -M"
       delegate_to: localhost
 
     - name: inspect images
@@ -8,7 +8,6 @@
       register: inspect
       with_dict: "{{ wl_docker_images }}"
       become: yes
-      become_flags: '-E'
       delegate_to: localhost
       ignore_errors: yes
 
@@ -22,7 +21,6 @@
       loop: "{{ inspect.results }}"
       delegate_to: localhost
       become: yes
-      become_flags: '-E'
 
     - name: copy registry images to daemon
       command: "skopeo copy {{ skopeo_options | default('') }} --src-tls-verify={{ item.item.value }} --dest-daemon-host=http://{{ local_daemon_url }} docker://{{ item.item.key }} docker-daemon:{{ item.item.key }}"
@@ -34,9 +32,8 @@
       loop: "{{ inspect.results }}"
       delegate_to: localhost
       become: yes
-      become_flags: '-E'
 
     - name: cancel port forwarding
-      command: "ssh -4 {{ ansible_user }}@{{ ansible_host }} -i {{ ansible_private_key_file }} -o ControlPath={{ control_path }} -O exit"
+      command: "ssh -4 -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -i {{ ansible_private_key_file }} -o ControlPath={{ control_path }} -O exit"
       delegate_to: localhost
 

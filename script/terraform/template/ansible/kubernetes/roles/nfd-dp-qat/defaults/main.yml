@@ -17,6 +17,5 @@ qat_device_plugin_drivers_for_kernel:
   - d15xxvf
 qat_device_plugin_apparmor_profile: "unconfined"
 qat_device_plugin_max_vfs: "32"
-qat_device_plugin_dir: "/opt/qat_device_plugin"
 qat_device_plugin_nodeselector:
   - "intel.feature.node.kubernetes.io/qat=true"

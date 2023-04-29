@@ -1,6 +1,0 @@
-
-- name: label the nodes
-  include_tasks:
-    file: label.yaml
-  loop: "{{ groups['workload_hosts'] }}"
-

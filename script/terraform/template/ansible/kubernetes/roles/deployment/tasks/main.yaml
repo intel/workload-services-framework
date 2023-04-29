@@ -6,6 +6,12 @@
   include_role:
     name: docker_auth
 
+- name: Customize deployment yaml for CNI
+  include_role:
+    name: "cni-{{ k8s_cni }}"
+    tasks_from: customize-deployment.yaml
+  when: ((role_path + '/../cni-' + k8s_cni + '/tasks/customize-deployment.yaml') is exists)
+
 - name: create deployment
   command: "kubectl create --namespace {{ wl_namespace }} -f /tmp/{{ wl_namespace }}-{{ wl_kubernetes_yaml }}"
 
@@ -24,49 +30,9 @@
       fail:
         msg: "abort due to scheduling failure"
 
-- name: get benchmark pods
-  shell: "kubectl get --namespace={{ wl_namespace }} pod --selector={{ wl_job_filter[0] }}={{ wl_job_filter[1] }} '-o=jsonpath={.items[*].metadata.name}' | tr ' ' '\n'"
-  register: pods
-
-- name: invoke trace
-  include_role:
-    name: trace
-    tasks_from: start
-  vars:
-    pods_str: "{{ pods.stdout_lines | join(' ') }}"
-  when: wl_trace_modules is defined
-
-- block:
-
-    - name: get benchmark pods
-      shell: "kubectl get --namespace={{ wl_namespace }} pod --selector={{ wl_job_filter[0] }}={{ wl_job_filter[1] }} '-o=jsonpath={.items[*].metadata.name}' | tr ' ' '\n'"
-      register: pods
-
-    - name: wait for execution complete
-      command: "timeout {{ wl_timeout[0] }}s kubectl exec --namespace={{ wl_namespace }} {{ item }} -c {{ wl_job_filter[1] }} -- sh -c 'cat /export-logs > /tmp/{{ wl_namespace }}-{{ item }}-{{ itr }}-logs.tar'"
-      with_items: "{{ pods.stdout_lines }}"
-      ignore_errors: yes
-
-    - name: get benchmark pods
-      shell: "kubectl get --namespace={{ wl_namespace }} pod --selector={{ wl_job_filter[0] }}={{ wl_job_filter[1] }} '-o=jsonpath={.items[*].metadata.name}' | tr ' ' '\n'"
-      register: pods
-
-    - name: extract logs
-      shell: "kubectl exec --namespace={{ wl_namespace }} -c {{ wl_job_filter[1] }} {{ item }} -- sh -c 'cat /tmp/{{ wl_namespace }}-{{ item }}-{{ itr }}-logs.tar' > /tmp/{{ wl_namespace }}-{{ item }}-{{ itr }}-logs.tar && tar xf /tmp/{{ wl_namespace }}-{{ item }}-{{ itr }}-logs.tar -O > /dev/null"
-      register: status
-      until: status.rc == 0
-      retries: 5
-      delay: 5
-      with_items: "{{ pods.stdout_lines }}"
-      ignore_errors: yes
-
-  always:
-
-    - name: revoke trace
-      include_role:
-        name: trace
-        tasks_from: stop
-      when: wl_trace_modules is defined
+- name: workload-execution
+  include_tasks:
+    file: process-traces-and-logs.yaml
 
 - name: collect trace data
   include_role:
@@ -81,22 +47,26 @@
 
 - block:
 
+  - name: calculate deletion condition
+    set_fact: 
+      should_delete_namespace: "{{ ((csp | default('static')) == 'static') or ((itr |int) < (run_stage_iterations | default(1) | int)) or ('cleanup' not in (stage | default('cleanup'))) }}"
+
   - name: delete deployment
     command: "kubectl --namespace={{ wl_namespace }} delete -f /tmp/{{ wl_namespace }}-{{ wl_kubernetes_yaml }} --ignore-not-found=true --grace-period=150 --timeout=5m"
     ignore_errors: yes
-    when: ((csp | default('static')) == 'static') or ((itr |int) < (run_stage_iterations | default(1) | int))
+    when: should_delete_namespace
       
   - name: get resource types
     shell: "kubectl api-resources --namespaced -o name --no-headers | cut -f1 -d."
     register: resources
-    when: ((csp | default('static')) == 'static') or ((itr |int) < (run_stage_iterations | default(1) | int))
+    when: should_delete_namespace
 
   - name: delete resources
     shell: 
       cmd: "kubectl --namespace={{ wl_namespace }} delete {{ resources.stdout_lines | join(',') }} --all --ignore-not-found=true --grace-period=150 --timeout=5m"
       executable: /bin/bash
     ignore_errors: yes
-    when: ((csp | default('static')) == 'static') or ((itr |int) < (run_stage_iterations | default(1) | int))
+    when: should_delete_namespace
       
   - name: delete namespace
     command: "timeout {{ k8s_delete_namespace_timeout}} kubectl delete namespace {{ wl_namespace }} --grace-period=300 --timeout=10m --wait --ignore-not-found=true"
@@ -104,49 +74,11 @@
     until: delns.rc == 0
     retries: 10
     delay: 10
-    when: ((csp | default('static')) == 'static') or ((itr |int) < (run_stage_iterations | default(1) | int))
+    when: should_delete_namespace
 
   rescue:
 
   - name: perform kill namespace workaround
     command: "bash -c 'kubectl replace --raw \"/api/v1/namespaces/{{ wl_namespace }}/finalize\" -f <(kubectl get ns {{ wl_namespace }} -o json | grep -v \"\\\"kubernetes\\\"\")'"
     ignore_errors: yes
-
-- name: create the iteration directory
-  file:
-    path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ item }}"
-    state: directory
-  with_items: "{{ pods.stdout_lines }}"
-  delegate_to: localhost
-
-- name: copy logs to local
-  fetch:
-    src: "/tmp/{{ wl_namespace }}-{{ item }}-{{ itr }}-logs.tar"
-    dest: "{{ wl_logs_dir }}/itr-{{ itr }}/"
-    flat: yes
-  with_items: "{{ pods.stdout_lines }}"
-  ignore_errors: yes
-
-- name: untar the logs
-  unarchive:
-    src: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ wl_namespace }}-{{ item }}-{{ itr }}-logs.tar"
-    dest: "{{ wl_logs_dir}}/itr-{{ itr }}/{{ item }}"
-  with_items: "{{ pods.stdout_lines }}"
-  delegate_to: localhost
-  ignore_errors: yes
-
-- name: remove tmp files
-  file: 
-    path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ wl_namespace }}-{{ item }}-{{ itr }}-logs.tar"
-    state: absent
-  with_items: "{{ pods.stdout_lines }}"
-  delegate_to: localhost
-  ignore_errors: yes
-
-- name: remove tmp logs files
-  file: 
-    path: "/tmp/{{ wl_namespace }}-{{ item }}-{{ itr }}-logs.tar"
-    state: absent
-  with_items: "{{ pods.stdout_lines }}"
-  ignore_errors: yes
 

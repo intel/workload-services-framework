@@ -1,0 +1,5 @@
+---
+
+qatplugin_repository: https://github.com/intel/intel-device-plugins-for-kubernetes.git
+qatplugin_release: v0.26.0
+qatplugin_namespace: qat-device-plugin

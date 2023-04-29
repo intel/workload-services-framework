@@ -7,5 +7,5 @@
 
 - name: Install sysstat
   include_tasks:
-    "install-{{ os.stdout }}.yaml"
+    file: "install-{{ (os.stdout == 'rhel' or os.stdout =='anolis') | ternary('centos', os.stdout) }}.yaml"
 

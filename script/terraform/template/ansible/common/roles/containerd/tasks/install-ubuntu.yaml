@@ -1,27 +1,37 @@
 
-- name: add software dependencies
+- name: remove old versions
   apt:
     name:
-    - ca-certificates
-    - gnupg
+    - containerd
+    - containerd.io
+    - runc
+    state: absent
+  become: true
+  ignore_errors: true
+  when: ((csp | default('static')) == 'static')
+
+- name: install prerequisite
+  apt:
+    name: gnupg
     state: present
-  ignore_errors: yes
-  become: yes
+    update_cache: true
   register: aptrc
   until: aptrc is success
   retries: 10
-  delay: 10
-
+  delay: 5
+  become: true
 
 - name: add docker GPG key
-  apt_key:
+  get_url:
     url: "{{ docker_dist_repo }}/linux/ubuntu/gpg"
-    state: present
-  register: aptrc
-  become: yes
-  until: aptrc is success
+    dest: /etc/apt/trusted.gpg.d/docker.asc
+    mode: '0644'
+    force: true
+  become: true
+  register: getrc
+  until: getrc is success
   retries: 10
-  delay: 10
+  delay: 5
 
 - name: get os codename
   shell:
@@ -33,15 +43,16 @@
   apt_repository:
     repo: "deb {{ docker_dist_repo }}/linux/ubuntu {{ codename.stdout | lower }} stable"
     state: present
-  become: yes
+    update_cache: false
+  become: true
 
 - name: install containerd.io
   apt:
     name:
     - "containerd.io={{ containerd_default_version['ubuntu'] }}"
-    update_cache: yes
+    update_cache: true
   register: aptrc
-  become: yes
+  become: true
   until: aptrc is success
   retries: 10
   delay: 10

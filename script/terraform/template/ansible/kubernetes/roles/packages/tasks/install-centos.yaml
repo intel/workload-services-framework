@@ -1,4 +1,16 @@
 
+- name: remove kubeadm, kubelet, and kubectl
+  yum:
+    name:
+    - kubeadm
+    - kubelet
+    - kubectl
+    - kubernetes-cni
+    state: absent
+  become: true
+  when: ((csp | default('static')) == 'static')
+  ignore_errors: true
+
 - name: add the k8s repository
   yum_repository:
     name: k8s
@@ -10,11 +22,10 @@
 - name: install kubeadm, kubelet, and kubectl
   yum:
     name: 
-    - "kubeadm-{{ k8s_version }}"
-    - "kubelet-{{ k8s_version }}"
-    - "kubectl-{{ k8s_version }}"
-    allow_downgrade: yes
-    state: present
+    - "kubeadm-{{ k8s_version }}-*"
+    - "kubelet-{{ k8s_version }}-*"
+    - "kubectl-{{ k8s_version }}-*"
+    update_cache: true
   become: true
   register: yumrc
   until: yumrc is success

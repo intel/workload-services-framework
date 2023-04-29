@@ -10,3 +10,4 @@
   shell:
     cmd: "istioctl uninstall --purge -y"
   when: istio_installed.rc == 0
+  ignore_errors: true

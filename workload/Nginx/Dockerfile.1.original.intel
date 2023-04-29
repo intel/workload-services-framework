@@ -41,7 +41,8 @@ FROM rockylinux:8.6
 RUN dnf -y install epel-release dnf-plugins-core && \
     dnf config-manager --set-enabled powertools && \
     dnf -y install ufw && \
-    dnf install -y numactl iptables && dnf -y update
+    dnf install -y numactl iptables net-tools && dnf -y update && \
+    dnf clean all
 
 ENV  OPENSSL_ENGINES=/usr/local/lib64/engines-1.1
 
@@ -66,3 +67,4 @@ RUN mkfifo /export-logs
 CMD (ldconfig && /prepare_nginx.sh; echo $? > status) 2>&1 | tee output.logs && \
     tar cf /export-logs status output.logs && \
     sleep infinity
+

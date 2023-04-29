@@ -80,7 +80,6 @@ The workload contains these docker images: `nginx-original`, `async-nginx-qatsw`
      Test #1: test_official_nginx_original_1node_https
      Test #2: test_official_nginx_original_2node_https
      Test #3: test_official_nginx_original_3node_https
-
    async-nginx-qatsw: Intel async Nginx docker image for test cases:
      Test #7: test_intel_async_nginx_qatsw_off_1node_https
      Test #8: test_intel_async_nginx_qatsw_async_1node_https
@@ -90,10 +89,10 @@ The workload contains these docker images: `nginx-original`, `async-nginx-qatsw`
      Test #12: test_intel_async_nginx_qatsw_async_3node_https
      Test #13: test_intel_async_nginx_qatsw_async_1node_https_gated
      Test #14: test_intel_async_nginx_qatsw_async_1node_https_pkm
-
    nginx-client-openssl: client stress docker image which will run a lot of "openssl s_time -connect server_ip:port -new -cipher $CIPHER –time 60s" instances to simulate virtual clients simultaneously.
 
- This Workload currently cannot support Docker running via "docker run ...". This Workload can support Kubernetes, Cumulus and Terraform running.
+ This Workload currently cannot support Docker running via "docker run ..."
+ This Workload can support Kubernetes or Cumulus running via "kubectl exec ..."
 
 ### KPI
 
@@ -136,7 +135,7 @@ Built target kpi_intel_async_nginx_qatsw_async_3node_https
 
 The primary KPI is defined as the `Total requests per second (Requests/s)` value.
 
-### Performance BKM (TLSv1.2)
+### Performance BKM
 - System
   - intel_iommu: OFF
 
@@ -145,33 +144,6 @@ The primary KPI is defined as the `Total requests per second (Requests/s)` value
       - Turbo: ON
       - SNC: OFF
       - Intel VT for directed I/O: OFF
-
-### Performance BKM (TLSv1.3)
-- **ICX**
-
-  | BIOS setting                     | Required setting |
-  | -------------------------------- | ---------------- |
-  | Hyper-Threading                  | Enable           |
-  | CPU power and performance policy | Performance      |
-  | turbo boost technology           | Enable           |
-  | Package C State                  | C0/C1 state      |
-  
-  System(In this example, physical core: 0-31,64-95, logical core: 32-63,96-127):
-  - 2M hugepages: 4096
-  - irqbalance: disable
-  - Ethernet 100G Switch
-
-  IRQs Binding: Bind IRQs to the core on Socket2. First get the currently bound irq list of the NIC used by nginx. For example: you can use this command: 
-  ```
-  irq_list=($(cat /proc/interrupts | grep "$dev_name" | awk -F: '{print $1}'))
-  ```
-  Then you can modify the smp_affinity_list of irq_list to the core index of socket2. You can refer to the following logic to complete the modification:
-  ```
-  for(( i = 0; i < $irq_list_len; i ++ ))
-  do
-    echo "$core" > /proc/irq/${irq_list[$i]}/smp_affinity_list
-  done
-  ```
 
 ### Index Info
 - Name: `Nginx`

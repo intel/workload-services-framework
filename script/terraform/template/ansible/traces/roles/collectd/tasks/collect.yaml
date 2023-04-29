@@ -56,3 +56,11 @@
   become: no
   ignore_errors: yes
 
+- name: Remove any pid file
+  file:
+    path: "{{ wl_logs_dir }}/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.pid"
+    state: absent
+  delegate_to: "{{ trace_node.1 }}"
+  become: yes
+  ignore_errors: yes
+

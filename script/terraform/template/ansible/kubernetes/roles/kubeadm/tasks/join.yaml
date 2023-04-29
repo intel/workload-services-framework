@@ -1,8 +1,24 @@
 
-- name: Join workers
-  command: "{{ hostvars['controller-0']['ansible_facts']['join_cmd'] }}"
-  become: true
+- block:
+  - name: Join workers
+    command: "{{ hostvars['controller-0']['ansible_facts']['join_cmd'] }} --v={{ k8s_log_verbosity | default(2) }}"
+    become: true
+    register: join_workers
+    async: "{{ k8s_join_workers_timeout | default(180) | int }}"
+
+  rescue:
+  - name: Rescue if join worker failed
+    include_tasks:
+      file: join-rescue.yaml
+    
+  always:
+  - name: Join workers
+    command: "{{ hostvars['controller-0']['ansible_facts']['join_cmd'] }} --v=5"
+    become: true
+    ignore_errors: true
+    when: join_workers.finished != 0
 
 - name: Customize kubelet
-  include_tasks:
-    file: customize-kubelet.yaml
+  include_role:
+    name: kubelet
+    tasks_from: customize-kubelet

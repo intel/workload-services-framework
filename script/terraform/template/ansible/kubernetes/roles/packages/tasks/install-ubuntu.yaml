@@ -1,27 +1,65 @@
 
-- name: add GPG key
-  apt_key:
-    url: "{{ k8s_repo_key_url['ubuntu'] }}"
-    state: present
+- name: remove kubeadm, kubelet, and kubectl
+  apt:
+    name: 
+    - kubeadm
+    - kubelet
+    - kubectl
+    - kubernetes-cni
+    state: absent
+    purge: "{{ k8s_purge | default(false) | bool }}"
   become: true
+  when: ((csp | default('static')) == 'static')
+  ignore_errors: true
+
+- name: install prerequisite
+  apt:
+    name: gnupg
+    state: present
+    update_cache: true
   register: aptrc
   until: aptrc is success
   retries: 10
-  delay: 10
+  delay: 5
+  become: true
+
+- block:
+
+    - name: add k8s GPG key
+      get_url:
+        url: "{{ k8s_repo_key_url['ubuntu'] }}" 
+        dest: /etc/apt/trusted.gpg.d/k8s.gpg
+        mode: '0644'
+        force: true
+      become: true
+      register: getrc
+      until: getrc is success
+      retries: 10
+      delay: 10
+
+  rescue:
+
+    - name: copy saved k8s.gpg to remote
+      copy:
+        src:  /etc/apt/trusted.gpg.d/k8s.gpg
+        dest: /etc/apt/trusted.gpg.d/k8s.gpg
+        mode: '0644'
+      become: true
 
 - name: add k8s repository to apt
   apt_repository:
     repo: "deb {{ k8s_repo_url['ubuntu'] }} kubernetes-xenial main"
     state: present
+    update_cache: false
   become: true
 
 - name: install kubeadm, kubelet, and kubectl
   apt:
     name: 
-    - "kubeadm={{ k8s_version }}"
-    - "kubelet={{ k8s_version }}"
-    - "kubectl={{ k8s_version }}"
-    update_cache: yes
+    - "kubeadm={{ k8s_version }}-*"
+    - "kubelet={{ k8s_version }}-*"
+    - "kubectl={{ k8s_version }}-*"
+    update_cache: true
   become: true
   register: aptrc
   until: aptrc is success

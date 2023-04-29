@@ -1,6 +1,8 @@
 
+k8s_version: "1.24.4"
 k8s_cni: flannel
 k8s_plugins: []
 k8s_enable_registry: true
+k8s_enable_csp_registry: false
 my_ip_list: ""
 

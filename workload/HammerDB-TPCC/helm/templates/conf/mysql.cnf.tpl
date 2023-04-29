@@ -3,6 +3,7 @@ Expand to data
 */}}
 {{- define "configMapOfMysql" }}
 [mysqld]
+skip-log-bin
 default_authentication_plugin={{ .Values.MYSQL_DEFAULT_AUTHENTICATION_PLUGIN }} # mysql_native_password
 # general
 max_connections={{ .Values.MYSQL_MAX_CONNECTIONS }} # 4000
@@ -20,10 +21,10 @@ transaction_isolation={{ .Values.MYSQL_TRANSACTION_ISOLATION }} # REPEATABLE-REA
 # files
 innodb_file_per_table={{ .Values.MYSQL_INNODB_FILE_PER_TABLE }} # ON
 innodb_log_file_size={{ .Values.MYSQL_INNODB_LOG_FILE_SIZE }} # 1024M
-innodb_log_files_in_group={{ .Values.MYSQL_INNODB_LOG_FILES_IN_GROUP }} # 32G scale up per 100 warehouse ~ 4G
+innodb_log_files_in_group={{ .Values.MYSQL_INNODB_LOG_FILES_IN_GROUP }} # 32
 innodb_open_files={{ .Values.MYSQL_INNODB_OPEN_FILES }} # 4000
 # buffers
-innodb_buffer_pool_size={{ .Values.MYSQL_INNODB_BUFFER_POOL_SIZE }} # 96G scale up per 100 warehouse ~ 12G
+innodb_buffer_pool_size={{ .Values.MYSQL_INNODB_BUFFER_POOL_SIZE }} # 4Gi
 innodb_buffer_pool_instances={{ .Values.MYSQL_INNODB_BUFFER_POOL_INSTANCES }} # 16
 innodb_log_buffer_size={{ .Values.MYSQL_INNODB_LOG_BUFFER_SIZE }} # 64M
 # tune
@@ -57,17 +58,17 @@ innodb_adaptive_hash_index={{ .Values.MYSQL_INNODB_ADAPTIVE_HASH_INDEX }} # 0
 
 ### WSF optimized
 # reduce spin lock wait, refer to https://dev.mysql.com/doc/refman/8.0/en/innodb-performance-spin_lock_polling.html
-innodb_spin_wait_pause_multiplier={{ .Values.MYSQL_INNODB_SPIN_WAIT_PAUSE_MULTIPLIER }} # 50 -> 5
-innodb_sync_spin_loops={{ .Values.MYSQL_INNODB_SYNC_SPIN_LOOPS }} # 30 -> 15
+innodb_spin_wait_pause_multiplier={{ .Values.MYSQL_INNODB_SPIN_WAIT_PAUSE_MULTIPLIER }} # 50
+innodb_sync_spin_loops={{ .Values.MYSQL_INNODB_SYNC_SPIN_LOOPS }} # 30
 # Intel SSDs perform better with a 4096 Byte (4KB) alignment, refer to https://www.intel.com/content/dam/www/public/us/en/documents/white-papers/ssd-server-storage-applications-paper.pdf
-innodb_page_size={{ .Values.MYSQL_INNODB_PAGE_SIZE }} # 16K - > 4K
+innodb_page_size={{ .Values.MYSQL_INNODB_PAGE_SIZE }} # 16K
 
 # mysqltuner.pl recommendations
-thread_cache_size={{ .Values.MYSQL_THREAD_CACHE_SIZE }}
+# thread_cache_size={{ .Values.MYSQL_THREAD_CACHE_SIZE }} # -1
 
 ###special configuration
 {{- if ne .Values.DB_FS_TYPE "ramfs" }}
-innodb_flush_method=O_DIRECT_NO_FSYNC
+innodb_flush_method={{ .Values.MYSQL_INNODB_FLUSH_METHOD }} # O_DIRECT_NO_FSYNC
 {{- end }}
 
 {{- if eq .Values.DB_HUGEPAGE_STATUS "on" }}

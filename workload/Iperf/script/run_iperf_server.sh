@@ -10,7 +10,7 @@ PARALLEL_NUM=${PARALLEL_NUM:-8}
 
 # iperf command line on server side
 if [[ $IPERF_VER == "2" ]]; then
-  SERVER_CMD="taskset -c ${SERVER_CORE_LIST} iperf -s -m -p ${SERVER_POD_PORT} -e -o output.logs"
+  SERVER_CMD="taskset -c ${SERVER_CORE_LIST} iperf -s -m -p ${SERVER_POD_PORT} -o output.logs"
 else
   SERVER_CMD="taskset -c ${SERVER_CORE_LIST} iperf3 -s -p ${SERVER_POD_PORT} -A ${SERVER_CPU_NUM} -V"
 fi

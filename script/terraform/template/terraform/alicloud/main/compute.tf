@@ -11,11 +11,12 @@ resource "alicloud_instance" "default" {
 
   instance_name = "wsf-${var.job_id}-${each.key}-instance"
   host_name = each.key
-  image_id = each.value.image!=null?each.value.image:data.alicloud_images.search[each.value.profile].images.0.id
+  image_id = each.value.image!=null?each.value.image:local.images[each.value.profile]
   instance_type = each.value.instance_type
   security_groups = [ alicloud_security_group.default.id ]
   system_disk_category = each.value.os_disk_type
   system_disk_size = each.value.os_disk_size
+  system_disk_performance_level = each.value.os_disk_performance
   resource_group_id = var.resource_group_id
   vswitch_id = alicloud_vswitch.default.id
 

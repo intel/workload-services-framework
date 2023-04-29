@@ -1,0 +1,7 @@
+
+
+- name: Prerequisite of calicovpp
+  include_role:
+    name: cni-calicovpp
+    tasks_from: prerequisite.yaml
+  when: k8s_cni == "calicovpp"

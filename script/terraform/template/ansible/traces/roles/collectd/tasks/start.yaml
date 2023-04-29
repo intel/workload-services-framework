@@ -1,8 +1,11 @@
 
   - name: "Start collectd on {{ trace_node.1 }}"
-    service:
-      name: collectd
-      state: started
+    shell:
+      cmd: |
+        {{ collectd_bin_path }} -f &
+        echo $! > /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.pid
+        disown
+      executable: /bin/bash
     become: yes
     delegate_to: "{{ trace_node.1 }}"
     ignore_errors: yes

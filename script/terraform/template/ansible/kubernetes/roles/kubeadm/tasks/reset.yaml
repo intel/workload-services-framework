@@ -2,13 +2,69 @@
 - name: reset kubernetes
   command: "kubeadm reset -f"
   ignore_errors: yes
-  become: yes
+  become: true
+
+- name: reset calicovpp
+  include_role:
+    name: cni-calicovpp
+    tasks_from: reset.yaml
+  when: k8s_cni == "calicovpp"
 
 - name: delete ip links
   command: "ip link delete {{ item }}"
-  become: yes
+  become: true
   ignore_errors: yes
   loop:
     - cni0
     - flannel.1
     - vxlan.calico
+
+- name: remove all calico links
+  become: true
+  shell: |
+    ip link list | grep cali | awk '{print $2}' | cut -c 1-15 | xargs -I {} ip link delete {}
+  ignore_errors: true
+
+- name: remove kernel ipip module
+  become: true
+  shell: |
+    modprobe -r ipip
+  ignore_errors: true
+
+- name: delete cni files
+  become: true
+  ignore_errors: true
+  file:
+    path: "{{ item }}"
+    state: absent
+  with_items: 
+    - "/etc/cni/net.d"
+    - "/var/run/calico/"
+
+- name: clear ip route
+  become: true
+  shell: |
+    ip route flush proto bird
+
+- name: flush and delete calico iptables
+  become: true
+  shell: |
+    iptables-save | grep -i cali | iptables -F
+    iptables-save | grep -i cali | iptables -X
+  ignore_errors: true
+
+- name: restart containerd
+  include_role:
+    name: containerd
+    tasks_from: restart
+
+- name: remove cpumanager, topologymanager, memorymanager states
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /var/lib/kubelet/cpu_manager_state
+    - /var/lib/kubelet/topology_manager_state
+    - /var/lib/kubelet/memory_manager_state
+  become: true
+

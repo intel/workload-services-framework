@@ -23,6 +23,7 @@ fi
 cp -f /usr/local/etc/wsf/certs/*.crt /usr/local/share/ca-certificates > /dev/null 2>&1 && update-ca-certificates > /dev/null 2>&1 || true
 
 ####INSERT####
-chown tfu.tfu /home
-[ -d "/home/.ssh" ] && chown tfu.tfu /home/.ssh
+
+chown tfu.tfu /home 2> /dev/null || true
+[ -d "/home/.ssh" ] && chown tfu.tfu /home/.ssh 2> /dev/null || true
 exec gosu tfu "$@"

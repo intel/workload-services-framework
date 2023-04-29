@@ -1,10 +1,4 @@
 
-  - name: wait for CNI ready
-    include_role:
-      name: "cni-{{ k8s_cni }}"
-      tasks_from: wait-ready
-    when: install_k8s
-
   - name: check if plugin exists
     stat:
       path: "{{ playbook_dir }}/roles/{{ item }}"
@@ -23,6 +17,7 @@
   - name: label nodes
     include_role:
       name: label
+      tasks_from: set
 
   - name: Create cluster info
     include_role:

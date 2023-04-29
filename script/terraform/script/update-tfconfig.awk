@@ -1,6 +1,5 @@
 
 BEGIN {
-    vm_count["controller"]=cvc
     nspc=0
     nspm=0
     section=0
@@ -48,6 +47,8 @@ FNR!=NR && FNR==1 {
     ++vm_count[vm_group]
     dsc[vm_group][vm_count[vm_group]]=ds
     nsc[vm_group][vm_count[vm_group]]=ns
+    if (vm_count["controller"]<cvc) 
+        vm_count["controller"]=cvc
     r=0
 }
 

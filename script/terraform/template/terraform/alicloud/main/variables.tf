@@ -50,6 +50,7 @@ variable "instance_profiles" {
     os_type = string
     os_disk_type = string
     os_disk_size = number
+    os_disk_performance = string
     image = string
 
     data_disk_spec = list(object({

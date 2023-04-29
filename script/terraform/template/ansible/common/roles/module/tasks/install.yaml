@@ -1,11 +1,5 @@
 
 - name: "modprobe {{ label_result.item.split('=')[0].split('-')[3:] | join('-') | lower }}"
-  command: "modprobe {{ label_name.split('=')[0].split('-')[3:] | join('-') | lower }}"
-
-- name: Update modules.conf
-  blockinfile:
-    path: "/etc/modules-load.d/99-wsf-settings.conf"
-    block: "{{ label_name.split('=')[0].split('-')[3:] | join('-') | lower }}"
-    marker: "# {mark} ANSIBLE MANAGED BLOCK MODULE {{ label_name.split('=')[0].split('-')[3:] | join('-') | upper }}"
-    create: yes
+  set_fact:
+    wl_kernel_modules: "{{ wl_kernel_modules + [ label_name.split('=')[0].split('-')[3:] | join('-') | lower ] }}"
 

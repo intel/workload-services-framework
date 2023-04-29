@@ -213,6 +213,87 @@ scan_images () {
     done
 }
 
+# This function will check if the return of a command was empty, case the return is empty meaning that the object already was deleted from amazon
+checkResult () {
+   result="$1"
+   if [ "z$result" == "z" ]; then
+        return 0
+   else
+        if [ "$result" == "$OWNER" ]; then
+            sleep 5
+            return 1
+        fi
+   fi
+   return 0
+}
+
+scan_rds () {
+    echo
+    echo "checking RDS instance name:"
+    for RDS_name in $(aws rds describe-db-instances --region $region --query 'DBInstances[*].DBInstanceIdentifier' --output text 2> /dev/null) ; do
+        if [ "$RDS_name" == "$OWNER" ]; then
+            echo "Deleting: $RDS_name" 
+            (set -x; aws rds delete-db-instance --region $region --db-instance-identifier "$RDS_name" --skip-final-snapshot)
+        fi
+    done
+
+    checkDone=1
+    while [ $checkDone -eq 1 ]; do
+        echo "Checking if the RDS instance still exist..."
+        result=`aws rds describe-db-instances --region $region --query 'DBInstances[*].DBInstanceIdentifier' --output text`
+        checkResult $result
+        checkDone=$?
+    done
+
+    for RDS_db_param in $(aws rds describe-db-parameter-groups --region $region --output text | grep -v default | awk '{print $4}' 2> /dev/null) ; do 
+        if [ "$RDS_db_param" == "$OWNER" ]; then
+            echo "Deleting RDS db-parameter-group: $RDS_db_param"
+            (set -x; aws rds delete-db-parameter-group --region $region --db-parameter-group-name $RDS_db_param)
+        fi
+    done
+
+    for subnet in $(aws rds describe-db-subnet-groups --region $region --query "DBSubnetGroups[*].DBSubnetGroupName" --output text 2> /dev/null); do
+        if [ "$subnet" == "$OWNER" ]; then
+            echo "Deleting : $subnet"
+            (set -x; aws rds delete-db-subnet-group --region $region --db-subnet-group-name $subnet)
+        fi
+    done
+}
+
+scan_k8s_clusters () {
+    while true; do
+        resources=()
+        echo
+        echo "Scaning eks..."
+        for cluster in $(aws eks list-clusters --region $region --query 'clusters[*]' --output text); do
+            if [ "$(aws eks describe-cluster --region $region --name $cluster --query 'cluster.tags.owner' --output text)" = "$OWNER" ]; then
+                echo "cluster: $cluster"
+                resources+=("$cluster")
+                for ng in $(aws eks list-nodegroups --region $region --cluster-name $cluster --query 'nodegroups[*]' --output text); do
+                    resources+=("$ng")
+                    echo "nodegroup: $ng"
+                    (set -x; aws eks delete-nodegroup --region $region --nodegroup-name $ng --cluster-name $cluster)
+                done
+                (set -x; aws eks delete-cluster --region $region --name $cluster)
+            fi
+        done
+        [ ${#resources[@]} -eq 0 ] && break
+    done
+}
+
+scan_repositories () {
+    echo ""
+    echo "scan repositories..."
+    for repo in $(aws ecr describe-repositories --color off --region $region --query 'repositories[*].repositoryName' --output text); do
+        if [[ "$repo" = "wsf-$OWNER-"* ]]; then
+            echo "repository: $repo" 
+            (set -x; aws ecr delete-repository --region $region --repository-name $repo --force)
+            resources+=("$repo")
+        fi
+    done
+}
+
+export AWS_PAGER=
 . cleanup-common.sh
 
 read_regions aws
@@ -220,8 +301,11 @@ for regionres in "${REGIONS[@]}"; do
     region="${regionres/,*/}"
     [[ "$region" =~ "[0-9]$" ]] || region="${region%?}"
     echo "region: $region"
-    vpcs=($(aws --region $region ec2 describe-vpcs --output=json --filters Name=tag:owner,Values="$OWNER" | awk '/"VpcId":/{print$NF}' | tr -d '",'))
 
+    scan_k8s_clusters
+    scan_rds
+
+    vpcs=($(aws --region $region ec2 describe-vpcs --output=json --filters Name=tag:owner,Values="$OWNER" | awk '/"VpcId":/{print$NF}' | tr -d '",'))
     while true; do
         resources=()
 
@@ -254,6 +338,7 @@ for regionres in "${REGIONS[@]}"; do
         scan_internet_gateway
         scan_subnet
         scan_images
+        scan_repositories
 
         [ "${#resources[@]}" -eq 0 ] && break
     done

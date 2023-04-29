@@ -1,0 +1,8 @@
+
+- name: Update modules.conf
+  blockinfile:
+    path: "/etc/modules-load.d/99-wsf-settings.conf"
+    state: absent
+    create: yes
+  ignore_errors: yes
+

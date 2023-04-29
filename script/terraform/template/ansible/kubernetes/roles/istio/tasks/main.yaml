@@ -15,6 +15,10 @@
   when: 
   - k8s_istio_profile | trim != ""
   - istio_installed.rc != 0
+  register: getrc
+  until: getrc is success
+  retries: 10
+  delay: 5
 
 - name: Download istio into /tmp directory
   shell:

@@ -14,6 +14,26 @@ done
 while true; do
     resources=()
 
+    for zone in ${REGIONS[@]}; do
+        zone=${zone/,*/}
+        echo
+        echo "Scanning gke clusters...zone $zone"
+        for gke in $(gcloud container clusters list --format json --zone $zone | tac | sed -n "/\"name\": \"wsf-$OWNER-.*-cluster\"/,/\"name\":/{/\"name\":/{p}}" | cut -f4 -d'"'); do
+            echo "Cluster: $gke"
+            (set -x; gcloud container clusters delete $gke --zone $zone --quiet)
+            resources+=($gke)
+        done
+
+        echo 
+        echo "Scanning artifacts...zone $zone"
+        region=$(echo $zone | sed 's|[-][a-z]$||')
+        for pos in $(gcloud artifacts repositories list --format json --location=$region | tac | sed -n "/\"name\": \"wsf-$OWNER-.*-gcr\"/,/\"name\":/{/\"name\":/{p}}" | cut -f4 -d'"'); do
+            echo "Artifacts: $pos"
+            (set -x; gcloud artifacts repositories delete $pos --location=$region --quiet)
+            resources+=($pos)
+        done
+    done
+
     echo
     echo "Scanning instances..."
     for iid in $(gcloud compute instances list --filter "labels.owner:$OWNER" --format=yaml | awk '/^name:/{print$NF}' | tr -d '"'); do

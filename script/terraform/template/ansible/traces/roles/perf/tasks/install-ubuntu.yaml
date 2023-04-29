@@ -10,6 +10,7 @@
       - linux-tools-generic
       - "linux-tools-{{ unamer.stdout }}"
     state: present
+    update_cache: yes
   become: yes
   register: aptrc
   until: aptrc is success

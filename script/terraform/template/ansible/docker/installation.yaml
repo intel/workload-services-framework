@@ -6,7 +6,10 @@
 
     - name: Install docker
       include_role:
-        name: installation
+        name: docker
+      when:
+      - ansible_connection != 'winrm'
+      - ((native | default(false) | bool) == false) or ('gprofiler' in (wl_trace_modules | default('')))
 
 - hosts: trace_hosts
   become: yes
@@ -15,9 +18,11 @@
 
     - name: Install trace module
       include_role:
-        name: installation
-        tasks_from: trace-block
-      when: trace_module == "gprofiler"
+        name: trace
+        tasks_from: install
+      when:
+      - trace_module == 'gprofiler'
+      - ansible_connection != 'winrm'
       loop: "{{ wl_trace_modules | default('') | split(',') }}"
       loop_control:
         loop_var: trace_module

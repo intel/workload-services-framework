@@ -107,8 +107,102 @@ diset tpcc mysql_duration $TPCC_MINUTES_OF_DURATION
 diset tpcc mysql_total_iterations $TPCC_TOTAL_ITERATIONS
 diset tpcc mysql_async_scale ${TPCC_ASYNC_SCALE:-false}
 diset tpcc mysql_connect_pool ${TPCC_CONNECT_POOL:-false}
+diset tpcc mysql_timeprofile $TPCC_TIMEPROFILE
 vuset logtotemp 1
 vuset unique 1
+loadscript
+puts "SEQUENCE STARTED"
+foreach z [ split "$TPCC_HAMMER_NUM_VIRTUAL_USERS" "_" ] {
+    puts "\$z VU TEST"
+    vuset vu \$z
+    vucreate
+    vurun
+    runtimer $TPCC_RUNTIMER_SECONDS
+    vudestroy
+    after $TPCC_WAIT_COMPLETE_MILLSECONDS
+}
+puts "TEST SEQUENCE COMPLETE"
+exit
+EOF
+}
+
+function buildschema_postgresql() {
+    cat >"${TPCC_TCL_SCRIPT_PATH}/build_schema.tcl"<<EOF
+#!/bin/tclsh
+puts "SETTING CONFIGURATION"
+global complete
+proc wait_to_complete {} {
+    global complete
+    set complete [vucomplete]
+    puts "Is it complete ?: \$complete"
+    if {!\$complete} {
+        after $TPCC_WAIT_COMPLETE_MILLSECONDS wait_to_complete
+    } else {
+        puts "BUILD SCHEMA COMPLETE"
+        exit
+    }
+}
+dbset db pg
+dbset bm TPC-C
+diset connection pg_host $DB_HOST
+diset connection pg_port $DB_PORT
+diset tpcc pg_superuser $PG_SUPERUSER
+diset tpcc pg_superuserpass $PG_SUPERUSERPASS
+diset tpcc pg_defaultdbase $PG_DEFAULTDBASE
+diset tpcc pg_num_vu $TPCC_THREADS_BUILD_SCHEMA
+diset tpcc pg_count_ware $TPCC_NUM_WAREHOUSES
+diset tpcc pg_raiseerror  true
+diset tpcc pg_storedprocs true
+print dict
+buildschema
+wait_to_complete
+vwait forever
+EOF
+}
+
+function runhammer_postgresql() {
+    cat >"${TPCC_TCL_SCRIPT_PATH}/run_timer.tcl"<<EOF
+#!/bin/tclsh
+proc runtimer { seconds } {
+    set x 0
+    set timerstop 0
+    while {!\$timerstop} {
+        incr x
+        after 1000
+        if { ![ expr {\$x % 60} ] } {
+            set y [ expr \$x / 60 ]
+            puts "Timer: \$y minutes elapsed"
+        }
+        update
+        if {  [ vucomplete ] || \$x eq \$seconds } {
+            set timerstop 1
+        }
+    }
+    return
+}
+
+puts "SETTING CONFIGURATION"
+dbset db pg
+dbset bm TPC-C
+diset connection pg_host $DB_HOST
+diset connection pg_port $DB_PORT
+diset tpcc pg_superuser $PG_SUPERUSER
+diset tpcc pg_superuserpass $PG_SUPERUSERPASS
+diset tpcc pg_defaultdbase $PG_DEFAULTDBASE
+diset tpcc pg_driver timed
+diset tpcc pg_rampup $TPCC_MINUTES_OF_RAMPUP
+diset tpcc pg_duration $TPCC_MINUTES_OF_DURATION
+diset tpcc pg_total_iterations $TPCC_TOTAL_ITERATIONS
+diset tpcc pg_allwarehouse false
+diset tpcc pg_vacuum true
+diset tpcc pg_raiseerror  true
+diset tpcc pg_storedprocs true
+diset tpcc pg_timeprofile $TPCC_TIMEPROFILE
+diset tpcc pg_async_scale ${TPCC_ASYNC_SCALE:-false}
+diset tpcc pg_connect_pool ${TPCC_CONNECT_POOL:-false}
+vuset logtotemp 1
+vuset unique 1
+vuset timestamps 1
 loadscript
 puts "SEQUENCE STARTED"
 foreach z [ split "$TPCC_HAMMER_NUM_VIRTUAL_USERS" "_" ] {
@@ -132,6 +226,9 @@ fi
 if [[ "$DB_TYPE" == "mysql" ]]; then
     buildschema_mysql
     rumhammer_mysql
+elif [[ "$DB_TYPE" == "postgresql" ]]; then
+    buildschema_postgresql
+    runhammer_postgresql
 fi
 
 # Make sure with a stable connection to database server
@@ -157,52 +254,57 @@ NUMACTL_OPTIONS=""
 if ${RUN_SINGLE_NODE:-true}; then
     # on single node
     if ${ENABLE_SOCKET_BIND:-true}; then
-        system_cores=$(nproc)
-        if [[ "$system_cores" -le 1 ]]; then
-            echo "Only $system_cores cores, skip to balance"
-        else
-            nodes=$(lscpu | awk '/^NUMA node\(s\)/{print $3'})
-            SERVER_CORE_NEEDED_FACTOR=${SERVER_CORE_NEEDED_FACTOR:-0.9}
-            SERVER_CORE_NEEDED=$(echo "$system_cores $SERVER_CORE_NEEDED_FACTOR" |awk '{ printf("%d\n",$1 * $2) }')
-            CLIENT_CORE_NEEDED=$((system_cores - SERVER_CORE_NEEDED))
-            CLIENT_CORE_NEEDED_LESS=true # assume client need less core
-            if [[ "$CLIENT_CORE_NEEDED" -gt "$SERVER_CORE_NEEDED" ]]; then
-                CLIENT_CORE_NEEDED_LESS=false
+        if [[ -z "$CLIENT_SOCKET_BIND_NODE" ]]; then
+            system_cores=$(nproc)
+            if [[ "$system_cores" -le 1 ]]; then
+                echo "Only $system_cores cores, skip to balance"
+            else
+                nodes=$(lscpu | awk '/^NUMA node\(s\)/{print $3'})
+                SERVER_CORE_NEEDED_FACTOR=${SERVER_CORE_NEEDED_FACTOR:-0.9}
+                SERVER_CORE_NEEDED=$(echo "$system_cores $SERVER_CORE_NEEDED_FACTOR" |awk '{ printf("%d\n",$1 * $2) }')
+                CLIENT_CORE_NEEDED=$((system_cores - SERVER_CORE_NEEDED))
+                CLIENT_CORE_NEEDED_LESS=true # assume client need less core
+                if [[ "$CLIENT_CORE_NEEDED" -gt "$SERVER_CORE_NEEDED" ]]; then
+                    CLIENT_CORE_NEEDED_LESS=false
+                fi
+                # caculate which cores will be used
+                HALF_SYSTEM_CORES=$(( system_cores / 2 ))
+                for i in $(seq 0 $((HALF_SYSTEM_CORES - 1)))
+                do
+                    if [[ $CLIENT_CORE_NEEDED_LESS && "$i" -ge "$CLIENT_CORE_NEEDED" ]]; then
+                        break
+                    fi
+                    nth_core_on_node=$(((2 * (i / nodes)) + 1))
+                    core=$(grep ",$((i % nodes))" /tmp/cpu_numa_map | sed "${nth_core_on_node}q;d" | awk -F ',' '{print $1}')
+                    if [[ ! $CLIENT_CORE_NEEDED_LESS && "$i" -ge "$SERVER_CORE_NEEDED" ]]; then
+                        core_list+=($core) # assign server leftover cores to client
+                    fi
+                    core_list+=($((core+1)))
+                done
+                echo "Run on single node, system online cores: $system_cores, numa nodes: $nodes, server core needed factor: $SERVER_CORE_NEEDED_FACTOR, client core needed: ${#core_list[@]}, server core needed: $SERVER_CORE_NEEDED"
+                NUMACTL_OPTIONS="numactl --physcpubind=$(echo "${core_list[@]}"|tr ' ' ',') --localalloc"
             fi
-            # caculate which cores will be used
-            HALF_SYSTEM_CORES=$(( system_cores / 2 ))
-            for i in $(seq 0 $((HALF_SYSTEM_CORES - 1)))
-            do
-                if [[ $CLIENT_CORE_NEEDED_LESS && "$i" -ge "$CLIENT_CORE_NEEDED" ]]; then
-                    break
-                fi
-                nth_core_on_node=$(((2 * (i / nodes)) + 1))
-                core=$(grep ",$((i % nodes))" /tmp/cpu_numa_map | sed "${nth_core_on_node}q;d" | awk -F ',' '{print $1}')
-                if [[ ! $CLIENT_CORE_NEEDED_LESS && "$i" -ge "$SERVER_CORE_NEEDED" ]]; then
-                    core_list+=($core) # assign server leftover cores to client
-                fi
-                core_list+=($((core+1)))
-            done
-            echo "Run on single node, system online cores: $system_cores, numa nodes: $nodes, server core needed factor: $SERVER_CORE_NEEDED_FACTOR, client core needed: ${#core_list[@]}, server core needed: $SERVER_CORE_NEEDED"
-            NUMACTL_OPTIONS="numactl --physcpubind=$(echo "${core_list[@]}"|tr ' ' ',') --localalloc"
+        else
+            if [[ -z "$CLIENT_SOCKET_BIND_CORE_LIST" ]]; then
+                NUMACTL_OPTIONS="numactl --cpunodebind=$CLIENT_SOCKET_BIND_NODE --membind=$CLIENT_SOCKET_BIND_NODE"
+                echo "Run on multi node, socket bind enabled, bind on nodes: $CLIENT_SOCKET_BIND_NODE"
+            else
+                NUMACTL_OPTIONS="numactl --cpunodebind=$CLIENT_SOCKET_BIND_NODE --membind=$CLIENT_SOCKET_BIND_NODE --physcpubind=$CLIENT_SOCKET_BIND_CORE_LIST"
+                echo "Run on multi node, socket bind enabled, bind on nodes: $CLIENT_SOCKET_BIND_NODE, bind on cpu list: $CLIENT_SOCKET_BIND_CORE_LIST"
+            fi
         fi
     else
         echo "Run on single node, socket bind disabled, skip to bind"
     fi
 else
-    # on multi-node
-    if ${ENABLE_RPSRFS_AFFINITY:-true}; then
-        echo "Enable rps/rfs on client side"
-        source /network_rps_tuning.sh # enable network RPS tunning on multi-node
-    fi
     if ${ENABLE_SOCKET_BIND:-true}; then
         DEFAULT_NODES=$(lscpu |awk '/^NUMA node[0-9]+ CPU\(s\)/{split($2, result, "node"); print result[2]}' |tr '\n' ',')
         if [[ "${DEFAULT_NODES}" =~ ^.*,$ ]]; then
             DEFAULT_NODES=${DEFAULT_NODES::-1} # remove the last character ","
         fi
-        if [[ -z "$SOCKET_BIND_NODE" ]]; then
+        if [[ -z "$CLIENT_SOCKET_BIND_NODE" ]]; then
             echo "Not specified socket bind node, by default using all nodes $DEFAULT_NODES"
-            SOCKET_BIND_NODE=$DEFAULT_NODES
+            CLIENT_SOCKET_BIND_NODE=$DEFAULT_NODES
         fi
         if ${EXCLUDE_IRQ_CORES:-false}; then
             function get_network_device_by_ip() {
@@ -229,7 +331,7 @@ else
             echo "irq_cores: ${irq_cores[@]}"
             echo "${irq_cores[@]}" |tr ' ' '\n' > $file2
 
-            nodes=($(echo $SOCKET_BIND_NODE |tr '_\|,' ' ')) #split by _ or ,
+            nodes=($(echo $CLIENT_SOCKET_BIND_NODE |tr '_\|,' ' ')) #split by _ or ,
             for node in ${nodes[@]}
             do
                 node_cores+=($(grep ",$node" /tmp/cpu_numa_map | awk -F ',' '{print $1}'))
@@ -246,8 +348,13 @@ else
             NUMACTL_OPTIONS="numactl --physcpubind=$app_cores --localalloc"
             echo "Run on multi node, socket bind enabled, bind on cores exclude interrupt cores"
         else
-            NUMACTL_OPTIONS="numactl --cpunodebind=$SOCKET_BIND_NODE --localalloc"
-            echo "Run on multi node, socket bind enabled, bind on nodes: $SOCKET_BIND_NODE"
+            if [[ -z "$CLIENT_SOCKET_BIND_CORE_LIST" ]]; then
+                NUMACTL_OPTIONS="numactl --cpunodebind=$CLIENT_SOCKET_BIND_NODE --membind=$CLIENT_SOCKET_BIND_NODE"
+                echo "Run on multi node, socket bind enabled, bind on nodes: $CLIENT_SOCKET_BIND_NODE"
+            else
+                NUMACTL_OPTIONS="numactl --cpunodebind=$CLIENT_SOCKET_BIND_NODE --membind=$CLIENT_SOCKET_BIND_NODE --physcpubind=$CLIENT_SOCKET_BIND_CORE_LIST"
+                echo "Run on multi node, socket bind enabled, bind on nodes: $CLIENT_SOCKET_BIND_NODE, bind on cpu list: $CLIENT_SOCKET_BIND_CORE_LIST"
+            fi
         fi
     else
         echo "Run on multi node, socket bind disabled, skip to bind"
@@ -258,7 +365,7 @@ echo "NUMACTL_OPTIONS: $NUMACTL_OPTIONS"
 
 echo "===Stage 1: Build schema started==="
 start=$(date +%s)
-./hammerdbcli auto ${TPCC_TCL_SCRIPT_PATH}/build_schema.tcl | tee /build_schema_${DB_TYPE}_tcl.log
+$NUMACTL_OPTIONS ./hammerdbcli auto ${TPCC_TCL_SCRIPT_PATH}/build_schema.tcl | tee /build_schema_${DB_TYPE}_tcl.log
 end=$(date +%s)
 echo "===Stage 1: Build schema finished spent $(( end - start )) seconds"
 

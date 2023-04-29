@@ -4,6 +4,7 @@ import json
 import yaml
 import sys
 import os
+import copy
 
 CLUSTER_CONFIG = "cluster-config.yaml"
 KUBERNETES_CONFIG = "kubernetes-config.yaml"
@@ -20,7 +21,7 @@ for argv in sys.argv:
     argv = argv[2:]
     if "=" in argv:
       k, _, v = argv.partition("=")
-      options[k.replace('-', '_')] = v
+      options[k.replace('-', '_')] = v.strip().replace('%20', ' ')
     elif argv.startswith("no"):
       options[argv[2:].replace('-', '_')] = False
     else:
@@ -38,6 +39,9 @@ inventories = {
   "workload_hosts": {
     "hosts": {},
   },
+  "off_cluster_hosts": {
+    "hosts": {},
+  },
   "cluster_hosts": {
     "hosts": {},
   },
@@ -45,9 +49,10 @@ inventories = {
     "hosts": {},
   },
 }
-non_controller_groups = {}
 bastion_hosts = {}
 for host in instances:
+  if "private_ip" not in instances[host]:
+    continue
   vm_group = _GetVMGroup(host)
   if vm_group not in inventories:
     inventories[vm_group]={
@@ -57,16 +62,24 @@ for host in instances:
   inventories[vm_group]["hosts"][host].update({
     "ansible_host": instances[host].get("public_ip", instances[host]["private_ip"]),
     "ansible_user": instances[host]["user_name"],
+    "ansible_port": instances[host].get("ssh_port", 22),
     "wl_kernel_args": options.get("wl_kernel_args", {}),
   })
   if vm_group == "controller":
     inventories["cluster_hosts"]["hosts"][host] = inventories[vm_group]["hosts"][host]
-  else:
-    non_controller_groups[vm_group] = 1
   if "bastion_host" in instances[host]:
     if instances[host]["bastion_host"] not in bastion_hosts:
       bastion_hosts[instances[host]["bastion_host"]] = []
     bastion_hosts[instances[host]["bastion_host"]].append(host)
+  if "winrm_password" in instances[host]:
+    inventories[vm_group]["hosts"][host].update({
+      "ansible_connection": "winrm",
+      "ansible_password": instances[host]["winrm_password"],
+      "ansible_port": instances[host].get("winrm_port", "5986"),
+      "ansible_winrm_server_cert_validation": "ignore",
+      "ansible_winrm_transport": "basic",
+      "ansible_winrm_scheme": "https",
+    })
 
 
 def _ExtendOptions(updates):
@@ -114,7 +127,7 @@ def _DecodeKernelArgs(line):
 
 def _EncodeKernelArgs(args):
   return " ".join([f"{k} {args[k]}" for k in args])
-    
+
 
 def _IsSUTAccessible(image):
   for reg1 in options.get("skopeo_sut_accessible_registries", "").split(","):
@@ -132,20 +145,11 @@ def _IsRegistrySecure(image):
 
 def _CreatePerHostCtls(name, ctls):
   for group in ctls:
-    if group in non_controller_groups:
-      for host in inventories["workload_hosts"]["hosts"]:
+    for igroup in inventories:
+      for host in inventories[igroup]["hosts"]:
         vm_group = _GetVMGroup(host)
         if vm_group == group:
-          inventories["workload_hosts"]["hosts"][host][name] = ctls[group]
-
-
-def _SetHugePageKernelArgs(kernel_args, hugepagesz, hugepages):
-  sz = f"hugepagesz={hugepagesz}"
-  if sz in kernel_args:
-    hugepages1 = int(kernel_args[sz].split("=")[-1])
-    if hugepages1 > hugepages:
-      hugepages = hugepages1
-  kernel_args[sz] = f'{sz} hugepages={hugepages}'
+          inventories[igroup]["hosts"][host][name] = ctls[group]
 
 
 def _List2Dict(alist):
@@ -154,14 +158,14 @@ def _List2Dict(alist):
     k, _, v = e.partition("=")
     adict[k] = v
   return adict
-    
+
 
 def _RegistryEnabled():
   my_ip_list = options["my_ip_list"].split(",")
   for h in inventories["cluster_hosts"]["hosts"]:
     if inventories["cluster_hosts"]["hosts"][h]["private_ip"] in my_ip_list:
       return False
-  return options.get("k8s_enable_registry", True)
+  return str(options.get("k8s_enable_registry", 'True')).lower() == 'true'
 
 
 def _GetTunables():
@@ -190,13 +194,19 @@ with open(CLUSTER_CONFIG) as fd:
           nidx[vm_group] = 0
         host = _GetNextHost(inventories[vm_group]["hosts"], nidx[vm_group])
 
-        inventories["workload_hosts"]["hosts"][host] = inventories[vm_group]["hosts"][host]
+        if vm_group != "controller":
+          if c.get("off_cluster", False):
+            inventories["off_cluster_hosts"]["hosts"][host] = inventories[vm_group]["hosts"][host]
+          else:
+            inventories["workload_hosts"]["hosts"][host] = inventories[vm_group]["hosts"][host]
+            inventories["cluster_hosts"]["hosts"][host] = inventories[vm_group]["hosts"][host]
 
-        if c.get("traceable", vm_group == "worker"):
+        if c.get("traceable", vm_group != "controller"):
           inventories["trace_hosts"]["hosts"][host] = inventories[vm_group]["hosts"][host]
 
         if "k8s_node_labels" not in inventories[vm_group]["hosts"][host]:
             inventories[vm_group]["hosts"][host]["k8s_node_labels"] = []
+
         vm_group_label = f"VM-GROUP={vm_group}"
         if vm_group_label not in inventories[vm_group]["hosts"][host]["k8s_node_labels"]:
           inventories[vm_group]["hosts"][host]["k8s_node_labels"].append(vm_group_label)
@@ -207,13 +217,7 @@ with open(CLUSTER_CONFIG) as fd:
             label_str = f"{label}=yes"
             if label_str not in inventories[vm_group]["hosts"][host]["k8s_node_labels"]:
               inventories[vm_group]["hosts"][host]["k8s_node_labels"].append(label_str)
-            
-            if "HAS-SETUP-HUGEPAGE-" in label:
-              req = label.split("-")[-2:]
-              hugepagesz = req[0].replace("B", "")
-              hugepages = int(req[1])
-              _SetHugePageKernelArgs(inventories[vm_group]["hosts"][host]["wl_kernel_args"], hugepagesz, hugepages)
-              
+
         if "sysctls" in c:
           if vm_group not in sysctls:
             sysctls[vm_group] = {}
@@ -228,11 +232,11 @@ with open(CLUSTER_CONFIG) as fd:
       for option1 in doc["terraform"]:
         if option1 not in options:
           options[option1] = doc["terraform"][option1]
+        elif isinstance(options[option1], dict):
+          tmp = copy.deepcopy(doc["terraform"][option1])
+          tmp.update(options[option1])
+          options[option1] = tmp
 
-for host1 in inventories["workload_hosts"]["hosts"]:
-  vm_group = _GetVMGroup(host1)
-  for host2 in inventories[vm_group]["hosts"]:
-    inventories["cluster_hosts"]["hosts"][host2] = inventories[vm_group]["hosts"][host2]
 
 _CreatePerHostCtls("wl_sysctls", sysctls)
 _CreatePerHostCtls("wl_sysfs", sysfs)
@@ -250,6 +254,7 @@ if options.get("wl_docker_image", None):
     "name": "docker installation",
     "import_playbook": "./template/ansible/docker/installation.yaml",
     "vars": _ExtendOptions({
+      "wl_tunables": _GetTunables(),
     })
   })
   if not _IsSUTAccessible(options["wl_docker_image"]):
@@ -262,46 +267,44 @@ if options.get("wl_docker_image", None):
         },
       })
     })
-  if options.get("docker_auth_reuse", False):
-    playbooks.append({
-      "name": "Docker Auth",
-      "import_playbook": "./template/ansible/common/docker_auth.yaml",
-      "vars": _ExtendOptions({
-      })
-    })
 
-elif os.path.exists(KUBERNETES_CONFIG):
+elif os.path.exists(KUBERNETES_CONFIG) or options.get("k8s_install", False):
   k8s_registry_port = options.get("k8s_registry_port", "20668")
+  k8s_registry_ip = inventories["controller"]["hosts"]["controller-0"]["private_ip"] if "controller" in inventories else "127.0.0.1"
 
   playbooks.append({
     "name": f"k8s installation",
     "import_playbook": "./template/ansible/kubernetes/installation.yaml",
     "vars": _ExtendOptions({
       "k8s_registry_port": k8s_registry_port,
-      "k8s_registry_ip": inventories["controller"]["hosts"]["controller-0"]["private_ip"],
+      "k8s_registry_ip": k8s_registry_ip,
+      "wl_tunables": _GetTunables(),
     })
   })
 
-  if _RegistryEnabled():
+  if _RegistryEnabled() and os.path.exists(KUBERNETES_CONFIG):
     images = _ScanImages()
     playbooks.append({
       "name": "transfer image",
       "import_playbook": "./template/ansible/common/image_to_registry.yaml",
       "vars": _ExtendOptions({
-        "wl_docker_images": { 
+        "wl_docker_images": {
           im: _IsRegistrySecure(im) for im in images if not _IsSUTAccessible(im)
         },
-        "k8s_remote_registry_url": inventories["controller"]["hosts"]["controller-0"]["private_ip"]+":" + k8s_registry_port,
+        "k8s_remote_registry_url": options.get("k8s_remote_registry_url", k8s_registry_ip + ":" + k8s_registry_port),
       })
     })
-    if options.get("docker_auth_reuse", False):
-      playbooks.append({
-        "name": "Docker Auth",
-        "import_playbook": "./template/ansible/common/docker_auth.yaml",
-        "vars": _ExtendOptions({
-          "wl_workerlist": "controller-0",
-        })
-      })
+
+if options.get("docker_auth_reuse", False):
+  playbooks.append({
+    "name": "Docker Auth",
+    "import_playbook": "./template/ansible/common/docker_auth.yaml",
+    "vars": _ExtendOptions({
+      "docker_auth_method": options.get("docker_auth_method", "docker"),
+      "docker_auth_cred_ver": options.get("docker_auth_cred_ver", "undefined"),
+      "docker_auth_pass_ver": options.get("docker_credential_pass_ver", "undefined"),
+    })
+  })
 
 if os.path.exists("/opt/workload/template/ansible/custom/installation.yaml"):
   playbooks.append({
@@ -320,36 +323,61 @@ if options.get("svrinfo", True):
     })
   })
   
+if options.get("msrinfo", False):
+  playbooks.append({
+    "name": "Invoke msrinfo",
+    "import_playbook": "./template/ansible/common/msrinfo.yaml",
+    "vars": _ExtendOptions({
+    })
+  })
+
 with open(CLUSTER, "w") as fd:
   yaml.dump(playbooks, fd)
 
 with open(CLEANUP, "w") as fd:
-  playbooks = []
+  playbooks = [{
+    "hosts": "localhost",
+    "gather_facts": "false",
+    "tasks": [{
+      "name": "Breakpoint at CleanupStage",
+      "include_role": {
+        "name": "breakpoint",
+      },
+      "vars": {
+        "breakpoint": "CleanupStage",
+      }
+    }]
+  }]
+
+  # k8s cleanup
+  if os.path.exists(KUBERNETES_CONFIG) or options.get("k8s_install", False):
+    playbooks.append({
+      "name": "Kubernetes cleanup sequence",
+      "import_playbook": "./template/ansible/kubernetes/cleanup.yaml",
+      "vars": _ExtendOptions({
+        "wl_tunables": _GetTunables(),
+      }),
+    })
 
   # custom cleanup
   if os.path.exists("/opt/workload/template/ansible/custom/cleanup.yaml"):
     playbooks.append({
-      "name": "custom cleanup",
+      "name": "custom cleanup sequence",
       "import_playbook": "./template/ansible/custom/cleanup.yaml",
       "vars": _ExtendOptions({
         "wl_tunables": _GetTunables(),
-      })
-    })
-  # k8s cleanup
-  if os.path.exists("/opt/workload/template/ansible/kubernetes/cleanup.yaml"):
-    playbooks.append({
-      "name": "default cleanup sequence",
-      "import_playbook": "./template/ansible/kubernetes/cleanup.yaml",
-      "vars": _ExtendOptions({
       }),
     })
-  # common cleanup
+
+  # default cleanup
   playbooks.append({
     "name": "default cleanup sequence",
     "import_playbook": "./template/ansible/common/cleanup.yaml",
     "vars": _ExtendOptions({
+      "wl_tunables": _GetTunables(),
     }),
   })
+
   yaml.dump(playbooks, fd)
 
 with open(INVENTORY, "w") as fd:

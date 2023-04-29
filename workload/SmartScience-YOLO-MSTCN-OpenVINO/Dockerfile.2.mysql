@@ -1,0 +1,11 @@
+# smartscience-mysql
+
+FROM mysql
+
+ENV AUTO_RUN_DIR /docker-entrypoint-initdb.d
+
+ENV FILE create_sql.sql
+
+COPY ./$FILE $AUTO_RUN_DIR/
+
+RUN chmod -R 775 $AUTO_RUN_DIR

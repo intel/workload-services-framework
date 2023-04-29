@@ -1,0 +1,26 @@
+
+- name: Install emon locally
+  shell:
+    cmd: |
+      flock /tmp/emon.lock bash -c '
+          which () {
+            echo "x"
+          }
+          [ ! -e {{ emon_bin_path }} ] && mkdir -p {{ emon_bin_path }} && . ./sep-installer.sh -i -u -C {{ emon_bin_path }} --accept-license -ni -i --no-load-driver
+      '
+    chdir: "{{ emon_src_path }}"
+    executable: /bin/bash
+  delegate_to: localhost
+  become: yes
+  ignore_errors: yes
+  
+- name: Run emon post-processing
+  shell:
+    cmd: |
+      . {{ emon_bin_path }}/sep/sep_vars.sh
+      emon {{ emon_options }} -process-pyedp {{ emon_bin_path }}/sep/{{ emon_edp_config }}
+    chdir: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-emon"
+    executable: /bin/bash
+  delegate_to: localhost
+  ignore_errors: yes
+      

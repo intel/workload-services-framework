@@ -1,9 +1,0 @@
-
-
-- name: Update modules.conf
-  blockinfile:
-    path: "/etc/modules-load.d/99-wsf-settings.conf"
-    marker: "# {mark} ANSIBLE MANAGED BLOCK for module {{ label_name.split('=')[0].split('-')[3:] | join('-') | upper }}"
-    state: absent
-  ignore_errors: yes
-

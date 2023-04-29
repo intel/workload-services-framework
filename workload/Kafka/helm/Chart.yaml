@@ -1,0 +1,4 @@
+apiVersion: v2
+name: kafka
+type: application
+version: "1.0"

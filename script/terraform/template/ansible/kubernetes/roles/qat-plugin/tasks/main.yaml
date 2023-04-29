@@ -1,0 +1,61 @@
+---
+- name: check QAT Device Plugin installation status
+  command: "kubectl wait --for=condition=Ready pod --all -n {{ qatplugin_namespace }} --timeout 1s"
+  ignore_errors: true
+  register: qatplugin_ready
+
+- block:
+  - name: Detect OS
+    shell: 
+      cmd: ". /etc/os-release; echo $ID"
+      executable: /bin/bash
+    register: os
+
+  - name: Install git on Debian.
+    apt:
+      name:
+        - git
+      state: present
+      update_cache: yes
+    register: aptrc
+    until: aptrc is success
+    retries: 10
+    delay: 10
+    become: true
+    when: os.stdout in ['ubuntu', 'debian']
+
+  - name: Install git on RedHat.
+    dnf:
+      name:
+        - git
+      state: present
+      update_cache: true
+    register: dnfrc
+    until: dnfrc is success
+    retries: 10
+    delay: 10
+    become: true
+    when: os.stdout in ['centos', 'fedora']
+
+  - name: create namespace qat-plugin namespace
+    ignore_errors: true
+    shell: |
+      kubectl create namespace {{ qatplugin_namespace }}
+
+  - name: Install qat-plugin
+    shell: |
+      git clone --depth 1 {{ qatplugin_repository }} -b {{ qatplugin_release }} /tmp/{{ wl_namespace }}-qatplugin
+      cd /tmp/{{ wl_namespace }}-qatplugin
+      kubectl create -k deployments/qat_plugin/overlays/apparmor_unconfined -n {{ qatplugin_namespace }}
+    run_once: true
+
+  - name: remove qat-plugin installation files
+    become: true
+    file:
+      path: '/tmp/{{ wl_namespace }}-qatplugin'
+      state: absent
+
+  - name: wait for qat-plugin to become fully available
+    command: "kubectl wait --for=condition=Ready pod --all -n {{ qatplugin_namespace }} --timeout 30s"
+
+  when: qatplugin_ready.rc == 1

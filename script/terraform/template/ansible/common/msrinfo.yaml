@@ -1,0 +1,8 @@
+- hosts: all
+  tasks:
+    - name: Get full characterization
+      include_role:
+        name: characterization
+      when:
+      - ansible_connection != 'winrm'
+      - ansible_processor[1] == "GenuineIntel"
