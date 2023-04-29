@@ -57,7 +57,6 @@ metadata:
 spec:
 ifelse("defn(`MODE')","pod2pod",`dnl
   clusterIP: None
-',`dnl
 ')dnl
   selector:
     app: iperf-server
@@ -70,7 +69,12 @@ ifelse("defn(`MODE')","pod2pod",`dnl
     port: 80
     targetPort: 80
     name: iperf-server-nginx-pod-port
+ifelse("defn(`MODE')","ingress",`dnl
+  externalIPs:
+  - 127.0.0.1
+')dnl
 
+ifelse("defn(`MODE')","ingress",,`
 ---
 
 apiVersion: batch/v1
@@ -89,7 +93,14 @@ spec:
       initContainers:
         - name: wait-for-iperf-server-service
           image: docker.io/library/busybox:1.28
-          command: ["sh", "-c", "while [ $(wget --server-response --no-check-certificate http://IPERF_SERVICE_NAME:80 2>&1 | awk '/\ HTTP/{print $2}') -ne 200 ]; do echo Waiting...; sleep 5s; done"]
+          command: 
+          - "sh"
+          - "-c"
+          - |
+            while [ $(wget --server-response --no-check-certificate http://IPERF_SERVICE_NAME:80 2>&1 | awk "/ HTTP/{print \$2}") -ne 200 ]; do
+              echo Waiting...
+              sleep 5s
+            done
       containers:
       - name: iperf-client
         image: IMAGENAME(Dockerfile.1.iperf)
@@ -125,3 +136,4 @@ spec:
           value: "client"
       restartPolicy: Never
   backoffLimit: 5
+')

@@ -18,12 +18,13 @@
     if [ -x "/usr/sbin/mkfs.${disk_format}" ]; then
         mkdir -p ${disk.mount_path}
         if ! grep -q -F ${disk.mount_path} /etc/fstab; then
-            printf "n\np\n1\n\n\nw\nq\n" | fdisk $device
+            parted -s $device \
+                mklabel gpt \
+                mkpart primary ${disk_format} 0% 100%
             devpart="$(lsblk -l -p $device | tail -n1 | cut -f1 -d' ')"
-            yes | mkfs.${disk_format} -m 0 $devpart
-
-            devuuid="$(blkid $devpart | cut -f2 -d' ')"
-            echo "$devuuid ${disk.mount_path} ${disk_format} defaults 0 2" >> /etc/fstab
+            devuuid="$(uuidgen)"
+            yes | mkfs.${disk_format} -m 0 -U $devuuid $devpart
+            echo "UUID=$devuuid ${disk.mount_path} auto defaults,nofail 0 2" >> /etc/fstab
         fi
         mount -a
         chown ${disk_user}.${disk_group} ${disk.mount_path}

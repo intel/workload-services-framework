@@ -21,7 +21,7 @@
 
     - name: Install docker
       include_role:
-        name: installation
+        name: docker
 
     - name: ctest alias
       include_role:

@@ -14,7 +14,7 @@
 
   - name: install containerd
     include_tasks:
-      file: "install-{{ os.stdout }}.yaml"
+      file: "install-{{ (os.stdout == 'rhel' or os.stdout == 'anolis') | ternary('centos', os.stdout) }}.yaml"
     when: containerd.rc != 0
 
   - name: check containerd configuration
@@ -81,17 +81,10 @@
       path: "{{ containerd_proxy_conf }}"
     register: proxy_conf
 
-  - name: "Ensure {{ containerd_proxy_conf | dirname }} exists"
-    file:
-      path: "{{ containerd_proxy_conf | dirname }}"
-      state: directory
-      recurse: yes
-    when: proxy != "::" and not proxy_conf.stat.exists
-    become: yes
-
   - name: configure proxy
     shell: |
-      printf "[Service]\nEnvironment=\"HTTP_PROXY=$http_proxy\" \"HTTPS_PROXY=$https_proxy\" \"NO_PROXY=$no_proxy\"\n" > {{ containerd_proxy_conf }}
+      mkdir -p {{ containerd_proxy_conf | dirname }}
+      printf "[Service]\nEnvironment=\"HTTP_PROXY=$http_proxy\" \"HTTPS_PROXY=$https_proxy\" \"NO_PROXY=$no_proxy{{ ((k8s_registry_ip is defined) and (k8s_enable_registry | default(true))) | ternary(',' + (k8s_registry_ip | default('')),'') }}\"\n" > {{ containerd_proxy_conf }}
     when: proxy != "::" and not proxy_conf.stat.exists
     become: yes
     
@@ -102,12 +95,8 @@
       - ansible_host in my_ip_list.split(",")
       - reconfigure or containerd.rc != 0 or (proxy != "::" and not proxy_conf.stat.exists)
 
-  - name: retart containerd
-    systemd:
-      name: containerd
-      daemon_reload: yes
-      enabled: yes
-      state: restarted
+  - name: restart containerd
+    include_tasks:
+      file: 'restart.yaml'
     when: reconfigure or containerd.rc != 0 or (proxy != "::" and not proxy_conf.stat.exists)
-    become: yes
 

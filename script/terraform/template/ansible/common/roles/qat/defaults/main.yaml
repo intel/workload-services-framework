@@ -1,0 +1,12 @@
+---
+# defaults file for qat
+wl_kernel_args: {}
+qat_firmware1: /lib/firmware/qat_4xxx.bin
+qat_firmware2: /lib/firmware/qat_4xxx_mmp.bin
+qat_firmware1_repo: https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/qat_4xxx.bin
+qat_firmware2_repo: https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/qat_4xxx_mmp.bin
+qat_service: /usr/lib/systemd/system/qat.service
+qat_policy: 0
+qat_driver_version: QAT20.L.1.0.0-00021
+qat_driver_url: https://downloadmirror.intel.com/765523/QAT20.L.1.0.0-00021.tar.gz
+qat_driver_dir: /opt/intel/QAT

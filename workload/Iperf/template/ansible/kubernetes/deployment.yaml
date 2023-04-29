@@ -1,0 +1,13 @@
+
+- hosts: localhost
+  gather_facts: no
+  tasks:
+
+  - name: rewrite cluster IP
+    replace:
+      path: "{{ wl_logs_dir }}/kubernetes-config.yaml.mod.yaml"
+      regexp: "127.0.0.1"
+      replace: "{{ hostvars['controller-0']['private_ip'] }}"
+    when: wl_tunables.MODE == 'ingress'
+
+- import_playbook: deployment.yaml.origin

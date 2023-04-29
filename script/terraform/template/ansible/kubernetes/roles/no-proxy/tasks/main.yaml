@@ -1,0 +1,28 @@
+
+- name: Read no_proxy
+  shell: 
+    cmd: "echo $no_proxy"
+    executable: /bin/bash
+  register: noproxy
+
+- name: Set fact
+  set_fact:
+    cluster_proxy_list: "{{k8s_pod_cidr | default('10.244.0.0/16')}},{{ k8s_service_cidr | default('10.96.0.0/12')}},{{ groups['cluster_hosts'] | map('extract', hostvars, ['ansible_host']) | join(',') }},{{ groups['cluster_hosts'] | map('extract', hostvars, ['private_ip']) | join(',') }},{{ k8s_apiserver_cluster_ip | default('10.96.0.1')}}"
+
+# avoid duplicate append
+- name: Test cluster proxy list already exists
+  shell: grep -F -q '{{ cluster_proxy_list }}' /etc/environment
+  register: test_cluster_proxy_list
+  ignore_errors: true
+
+- name: Add cluster proxy list to no-proxy
+  blockinfile:
+    path: /etc/environment
+    block: |
+      no_proxy={{ noproxy.stdout_lines | first | default('') }},{{ cluster_proxy_list }}
+  become: true
+  when: test_cluster_proxy_list.rc != 0
+
+- name: reset ssh connection
+  meta: reset_connection
+

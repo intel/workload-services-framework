@@ -8,3 +8,38 @@
     loop_var: trace_module
   ignore_errors: yes
 
+# ##########
+# Avoid race condition when apply hugepages at runtime
+#   - when updating huge pages at run time with ansible, pages are updated asynchronously
+#   - wait until pages are fully flushed and configured before restarting kubelet
+# ##########
+- name: Wait until huge pages are fully configured
+  command: cat "/sys/kernel/mm/hugepages/hugepages-{{ item.split('-')[3] }}/nr_hugepages"
+  register: npages
+  until: (npages.stdout | int >= {{ item.split('-')[4].split('=')[0] }} | int)
+  retries: 10
+  delay: 5
+  when:
+    - (csp | default('static')) == 'static' and (k8s_reset | default('false') | bool) == false
+    - ('HAS-SETUP-HUGEPAGE-' in item)
+  loop: "{{ k8s_node_labels | default([]) }}"
+
+- name: Restart kubelet for huge pages
+  systemd:
+    name: kubelet
+    state: restarted
+    daemon_reload: true
+  changed_when: false
+  become: true
+  check_mode: false
+  failed_when: false
+  when:
+    - (csp | default('static')) == 'static' and (k8s_reset | default('false') | bool) == false
+    - ( (k8s_node_labels | default([]) | join(' ')) is match('.*HAS-SETUP-HUGEPAGE-.*') )
+
+- name: Customize workers
+  include_role:
+    name: installation
+    tasks_from: customize
+  when: (role_path + '/tasks/customize.yaml') is exists
+

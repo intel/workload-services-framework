@@ -1,0 +1,13 @@
+control_path: "/tmp/intel-msr-%h-%p-%r"
+INTEL_MSR_ITEMS: [ {
+    "name": "LLC",
+    "value": "0x0c90"
+  },
+  {
+    "name": "L2C",
+    "value": "0x0d10"
+  },
+  {
+    "name": "UCORE",
+    "value": "0x620"
+  }]

@@ -1,0 +1,15 @@
+---
+install_dependencies:
+  Debian:
+    - make
+    - cmake
+    - m4
+    - gcc
+    - wget
+    - unzip
+  RedHat:
+    - make
+    - cmake
+    - gcc
+    - wget
+    - unzip

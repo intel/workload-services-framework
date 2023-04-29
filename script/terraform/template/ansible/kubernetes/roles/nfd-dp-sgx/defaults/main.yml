@@ -10,6 +10,5 @@ sgx_device_plugin_ver: "0.24.0"
 intel_sgx_dp_namespace: "inteldeviceplugins-system"
 sgx_enclaveLimit: "20"
 sgx_provisionLimit: "20"
-sgx_device_plugin_dir: "/opt/sgx_device_plugin"
 sgx_device_plugin_nodeselector:
   - "intel.feature.node.kubernetes.io/sgx=true"

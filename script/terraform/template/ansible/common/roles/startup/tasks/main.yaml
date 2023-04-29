@@ -8,39 +8,27 @@
     path: "{{ startup_restore_path }}"
     state: directory
     recurse: yes
-  when: ((wl_sysctls.keys() | length) + (wl_default_sysctls.keys() | length) > 0) or ((wl_sysfs.keys() | length) + (wl_default_sysfs.keys() | length) > 0) or ((wl_kernel_args.keys() | length > 0) and (not ansible_host in my_ip_list.split(',')) and (wl_enable_reboot | default('true') | bool))
   failed_when: false
 
-- name: process sysctls
-  include_tasks:
-    file: sysctl.yaml
-  when: (wl_sysctls.keys() | length) + (wl_default_sysctls.keys() | length) > 0
-
-- name: process sysfs
-  include_tasks:
-    file: sysfs.yaml
-  when: (wl_sysfs.keys() | length) + (wl_default_sysfs.keys() | length) > 0
-
-- name: check label stat
+- name: check label kernel-args
   stat:
-    path: "{{ playbook_dir }}/roles/{{ item.split('=')[0].split('-')[2] | lower }}/tasks/install.yaml"
+    path: "{{ playbook_dir }}/roles/{{ item.split('=')[0].split('-')[2] | lower }}/tasks/kernel-args.yaml"
   when:
   - item.startswith("HAS-SETUP-")
-  - not item.startswith("HAS-SETUP-HUGEPAGE-")
-  register: label_check
+  register: label_kargs
   loop: "{{ k8s_node_labels }}"
   delegate_to: localhost
 
-- name: provision labels
+- name: apply label kernel-args
   include_role:
     name: "{{ label_result.item.split('=')[0].split('-')[2]|lower }}"
-    tasks_from: install
+    tasks_from: kernel-args
   vars:
     label_name: "{{ label_result.item }}"
   when:
-    - wl_enable_reboot
+    - wl_enable_reboot | default('true') | bool
     - label_result.stat.exists | default(false) | bool
-  loop: "{{ label_check.results }}"
+  loop: "{{ label_kargs.results }}"
   loop_control:
     loop_var: label_result
 
@@ -51,4 +39,41 @@
   - wl_enable_reboot | default('true') | bool
   - wl_kernel_args.keys() | length > 0
   - not ansible_host in my_ip_list.split(',')
+
+- name: check label install
+  stat:
+    path: "{{ playbook_dir }}/roles/{{ item.split('=')[0].split('-')[2] | lower }}/tasks/install.yaml"
+  when:
+  - item.startswith("HAS-SETUP-")
+  register: label_install
+  loop: "{{ k8s_node_labels }}"
+  delegate_to: localhost
+
+- name: provision labels
+  include_role:
+    name: "{{ label_result.item.split('=')[0].split('-')[2]|lower }}"
+    tasks_from: install
+  vars:
+    label_name: "{{ label_result.item }}"
+  when:
+    - wl_enable_reboot | default('true') | bool
+    - label_result.stat.exists | default(false) | bool
+  loop: "{{ label_install.results }}"
+  loop_control:
+    loop_var: label_result
+
+- name: process kernel modules
+  include_tasks:
+    file: kernel-modules.yaml
+  when: (wl_kernel_modules | length) > 0
+
+- name: process sysctls
+  include_tasks:
+    file: sysctl.yaml
+  when: (wl_sysctls.keys() | length) + (wl_default_sysctls.keys() | length) > 0
+
+- name: process sysfs
+  include_tasks:
+    file: sysfs.yaml
+  when: (wl_sysfs.keys() | length) + (wl_default_sysfs.keys() | length) > 0
 

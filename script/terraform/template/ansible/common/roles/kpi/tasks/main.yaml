@@ -5,14 +5,16 @@
         dest: "{{ wl_logs_dir }}/itr-{{ item }}/"
         mode: "a+rx"
       loop: "{{ range(1, run_stage_iterations | default(1) |int+1, 1) | list }}"
-      failed_when: false
+      when: ((wl_logs_dir + '/kpi.sh') is exists)
+      ignore_errors: true
 
     - name: modify top level kpi.sh to point to itr-1
       lineinfile:
         path: "{{ wl_logs_dir }}/kpi.sh"
         line: "[ -d itr-1 ] && cd itr-1"
         insertafter: "^#!.*"
-        firstmatch: yes
+        firstmatch: true
         state: present
-      failed_when: false
+      when: ((wl_logs_dir + '/kpi.sh') is exists)
+      ignore_errors: true
 

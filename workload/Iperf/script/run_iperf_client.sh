@@ -44,7 +44,7 @@ else
 fi
 
 if [[ $IPERF_VER == "2" ]]; then
-  CLIENT_CMD="taskset -c ${CLIENT_CORE_LIST} iperf -c ${IPERF_SERVER} -p ${SERVER_POD_PORT} -t ${CLIENT_TRANSMIT_TIME} -m -P ${PARALLEL_NUM} -l ${BUFFER_SIZE} -e"
+  CLIENT_CMD="taskset -c ${CLIENT_CORE_LIST} iperf -c ${IPERF_SERVER} -p ${SERVER_POD_PORT} -t ${CLIENT_TRANSMIT_TIME} -m -P ${PARALLEL_NUM} -l ${BUFFER_SIZE}"
 else
   CLIENT_CMD="taskset -c ${CLIENT_CORE_LIST} iperf3 -c ${IPERF_SERVER} -p ${SERVER_POD_PORT} -P ${PARALLEL_NUM} -V"
 fi

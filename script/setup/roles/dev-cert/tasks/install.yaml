@@ -14,11 +14,23 @@
 
   - name: Install cert
     include_tasks:
-      file: 'install-{{ os.stdout }}.yaml'
+      file: "install-{{ (os.stdout == 'rhel') | ternary('centos', os.stdout) }}.yaml"
 
   - name: restart containerd
     systemd:
       name: containerd
+      state: restarted
+    ignore_errors: yes
+
+  - name: restart docker
+    systemd:
+      name: docker
+      state: restarted
+    ignore_errors: yes
+
+  - name: restart kubelet
+    systemd:
+      name: kubelet
       state: restarted
     ignore_errors: yes
 

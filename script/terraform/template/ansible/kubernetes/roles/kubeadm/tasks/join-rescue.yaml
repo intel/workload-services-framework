@@ -1,0 +1,6 @@
+
+- name: Rescue join if mac address changed
+  include_role: 
+    name: cni-calicovpp
+    tasks_from: rescue-macchange.yaml
+  when: k8s_cni == "calicovpp"

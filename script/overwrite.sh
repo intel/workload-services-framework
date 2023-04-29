@@ -1,9 +1,9 @@
 #!/bin/bash -e
 
-if [ -r "$SCRIPT/$BACKEND/vars.sh" ]; then
+if [ -r "$PROJECTROOT/script/$BACKEND/vars.sh" ]; then
     for _k in $(compgen -e); do
         eval "_v=\"\$$_k\""
-        . "$SCRIPT/$BACKEND/vars.sh" "$_k" "$_v"
+        . "$PROJECTROOT/script/$BACKEND/vars.sh" "$_k" "$_v"
     done
 fi
 
@@ -31,8 +31,8 @@ if [ -r "$TEST_CONFIG" ]; then
                 eval "export $_k=\"$_v\""
                 echo "OVERWRITE: $_k=$_v"
             fi
-            if [ -r "$SCRIPT/$BACKEND/vars.sh" ]; then
-                . "$SCRIPT/$BACKEND/vars.sh" "$_k" "$_v"
+            if [ -r "$PROJECTROOT/script/$BACKEND/vars.sh" ]; then
+                . "$PROJECTROOT/script/$BACKEND/vars.sh" "$_k" "$_v"
             fi
         fi
     done < <(cat "$TEST_CONFIG"; echo)

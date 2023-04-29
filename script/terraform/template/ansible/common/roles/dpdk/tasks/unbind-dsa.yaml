@@ -1,0 +1,14 @@
+
+- name: Get DSA device ids with dpdk driver bound
+  shell: |
+    {{ dpdk_devbind }} --status-dev dma | grep 'Device 0b25' |awk '{print $1}'
+  register: get_dsa_device_ids
+
+- name: Unbind DSA device by device ids
+  become: true
+  shell: |
+    {{ dpdk_devbind }} -u {{ get_dsa_device_ids.stdout_lines | join(' ') }} --force
+  ignore_errors: true
+  when:
+  - get_dsa_device_ids.rc == 0
+  - get_dsa_device_ids.stdout_lines | length > 0

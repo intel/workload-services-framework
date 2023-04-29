@@ -1,0 +1,11 @@
+
+- name: set hugepage kernel args
+  set_fact:
+    wl_kernel_args: "{{ wl_kernel_args | combine({ 'hugepagesz=' + (label_name.split('-')[3]): 'hugepagesz=' + (label_name.split('-')[3].replace('B','')) + ' hugepages=' + (label_name.split('=')[0].split('-')[4]) }) }}"
+
+- name: set defaulthugepagesz
+  set_fact:
+    wl_kernel_args: "{{ wl_kernel_args | combine({ 'defaulthugepagesz': 'defaulthugepagesz=' + (label_name.split('-')[3].replace('B','')) }) }}"
+  when:
+  - wl_set_default_hugepagesz | default(false) | bool
+

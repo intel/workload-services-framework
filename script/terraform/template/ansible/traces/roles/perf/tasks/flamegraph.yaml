@@ -29,7 +29,6 @@
     update_cache: yes
     state: present
   become: yes
-  become_flags: -E
   ignore_errors: yes
   delegate_to: localhost
   register: aptrc

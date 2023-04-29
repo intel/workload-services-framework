@@ -15,6 +15,7 @@ ifelse(RUN_SINGLE_NODE,true,`dnl
 SERVER_LABEL_POLICY
 ',`dnl
 - labels: {}
+  vm_group: client
 SERVER_LABEL_POLICY
 ')
 

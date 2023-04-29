@@ -40,6 +40,7 @@ locals {
         disk_size = v.data_disk_spec.disk_size
         disk_type = v.data_disk_spec.disk_type
         disk_iops = v.data_disk_spec.disk_iops
+        disk_throughput = v.data_disk_spec.disk_throughput
         lun       = i
       }
     ]
@@ -50,6 +51,7 @@ locals {
       disk_size = dsk.disk_size
       disk_type = dsk.disk_type
       disk_iops = dsk.disk_iops
+      disk_throughput = dsk.disk_throughput
       lun       = dsk.lun
     }
   }
@@ -72,10 +74,13 @@ resource "aws_ebs_volume" "default" {
 
   availability_zone = var.zone
   iops = each.value.disk_iops
+  throughput = each.value.disk_throughput
   size = each.value.disk_size
   type = each.value.disk_type
   
-  tags = var.common_tags
+  tags = {
+    Name = "wsf-${var.job_id}-disk-${each.key}"
+  }
 }
 
 resource "aws_volume_attachment" "default" {

@@ -1,9 +1,9 @@
 #!/bin/bash -e
 
 ### HammerDB settings
-export TPCC_NUM_WAREHOUSES=${TPCC_NUM_WAREHOUSES:-800}
-export TPCC_THREADS_BUILD_SCHEMA=${TPCC_THREADS_BUILD_SCHEMA:-128} # depends on actual cpu cores by default aligned with ICX
-export TPCC_HAMMER_NUM_VIRTUAL_USERS=${TPCC_HAMMER_NUM_VIRTUAL_USERS:-""}
+export TPCC_NUM_WAREHOUSES=${TPCC_NUM_WAREHOUSES:-50} # default for xlarge case
+export TPCC_THREADS_BUILD_SCHEMA=${TPCC_THREADS_BUILD_SCHEMA:-4} # depends on actual cpu cores, default for xlarge case
+export TPCC_HAMMER_NUM_VIRTUAL_USERS=${TPCC_HAMMER_NUM_VIRTUAL_USERS:-"9_9_9"} # default for c6i.xlarge case
 export TPCC_MINUTES_OF_RAMPUP=${TPCC_MINUTES_OF_RAMPUP:-2}
 export TPCC_RUNTIMER_SECONDS=${TPCC_RUNTIMER_SECONDS:-600}
 export TPCC_MINUTES_OF_DURATION=${TPCC_MINUTES_OF_DURATION:-5}
@@ -17,6 +17,7 @@ export TPCC_VUSERS_STEPS=${TPCC_VUSERS_STEPS:-4}
 export TPCC_VUSERS_FLOAT_FACTOR=${TPCC_VUSERS_FLOAT_FACTOR:-0.1}
 export TPCC_ASYNC_SCALE=${TPCC_ASYNC_SCALE:-false}
 export TPCC_CONNECT_POOL=${TPCC_CONNECT_POOL:-false}
+export TPCC_TIMEPROFILE=${TPCC_TIMEPROFILE:-false}
 
 
 function scale_hammerdb_params_gated() {

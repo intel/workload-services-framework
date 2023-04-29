@@ -1,0 +1,91 @@
+{{- $brokerServerList := include "brokerServerList" .Values -}}
+{{- $zkServerList := include "zkServerList" .Values -}}
+{{- $IMAGESUFFIX := include "IMAGESUFFIX" .Values -}}
+{{- $jdkVER := trimPrefix "kafka_" .Values.WORKLOAD }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: zookeeper-kafka-server
+  labels:
+    app: zookeeper-kafka-server
+spec:
+  replicas: {{ .Values.BROKER_SERVER_NUM }}
+  selector:
+    matchLabels:
+      app: zookeeper-kafka-server
+  serviceName: "zookeeper-kafka-server-service"
+  podManagementPolicy: Parallel 
+  template:
+    metadata:
+      labels:
+        app: zookeeper-kafka-server
+        zoo-producer-consumer: anti
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: zookeeper-kafka-server-container
+        image: {{ .Values.REGISTRY }}zookeeper-kafka-server-{{  $jdkVER }}{{ $IMAGESUFFIX }}{{ .Values.RELEASE }}
+        imagePullPolicy:  {{ include "imagepolicy" .Values }}
+        ports:
+          - containerPort: 2181
+          - containerPort: 9092
+          - containerPort: 9093
+        securityContext:
+          privileged: true
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: K_SERVER_CORE_NEEDED_FACTOR
+            value: "{{ .Values.SERVER_CORE_NEEDED_FACTOR }}"
+          - name: K_ZK_SERVER
+            value: "zookeeper-kafka-server-0.zookeeper-kafka-server-service:2181"
+          - name: K_ENCRYPTION
+            value: "{{ .Values.ENCRYPTION }}"
+          - name: K_NUM_NETWORK_THREADS
+            value: "{{ .Values.NUM_NETWORK_THREADS }}"
+          - name: K_SERVER_NUMACTL_OPTIONS
+            value: "{{ .Values.SERVER_NUMACTL_OPTIONS }}"      
+{{- if contains "_3n" .Values.TESTCASE }}
+        {{- $args := dict "key" "zoo-producer-consumer" "value" "anti" }}
+        {{- include "podAntiAffinity" $args }}
+{{- end }}
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-topic-creator
+spec:
+  template:
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: kafka-topic-creator-container
+        image: {{ .Values.REGISTRY }}kafka-client-{{  $jdkVER }}{{ $IMAGESUFFIX }}{{ .Values.RELEASE }}
+        imagePullPolicy:  {{ include "imagepolicy" .Values }}
+        command: ["sh", "-c", "run_test.sh && sleep infinity"]
+        securityContext:
+          privileged: true
+        env:
+          - name: K_IDENTIFIER
+            value: "topic"
+          - name: K_SERVER_CORE_NEEDED_FACTOR
+            value: "{{ .Values.SERVER_CORE_NEEDED_FACTOR }}"
+          - name: K_KAFKA_SERVER
+            value: "{{ $brokerServerList }}"
+          - name: K_REPLICATION_FACTOR
+            value: "{{ .Values.REPLICATION_FACTOR }}"
+          - name: K_PARTITIONS
+            value: "{{ .Values.PARTITIONS }}"
+          - name: K_KAFKA_BENCHMARK_TOPIC
+            value: "{{ .Values.KAFKA_BENCHMARK_TOPIC }}"
+          - name: K_ENCRYPTION
+            value: "{{ .Values.ENCRYPTION }}"
+      {{- $args := dict "key" "app" "value" "zookeeper-kafka-server" }}
+      {{- include "podAffinity" $args }}
+      restartPolicy: Never
+  backoffLimit: 2

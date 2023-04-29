@@ -1,0 +1,57 @@
+
+- name: remove old versions
+  apt:
+    name:
+    - docker
+    - docker-engine
+    - docker.io
+    - docker-ce
+    - docker-ce-cli
+    state: absent
+  when: ((csp | default('static')) == 'static')
+  ignore_errors: true
+
+- name: install prerequisite
+  apt:
+    name: gnupg
+    state: present
+    update_cache: true
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 5
+
+- name: add docker GPG key
+  get_url:
+    url: "{{ docker_dist_repo }}/linux/ubuntu/gpg"
+    dest: /etc/apt/trusted.gpg.d/docker.asc
+    mode: '0644'
+    force: true
+  register: getrc
+  until: getrc is success
+  retries: 10
+  delay: 5
+    
+- name: get os codename
+  shell:
+    cmd: ". /etc/os-release; echo $VERSION_CODENAME"
+    executable: /bin/bash
+  register: codename
+
+- name: add docker repository to apt
+  apt_repository:
+    repo: "deb {{ docker_dist_repo }}/linux/ubuntu {{ codename.stdout | lower }} stable"
+    state: present
+    update_cache: false
+
+- name: install docker
+  apt:
+    name:
+    - "docker-ce={{ docker_version | default(docker_default_version['ubuntu']) }}"
+    - "docker-ce-cli={{ docker_cli_version | default(docker_cli_default_version['ubuntu']) }}"
+    update_cache: true
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+

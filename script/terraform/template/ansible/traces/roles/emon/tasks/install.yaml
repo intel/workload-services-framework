@@ -1,0 +1,78 @@
+
+- name: Check if emon is already installed
+  stat:
+    path: "{{ emon_bin_path }}/sep/sep_vars.sh"
+  register: emon
+
+- name: Copy the emon installation package
+  copy:
+    src: "{{ emon_src_path }}"
+    dest: "{{ emon_src_path | dirname }}/"
+    mode: preserve
+  become: yes
+  when: not emon.stat.exists
+
+- name: "Create an {{ emon_group }} group"
+  group:
+    name: "{{ emon_group }}"
+    state: present
+    system: yes
+  become: yes
+  when: not emon.stat.exists
+
+- name: Detect OS
+  shell:
+    cmd: . /etc/os-release; echo $ID
+    executable: /bin/bash
+  register: os
+  when: not emon.stat.exists
+
+- name: "Create {{ emon_bin_path }}"
+  file:
+    path: "{{ emon_bin_path }}"
+    state: directory
+  when: not emon.stat.exists
+  become: yes
+
+- name: Install emon on centos/rhel
+  include_tasks:
+    "install-centos.yaml"
+  when: 
+    - not emon.stat.exists
+    - os.stdout == "centos" or os.stdout == "rhel"
+
+- name: Install emon on ubuntu/debian
+  include_tasks:
+    "install-ubuntu.yaml"
+  when:
+    - not emon.stat.exists
+    - os.stdout == "ubuntu" or os.stdout == "debian"
+
+- name: Remove any installation files
+  file:
+    path: "{{ emon_src_path }}"
+    state: absent
+  become: yes
+  when: not emon.stat.exists
+
+- name: "Add user to the {{ emon_group }} group"
+  user:
+    name: "{{ ansible_user }}"
+    append: yes
+    groups: 
+      - "{{ emon_group }}"
+  become: yes
+  when: not emon.stat.exists
+
+- name: reset ssh connection
+  meta: reset_connection
+
+- name: stop any pending emon session
+  shell: 
+    cmd: ". ./sep_vars.sh; emon -stop"
+    executable: /bin/bash
+    chdir: "{{ emon_bin_path }}/sep"
+  ignore_errors: yes
+  become: yes
+  when: emon.stat.exists
+

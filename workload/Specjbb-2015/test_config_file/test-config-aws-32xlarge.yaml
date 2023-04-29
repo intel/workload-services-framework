@@ -1,0 +1,10 @@
+# test-config-aws-32xlarge.yaml
+# Overwrite the test cases for performance tunning on AWS instances.
+
+*_main:
+  SPECJBB_TIER_1_THREADS: 224
+  SPECJBB_TIER_2_THREADS: 5
+  SPECJBB_TIER_3_THREADS: 29
+  SPECJBB_XMX: 64g
+  SPECJBB_GROUPS: 2
+  AWS_MACHINE_TYPE: m6i.32xlarge

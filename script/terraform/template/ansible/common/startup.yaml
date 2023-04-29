@@ -1,12 +1,11 @@
 
-- hosts: cluster_hosts
-  become: true
+- hosts: all
   gather_facts: no
   tasks:
 
     - name: Wait for system to become reachable
       wait_for_connection:
-        connect_timeout: 1
+        connect_timeout: 20
         sleep: 1
         delay: 1
         timeout: 1800
@@ -21,7 +20,7 @@
       vars:
         breakpoint: PrepareStage
 
-- hosts: workload_hosts
+- hosts: all
   become: true
   any_errors_fatal: true
   gather_facts: no
@@ -30,9 +29,10 @@
     - name: Startup sequence
       include_role:
         name: startup
+      when: ansible_connection != 'winrm'
 
 - hosts: trace_hosts
-  become: yes
+  become: true
   gather_facts: no
   tasks:
 
@@ -40,7 +40,9 @@
       include_role:
         name: startup
         tasks_from: trace-block
-      when: trace_module != "gprofiler" and trace_module != ""
+      when:
+      - trace_module != "gprofiler" and trace_module != ""
+      - ansible_connection != 'winrm'
       loop: "{{ wl_trace_modules | default('') | split(',') }}"
       loop_control:
         loop_var: trace_module

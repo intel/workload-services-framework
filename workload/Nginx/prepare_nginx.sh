@@ -118,6 +118,43 @@ fi
 
 ulimit -a
 
+# workaround for aws m6i.16xlarge 64c VM only has 8 rx/tx combined queues and 8 IRQs
+if [ -z "$(lscpu | grep Hypervisor)" ]; then
+  echo test in local bare metal
+else
+  echo test in cloud
+  if [ $NGINX_WORKERS ] && [ $NGINX_WORKERS -gt 32 ] && [ $NODE_OWN_IP_ADDRESS ]; then
+    for dir in /sys/class/net/*/     # list directories
+    do
+      dir=${dir%*/}      # remove the trailing"/"
+      devname=${dir##*/}    # print everything after the final"/"
+      confirm_nic_info=`ifconfig $devname`
+      if [[ "$confirm_nic_info" =~ $NODE_OWN_IP_ADDRESS ]] ; then
+        echo "found interface $devname as worker node nic ip";
+        lines_num=`ls -l /sys/class/net/$devname/queues | wc -l`
+        if [ $lines_num -eq 17 ]; then
+          echo found the right rx and tx queues number in /sys/class/net/$devname/queues;
+          cpu_list_file="/sys/class/net/$devname/device/local_cpus"
+          if [ -f "$cpu_list_file" ]; then
+            local_cpu_lists=`cat $cpu_list_file`
+            echo local cpu list for nic is $local_cpu_lists
+            for (( ii=0;ii<=7;ii=ii+1 )); do
+              echo try to modify /sys/class/net/$devname/queues/rx-$ii/rps_cpus
+              if [ -s "/sys/class/net/$devname/queues/rx-$ii/rps_cpus" ]; then
+                echo /sys/class/net/$devname/queues/rx-$ii/rps_cpus exist and not zero file size
+                cat /sys/class/net/$devname/queues/rx-$ii/rps_cpus
+                echo $local_cpu_lists > /sys/class/net/$devname/queues/rx-$ii/rps_cpus
+                cat /sys/class/net/$devname/queues/rx-$ii/rps_cpus
+              fi
+            done
+          fi
+        fi
+        break;
+      fi
+    done
+  fi
+fi
+
 # Check the instructions
 if [ -z "$(lscpu | grep 'gfni\|vaes\|vpclmulqdq')" ];then
     echo "The CPU cores does not support these three instruction sets: gfni, vaes and vpclmulqdq."
@@ -180,7 +217,7 @@ if [[ $MODE == "http" ]]; then
     sed -i "s|listen 80|listen $PORT|" $NGINXCONF
   fi
 elif [[ $MODE == "https" ]]; then
-  if [[ $WORKLOAD == "nginx_original" ]] || [[ "$WORKLOAD" == nginx_original_GRAVITON* ]] || [[ $WORKLOAD == "nginx_original_MILAN" ]]; then
+  if [[ $WORKLOAD == "nginx_original" ]] || [[ "$WORKLOAD" == nginx_original_ARMv* ]] || [[ $WORKLOAD == "nginx_original_MILAN" ]]; then
     NGINXCONF=${NGINXCONF:-/usr/local/share/nginx/conf/nginx-https.conf}
   elif [[ $WORKLOAD == "nginx_qatsw" ]]  || [[ $WORKLOAD == "nginx_qathw" ]]; then
     if [[ $QATACCL == "off" ]];then

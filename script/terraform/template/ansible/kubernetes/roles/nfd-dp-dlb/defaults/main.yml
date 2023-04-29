@@ -8,7 +8,6 @@ dp_operator_namespace: "inteldeviceplugins-system"
 dlb_device_plugin: true
 dlb_device_plugin_ver: "0.24.0"
 intel_dlb_dp_namespace: "inteldeviceplugins-system"
-dlb_device_plugin_dir: "/opt/dlb_device_plugin"
 dlb_device_plugin_apparmor_profile: "unconfined"
 dlb_device_plugin_nodeselector:
   - "intel.feature.node.kubernetes.io/dlb=true"

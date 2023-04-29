@@ -54,7 +54,7 @@ data "template_cloudinit_config" "default" {
   part {
     filename = "init-shellscript"
     content_type = "text/x-shellscript"
-    content = templatefile("./template/terraform/azure/main/cloud-init.sh", {
+    content = templatefile("${path.module}/templates/cloud-init.sh.tpl", {
       disk_count  = each.value.data_disk_spec!=null?each.value.data_disk_spec.disk_count:0
       disk_format = each.value.data_disk_spec!=null?each.value.data_disk_spec.disk_format:"ext4"
       device_root = each.value.data_disk_spec!=null?each.value.data_disk_spec.disk_type!="local"?"/dev/disk/azure/scsi1":"":""
@@ -66,7 +66,7 @@ data "template_cloudinit_config" "default" {
   part {
     filename = "init-cloud"
     content_type = "text/cloud-config"
-    content = "${file("./template/terraform/azure/main/cloud_init_resourcedisk.cfg")}"
+    content = "${file("${path.module}/templates/cloud_init_resourcedisk.cfg.tpl")}"
   }
 }
 

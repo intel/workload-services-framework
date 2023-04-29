@@ -1,23 +1,4 @@
 
-- name: "wait for the starting phrase: {{ wl_trace_mode.split(',')[1] }} pods {{ pods_str }}"
-  shell: |
-    timeout {{ wl_timeout[2] | int }}s bash -c "while true; do 
-      for pod1 in {{ pods_str }}; do
-          kubectl logs --ignore-errors --prefix=false --namespace={{ wl_namespace }} \$pod1 -c {{ wl_job_filter[1] }}
-      done | grep -q -F \"{{ wl_trace_mode.split(',')[1] }}\" && exit 0
-      sleep 1s
-    done"
-  args:
-    executable: /bin/bash
-  ignore_errors: yes
-  register: trace_started
-  when: wl_trace_mode | split(',') | first == "roi"
-
-- name: "wait for timeout {{ wl_trace_mode.split(',')[1] }}s"
-  command: "sleep {{ wl_trace_mode.split(',')[1] | int }}"
-  when: wl_trace_mode | split(',') | first == "time"
-  ignore_errors: yes
-
 - name: start trace
   include_tasks:
     file: start-block.yaml
@@ -26,32 +7,8 @@
     loop_var: trace_node
   ignore_errors: yes
 
-- name: "wait for the stop phrase: {{ wl_trace_mode.split(',')[2] }}"
-  shell: |
-    timeout {{ wl_timeout[2] | int }}s bash -c "while true; do 
-      for pod1 in {{ pods_str }}; do
-        kubectl logs --ignore-errors --prefix=false --namespace={{ wl_namespace }} \$pod1 -c {{ wl_job_filter[1] }}
-      done | grep -q -F \"{{ wl_trace_mode.split(',')[2] }}\" && exit 0
-      sleep 1s
-    done"
-  args:
-    executable: /bin/bash
-  ignore_errors: yes
-  when:
-  - wl_trace_mode | split(',') | first == "roi"
-  - trace_started.rc == 0
-
-- name: "wait for timeout {{ wl_trace_mode.split(',')[2] }}s"
-  command: "sleep {{ wl_trace_mode.split(',')[2] | int }}"
-  when: wl_trace_mode | split(',') | first == "time"
-  ignore_errors: yes
-
-- name: stop trace
-  include_tasks:
-    file: stop-block.yaml
-  when: wl_trace_mode | split(',') | length >= 3
-  loop: "{{ wl_trace_modules | default() | split(',') | product(groups['trace_hosts']) | list }}"
-  loop_control:
-    loop_var: trace_node
-  ignore_errors: yes
+- name: set trace started
+  set_fact:
+    trace_started: true
+    cacheable: true
 

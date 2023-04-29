@@ -1,6 +1,6 @@
 
 resource "tencentcloud_key_pair" "default" {
-  key_name   = replace("wsf-${var.job_id}", "-", "_")
+  key_name   = substr(replace("wsf-${var.job_id}", "-", "_"), 0, 25)
   public_key = var.ssh_pub_key
 }
 

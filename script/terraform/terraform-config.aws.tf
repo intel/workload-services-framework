@@ -5,6 +5,7 @@ variable "disk_spec_1" {
     disk_format = "ext4"
     disk_type = "gp2"
     disk_iops = null
+    disk_throughput = null
   }
 }
 
@@ -15,6 +16,7 @@ variable "disk_spec_2" {
     disk_format = "ext4"
     disk_type = "gp2"
     disk_iops = null
+    disk_throughput = null
   }
 }
 
@@ -55,7 +57,7 @@ variable "wl_category" {
 
 variable "wl_namespace" {
   default = ""
-} 
+}
 
 variable "wl_docker_image" {
   default = ""
@@ -67,6 +69,10 @@ variable "wl_docker_options" {
 
 variable "wl_job_filter" {
   default = ""
+}
+
+variable "wl_export_logs" {
+  default = "/export-logs"
 }
 
 variable "wl_timeout" {
@@ -93,6 +99,8 @@ variable "worker_profile" {
     os_type = "ubuntu2204"
     os_disk_type = "gp2"
     os_disk_size = 200
+    os_disk_iops = null
+    os_disk_throughput = null
 
     data_disk_spec = null
     network_spec = null
@@ -111,6 +119,8 @@ variable "client_profile" {
     os_type = "ubuntu2204"
     os_disk_type = "gp2"
     os_disk_size = 200
+    os_disk_iops = null
+    os_disk_throughput = null
 
     data_disk_spec = null
     network_spec = null
@@ -129,6 +139,8 @@ variable "controller_profile" {
     os_type = "ubuntu2204"
     os_disk_type = "gp2"
     os_disk_size = 200
+    os_disk_iops = null
+    os_disk_throughput = null
 
     data_disk_spec = null
     network_spec = null
@@ -145,10 +157,12 @@ module "wsf" {
   sg_whitelist_cidr_blocks = compact(split("\n",file("proxy-ip-list.txt")))
   ssh_pub_key = file("ssh_access.key.pub")
 
-  common_tags = merge(var.custom_tags, {
-    owner: var.owner,
-    workload: var.wl_name,
-  })
+  common_tags = {
+    for k,v in merge(var.custom_tags, {
+      owner: var.owner,
+      workload: var.wl_name,
+    }) : k => substr(replace(lower(v), "/[^a-z0-9_-]/", ""), 0, 63)
+  }
 
   instance_profiles = [
     merge(var.worker_profile, {
@@ -175,6 +189,7 @@ output "options" {
     wl_docker_image : var.wl_docker_image,
     wl_docker_options : var.wl_docker_options,
     wl_job_filter : var.wl_job_filter,
+    wl_export_logs: var.wl_export_logs,
     wl_timeout : var.wl_timeout,
     wl_registry_map : var.wl_registry_map,
     wl_namespace : var.wl_namespace,
@@ -186,6 +201,7 @@ output "options" {
 }
 
 output "instances" {
+  sensitive = true
   value = {
     for k,v in module.wsf.instances : k => merge(v, {
       csp = "aws",

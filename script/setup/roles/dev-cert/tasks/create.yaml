@@ -18,7 +18,7 @@
 
 - name: Install OpenSSL
   include_tasks:
-    file: "openssl-{{ os.stdout }}.yaml"
+    file: "openssl-{{ (os.stdout == 'rhel') | ternary('centos', os.stdout) }}.yaml"
   when: not cert.stat.exists
 
 - name: Create self-generated certificates

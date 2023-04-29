@@ -1,0 +1,28 @@
+
+- name: get node name
+  shell: |
+    kubectl get nodes -o='custom-columns=name:.metadata.name,ip:.status.addresses[?(@.type=="InternalIP")].address' --no-headers | grep -F " {{ hostvars[node]['private_ip'] }}" | cut -f1 -d' '
+  register: nodename
+  until: nodename.stdout_lines | length > 0
+  retries: 5
+  delay: 5
+  when: hostvars[node]['k8s_node_labels'] | default([]) | length > 0
+
+- name: get node labels
+  command: |
+    kubectl get node {{ nodename.stdout }} -o jsonpath='{.metadata.labels}'
+  register: nodelabels
+  when: hostvars[node]['k8s_node_labels'] | default([]) | length > 0
+
+- name: save node labels
+  copy:
+    content: "{{ nodelabels.stdout }}"
+    dest: "{{ wl_logs_dir }}/{{ node }}-k8s-node-labels.json"
+  delegate_to: localhost
+  when: hostvars[node]['k8s_node_labels'] | default([]) | length > 0
+
+- name: label the nodes
+  command: |
+    kubectl label --overwrite node {{ nodename.stdout }} {{ hostvars[node]['k8s_node_labels'] | default([]) | join(' ') }}
+  when: hostvars[node]['k8s_node_labels'] | default([]) | length > 0
+

@@ -1,4 +1,3 @@
-
 ### Customize the Build Process:
 
 You can use the following build options to customize the build process:  
@@ -11,12 +10,12 @@ You can use the following build options to customize the build process:
   > `RELEASE` must begin with colon `:`
 - **BACKEND**: Specify the validation backend: [`docker`](setup-docker.md), [`kubernetes`](setup-kubernetes.md), or [`terraform`](setup-terraform.md).    
   - **TERRAFORM_OPTIONS**: Specify the `terraform` options.  
-  - **TERRAFORM_SUT**: Specify the target SUT (Sytem Under Test) list.
+  - **TERRAFORM_SUT**: Specify the target SUT (System Under Test) list.
 - **TIMEOUT**: Specify the validation timeout, which contains the execution timeout and docker pull timeout. Default to 28800,300 seconds.   
 - **BENCHMARK**: Specify a workload pattern. Workloads not matching the pattern will be disabled. 
 - **SPOT_INSTANCE**: If specified, overwrite the `spot_instance` variable in the Cloud configuration files.   
 
-Build examples:   
+### Build examples:   
 
 ```bash
 cd build
@@ -39,4 +38,3 @@ make bom
 - [Docker Engine](setup-docker.md)  
 - [Kubernetes Cluster](setup-kubernetes.md)  
 - [Terraform Setup](setup-terraform.md)  
-

@@ -1,3 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-config-log
+  labels:
+    app: db-config-log
+data:
+  {{ .Values.DB_TYPE }}.conf: |
+{{- if eq .Values.DB_TYPE "mysql" }}
+  {{- if .Values.MYSQL_CONFIG_SIMPILIFIED }}
+{{- include "configMapOfMysqlSimplified" . |indent 4 }}
+  {{- else }}
+{{- include "configMapOfMysql" . |indent 4 }}
+  {{- end }}
+{{- else if eq .Values.DB_TYPE "postgresql" }}
+{{- include "configMapOfPostgresql" . |indent 4 }}
+{{- end }}
+
+---
 
 apiVersion: batch/v1
 kind: Job
@@ -19,10 +38,19 @@ spec:
         command: ["sh", "-c", "until nc -z -w5 {{ .Values.DB_SERVICE }} {{ .Values.DB_PORT }}; do echo waiting for database service; sleep 2; done"]
       containers:
       - name: benchmark
+{{- if eq .Values.MYSQL_USECASE "oss" }}
+        image: {{ .Values.REGISTRY }}tpcc-mysql{{ .Values.DB_VERSION }}-{{ .Values.MYSQL_USECASE }}{{ .Values.RELEASE }}
+        command: ["/home/sf-entrypoint-client.sh"]
+{{- else }}
         image: {{ .Values.REGISTRY }}tpcc-hammerdb{{ .Values.RELEASE }}
+{{- end }}
         volumeMounts:
           - mountPath: /dev/shm
             name: shm-volume
+          - mountPath: /db.cnf
+            name: db-config-log-volume
+            subPath: {{ .Values.DB_TYPE }}.conf
+            readOnly: false
         imagePullPolicy: {{ include "imagepolicy" .Values }}
         securityContext:
           privileged: true
@@ -59,6 +87,8 @@ spec:
             value: "{{ .Values.TPCC_ASYNC_SCALE }}"
           - name: TPCC_CONNECT_POOL
             value: "{{ .Values.TPCC_CONNECT_POOL }}"
+          - name: TPCC_TIMEPROFILE
+            value: "{{ .Values.TPCC_TIMEPROFILE }}"
           - name: DB_HOST
             value: "{{ .Values.DB_SERVICE }}"
           - name: DB_PORT
@@ -67,14 +97,18 @@ spec:
             value: "{{ .Values.RUN_SINGLE_NODE }}"
           - name: ENABLE_SOCKET_BIND
             value: "{{ .Values.ENABLE_SOCKET_BIND }}"
-          - name: SOCKET_BIND_NODE
-            value: "{{ .Values.SOCKET_BIND_NODE }}"
+          - name: CLIENT_SOCKET_BIND_NODE
+            value: "{{ .Values.CLIENT_SOCKET_BIND_NODE }}"
+          - name: CLIENT_SOCKET_BIND_CORE_LIST
+            value: "{{ .Values.CLIENT_SOCKET_BIND_CORE_LIST }}"
 {{- if .Values.RUN_SINGLE_NODE}}
           - name: SERVER_CORE_NEEDED_FACTOR
             value: "{{ .Values.SERVER_CORE_NEEDED_FACTOR }}"
 {{- end }}
           - name: ENABLE_RPSRFS_AFFINITY
             value: "{{ .Values.ENABLE_RPSRFS_AFFINITY }}"
+          - name: ENABLE_TUNING
+            value: "{{ .Values.ENABLE_TUNING }}"
           - name: RPS_SOCK_FLOW_ENTRIES
             value: "{{ .Values.RPS_SOCK_FLOW_ENTRIES }}"
           - name: ENABLE_IRQ_AFFINITY
@@ -92,15 +126,25 @@ spec:
             value: "{{ .Values.MYSQL_ROOT_PASSWORD }}"
           - name: MYSQL_STORAGE_ENGINE
             value: "{{ .Values.MYSQL_STORAGE_ENGINE }}"
+{{- else if eq .Values.DB_TYPE "postgresql" }}
+          - name: PG_SUPERUSER
+            value: "{{ .Values.PG_SUPERUSER }}"
+          - name: PG_SUPERUSERPASS
+            value: "{{ .Values.PG_SUPERUSERPASS }}"
+          - name: PG_DEFAULTDBASE
+            value: "{{ .Values.PG_DEFAULTDBASE }}"
 {{- end }}
       volumes:
       - name: shm-volume
         emptyDir:
           medium: Memory
+      - name: db-config-log-volume
+        configMap:
+          name: db-config-log
       restartPolicy: Never
 {{- if not .Values.RUN_SINGLE_NODE }}
-      {{- $args := dict "key" "HAS-SETUP-DISK-MOUNT-1" "operator" "NotIn" "value" "yes" }}
-      {{- include "nodeAffinity" $args }}
+      {{- $args := dict "key" "HAS-SETUP-DISK-MOUNT-1" "operator" "NotIn" "value" "yes" "key1" "app" "operator1" "In" "value1" "database"}}
+      {{- include "nodeAffinityPreferred" $args }}
 {{- else }}
       {{- $args := dict "key" "app" "operator" "In" "value" "database" }}
       {{- include "podAffinity" $args }}

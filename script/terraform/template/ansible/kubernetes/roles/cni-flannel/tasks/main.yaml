@@ -1,4 +1,18 @@
 
+
+# retry to fix known issue: the server could not find the requested resource
 - name: install flannel
   command: "kubectl apply -f {{ k8s_flannel_repo }}"
+
+### fix known issue: flannel namespace changed from kube-system to kube-flannel since v0.19.0 
+- name: Set fact for flannel namespace by version
+  set_fact:
+    flannel_namespace: "{{ 'kube-flannel' if (k8s_flannel_version is version('v0.19.0', '>=') ) else 'kube-system' }}"
+
+- name: Wait for flannel pod ready
+  shell: "kubectl wait --namespace={{ flannel_namespace }} pod --for=condition=Ready -l app=flannel --timeout=600s"
+  register: wait_ready
+  retries: 50
+  delay: 3
+  until: wait_ready.rc == 0
 

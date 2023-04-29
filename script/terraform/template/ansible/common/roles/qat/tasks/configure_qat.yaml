@@ -1,0 +1,21 @@
+---
+
+- name: confiure qat
+  shell:
+    cmd: |
+        groupadd qat
+        usermod -a -G qat `whoami`
+        mkdir -p /etc/sysconfig/
+        echo "ServicesEnabled=sym;asym" > /etc/sysconfig/qat
+        echo "POLICY={{qat_policy}}" >> /etc/sysconfig/qat
+    executable: /bin/bash
+  become: true
+  ignore_errors: true
+
+- name: restart qat service
+  shell:
+    cmd: |
+        systemctl restart qat.service
+        systemctl enable qat.service
+    executable: /bin/bash
+  become: true

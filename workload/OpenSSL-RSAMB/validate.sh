@@ -7,13 +7,19 @@ ASYNC_JOBS=${ASYNC_JOBS:-64}
 PROCESSES=${PROCESSES:-8}
 BIND_CORE=${BIND_CORE:-1c1t}
 BIND=${BIND:-false}
+MODE=${CONFIG/-*/}
+ALGORITHM=$(echo $CONFIG | cut -f2- -d-)
 
 # Logs Setting
 DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
 . "$DIR/../../script/overwrite.sh"
 
 # Workload Setting
-WORKLOAD_PARAMS="mode:${CONFIG/-*/};algorithm:$(echo $CONFIG | cut -f2- -d-);ASYNC_JOBS:$ASYNC_JOBS;PROCESSES:$PROCESSES;BIND_CORE:$BIND_CORE;BIND:$BIND"
+if [[ "$CONFIG" = sw-* ]]; then
+    WORKLOAD_PARAMS=(MODE ALGORITHM PROCESSES BIND_CORE BIND)
+else
+    WORKLOAD_PARAMS=(MODE ALGORITHM ASYNC_JOBS PROCESSES BIND_CORE BIND)
+fi
 
 # Docker Setting
 if [[ "$CONFIG" = qathw* ]] && [ "$BACKEND" != "@pve" ]; then

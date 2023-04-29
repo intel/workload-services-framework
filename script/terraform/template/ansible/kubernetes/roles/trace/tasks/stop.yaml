@@ -5,6 +5,11 @@
   loop: "{{ wl_trace_modules | default() | split(',') | product(groups['trace_hosts']) | list }}"
   loop_control:
     loop_var: trace_node
-  when: wl_trace_mode | split(',') | length < 3
+  when: trace_started | default(false) == true
   ignore_errors: yes
+
+- name: clear trace started
+  set_fact:
+    trace_started: false
+    cacheable: true
 

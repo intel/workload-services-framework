@@ -8,3 +8,4 @@ dev_registry_certs_path:
   ubuntu: /usr/local/share/ca-certificates
   debian: /usr/local/share/ca-certificates
   centos: /etc/pki/ca-trust/source/anchors
+  rhel: /etc/pki/ca-trust/source/anchors

@@ -1,9 +1,22 @@
 
+- hosts: cluster_hosts
+  any_errors_fatal: true
+  gather_facts: no
+  tasks:
+
+    - name: check for essentials
+      include_role:
+        name: check
+
+    - name: check for essentials
+      include_role:
+        name: check
+        tasks_from: check-host
+
 - name: 
   import_playbook: ../terraform/template/ansible/kubernetes/installation.yaml
   vars:
     k8s_enable_registry: false
-    k8s_reset: false
     k8s_node_labels: []
     k8s_enable_nfd: true
     k8s_cni: "flannel"

@@ -1,17 +1,17 @@
 
 ### Run Test
 
-Use `ctest` to run a single test or batch of tests. You can do this at the top-level `build` directory or under each workload directory. In the latter case, only the tests of the workload will be executed. 
+Use `./ctest.sh` to run a single test or batch of tests. You can do this at the top-level `build` directory or under each workload directory. In the latter case, only the tests of the workload will be executed. 
 
 ```
 cd build
 cd workload/dummy
-ctest
+./ctest.sh -N
 ```
 
 ### CTest Options
 
-There is extensive list of options in `ctest` to control how tests can be executed. See the `ctest` manpage. The followings are most common options.  
+There is extensive list of options in `./ctest.sh` to control how tests can be executed. See the `./ctest.sh` manpage. The followings are most common options.  
 
 - *`-R`*: Select tests based on a regular expression string.   
 - *`-E`*: Exclude tests based on a regular expression string.  
@@ -19,31 +19,30 @@ There is extensive list of options in `ctest` to control how tests can be execut
 - *`-N`*: Dry-run the tests only.  
 
 Example: list tests with `boringssl` in name excluding those with `_gated`
-```
-ctest -R boringssl -E _gated -N
-```
 
-Example: run only `test_static_boringssl` (exact match)
 ```
-ctest -R '^test_static_boringssl$'
+./ctest.sh -R boringssl -E _gated -N
+
+```
+Example: run only `test_static_boringssl` (exact match)
+
+```
+./ctest.sh -R '^test_static_boringssl$'
 ```
 
 ### Customize Configurations
 
-It is possible to specify a global test configuration file to overwrite any configuration parameter of a test case:   
+It is possible to specify a test configuration file to overwrite any configuration parameter of a test case:   
 
 ```
-TEST_CONFIG=$(pwd)/test_config.yaml ctest -V
+./ctest.sh --config=test_config.yaml -V
 ```
-
-where `TEST_CONFIG` specifies the test configuration file.  
 
 The configuration file uses the following format:
 
 ```
 *_dummy_pi:
     SCALE: 3000
-
 ```
 
 where `*_dummy_pi` specifies the test case name. You can use `*` to specify a wildcard match. The subsection underneath specifies the configuration variables and values. Any parameters specified in each test case [`validate.sh`](validate.md) can be overwritten. 
@@ -62,10 +61,10 @@ A set of utility scripts are linked under your workload build directory to make 
 Usage: [options]
 --nohup          Run ctest in the daemon mode for long benchmark 
 --loop           Run the benchmark multiple times sequentially.
---run            Run the benchmark multiple times on the same SUT(s), only for cumulus.  
+--run            Run the benchmark multiple times on the same SUT(s).  
 --burst          Run the benchmark multiple times simultaneously.
 --config         Specify the test-config file.  
---options        Specify additioanl validation backend options.  
+--options        Specify additional validation backend options.  
 --set            Set the workload parameter values during loop and burst iterations.  
 --stop           Kill all ctest sessions.  
 --continue       Ignore any errors and continue the loop and burst iterations.  
@@ -73,6 +72,8 @@ Usage: [options]
 --reuse-sut      Reuse previously prepared cloud SUT instances. 
 --cleanup-sut    Cleanup cloud SUT instances. 
 --dry-run        Generate the testcase configurations and then exit.  
+--testcase       Specify the exact testcase name to be executed.  
+--noenv          Clean any external environment variables before proceeding with the tests.    
 ```
 
 The followings are some examples:
@@ -129,7 +130,6 @@ The followings are some examples:
 ./ctest.sh -R aws --set "AWS_DISK_SIZE=500 1000" --loop 2 --nohup
 ./ctest.sh -R aws --set "AWS_IOPS=16000 32000" --loop 2 --nohup
 ./ctest.sh -R aws --set "AWS_NUM_STRIPED_DISKS=1 2" --loop 2 --nohup
-
 ```
 
 See Also: [Cloud SUT Reuse](#cloud-sut-reuse)
@@ -151,6 +151,7 @@ Usage: [options] [logs-directory]
 --filter _(real|throughput)
                       Specify a trim filter to shorten spreadsheet name.  
 --file <filename>     Specify the spread sheet filename. 
+--uri                 Show the WSF portal URI if present.   
 ```
 
 > The `xls-ai` option writes the KPI data in the `kpi-report.xls` spread sheet as follows:
@@ -171,7 +172,7 @@ Usage: [options] [logs-directory]
 
 ### Cloud SUT Reuse
 
-With the cumulus backend, it is possible to reuse the Cloud SUT instances during the benchmark process. This is especially useful in tuning parameters for any workload.   
+It is possible to reuse the Cloud SUT instances during the benchmark process. This is especially useful in tuning parameters for any workload.   
 
 To reuse any SUT instances, you need to first prepare (provision) the Cloud instances, using the `ctest.sh` `--prepare-sut` command as follows:  
 
@@ -205,6 +206,6 @@ SUT reuse is subject to the following limitations:
 
 ---
 
-Please cleanup the Cloud instances after use. 
+After using the Cloud instances, please clean them up.
 
 --- 

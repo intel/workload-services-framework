@@ -1,0 +1,33 @@
+---
+- name: check dsa device
+  shell: lspci | grep -i 0b25
+  register: dsa_supported
+  ignore_errors: true
+
+- block:
+  - debug:
+      msg: "this machine does not support dsa"
+  - meta: end_play
+  when: dsa_supported is failed
+
+- name: check vfio-pci 
+  stat:
+    path: "/sys/bus/pci/drivers/vfio-pci"
+  register: pci_sta
+
+- name: install vfio-pci module 
+  shell: |
+    modprobe vfio-pci
+  register: vfio_pci_installed
+  ignore_errors: true
+  when: pci_sta.stat.exists == false
+
+- block:
+  - name: kernel-space driver
+    shell: lsmod | grep idxd
+
+  rescue:
+    - name: load idxd
+      shell: modprobe idxd
+      register: idxd_installed
+      ignore_errors: true

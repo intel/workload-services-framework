@@ -5,12 +5,19 @@ FROM csp-common${RELEASE} as csp
 FROM terraform-static${RELEASE}
 
 # Install GCP CLI
-RUN apt-get update && apt-get install -y apt-transport-https ca-certificates gnupg && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN echo "deb https://packages.cloud.google.com/apt cloud-sdk main" > /etc/apt/sources.list.d/google-cloud-sdk.list
 
-RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - && \
-    echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" > /etc/apt/sources.list.d/google-cloud-sdk.list
 RUN apt-get update && apt-get install -y google-cloud-cli && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install kubectl
+ARG KUBECTL_CLI=v1.24.4
+ARG KUBECTL_REPO=https://dl.k8s.io/release/${KUBECTL_CLI}/bin/linux/amd64/kubectl
+RUN curl -o /usr/local/bin/kubectl -L ${KUBECTL_REPO} && \
+    chmod a+rx /usr/local/bin/kubectl
+
+# Configure kubectl required plugin
+RUN apt-get update && apt-get install -y google-cloud-sdk-gke-gcloud-auth-plugin && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Add cleanup script
 COPY --from=csp /opt/script/cleanup-gcp.sh /usr/local/bin/cleanup

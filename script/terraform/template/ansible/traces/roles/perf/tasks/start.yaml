@@ -2,7 +2,7 @@
   - name: "Start perf on {{ trace_node.1 }}"
     shell:
       cmd: |
-        perf record {{ perf_record_options }} --output /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.record > /dev/null 2>&1 &
+        perf {{ perf_action }} {{ perf_options }} --output /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.record -- sleep {{ perf_collection_time }} > /dev/null 2>&1 &
         echo $! > /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.pid
         disown
       executable: /bin/bash

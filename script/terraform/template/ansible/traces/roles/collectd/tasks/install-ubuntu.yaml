@@ -23,6 +23,7 @@
 - name: Install collectd for ubuntu2004
   apt:
     name: collectd
+    update_cache: true
   when: os_version.stdout == "20.04" and not collectd.stat.exists
   become: yes
   register: aptrc

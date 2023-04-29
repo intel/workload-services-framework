@@ -10,18 +10,28 @@ Expand to the image pull policy.
 {{- end }}
 
 {{/*
-Expand to nodeAffinity
+Expand to nodeAffinityPreferred
 */}}
-{{- define "nodeAffinity" }}
+{{- define "nodeAffinityPreferred" }}
       affinity:
         nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 20
+            preference:
+              matchExpressions:
               - key: {{ .key }}
                 operator: {{ .operator }}
                 values:
                 - "{{ .value }}"
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: {{ .key1 }}
+                operator: {{ .operator1 }}
+                values:
+                - "{{ .value1 }}"
+            topologyKey: "kubernetes.io/hostname"
 {{- end }}
 
 {{/*
@@ -40,4 +50,20 @@ Expand to podAffinity
                   values:
                   - "{{ .value }}"
               topologyKey: "kubernetes.io/hostname"
+{{- end }}
+
+{{/*
+Expand to podAntiAffinity
+*/}}
+{{- define "podAntiAffinity" }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: {{ .key }}
+                operator: {{ .operator }}
+                values:
+                - "{{ .value }}"
+            topologyKey: "kubernetes.io/hostname"
 {{- end }}

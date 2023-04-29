@@ -1,8 +1,17 @@
 
 k8s_calico_version: "v3.23"
-k8s_calico_options: ""
-k8s_calico_vxlan_manifest: "https://projectcalico.docs.tigera.io/archive/{{ k8s_calico_version }}/manifests/calico-vxlan.yaml"
-k8s_calico_manifest: "https://projectcalico.docs.tigera.io/archive/{{ k8s_calico_version }}/manifests/calico.yaml"
 
-k8s_calicoctl_version: "v3.23.5"
-k8s_calicoctl: "https://github.com/projectcalico/calico/releases/download/{{ k8s_calicoctl_version }}/calicoctl-linux-amd64"
+# install operator to manage the installation, upgrade, and general lifecycle of a Calico cluster
+k8s_calico_tigera_operator_repository: "https://projectcalico.docs.tigera.io/archive/{{ k8s_calico_version }}/manifests/tigera-operator.yaml"
+
+# custom install resources to configure Calico
+k8s_calico_custom_resources_repository: "https://projectcalico.docs.tigera.io/archive/{{ k8s_calico_version }}/manifests/custom-resources.yaml"
+
+#  install the calicoctl command line tool to manage Calico resources and perform administrative functions
+k8s_calicoctl_version: "{{ k8s_calico_version }}.0"
+k8s_calicoctl_repository: "https://github.com/projectcalico/calico/releases/download/{{ k8s_calicoctl_version }}/calicoctl-linux-amd64"
+k8s_calicoctl_install_dest: "/usr/local/bin/calicoctl"
+
+k8s_calico_encapsulation: "VXLAN"
+
+k8s_calico_mtu: 1500

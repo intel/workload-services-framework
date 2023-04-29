@@ -2,7 +2,7 @@
 - hosts: localhost
   connection: local
   gather_facts: no
-  become: yes
+  become: true
   tasks:
     
     - name: Create Certificate
@@ -15,8 +15,26 @@
         name: dev-cert
         tasks_from: install
 
+
+- hosts: cluster_hosts 
+  gather_facts: no
+  become: true
+  tasks:
+
+    - name: Copy the dev-cert to remote
+      include_role:
+        name: dev-cert
+        tasks_from: install
+
+
+- hosts: localhost
+  connection: local
+  gather_facts: no
+  become: true
+  tasks:
+    
     - name: Install docker registry
       include_role:
         name: dev-cert
         tasks_from: registry
-      
+

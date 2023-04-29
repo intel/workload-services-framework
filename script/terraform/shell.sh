@@ -20,17 +20,13 @@ options+=(
     "-e" "TF_UID=$(id -u)"
     "-e" "TF_GID=$(id -g)"
     "-e" "DOCKER_GID=$(getent group docker | cut -f3 -d:)"
-    $(env | cut -f1 -d= | grep -E '_(proxy|PROXY)$' | sed 's/^/-e /')
-    "-v" "/etc/localtime:/etc/localtime"
+    $(compgen -e | sed -nE '/_(proxy|PROXY)$/{s/^/-e /;p}')
+    "-v" "/etc/localtime:/etc/localtime:ro"
+    "-v" "/etc/timezone:/etc/timezone:ro"
     "-v" "/var/run/docker.sock:/var/run/docker.sock"
-    $(find "$SDIR/../csp" -name ".??*" -type d ! -name ".docker" ! -name ".gitconfig" ! -name ".ssh" -exec sh -c 'printf -- "-v\\n{}:/home/$(basename "{}")\\n-v\\n{}:/root/$(basename "{}")\\n"' \;)
+    $(find "$SDIR/../csp" -name ".??*" -type d ! -name .docker ! -name .gitconfig ! -name .ssh ! -name .kube ! -name .diskv-temp -exec sh -c 'printf -- "-v\\n{}:/home/$(basename "{}")\\n-v\\n{}:/root/$(basename "{}")\\n"' \;)
 )
 
-if [ -n "$REGISTRY" ]; then
-    options+=(
-        "--pull" "always"
-    )
-fi
 if [ -r "$HOME"/.gitconfig ]; then
     options+=(
         "-v" "$HOME/.gitconfig:/home/.gitconfig:ro"

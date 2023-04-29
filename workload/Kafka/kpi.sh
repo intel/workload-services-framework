@@ -17,6 +17,14 @@ BEGIN {
     maximum_throughput_sla=0
     max_p95_tx_latency=0
     number_of_producer=0
+    max_p95_latency=0
+    min_p95_latency=9999999
+    avg_p95_latency=0
+    total_p95_latency=0
+    max_p99_latency=0
+    min_p99_latency=9999999
+    avg_p99_latency=0
+    total_p99_latency=0
 }
 
 #parse producer results
@@ -46,6 +54,21 @@ BEGIN {
     if ( producer_95th[FILENAME] > max_p95_tx_latency) {
         max_p95_tx_latency = producer_95th[FILENAME]
     }
+
+    if ( producer_95th[FILENAME] > max_p95_latency) {
+        max_p95_latency = producer_95th[FILENAME]
+    }
+    if ( producer_95th[FILENAME] < min_p95_latency) {
+        min_p95_latency = producer_95th[FILENAME]
+    }
+    total_p95_latency += producer_95th[FILENAME]
+    if ( producer_99th[FILENAME] > max_p99_latency) {
+        max_p99_latency = producer_99th[FILENAME]
+    }
+    if ( producer_99th[FILENAME] < min_p99_latency) {
+        min_p99_latency = producer_99th[FILENAME]
+    }
+    total_p99_latency += producer_99th[FILENAME]
 }
 
 #parse consumer results
@@ -64,11 +87,19 @@ BEGIN {
 
 END {
     primary="*"
+    avg_p95_latency = total_p95_latency/number_of_producer
+    avg_p99_latency = total_p99_latency/number_of_producer
     print "kafka_p95_latency (ms): " kafka_p95_latency
     print "number_of_producer: " number_of_producer
     print primary "Maximum Throughput (MB/s): "  maximum_throughput
     print "Maximum Throughput for Latency SLA (MB/s): " maximum_throughput_sla
     print "max_p95_tx_latency (ms): " max_p95_tx_latency
+    print "max_p95_latency (ms): " max_p95_latency
+    print "min_p95_latency (ms): " min_p95_latency
+    print "avg_p95_latency (ms): " avg_p95_latency
+    print "max_p99_latency (ms): " max_p99_latency
+    print "min_p99_latency (ms): " min_p99_latency
+    print "avg_p99_latency (ms): " avg_p99_latency
 }
 
 

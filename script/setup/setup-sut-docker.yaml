@@ -1,4 +1,13 @@
 
+- hosts: workload_hosts
+  any_errors_fatal: true
+  gather_facts: no
+  tasks:
+
+    - name: check for essentials
+      include_role:
+        name: check
+
 - import_playbook: ../terraform/template/ansible/docker/installation.yaml
   vars:
     wl_enable_reboot: true

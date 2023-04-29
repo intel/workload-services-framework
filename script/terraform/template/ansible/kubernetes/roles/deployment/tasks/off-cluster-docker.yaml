@@ -1,0 +1,128 @@
+
+- name: workload execution procedure
+  block:
+
+    - name: waitproc to wait for logs complete
+      shell:
+        cmd: |
+          timeout {{ wl_timeout[0] }}s bash -c 'docker exec {{ off_cluster_container_id }} cat {{ wl_export_logs }} > /tmp/{{ wl_namespace }}-docker-logs.tar' > /dev/null &
+          echo $!
+          disown
+        executable: /bin/bash
+      register: waitproc
+      delegate_to: "{{ off_cluster_host }}"
+
+    - name: "wait for the starting phrase: {{ wl_trace_mode.split(',')[1] }}"
+      shell:
+        cmd: |
+          grep -q -F "{{ wl_trace_mode.split(',')[1] }}" <(
+            while kill -0 {{ waitproc.stdout_lines | first }}; do
+              docker logs {{ off_cluster_container_id }}
+              bash -c 'sleep 0.5'
+            done
+          )
+        executable: /bin/bash
+      when: (wl_trace_mode | split(',') | first == "roi")
+      ignore_errors: yes
+      delegate_to: "{{ off_cluster_host }}"
+
+    - name: "wait for timeout {{ wl_trace_mode.split(',')[1] }}s"
+      command: "timeout {{ wl_trace_mode.split(',')[1] | int }}s tail --pid={{ waitproc.stdout_lines[0] }} -f /dev/null"
+      when: (wl_trace_mode | split(',') | first == "time")
+      ignore_errors: yes
+      delegate_to: "{{ off_cluster_host }}"
+
+    - name: start trace
+      include_role:
+        name: trace
+        tasks_from: start
+      when: wl_trace_modules is defined
+
+    - name: "wait for the stop phrase: {{ wl_trace_mode.split(',')[2] }}"
+      shell:
+        cmd: |
+          grep -q -F "{{ wl_trace_mode.split(',')[2] }}" <(
+            while kill -0 {{ waitproc.stdout_lines | first }}; do
+              docker logs {{ off_cluster_container_id }}
+              bash -c 'sleep 0.5'
+            done
+          )
+        executable: /bin/bash
+      when: (wl_trace_mode | split(',') | first == "roi")
+      ignore_errors: yes
+      delegate_to: "{{ off_cluster_host }}"
+
+    - name: "wait for timeout {{ wl_trace_mode.split(',')[2] }}s"
+      command: "timeout {{ wl_trace_mode.split(',')[2] | int }}s tail --pid={{ waitproc.stdout_lines[0] }} -f /dev/null"
+      when: (wl_trace_mode | split(',') | first == "time")
+      ignore_errors: yes
+      delegate_to: "{{ off_cluster_host }}"
+
+    - name: revoke trace
+      include_role:
+        name: trace
+        tasks_from: stop
+      when:
+      - wl_trace_modules is defined
+      - (wl_trace_mode | split(',') | length == 3)
+
+    - name: wait until execution compete
+      command: "tail --pid={{ waitproc.stdout_lines | first }} -f /dev/null"
+      ignore_errors: yes
+      delegate_to: "{{ off_cluster_host }}"
+
+  always:
+
+    - name: revoke trace
+      include_role:
+        name: trace
+        tasks_from: stop
+      when: wl_trace_modules is defined
+
+- name: print docker info
+  command: "docker version"
+  delegate_to: "{{ off_cluster_host }}"
+
+- name: collect trace data
+  include_role:
+    name: trace
+    tasks_from: collect
+  when: wl_trace_modules is defined
+  ignore_errors: yes
+
+- name: print docker logs
+  command: "docker logs {{ off_cluster_container_id }}"
+  ignore_errors: true
+  delegate_to: "{{ off_cluster_host }}"
+
+- name: create the iteration direcctory
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ off_cluster_container_id }}"
+    state: directory
+  delegate_to: localhost
+
+- name: copy logs back to the itr directory
+  fetch:
+    src: "/tmp/{{ wl_namespace }}-docker-logs.tar"
+    dest: "{{ wl_logs_dir }}/itr-{{ itr }}/"
+    flat: yes
+  delegate_to: "{{ off_cluster_host }}"
+
+- name: untar the logs
+  unarchive:
+    src: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ wl_namespace }}-docker-logs.tar"
+    dest: "{{ wl_logs_dir}}/itr-{{ itr }}/{{ off_cluster_container_id }}"
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: remove remote logs
+  file:
+    path: "/tmp/{{ wl_namespace }}-docker-logs.tar"
+    state: absent
+  delegate_to: "{{ off_cluster_host }}"
+
+- name: remove local logs tarfile
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ wl_namespace }}-docker-logs.tar"
+    state: absent
+  delegate_to: localhost

@@ -1,10 +1,11 @@
 
-- hosts: controller-0
-  become: true
+- hosts: "{{ ('controller' in groups) | ternary('controller','localhost') }}"
+  become: false
   gather_facts: no
   tasks:
 
     - name: Cleanup k8s
       include_role:
         name: cleanup
+      when: ansible_connection != 'winrm'
 

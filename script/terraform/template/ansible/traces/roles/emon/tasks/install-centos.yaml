@@ -1,0 +1,56 @@
+- name: Detect OS version
+  shell:
+    cmd: . /etc/os-release; echo $VERSION_ID
+    executable: /bin/bash
+  register: version_id
+
+- name: Detect kernel version
+  shell:
+    cmd: uname -r
+    executable: /bin/bash
+  register: kernel_version
+
+- name: Check if kernel header is already installed
+  stat:
+    path: "/usr/src/kernels/{{ kernel_version.stdout }}"
+  register: kernel_header
+
+- block:
+
+  - name: Install prerequisites
+    yum:
+      name: 
+        - "@Development Tools"
+        - "kernel-devel-{{ kernel_version.stdout }}"
+      state: present
+    become: yes
+    register: yumrc
+    until: yumrc is success
+    retries: 10
+    delay: 10
+
+  rescue:
+
+    - name: Install prerequisites
+      yum:
+        name: 
+          - "@Development Tools"
+          - "kernel-devel"
+        state: present
+      become: yes
+      register: yumrc
+      until: yumrc is success
+      retries: 10
+      delay: 10
+
+  when:
+    - version_id.stdout | int >= 8
+    - not kernel_header.stat.exists
+
+- name: Install emon
+  shell:
+    cmd: "./sep-installer.sh -u -C {{ emon_bin_path }} --accept-license -ni -i -g {{ emon_group }} --c-compiler $(which gcc)"
+    chdir: "{{ emon_src_path }}"
+    executable: /bin/bash
+  become: yes
+  when: version_id.stdout | int >= 8

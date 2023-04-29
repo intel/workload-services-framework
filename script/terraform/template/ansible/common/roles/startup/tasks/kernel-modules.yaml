@@ -1,0 +1,12 @@
+
+- name: "modprobe modules"
+  command: "modprobe {{ item }}"
+  loop: "{{ wl_kernel_modules | unique }}"
+  ignore_errors: true
+
+- name: Update modules.conf
+  blockinfile:
+    path: "/etc/modules-load.d/99-wsf-settings.conf"
+    block: "{{ wl_kernel_modules | unique | join('\n') }}"
+    create: yes
+

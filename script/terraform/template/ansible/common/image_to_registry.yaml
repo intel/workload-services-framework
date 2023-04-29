@@ -1,8 +1,9 @@
-- hosts: controller-0
+- hosts: "{{ ('controller' in groups) | ternary('controller','localhost') }}"
   gather_facts: no
   tasks:
 
     - name: Transfer image(s) to docker registry
       include_role:
         name: image-to-registry
+      when: ansible_connection != 'winrm'
 

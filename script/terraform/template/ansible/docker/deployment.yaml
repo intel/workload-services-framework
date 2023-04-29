@@ -1,14 +1,4 @@
 
-- hosts: localhost
-  gather_facts: no
-  tasks:
-
-    - name: Breakpoint at RunStage
-      include_role:
-        name: breakpoint
-      vars:
-        breakpoint: RunStage
-
 - hosts: workload_hosts
   any_errors_fatal: true
   gather_facts: no
@@ -17,7 +7,10 @@
     - name: run docker validation over iterations
       include_role:
         name: deployment
+        tasks_from: "invoke-{{ native | default(false) | bool | ternary('native','docker') }}"
+      when: ansible_connection != 'winrm'
       loop: "{{ range(1, run_stage_iterations | default(1) |int+1, 1) | list }}"
       loop_control:
         loop_var: itr
+
 

@@ -1,3 +1,0 @@
-
-- name: Wait for calico pod ready
-  shell: "kubectl wait --namespace=kube-system pod --for=condition=Ready -l k8s-app=calico-node --timeout=600s"

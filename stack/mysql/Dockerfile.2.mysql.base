@@ -1,0 +1,123 @@
+# mysql8031-base
+
+ARG OS_VER=22.04
+ARG OS_IMAGE=ubuntu
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+# declare MySQL ingredient
+ARG MYSQL_VER="8.0.31"
+ARG MYSQL_IMAGE=mysql
+
+# add our user and group first to make sure their IDs get assigned consistently, regardless of whatever dependencies get added
+RUN groupadd -r mysql && useradd -r -g mysql mysql
+RUN apt-get update && apt-get install -y --no-install-recommends gnupg dirmngr && rm -rf /var/lib/apt/lists/*
+
+# add gosu for easy step-down from root
+# https://github.com/tianon/gosu/releases
+ARG GOSU_VER=1.14
+ARG GOSU_REPO="https://github.com/tianon/gosu/releases/download/$GOSU_VER"
+SHELL ["/bin/bash", "-eux", "-c"]
+RUN \
+	savedAptMark="$(apt-mark showmanual)" \
+	&& apt-get update \
+	&& apt-get install -y --no-install-recommends ca-certificates wget \
+	&& rm -rf /var/lib/apt/lists/* \
+	&& dpkgArch="$(dpkg --print-architecture | awk -F- '{ print $NF }')" \
+	&& wget -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VER/gosu-$dpkgArch" && \
+	wget -O /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/$GOSU_VER/gosu-$dpkgArch.asc" \
+	&& export GNUPGHOME="$(mktemp -d)" \
+	&& rm -rf "$GNUPGHOME" /usr/local/bin/gosu.asc \
+	&& apt-mark auto '.*' > /dev/null \
+	&& [ -z "$savedAptMark" ] || apt-mark manual $savedAptMark > /dev/null \
+	&& apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
+	&& chmod +x /usr/local/bin/gosu \
+	&& gosu --version \
+	&& gosu nobody true \
+	&& mkdir /docker-entrypoint-initdb.d
+
+ENV MYSQL_VERSION "${MYSQL_VER}"
+ARG MYSQL_DEB_POOL="https://repo.mysql.com/apt/ubuntu/pool/mysql-8.0/m/mysql-community"
+ARG MYSQL_SERVER_CORE_VER=${MYSQL_VER}
+ARG MYSQL_SERVER_CORE_PKG="${MYSQL_DEB_POOL}/mysql-community-server-core_${MYSQL_SERVER_CORE_VER}-1ubuntu22.04_amd64.deb"
+ARG MYSQL_CLIENT_CORE_VER=${MYSQL_VER}
+ARG MYSQL_CLIENT_CORE_PKG="${MYSQL_DEB_POOL}/mysql-community-client-core_${MYSQL_CLIENT_CORE_VER}-1ubuntu22.04_amd64.deb"
+ARG MYSQL_CLIENT_PLUGINS_VER=${MYSQL_VER}
+ARG MYSQL_CLIENT_PLUGINS_PKG="${MYSQL_DEB_POOL}/mysql-community-client-plugins_${MYSQL_CLIENT_PLUGINS_VER}-1ubuntu22.04_amd64.deb"
+ARG MYSQL_CLIENT_VER=${MYSQL_VER}
+ARG MYSQL_CLIENT_PKG="${MYSQL_DEB_POOL}/mysql-community-client_${MYSQL_CLIENT_VER}-1ubuntu22.04_amd64.deb"
+ARG MYSQL_COMMON_VER=${MYSQL_VER}
+ARG MYSQL_COMMON_PKG="${MYSQL_DEB_POOL}/mysql-common_${MYSQL_COMMON_VER}-1ubuntu22.04_amd64.deb"
+
+WORKDIR /tmp
+RUN \
+	apt-get update && apt-get install -y --no-install-recommends \
+		bzip2 \
+		curl \
+		openssl \
+		perl \
+		xz-utils \
+		zstd \
+		wget \
+		libaio1 \
+		libmecab2 \
+		libnuma1 \
+		libsasl2-2 \
+		ca-certificates \
+	&& apt-get clean && rm -rf /var/lib/apt/lists/* \
+	&& wget ${MYSQL_SERVER_CORE_PKG} \
+	&& dpkg -i mysql-community-server-core_${MYSQL_SERVER_CORE_VER}-1ubuntu22.04_amd64.deb \
+	&& wget ${MYSQL_COMMON_PKG} \
+	&& dpkg -i mysql-common_${MYSQL_COMMON_VER}-1ubuntu22.04_amd64.deb \
+	&& wget ${MYSQL_CLIENT_PLUGINS_PKG} \
+	&& dpkg -i mysql-community-client-plugins_${MYSQL_CLIENT_PLUGINS_VER}-1ubuntu22.04_amd64.deb \
+	&& wget ${MYSQL_CLIENT_CORE_PKG} \
+	&& dpkg -i mysql-community-client-core_${MYSQL_CLIENT_CORE_VER}-1ubuntu22.04_amd64.deb \
+	&& wget ${MYSQL_CLIENT_PKG} \
+	&& dpkg -i mysql-community-client_${MYSQL_CLIENT_VER}-1ubuntu22.04_amd64.deb \
+	&& rm -rf *.deb \
+	&& rm -rf /var/lib/mysql && mkdir -p /var/lib/mysql /var/run/mysqld \
+	&& chown -R mysql:mysql /var/lib/mysql /var/run/mysqld \
+	# ensure that /var/run/mysqld (used for socket and lock files) is writable regardless of the UID our mysqld instance ends up having at runtime
+	&& chmod 1777 /var/run/mysqld /var/lib/mysql
+VOLUME /var/lib/mysql
+
+### docker mysql known issue https://github.com/docker-library/mysql/issues/809
+ARG RECV_VER='467B942D3A79BD29'
+ARG RECV_REPO="keyserver.ubuntu.com"
+RUN apt-key adv --keyserver keyserver.ubuntu.com --keyserver-options http-proxy=$http_proxy --recv-keys $RECV_VER
+
+RUN \
+	apt-get update && apt-get install -y --no-install-recommends \
+		git \
+		make \
+		numactl \
+		procps \
+		net-tools \
+		wget \
+		perl \
+		bc \
+	&& apt-get clean && rm -rf /var/lib/apt/lists/* \
+	### setup memlock as unlimited, otherwise hugepage will not take effect
+	&& echo "mysql soft memlock unlimited" |tee -a /etc/security/limits.conf \
+	&& echo "mysql hard memlock unlimited" |tee -a /etc/security/limits.conf
+
+COPY --chown=mysql:mysql script/prepare_database.sh /
+COPY --chown=mysql:mysql script/docker-entrypoint.sh /usr/local/bin
+COPY --chown=mysql:mysql script/entrypoint.sh /
+COPY --chown=mysql:mysql opt/mysql.cnf /etc/mysql/conf.d/
+
+ENV DB_TYPE="mysql"
+ENV ENABLE_MOUNT_DIR="true"
+ENV DB_MOUNT_DIR="/var/lib/mysql"
+ENV RUN_SINGLE_NODE="false"
+ENV ENABLE_SOCKET_BIND="false"
+ENV SERVER_SOCKET_BIND_NODE=""
+ENV SERVER_SOCKET_BIND_CORE_LIST=""
+ENV EXCLUDE_IRQ_CORES="false"
+ENV MYSQL_LOG_DIR="/var/log/mysql"
+ENV MYSQL_INITDB_SKIP_TZINFO="true"
+
+ENTRYPOINT [ "/entrypoint.sh" ]
+EXPOSE 3306 33060
+CMD ["mysqld"]

@@ -5,7 +5,10 @@
 #echo c:$1
 
 MODE=${1:-https}
+CLIENT_TYPE=${2:-ab}
+
 #echo $MODE
+#echo $CLIENT_TYPE
 
 parse_common='
 function kvformat(key, value) {
@@ -135,8 +138,11 @@ BEGIN {
 }
 
 # https
-#parse_openssl_kpi "output.logs" || true
-parse_ab_kpi "output.logs" || true
+if [ ${CLIENT_TYPE} == "openssl" ]; then
+parse_openssl_kpi "output.logs" || true;
+else
+parse_ab_kpi "output.logs" || true;
+fi
 
 # http
 #parse_wrk_kpi "output.logs" || true

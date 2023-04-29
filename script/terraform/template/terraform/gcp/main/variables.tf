@@ -1,11 +1,21 @@
 variable "region" {
   type = string
   default = null
+
+  validation {
+    condition = var.region==null?true:can(regex("^([a-z]+)-([a-z]+[0-9]+)$", var.region))
+    error_message = "Failed region syntax: ^([a-z]+)-([a-z]+[0-9]+)$"
+  }
 }
 
 variable "zone" {
   type = string
   nullable = false
+
+  validation {
+    condition = can(regex("^([a-z]+)-([a-z]+[0-9]+)-[a-z]$", var.zone))
+    error_message = "Failed region syntax: ^([a-z]+)-([a-z]+[0-9]+)-[a-z]$"
+  }
 }
 
 variable "vpc_cidr_block" {

@@ -18,7 +18,6 @@
     path: "{{ playbook_dir }}/roles/{{ item.split('=')[0].split('-')[2] | lower }}/tasks/cleanup.yaml"
   when:
   - item.startswith("HAS-SETUP-")
-  - not item.startswith("HAS-SETUP-HUGEPAGE-")
   register: label_check
   loop: "{{ k8s_node_labels | default([]) }}"
   delegate_to: localhost
@@ -35,6 +34,10 @@
   loop: "{{ label_check.results }}"
   loop_control:
     loop_var: label_result
+
+- name: Restore kernel modules
+  include_tasks:
+    file: kernel-modules.yaml
 
 - name: Restore kernel args
   include_tasks:

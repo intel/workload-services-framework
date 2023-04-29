@@ -97,3 +97,4 @@ RUN mkfifo /export-logs
 CMD (ldconfig && /prepare_nginx.sh; echo $? > status) 2>&1 | tee output.logs && \
     tar cf /export-logs status output.logs && \
     sleep infinity
+

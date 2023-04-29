@@ -1,5 +1,6 @@
 
 collectd_interval: "10"
+collectd_bin_path: "/usr/sbin/collectd"
 collectd_csv_path: "/var/lib/collectd/csv"
 collectd_plugin_path: "/var/lib/collectd/plugins"
 collectd_ubuntu2204_debs:

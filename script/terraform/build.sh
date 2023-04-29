@@ -15,6 +15,8 @@ FIND_OPTIONS="-name Dockerfile.*.terraform"
 [[ "$clouds" = *tencent* ]] && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.tencent"
 [[ "$clouds" = *alicloud* ]] && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.alicloud"
 [[ "$clouds" = *vsphere* ]] && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.vsphere"
+[[ "$clouds" = *oracle* ]] && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.oracle"
+[[ "$clouds" = *kvm* ]] && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.kvm"
 [ -r "$DIR"/Dockerfile.*.static-int ] && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.static-int" || FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.static-ext"
 FIND_OPTIONS="( $FIND_OPTIONS )"
-. $DIR/../build.sh
+. "$DIR"/../build.sh

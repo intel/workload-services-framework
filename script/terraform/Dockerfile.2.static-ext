@@ -5,3 +5,14 @@ FROM terraform-base${RELEASE}
 
 COPY data/ /usr/local/src/
 
+# Install svrinfo
+ARG SVRINFO_VER=2.2.0
+ARG SVRINFO_PKG=https://github.com/intel/svr-info/releases/download/v${SVRINFO_VER}tag/svr-info-${SVRINFO_VER}.tgz
+RUN curl --retry 5 -o - -L ${SVRINFO_PKG} | tar xfz - -C /usr/local/src
+
+# Save known gpg key
+ARG K8S_GPG_VER=current
+ARG K8S_GPG_REPO=https://dl.k8s.io/apt/doc/apt-key.gpg
+RUN curl -fsSL -o /etc/apt/trusted.gpg.d/k8s.gpg ${K8S_GPG_REPO} && \
+    chown 644 /etc/apt/trusted.gpg.d/k8s.gpg
+

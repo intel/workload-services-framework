@@ -24,7 +24,8 @@ extract_group_value () {
 # default_group_value variable_pattern value_keyword env_suffix
 override_string () {
     extract_group_value "$4" "$1" "$2"
-    sed -i "/^\s*variable\s*[\"]$var[\"]\s*{/,/^\s*}/s|^\(\s*$3\s*=\).*$|\1 \"$value\"|" "$terraform_config_tf"
+    [ "$value" = "null" ] || value="\"$value\""
+    sed -i "/^\s*variable\s*[\"]$var[\"]\s*{/,/^\s*}/s|^\(\s*$3\s*=\).*$|\1 $value|" "$terraform_config_tf"
 }
 
 # default_group_value variable_pattern value_keyword env_suffix
@@ -53,14 +54,14 @@ replace_if () {
 
 # adjust vm_count and data_disk_spec
 DIR="$(dirname "$(readlink -f "$0")")"
-awk -v cvc=$3 -f "$DIR/script/update-tfconfig.awk" "$1" "$TERRAFORM_CONFIG_IN" > "$terraform_config_tf"
+awk -v cvc=$3 -f "$DIR/script/update-tfconfig.awk" "$1" "${TERRAFORM_CONFIG_TF:-$TERRAFORM_CONFIG_IN}" > "$terraform_config_tf"
 
 case "$PLATFORM" in
-GRAVITON2)
+ARMv8)
     replace_if worker_profile instance_type t2.medium m6g.large
     replace_if worker_profile instance_type e2-small t2a-standard-2
     ;;
-GRAVITON3)
+ARMv9)
     replace_if worker_profile instance_type t2.medium c7g.large
     replace_if worker_profile instance_type Standard_A2_v2 Standard_D2ps_v5
     replace_if worker_profile instance_type S1.MEDIUM2 SR1.MEDIUM4
@@ -127,6 +128,10 @@ for e in $(compgen -e); do
     $CSP"_"*"_CPU_CORE_COUNT="*)
         override_number worker _profile cpu_core_count CPU_CORE_COUNT
         ;;
+    # ./ctest.sh --set ORACLE_WORKER_MEMORY_SIZE=4
+    $CSP"_"*"_MEMORY_SIZE="*)
+        override_number worker _profile memory_size MEMORY_SIZE
+        ;;
     # ./ctest.sh --set GCP_WORKER_NIC_TYPE=GVNIC
     $CSP"_"*"_NIC_TYPE="*)
         override_string worker _profile nic_type NIC_TYPE
@@ -142,6 +147,14 @@ for e in $(compgen -e); do
     # ./ctest.sh --set AZURE_WORKER_OS_DISK_SIZE=100
     $CSP"_"*"_OS_DISK_SIZE="*)
         override_number worker _profile os_disk_size OS_DISK_SIZE 
+        ;;
+    # ./ctest.sh --set AWS_WORKER_OS_DISK_IOPS=64000
+    $CSP"_"*"_OS_DISK_IOPS="*)
+        override_number worker _profile os_disk_iops OS_DISK_IOPS
+        ;;
+    # ./ctest.sh --set AWS_WORKER_OS_DISK_THROUGHPUT=3000
+    $CSP"_"*"_OS_DISK_THROUGHPUT="*)
+        override_number worker _profile os_disk_throughput OS_DISK_THROUGHPUT
         ;;
     # ./ctest.sh --set AZURE_WORKER_OS_DISK_TYPE=gp2
     $CSP"_"*"_OS_DISK_TYPE="*)
@@ -200,6 +213,10 @@ for e in $(compgen -e); do
     $CSP"_RESOURCE_GROUP_ID="*)
         override_string "" resource_group_id default RESOURCE_GROUP_ID
         ;;
+    # ./ctest.sh --set ORACLE_COMPARTMENT=xyz
+    $CSP"_COMPARTMENT="*)
+        override_string "" compartment default COMPARTMENT
+        ;;
     # ./ctest.sh --set SPOT_INSTANCE=false
     "SPOT_INSTANCE="*)
         override_number "" spot_instance default SPOT_INSTANCE
@@ -227,6 +244,10 @@ for e in $(compgen -e); do
     # RESERVED
     WL_JOB_FILTER=*)
         override_string "" wl_job_filter default WL_JOB_FILTER
+        ;;
+    # RESERVED
+    WL_EXPORT_LOGS=*)
+        override_string "" wl_export_logs default WL_EXPORT_LOGS
         ;;
     # RESERVED
     WL_TIMEOUT=*)

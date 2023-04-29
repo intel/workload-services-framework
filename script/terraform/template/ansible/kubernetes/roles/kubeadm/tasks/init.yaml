@@ -2,11 +2,20 @@
 - name: Merge the configrations
   set_fact:
     kubeadm_options: "{{ k8s_kubeadm_options_default | combine(k8s_kubeadm_options, recursive=True) }}"
+    k8s_pod_cidr: "{{ k8s_pod_cidr }}"
+    k8s_service_cidr: "{{ k8s_service_cidr }}"
+    cacheable: yes
 
 - name: Create the kubeadm config file
   copy:
     content: "{{ kubeadm_options.values() | map('to_nice_yaml') | join('---\n') }}"
     dest: "/tmp/{{ wl_namespace }}-kubeadm-config.yaml"
+
+- name: Remove bindPort quote as integer
+  lineinfile:
+    dest: "/tmp/{{ wl_namespace }}-kubeadm-config.yaml"
+    regexp: '^.*bindPort: (.*)$'
+    line: "    bindPort: {{ k8s_apiserver_port | default(6443) }}"
 
 - name: kubeadm init
   command: "kubeadm init --config /tmp/{{ wl_namespace }}-kubeadm-config.yaml"
@@ -41,8 +50,9 @@
   become: yes
 
 - name: Customize kubelet
-  include_tasks:
-    file: customize-kubelet.yaml
+  include_role:
+    name: kubelet
+    tasks_from: customize-kubelet
 
 - name: Wait for all control-plane pods become created
   shell: "kubectl get po --namespace=kube-system --selector tier=control-plane --output=jsonpath='{.items[*].metadata.name}'"

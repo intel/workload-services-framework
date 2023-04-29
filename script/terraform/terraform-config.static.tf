@@ -23,6 +23,10 @@ variable "wl_job_filter" {
   default = ""
 }
 
+variable "wl_export_logs" {
+  default = "/export-logs"
+}
+
 variable "wl_timeout" {
   default = "28800,300,3000"
 }
@@ -48,9 +52,10 @@ variable "worker_profile" {
     vm_count = 1
     hosts = {
       "worker-0": {
-        "user_name": "xwu2",
-        "public_ip": "10.165.31.154",
-        "private_ip": "10.165.31.154",
+        "user_name": "root",
+        "public_ip": "127.0.0.1",
+        "private_ip": "127.0.0.1",
+        "ssh_port": 22,
       },
     }
   }
@@ -61,9 +66,10 @@ variable "client_profile" {
     vm_count = 1
     hosts = {
       "client-0": {
-        "user_name": "xwu2",
-        "public_ip": "10.165.31.154",
-        "private_ip": "10.165.31.154",
+        "user_name": "root",
+        "public_ip": "127.0.0.1",
+        "private_ip": "127.0.0.1",
+        "ssh_port": 22,
       },
     }
   }
@@ -74,9 +80,10 @@ variable "controller_profile" {
     vm_count = 1
     hosts = {
       "controller-0": {
-        "user_name": "xwu2",
-        "public_ip": "10.165.31.154",
-        "private_ip": "10.165.31.154",
+        "user_name": "root",
+        "public_ip": "127.0.0.1",
+        "private_ip": "127.0.0.1",
+        "ssh_port": 22,
       }
     }
   }
@@ -102,12 +109,16 @@ output "options" {
     wl_docker_image : var.wl_docker_image,
     wl_docker_options : var.wl_docker_options,
     wl_job_filter : var.wl_job_filter,
+    wl_export_logs: var.wl_export_logs,
     wl_timeout : var.wl_timeout,
     wl_registry_map : var.wl_registry_map,
     wl_namespace : var.wl_namespace,
     wl_trace_mode : var.wl_trace_mode,
     intel_publisher_sut_machine_type: var.intel_publisher_sut_machine_type,
     intel_publisher_sut_metadata: var.intel_publisher_sut_metadata,
+
+    # Enable k8s registry only in the DDCW use case. See doc/setup-wsf.md
+    k8s_enable_registry: false,
   }
 }
 
