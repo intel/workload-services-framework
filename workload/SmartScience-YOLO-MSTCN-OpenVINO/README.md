@@ -105,7 +105,6 @@ docker run --privileged=true --net=host --name=smtlab_ins -it smt_instance bash
 
 Run the [`kpi.sh`](kpi.sh) script to generate the KPIs. 
 
-
 The following KPI is defined:
 - `Average FPS`: The workload average FPS.  
 
@@ -117,6 +116,7 @@ This workload can run on any system with a `docker` or `Kubernete` setup.
 
 - Name: `Smart Science YOLO MSTCN OpenVINO`
 - Category: `ML/DL/AI`
-- Platform: `SPR`, `ICX`, `EMR`
+- Platform: `ICX`
 - keywords:`YOLOX`, `MSTCN`
+
 

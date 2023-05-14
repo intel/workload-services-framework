@@ -1,0 +1,20 @@
+# bertlarge-pytorch-xeon-public-dataset
+
+ARG OS_VER="22.04"
+ARG OS_IMAGE="ubuntu"
+FROM ${OS_IMAGE}:${OS_VER} as build
+
+RUN apt update && apt install -y wget unzip
+
+ARG DATASET_VER="v1.1"
+ARG DATASET_REPO="https://rajpurkar.github.io/SQuAD-explorer/dataset/dev-${DATASET_VER}.json"
+
+RUN mkdir -p /home/dataset && \
+    cd /home/dataset && \
+       wget ${DATASET_REPO} 
+
+ENV DATASET_DIR="/home/dataset/"
+
+# construct the final image
+FROM scratch
+COPY --from=build /home/dataset /home/dataset
