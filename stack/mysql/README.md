@@ -23,10 +23,3 @@ docker build . -t mysql8031-base:your-tag --build-arg http_proxy --build-arg htt
 docker run --name some-mysql -e MYSQL_ROOT_PASSWORD=my-secret-pw --privileged -d mysql8031-base:your-tag
 ```
 
-### Contact
-
-- Stage1 Contact: `Longtan Li`; `Junlai Wang`; `Amit Kumar Sah`
-- Validation: `Yanping Wu`
-- Stage2 Contact: `Khun Ban`
-
-The stack version was created by `Buczak, Jakub` and was based on [HammerDB-TPCC workload](workload/HammerDB-TPCC). Please contact original workload creators (listed above) regarding any questions about this workload.

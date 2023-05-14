@@ -1,4 +1,4 @@
-if(" SPR ICX " MATCHES " ${PLATFORM} ")
+if(" ICX " MATCHES " ${PLATFORM} ")
     add_workload("SmartScienceLab")
 
     add_testcase(${workload}_acc_inference "acc")

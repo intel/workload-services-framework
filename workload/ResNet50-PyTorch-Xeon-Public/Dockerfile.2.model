@@ -1,0 +1,18 @@
+# resnet50-pytorch-model
+
+ARG OS_VER="22.04"
+ARG OS_IMAGE="ubuntu"
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt -o Acquire::Check-Date=false update && \
+    apt install -y wget
+
+ARG MODEL_WEIGHTS_VER="0676ba61"
+ARG MODEL_WEIGHTS_REPO="https://download.pytorch.org/models/resnet50-${MODEL_WEIGHTS_VER}.pth"
+
+# Download model
+RUN mkdir -p /model && cd /model && \
+    wget --no-check-certificate ${MODEL_WEIGHTS_REPO}
