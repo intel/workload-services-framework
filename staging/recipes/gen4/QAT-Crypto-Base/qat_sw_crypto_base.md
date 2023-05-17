@@ -1,0 +1,117 @@
+## QAT SOFTWARE-ONLY
+[Intel® QuickAssist Technology (Intel® QAT)](https://www.intel.com/content/www/us/en/developer/topic-technology/open/quick-assist-technology/overview.html) enables acceleration for data encryption and compression for applications from networking to enterprise, cloud to storage, and content delivery to database. Below recipe contains instructions for a version without hardware acceleration.
+
+#QAT, #QuickAssistTechnology, #encryption, #compression
+
+## Software Components
+Table 1 lists the necessary software components for this workload. 
+The descending row order represents the install sequence. 
+The recommended component version and download location are also provided.
+
+Table 1: Software Components
+| Component    | Version |
+| :---         | :----: |
+| Ubuntu OS    | [22.04](https://ubuntu.com/) |
+| git          | [1:2.34.1-1ubuntu1.8](https://github.com/git-guides/install-git#install-git-on-linux) |
+| gcc          | [4:11.2.0-1ubuntu1](https://gcc.gnu.org/) |
+| g++          | [4:11.2.0-1ubuntu1](https://gcc.gnu.org/) |
+| make         | [4.3-4.1build1](https://www.gnu.org/software/make/) |
+| cmake        | [3.22.1-1ubuntu1.22.04.1](https://cmake.org/) |
+| autoconf     | [2.71-2](https://www.gnu.org/software/autoconf/) |
+| automake     | [1:1.16.5-1.3](https://www.gnu.org/software/automake/) |
+| libssl-dev   | [3.0.2-0ubuntu1.8](https://wiki.openssl.org/index.php/Libssl_API) |
+| libpcre3-dev | [2:8.39-13ubuntu0.22.04.1](https://www.pcre.org/) |
+| nasm         | [2.15.05-1](https://www.nasm.us/) |
+| libtool      | [2.4.6-15build2](https://www.gnu.org/software/libtool/) |
+| pkg-config   | [0.29.2-1ubuntu3](https://www.freedesktop.org/wiki/Software/pkg-config/) |
+| OpenSSL      | [1_1_1t](https://github.com/openssl/openssl.git) |
+| IPP crypto   | [ippcp_2021.7](https://github.com/intel/ipp-crypto) |
+| Intel IPSec  | [v1.3](https://github.com/intel/intel-ipsec-mb) |
+| QAT Engine   | [v0.6.19](https://github.com/intel/QAT_Engine) |
+| numactl      | [2.0.14-3ubuntu2](https://github.com/numactl/numactl) |
+| libpcre3     | [2:8.39-13ubuntu0.22.04.1](https://www.pcre.org/) |
+
+## Configuration Snippets
+This section contains code snippets on build instructions for components.
+
+Note: Common Linux utilities, such as docker, git, wget, will not be listed here. Please install on demand if it is not provided in base OS installation.
+
+### Ubuntu
+```
+docker pull ubuntu:22.04
+```
+
+### Helper libraries (1st part)
+```
+apt-get update && apt-get install -y git gcc g++ make cmake autoconf automake libssl-dev libpcre3-dev nasm libtool pkg-config
+```
+
+### OpenSSL
+```
+OPENSSL_INCLUDE_DIR="/usr/local/include/openssl"
+OPENSSL_LIBRARIES_DIR="/usr/local/lib"
+OPENSSL_ROOT_DIR="/usr/local/bin/openssl"
+OPENSSL_VER=1_1_1t
+OPENSSL_REPO=https://github.com/openssl/openssl.git
+
+git clone --depth 1 -b OpenSSL_${OPENSSL_VER} ${OPENSSL_REPO} openssl && \
+cd openssl && \
+./config && \
+make depend && \
+make -j && \
+make install
+```
+
+### IPP Crypto
+```
+IPP_CRYPTO_VER="ippcp_2021.7"
+IPP_CRYPTO_REPO="https://github.com/intel/ipp-crypto"
+git clone --depth 1 -b ${IPP_CRYPTO_VER} ${IPP_CRYPTO_REPO} && \
+cd ipp-crypto/sources/ippcp/crypto_mb && \
+cmake . -B"../build" \
+    -DOPENSSL_INCLUDE_DIR=${OPENSSL_INCLUDE_DIR} \
+    -DOPENSSL_LIBRARIES=${OPENSSL_LIBRARIES_DIR} \
+    -DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR} && \
+cd ../build && \
+make crypto_mb && make install
+```
+
+### Intel IPSec
+```
+IPSEC_MB_VER="v1.3"
+IPSEC_MB_REPO="https://github.com/intel/intel-ipsec-mb"
+git clone --depth 1 -b ${IPSEC_MB_VER} ${IPSEC_MB_REPO} && \
+cd intel-ipsec-mb && \
+make -j && \
+make install LIB_INSTALL_DIR=/usr/local/lib NOLDCONFIG=y
+```
+
+### QAT Engine
+```
+QATENGINE_VER="v0.6.19"
+QATENGINE_REPO="https://github.com/intel/QAT_Engine"
+git clone --depth 1 -b ${QATENGINE_VER} ${QATENGINE_REPO} && \
+cd QAT_Engine && \
+./autogen.sh && \
+./configure \
+    --enable-multibuff_offload \
+    --enable-ipsec_offload \
+    --enable-multibuff_ecx \
+    --enable-qat_sw && \
+make -j && make install
+```
+
+### Helper libraries (2nd part)
+```
+apt-get update && apt-get install -y numactl libpcre3 && apt-get clean
+```
+
+### Additional configuration
+```
+OPENSSL_ENGINES=/usr/local/lib/engines-1.1
+echo "/usr/local/lib" >> /etc/ld.so.conf.d/all-libs.conf && ldconfig
+```
+
+Workload Services Framework
+
+-end of document-
