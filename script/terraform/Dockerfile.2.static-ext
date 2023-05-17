@@ -3,7 +3,7 @@
 ARG RELEASE
 FROM terraform-base${RELEASE}
 
-COPY data/ /usr/local/src/
+#COPY data/ /usr/local/src/
 
 # Install svrinfo
 ARG SVRINFO_VER=2.2.0
