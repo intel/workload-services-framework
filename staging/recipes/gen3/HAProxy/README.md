@@ -7,8 +7,7 @@ HAProxy uses SSL/TLS SSL/TLS may be used on the connection coming from the clien
     
 Intel has introduced the Crypto-NI software solution which is based on Intel® Xeon® Scalable Processors (Codename Ice Lake /Whitley). It can effectively improve the security of web access. 
 
-The main software used in this solution are IPP Cryptography Library, Intel Multi-Buffer Crypto for IPsec Library ([intel-ipsec-mb](https://github.com/intel/intel-ipsec-mb.git)) and  Intel® QuickAssist Technology ([Intel® QAT](https://github.com/intel/QAT_Engine.git)), which  provide batch submission of multiple SSL requests and parallel asynchronous processing mechanism on the new instruction set, greatly improving the performance. Intel® QuickAssist Accelerator is a
-PCIe card that needs to be inserted into the PCIe slot in the server at the start.
+The main software used in this solution are IPP Cryptography Library, Intel Multi-Buffer Crypto for IPsec Library ([intel-ipsec-mb](https://github.com/intel/intel-ipsec-mb.git)) and  Intel® QuickAssist Technology ([Intel® QAT](https://github.com/intel/QAT_Engine.git)), which  provide batch submission of multiple SSL requests and parallel asynchronous processing mechanism on the new instruction set, greatly improving the performance. 
 
 #haproxy, #web server, #reverse proxy, #load balancer, #mail proxy, #HTTP cache
 
@@ -111,8 +110,6 @@ OPENSSL_ENGINES="$ssl_install_location"lib/engines-1.1
 PATH="$haproxy_install_location"sbin:$PATH
 LD_LIBRARY_PATH="$ssl_install_location"lib:"$mb_location"lib:$LD_LIBRARY_PATH
 ```
-
-Workload Services Framework
 
 -end of document-
 

@@ -2,16 +2,8 @@
 
 ## Envoy CryptoMB private key provider and vAES BoringSSL
 
-[Envoy](https://github.com/envoyproxy/envoy) Envoy is an L7 proxy and communication bus designed for large modern service-oriented architecture.  ​
+[Envoy](https://github.com/envoyproxy/envoy) Envoy is an L7 proxy and communication bus designed for large modern service-oriented architecture.  The biggest impact can be seen when transferring large files using vAES
 
-​Intel Boring SSL vAES Patch
-
-Transferring large files (makes it worthwhile for the vAES to make a perf. impact) and the Envoy server is CPU bound (close to 100% loaded). This might be a scenario when envoy is used as a load balancer - here it is moving large files that need to be encrypted.
-
-Apply the [vAES patch](https://boringssl-review.googlesource.com/c/boringssl/+/48745).
-
-
-#envoy, #web server, #reverse proxy, #load balancer, #mail proxy, #HTTP cache
 
 ## Software Components
 Table 1 lists the necessary software components. 
@@ -26,6 +18,13 @@ Table 1: Software Components
 | Envoy | [v1.26.1](https://github.com/envoyproxy/envoy.git) |
 | Bazel | [v4.2.1] (https://bazel.build/)|
 | Clang | [v11] (https://clang.llvm.org/)|
+
+### ​Intel Boring SSL vAES Patch
+To enable the Intel optimizations for vAES, Boring SSL must be patched
+[vAES patch](https://boringssl-review.googlesource.com/c/boringssl/+/48745).
+
+#envoy, #web server, #reverse proxy, #load balancer, #mail proxy, #HTTP cache
+
 
 ## Configuration Snippets
 This section contains code snippets on build instructions for software components.

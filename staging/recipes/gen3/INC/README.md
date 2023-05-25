@@ -17,9 +17,9 @@ The recommended component version and download location are also provided.
 Table 1: Software Components
 | Component| Version |
 | :---        |    :----:   |
-| DEBIAN | [11](https://debian.org/) |
-| PYTHON BASE | [3.9.14](https://github.com/python/) |
-| INTEL NEURAL-COMPRESSOR | [1.1.2](https://github.com/intel/neural-compressor) |
+| Debian | [11](https://debian.org/) |
+| Python | [3.9.14](https://github.com/python/) |
+| Intel Neural Compressor | [1.1.2](https://github.com/intel/neural-compressor) |
 
 ## Configuration Snippets
 This section contains code snippets on build instructions for software components.
