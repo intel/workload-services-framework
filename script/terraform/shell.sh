@@ -1,4 +1,9 @@
 #!/bin/bash -e
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 SDIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
 REGISTRY=${TERRAFORM_REGISTRY:-$REGISTRY}
@@ -24,6 +29,7 @@ options+=(
     "-v" "/etc/localtime:/etc/localtime:ro"
     "-v" "/etc/timezone:/etc/timezone:ro"
     "-v" "/var/run/docker.sock:/var/run/docker.sock"
+    "-v" "$SDIR/../..:/opt/project:ro"
     $(find "$SDIR/../csp" -name ".??*" -type d ! -name .docker ! -name .gitconfig ! -name .ssh ! -name .kube ! -name .diskv-temp -exec sh -c 'printf -- "-v\\n{}:/home/$(basename "{}")\\n-v\\n{}:/root/$(basename "{}")\\n"' \;)
 )
 
@@ -33,16 +39,18 @@ if [ -r "$HOME"/.gitconfig ]; then
         "-v" "$HOME/.gitconfig:/root/.gitconfig:ro"
     )
 fi
+
 if [ -d "$HOME/.docker" ]; then
     options+=(
         "-v" "$HOME/.docker:/home/.docker"
         "-v" "$HOME/.docker:/root/.docker"
     )
 fi
+
 if [ -d "/usr/local/etc/wsf" ]; then
     options+=(
         "-v" "/usr/local/etc/wsf:/usr/local/etc/wsf:ro"
     )
 fi
 
-docker run "${options[@]}" -i ${REGISTRY}terraform-${cloud}${RELEASE} "$@"
+docker run "${options[@]}" ${REGISTRY}terraform-${cloud}${RELEASE} "$@"

@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
     - name: Detect OS
       shell: 
@@ -24,7 +29,10 @@
       async: 1
       poll: 0
       ignore_errors: yes
-      when: (kargs.msg == 'Block inserted') or (kargs.msg == 'File created')
+      when:
+      - (kargs.msg == 'Block inserted') or (kargs.msg == 'File created')
+      - wl_enable_reboot | default('true') | bool
+      - kernel_args_reboot_required | default('false') | bool
 
     - name: wait for the machine to come back
       wait_for_connection:
@@ -33,5 +41,8 @@
         delay: 1
         timeout: 1800
       ignore_errors: yes
-      when: (kargs.msg == 'Block inserted') or (kargs.msg == 'File created')
+      when:
+      - (kargs.msg == 'Block inserted') or (kargs.msg == 'File created')
+      - wl_enable_reboot | default('true') | bool
+      - kernel_args_reboot_required | default('false') | bool
 

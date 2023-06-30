@@ -1,0 +1,13 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+instance_watch: false
+instance_watch_uptime: "240"
+instance_watch_interval: "30m"
+instance_watch_cpu_load: "10"
+instance_watch_cpu_load_count: "3"
+instance_watch_cpu_load_span: "15s"
+instance_watch_shutdown_postpone: "30"

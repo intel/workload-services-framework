@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 - hosts: workload_hosts
   become: yes
   any_errors_fatal: true
@@ -9,22 +14,5 @@
         name: docker
       when:
       - ansible_connection != 'winrm'
-      - ((native | default(false) | bool) == false) or ('gprofiler' in (wl_trace_modules | default('')))
-
-- hosts: trace_hosts
-  become: yes
-  gather_facts: no
-  tasks:
-
-    - name: Install trace module
-      include_role:
-        name: trace
-        tasks_from: install
-      when:
-      - trace_module == 'gprofiler'
-      - ansible_connection != 'winrm'
-      loop: "{{ wl_trace_modules | default('') | split(',') }}"
-      loop_control:
-        loop_var: trace_module
-      ignore_errors: yes
+      - (native | default(false) | bool) == false
 

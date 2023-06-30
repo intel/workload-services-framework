@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: create name space
   command: "kubectl create namespace {{ wl_namespace }}"
@@ -5,6 +10,8 @@
 - name: Create ImagePullSecret
   include_role:
     name: docker_auth
+  vars:
+    namespace: "{{ wl_namespace }}"
 
 - name: Customize deployment yaml for CNI
   include_role:
@@ -18,7 +25,9 @@
 - block:
   
     - name: wait for scheduling
-      shell: "timeout {{ wl_timeout[1] }}s bash -c 'until kubectl --namespace={{ wl_namespace }} wait pod --all --for=condition=Ready --field-selector=status.phase!=Succeeded --timeout=1s 1>/dev/null 2>&1; do if kubectl --namespace={{ wl_namespace }} get pod -o json | grep -q Unschedulable; then exit 1; fi; done; exit 0'"
+      shell: "timeout {{ timeout[1] | default(timeout[0]) }}s bash -c 'until kubectl --namespace={{ wl_namespace }} wait pod --all --for=condition=Ready --field-selector=status.phase!=Succeeded --timeout=1s 1>/dev/null 2>&1; do if kubectl --namespace={{ wl_namespace }} get pod -o json | grep -q Unschedulable; then exit 1; fi; done; exit 0'"
+      vars:
+        timeout: "{{ 'timeout' | extract(lookup('file', wl_logs_dir+'/workload-config.yaml')|from_yaml) | split(',') }}"
 
   rescue:
 

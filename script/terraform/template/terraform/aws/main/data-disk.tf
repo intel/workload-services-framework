@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 locals {
   ebs_device_names = [
@@ -97,7 +102,7 @@ data "template_cloudinit_config" "default" {
   part {
     filename = "init-shellscript"
     content_type = "text/x-shellscript"
-    content = templatefile("./template/terraform/aws/main/cloud-init.sh", {
+    content = templatefile("${path.module}/templates/cloud-init.sh", {
       disks = concat([ 
         for k,v in local.ebs_disks : {
           serial = replace(aws_ebs_volume.default[k].id, "-", "")

@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 locals {
   instances_flat = flatten([
     for profile in var.instance_profiles : [
@@ -5,7 +10,8 @@ locals {
         index = i
         profile = profile.name
         instance_type = profile.instance_type
-        image = profile.image
+        cpu_model_regex = profile.cpu_model_regex
+        os_image = profile.os_image
         os_type = profile.os_type
         os_disk_type = profile.os_disk_type
         os_disk_size = profile.os_disk_size
@@ -20,7 +26,8 @@ locals {
   instances = {
     for vm in local.instances_flat : "${vm.profile}-${vm.index}" => {
       instance_type = vm.instance_type
-      image = vm.image
+      cpu_model_regex = vm.cpu_model_regex
+      os_image = vm.os_image
       profile = vm.profile
       os_type = vm.os_type
       os_disk_type = vm.os_disk_type

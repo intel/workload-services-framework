@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: Create the sar directory
   file:
@@ -9,26 +14,30 @@
 
 - name: Fetch sar files
   fetch:
-    src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar.logs"
-    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-sar/sar.logs"
+    src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar.{{ item.src }}"
+    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-sar/{{ item.dest }}"
     flat: yes
   become: no
   delegate_to: "{{ trace_node.1 }}"
   ignore_errors: yes
+  loop:
+  - src:  logs
+    dest: sar.logs
+  - src:  start
+    dest: TRACE_START
+  - src:  stop
+    dest: TRACE_STOP
 
 - name: Remove any collection files
   file:
-    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar.logs"
+    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar.{{ item }}"
     state: absent
   become: yes
   delegate_to: "{{ trace_node.1 }}"
   ignore_errors: yes
-
-- name: Remove any collection files
-  file:
-    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar.pid"
-    state: absent
-  become: yes
-  delegate_to: "{{ trace_node.1 }}"
-  ignore_errors: yes
+  loop:
+  - logs
+  - start
+  - stop
+  - pid
 

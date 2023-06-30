@@ -1,4 +1,9 @@
 #!/usr/bin/gawk
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 function add_svrinfo_cell(vv) {
     t=(vv==vv*1)?"Number":"String"
@@ -271,7 +276,7 @@ function add_svrinfo(ws) {
     add_svrinfo_row(ws, "Configuration", "System", "Serial #")
     add_svrinfo_row(ws, "Configuration", "System", "UUID")
 
-    add_svrinfo_row(ws, "Configuration", "Baseboard", "Manifacturer")
+    add_svrinfo_row(ws, "Configuration", "Baseboard", "Manufacturer")
     add_svrinfo_row(ws, "Configuration", "Baseboard", "Product Name")
     add_svrinfo_row(ws, "Configuration", "Baseboard", "Version")
     add_svrinfo_row(ws, "Configuration", "Baseboard", "Serial #")
@@ -313,11 +318,14 @@ function add_svrinfo(ws) {
     add_svrinfo_row(ws, "Configuration", "CPU", "Sockets")
     add_svrinfo_row(ws, "Configuration", "CPU", "NUMA Nodes")
     add_svrinfo_row(ws, "Configuration", "CPU", "NUMA CPU List")
-    add_svrinfo_row(ws, "Configuration", "CPU", "CHA Count")
+    add_svrinfo_row(ws, "Configuration", "Uncore", "CHA Count")
+    add_svrinfo_row(ws, "Configuration", "Uncore", "Maximum Frequency")
+    add_svrinfo_row(ws, "Configuration", "Uncore", "Minimum Frequency")
     add_svrinfo_row(ws, "Configuration", "CPU", "L1d Cache")
     add_svrinfo_row(ws, "Configuration", "CPU", "L1i Cache")
     add_svrinfo_row(ws, "Configuration", "CPU", "L2 Cache")
     add_svrinfo_row(ws, "Configuration", "CPU", "L3 Cache")
+    add_svrinfo_row(ws, "Configuration", "CPU", "L3 per Core")
     add_svrinfo_row(ws, "Configuration", "CPU", "Memory Channels")
     add_svrinfo_row(ws, "Configuration", "CPU", "Prefetchers")
     add_svrinfo_row(ws, "Configuration", "CPU", "Intel Turbo Boost")
@@ -327,10 +335,10 @@ function add_svrinfo(ws) {
     add_svrinfo_accelerator_summary(ws, "Configuration", "Accelerator")
 
     add_svrinfo_row(ws, "Configuration", "Power", "TDP")
-    add_svrinfo_row(ws, "Configuration", "Power", "Power & Perf Policy")
-    add_svrinfo_row(ws, "Configuration", "Power", "Frequency Governer")
+    add_svrinfo_row(ws, "Configuration", "Power", "Power \\u0026 Perf Policy")
+    add_svrinfo_row(ws, "Configuration", "Power", "Frequency Governor")
     add_svrinfo_row(ws, "Configuration", "Power", "Frequency Driver")
-    add_svrinfo_row(ws, "Configuration", "Power", "MAX C-State")
+    add_svrinfo_row(ws, "Configuration", "Power", "Max C-State")
 
     add_svrinfo_row(ws, "Configuration", "Memory", "Installed Memory")
     add_svrinfo_row(ws, "Configuration", "Memory", "MemTotal")
@@ -380,11 +388,11 @@ function add_svrinfo_ex(ws, psp, ith) {
     add_svrinfo_row_ex(ws, psp, ith, "Configuration", "CPU", "Prefetchers")
     add_svrinfo_row_ex(ws, psp, ith, "Configuration", "CPU", "Intel Turbo Boost")
     add_svrinfo_row_ex(ws, psp, ith, "Configuration", "CPU", "PPINs")
-    add_svrinfo_row_ex(ws, psp, ith, "Configuration", "Power", "Power & Perf Policy")
+    add_svrinfo_row_ex(ws, psp, ith, "Configuration", "Power", "Power \\u0026 Perf Policy")
     add_svrinfo_row_ex(ws, psp, ith, "Configuration", "Power", "TDP")
     add_svrinfo_row_ex(ws, psp, ith, "Configuration", "Power", "Frequency Driver")
-    add_svrinfo_row_ex(ws, psp, ith, "Configuration", "Power", "Frequency Governer")
-    add_svrinfo_row_ex(ws, psp, ith, "Configuration", "Power", "MAX C-State")
+    add_svrinfo_row_ex(ws, psp, ith, "Configuration", "Power", "Frequency Governor")
+    add_svrinfo_row_ex(ws, psp, ith, "Configuration", "Power", "Max C-State")
     add_svrinfo_row_ex(ws, psp, ith, "Configuration", "Memory", "Installed Memory")
     add_svrinfo_row_ex(ws, psp, ith, "Configuration", "Memory", "Hugepagesize")
     add_svrinfo_row_ex(ws, psp, ith, "Configuration", "Memory", "Transparent Huge Pages")

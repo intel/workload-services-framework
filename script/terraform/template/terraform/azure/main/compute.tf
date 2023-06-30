@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 resource "azurerm_linux_virtual_machine" "default" {
   for_each = {
     for k,v in local.vms : k => v if replace(v.os_type,"windows","")==v.os_type
@@ -9,7 +14,7 @@ resource "azurerm_linux_virtual_machine" "default" {
   location            = azurerm_resource_group.default.location
   size                = each.value.instance_type
   admin_username      = local.os_image_user[each.value.os_type]
-  source_image_id     = each.value.image==null?null:(length(split("/",each.value.image))==9?each.value.image:tolist(data.azurerm_resources.image[each.key].resources).0.id)
+  source_image_id     = each.value.os_image==null?null:(length(split("/",each.value.os_image))==9?each.value.os_image:tolist(data.azurerm_resources.image[each.key].resources).0.id)
   user_data           = "${data.template_cloudinit_config.default[each.key].rendered}"
 
   priority            = var.spot_instance?"Spot":"Regular"
@@ -37,7 +42,7 @@ resource "azurerm_linux_virtual_machine" "default" {
   }
 
   dynamic "source_image_reference" {
-    for_each = each.value.image == null?[1]:[]
+    for_each = each.value.os_image == null?[1]:[]
 
     content {
       publisher = local.os_image_publisher[each.value.os_type]
@@ -106,10 +111,10 @@ resource "azurerm_windows_virtual_machine" "default" {
   admin_username = local.os_image_user[each.value.os_type]
   admin_password = random_password.default.0.result
 
-  source_image_id     = each.value.image==null?null:(length(split("/",each.value.image))==9?each.value.image:tolist(data.azurerm_resources.image[each.key].resources).0.id)
+  source_image_id     = each.value.os_image==null?null:(length(split("/",each.value.os_image))==9?each.value.os_image:tolist(data.azurerm_resources.image[each.key].resources).0.id)
 
   dynamic "source_image_reference" {
-    for_each = each.value.image == null?[1]:[]
+    for_each = each.value.os_image == null?[1]:[]
 
     content {
       publisher = local.os_image_publisher[each.value.os_type]
@@ -135,7 +140,7 @@ resource "azurerm_windows_virtual_machine" "default" {
 }
 
 locals {
-  setup_winrm_script = base64encode(templatefile("${path.module}/templates/setup-winrm.ps1.tpl", {
+  setup_winrm_script = base64encode(templatefile("${path.module}/templates/setup-winrm.ps1", {
     winrm_port = var.winrm_port
   }))
 }

@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 # check prerequisite: m4
 execute_process(COMMAND m4 --version RESULT_VARIABLE m4check OUTPUT_QUIET ERROR_QUIET)

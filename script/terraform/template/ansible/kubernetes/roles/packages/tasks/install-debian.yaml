@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: remove kubeadm, kubelet, and kubectl
   apt:
@@ -23,32 +28,25 @@
   delay: 5
   become: true
 
-- block:
+- name: add k8s GPG key
+  get_url:
+    url: "{{ k8s_repo_key_url['debian'] }}"
+    dest: /usr/share/keyrings/k8s.gpg.origin
+    mode: '0644'
+    force: true
+  become: true
+  register: getrc
+  until: getrc is success
+  retries: 10
+  delay: 10
 
-    - name: add k8s GPG key
-      get_url:
-        url: "{{ k8s_repo_key_url['debian'] }}"
-        dest: /etc/apt/trusted.gpg.d/k8s.gpg
-        mode: '0644'
-        force: true
-      become: true
-      register: getrc
-      until: getrc is success
-      retries: 10
-      delay: 10
-
-  rescue:
-
-    - name: copy saved k8s.gpg to remote
-      copy:
-        src:  /etc/apt/trusted.gpg.d/k8s.gpg
-        dest: /etc/apt/trusted.gpg.d/k8s.gpg
-        mode: '0644'
-      become: true
+- name: deamor the k8s GPG key
+  command: gpg --yes --dearmor -o /usr/share/keyrings/k8s.gpg /usr/share/keyrings/k8s.gpg.origin
+  become: true
 
 - name: add k8s repository to apt
   apt_repository:
-    repo: "deb {{ k8s_repo_url['debian'] }} kubernetes-xenial main"
+    repo: "deb [signed-by=/usr/share/keyrings/k8s.gpg] {{ k8s_repo_url['debian'] }} kubernetes-xenial main"
     state: present
     update_cache: false
   become: true

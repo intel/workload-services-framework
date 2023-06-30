@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 message("")
 message("========================================================================")
 message("  ${red}Upon execution, the Workload Services Framework may automatically")

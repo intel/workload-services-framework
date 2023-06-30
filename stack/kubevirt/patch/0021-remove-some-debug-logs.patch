@@ -1,0 +1,104 @@
+From 282571bc43c6f0cf970c732fb6edfccc01b1a5b2 Mon Sep 17 00:00:00 2001
+From: "Michael,Zhang" <michael.m.zhang@intel.com>
+Date: Wed, 12 Oct 2022 11:55:31 +0800
+Subject: [PATCH 21/22] remove some debug logs
+
+---
+ pkg/util/util.go                                 |  6 +++---
+ .../virtwrap/converter/converter.go              | 16 ++++++++--------
+ 2 files changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/pkg/util/util.go b/pkg/util/util.go
+index 5bf66cdcc..9629b8e60 100644
+--- a/pkg/util/util.go
++++ b/pkg/util/util.go
+@@ -197,12 +197,12 @@ func IsVhostuserVmiSpec(spec *v1.VirtualMachineInstanceSpec) bool {
+ 
+ 	//For spdk vhost support, re-visit
+ 	spdkVhostTag := "/var/tmp/vhost.tag" //If the tag is exist, then support the spdk vhost.
+-	logger := log.DefaultLogger()
++	// logger := log.DefaultLogger()
+ 	if _, err := os.Stat(spdkVhostTag); os.IsNotExist(err) {
+-		logger.Infof("SPDK vhost is not enabeled, please create the tag[%s]to support SPDK vhost in kubevirt.", spdkVhostTag)
++		// logger.Infof("SPDK vhost is not enabeled, please create the tag[%s]to support SPDK vhost in kubevirt.", spdkVhostTag)
+ 		return false
+ 	} else if err == nil {
+-		logger.Infof("SPDK vhost tag[%s] is exist, support SPDK vhost in kubevirt.", spdkVhostTag)
++		//logger.Infof("SPDK vhost tag[%s] is exist, support SPDK vhost in kubevirt.", spdkVhostTag)
+ 		return true
+ 	}
+ 	return false
+diff --git a/pkg/virt-launcher/virtwrap/converter/converter.go b/pkg/virt-launcher/virtwrap/converter/converter.go
+index 2f08748a3..f2acda16c 100644
+--- a/pkg/virt-launcher/virtwrap/converter/converter.go
++++ b/pkg/virt-launcher/virtwrap/converter/converter.go
+@@ -1040,7 +1040,7 @@ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, diskSource
+ 
+ 	logger := log.DefaultLogger()
+ 	if hasJob && jobNameMap[NAME] {
+-		logger.Infof("Job has already been processed before.")
++		// logger.Infof("Job has already been processed before.")
+ 		vhostCtrlPath = fmt.Sprintf("/var/tmp/vhost.%s", NAME)
+ 		disk.Type = "vhostuser"
+ 		disk.Device = "disk"
+@@ -1064,10 +1064,10 @@ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, diskSource
+ 		jobNameMap[NAME] = false
+ 	}
+ 
+-	logger.Infof("Notify the spdk-vhost to create vhost controller: suffix='%s', diskIndex='%d', capacity='%d'GiB .", podNameSuffix, diskIndex, diskCapcity)
++	// logger.Infof("Notify the spdk-vhost to create vhost controller: suffix='%s', diskIndex='%d', capacity='%d'GiB .", podNameSuffix, diskIndex, diskCapcity)
+ 
+ 	//3. Waiting for new vhost controller created
+-	logger.Info("loop to wait spdk-vhost controller created.")
++	// logger.Info("loop to wait spdk-vhost controller created.")
+ 	counter := 0
+ 	//total wait time is wait_times*Sleep_time
+ 	var wait_times = 5
+@@ -1804,7 +1804,7 @@ func Convert_v1_VirtualMachineInstance_To_api_Domain(vmi *v1.VirtualMachineInsta
+ 			spdkVhostPath := newDisk.Source.Path
+ 			if spdkVhostPath == "" {
+ 				// re-visit here.
+-				logger.Infof("Empty vhost controller path:'%s', try the default path", spdkVhostPath)
++				// logger.Infof("Empty vhost controller path:'%s', try the default path", spdkVhostPath)
+ 				spdkVhostPath = fmt.Sprintf("/var/tmp/vhost.%d", diskIndex)
+ 			}
+ 			blkQueueNum := 2
+@@ -1813,7 +1813,7 @@ func Convert_v1_VirtualMachineInstance_To_api_Domain(vmi *v1.VirtualMachineInsta
+ 				logger.Infof("SPDK vhost socket directory: '%s' not present, will not create vhost block device!!", spdkVhostPath)
+ 			} else if err == nil {
+ 
+-				logger.Infof("Mount SPDK vhost socket: '%s' .", spdkVhostPath)
++				// logger.Infof("Mount SPDK vhost socket: '%s' .", spdkVhostPath)
+ 
+ 				if util.IsVhostuserVmiSpec(&vmi.Spec) {
+ 					initializeQEMUCmdAndQEMUArg(domain)
+@@ -2044,7 +2044,7 @@ func Convert_v1_VirtualMachineInstance_To_api_Domain(vmi *v1.VirtualMachineInsta
+ 		}
+ 		if util.IsVhostuserVmiSpec(&vmi.Spec) {
+ 			// Shared memory required for vhostuser interfaces
+-			logger := log.DefaultLogger()
++			//logger := log.DefaultLogger()
+ 
+ 			// Set file as memory backend for spdk vhost support
+ 			domain.Spec.MemoryBacking.Source = &api.MemoryBackingSource{Type: "file"}
+@@ -2060,7 +2060,7 @@ func Convert_v1_VirtualMachineInstance_To_api_Domain(vmi *v1.VirtualMachineInsta
+ 				},
+ 			}
+ 
+-			logger.Info("Config the memory for vhost user interface.")
++			//logger.Info("Config the memory for vhost user interface.")
+ 			if vmi.Spec.Domain.Memory == nil || vmi.Spec.Domain.Memory.Hugepages == nil {
+ 				return fmt.Errorf("Hugepage is required for vhostuser interface to add NUMA cells %v", vmi.Spec.Domain.Memory)
+ 			}
+@@ -2073,7 +2073,7 @@ func Convert_v1_VirtualMachineInstance_To_api_Domain(vmi *v1.VirtualMachineInsta
+ 			cellMemory := domain.Spec.Memory.Value / uint64(sockets)
+ 			nCPUsPerCell := uint32(vcpus) / sockets
+ 
+-			logger.Infof("Cpu NUMA: '%d'. CPU sockets: %d. memory: %d.", nCPUsPerCell, sockets, cellMemory)
++			// logger.Infof("Cpu NUMA: '%d'. CPU sockets: %d. memory: %d.", nCPUsPerCell, sockets, cellMemory)
+ 
+ 			var idx uint32
+ 			for idx = 0; idx < sockets; idx++ {
+-- 
+2.27.0
+

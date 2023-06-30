@@ -79,32 +79,9 @@ LoadPlugin "aggregation"
 </Plugin>
 
 <Plugin load>
-    ReportRelative true
+    # https://github.com/collectd/collectd/issues/3180
+    {{ ('5.9.0' in version.stdout) | ternary('#','ReportRelative true') }}
 </Plugin>
-
-#<LoadPlugin python>
-#    Globals true
-#</LoadPlugin>
-
-#<Plugin python>
-#    ModulePath "{{ collectd_plugin_path }}"
-#    Import "sysstat_memstat"
-#    Import "network_irq_affinity"
-#    <Module sysstat_memstat>
-#        # SamplingRate is the interval (in seconds) at which the sysstat sampling is called. Needs to be a positive integer value
-#        # Metrics represents the types of data that this plugin can output.
-#        # Metrics options: "pgpgin/s,pgpgout/s,fault/s,majflt/s,pgfree/s,pgscank/s,pgscand/s,pgsteal/s,vmeff,kbmemfree,kbmemused,memused,kbbuffers,kbcached,kbcommit,commit,kbactive,kbinact,kbdirty,kbswpfree,kbswpused,swpused,kbswpcad,swpcad"
-#        #                           --- any subset of the input above will output the metrics in the list. Must be specified as a single line string, in quotations, with the elements separated by commas,
-#        #                  "all"  --- equivalent to giving the all the metrics mentioned above
-#        #                  if not specified this will default to the "kbmemused" consumption.
-#        # Docs: http://sebastien.godard.pagesperso-orange.fr/man_sar.html
-#        SamplingRate 10 #seconds.
-#        Metrics "all"
-#    </Module>
-#    <Module network_irq_affinity>
-#        # No config options
-#    </Module>
-#</Plugin>
 
 <Plugin "aggregation">
   <Aggregation>

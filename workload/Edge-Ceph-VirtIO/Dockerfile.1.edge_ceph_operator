@@ -1,0 +1,42 @@
+# edge-ceph-benchmark-operator
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+
+FROM ceph-base${RELEASE}
+ARG  BASE_PATH=/opt/rook
+ARG  WORK_PATH=${BASE_PATH}/benchmark
+ARG  KUBEVIRT_PATH=${WORK_PATH}/kubevirt
+
+USER root
+RUN yum group install -y "Development Tools" && \
+    yum -y install git make which gcc m4 libaio-devel bc zlib-devel && \
+    yum clean all
+    
+WORKDIR   ${WORK_PATH}
+
+ARG KUBECTL_VER="v1.23.1"
+ARG KUBECTL_REPO="https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VER}/bin/linux/amd64/kubectl"
+
+RUN curl -LO ${KUBECTL_REPO} && \
+    chmod +x ./kubectl && \
+    mv ./kubectl /usr/local/bin/kubectl
+
+ARG FIO_VER="3.29"
+ARG FIO_REPO="https://github.com/axboe/fio.git"
+RUN git clone -b fio-${FIO_VER} ${FIO_REPO} fio && \
+    cd fio && \
+    ./configure && \
+    make
+
+COPY script ./
+COPY template ./template
+
+# Create a pipefile for SF benchmark logs collection.
+RUN mkfifo /export-logs
+
+CMD ["./edge_ceph_virtIO_operator.sh", "--all"]

@@ -1,10 +1,15 @@
 #!/bin/bash
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 REGION_DIR="/opt/build/.regions"
 REGION_DIR_LOCK="/opt/build/.regions.lock"
 
 read_regions () {
-  REGIONS=($(flock "$REGION_DIR_LOCK" cat "$REGION_DIR/$1" | sort | uniq))
+  REGIONS=($(flock "$REGION_DIR_LOCK" cat "$REGION_DIR/$1" 2> /dev/null | sort | uniq))
 }
 
 delete_regions () {
@@ -17,7 +22,7 @@ delete_regions () {
   done
 }
 
-OWNER="${OWNER:-$(env | grep _OPTIONS= | tr ' ' '\n' | grep -F owner= | cut -f2 -d= | tr -c -d 'a-z0-9-')}"
-OWNER="${OWNER:-$(grep -E "^\s*name\s*=" $HOME/.gitconfig | cut -f2 -d= | tr -c -d 'a-z0-9-')}"
-OWNER="${OWNER:-$(env | grep _USER= | cut -f2 -d= | tr -c -d 'a-z0-9-')}"
+OWNER="${OWNER:-$(env | grep _OPTIONS= | tr ' ' '\n' | grep -F owner= | cut -f2 -d= | tr 'A-Z' 'a-z' | tr -c -d 'a-z0-9-')}"
+OWNER="${OWNER:-$(grep -E "^\s*name\s*=" $HOME/.gitconfig | cut -f2 -d= | tr 'A-Z' 'a-z' | tr -c -d 'a-z0-9-')}"
+OWNER="${OWNER:-$(env | grep _USER= | cut -f2 -d= | tr 'A-Z' 'a-z' | tr -c -d 'a-z0-9-')}"
 

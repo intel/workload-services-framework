@@ -1,4 +1,9 @@
 #!/bin/bash -e
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 overwrite () {
     if [ "$_kk" != "$1" ] || [ "$_vv" != "$2" ]; then
@@ -56,6 +61,11 @@ case "$1" in
 *_INSTANCE_TYPE)
   overwrite "${1%_INSTANCE_TYPE}_WORKER_INSTANCE_TYPE" "$2"
   ;;
+*_*_CPU_MODEL_REGEX) # preempt *_CPU_MODEL_REGEX
+  ;;
+*_CPU_MODEL_REGEX)
+  overwrite "${1%_CPU_MODEL_REGEX}_WORKER_CPU_MODEL_REGEX" "$2"
+  ;;
 *_*_MIN_CPU_PLATFORM) # preempt *_MIN_CPU_PLATFORM
   overwrite "$1" "$(convert_mcp "$2")"
   ;;
@@ -77,10 +87,10 @@ case "$1" in
 *_NIC_TYPE)
   overwrite "${1%_NIC_TYPE}_WORKER_NIC_TYPE" "$2"
   ;;
-*_*_IMAGE) # preempt *_IMAGE
+*_*_OS_IMAGE) # preempt *_IMAGE
   ;;
-*_IMAGE)
-  overwrite "${1%_IMAGE}_WORKER_IMAGE" "$2"
+*_OS_IMAGE)
+  overwrite "${1%_OS_IMAGE}_WORKER_OS_IMAGE" "$2"
   ;;
 *_*_OS_TYPE) # preempt *_OS_TYPE
   ;;

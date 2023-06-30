@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 resource "aws_vpc" "default" {
   cidr_block           = var.vpc_cidr_block
   enable_dns_hostnames = true

@@ -1,28 +1,8 @@
-
-- name: Install trace module
-  include_tasks:
-    file: trace-block.yaml
-  when: trace_module == 'gprofiler'
-  loop: "{{ (wl_trace_modules | default('')).split(',') }}"
-  loop_control:
-    loop_var: trace_module
-  ignore_errors: yes
-
-# ##########
-# Avoid race condition when apply hugepages at runtime
-#   - when updating huge pages at run time with ansible, pages are updated asynchronously
-#   - wait until pages are fully flushed and configured before restarting kubelet
-# ##########
-- name: Wait until huge pages are fully configured
-  command: cat "/sys/kernel/mm/hugepages/hugepages-{{ item.split('-')[3] }}/nr_hugepages"
-  register: npages
-  until: (npages.stdout | int >= {{ item.split('-')[4].split('=')[0] }} | int)
-  retries: 10
-  delay: 5
-  when:
-    - (csp | default('static')) == 'static' and (k8s_reset | default('false') | bool) == false
-    - ('HAS-SETUP-HUGEPAGE-' in item)
-  loop: "{{ k8s_node_labels | default([]) }}"
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: Restart kubelet for huge pages
   systemd:

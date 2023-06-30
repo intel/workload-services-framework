@@ -1,0 +1,82 @@
+From 79019d454c217f7e85acbc0992f7b344c7bba188 Mon Sep 17 00:00:00 2001
+From: "Michael,Zhang" <michael.m.zhang@intel.com>
+Date: Fri, 16 Sep 2022 16:10:36 +0800
+Subject: [PATCH 16/22] check the vhost socket exist before create vhostblk
+ device
+
+---
+ .../virtwrap/converter/converter.go           | 37 +++++++++++++------
+ 1 file changed, 26 insertions(+), 11 deletions(-)
+
+diff --git a/pkg/virt-launcher/virtwrap/converter/converter.go b/pkg/virt-launcher/virtwrap/converter/converter.go
+index 633684bc1..b6aa9eae9 100644
+--- a/pkg/virt-launcher/virtwrap/converter/converter.go
++++ b/pkg/virt-launcher/virtwrap/converter/converter.go
+@@ -859,6 +859,9 @@ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, diskSource
+ 	//   C = backend block image ID/name. For ceph, it's the block image name
+ 	podNameSuffix := "xyz1"
+ 	diskIndex := spdkVhostBlkVolIndices[volumeName]
++
++	//vhostCtrlPath := "/var/tmp/vhost.1"
++	vhostCtrlPath := fmt.Sprintf("/var/tmp/vhost.%d", diskIndex)
+ 	//Get the request disk capacity with Unit MiB.
+ 	diskCapcity := diskSource.Capacity.ToDec().ScaledValue(6)
+ 
+@@ -894,7 +897,7 @@ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, diskSource
+ 	disk.Driver.Type = "raw"
+ 	disk.Driver.Discard = ""
+ 	disk.Source.Type = "unix"
+-	disk.Source.Path = "/var/tmp/vhost.1"
++	disk.Source.Path = vhostCtrlPath
+ 	disk.Target.Bus = "virtio"
+ 	disk.Driver.ErrorPolicy = ""
+ 	disk.Driver.Cache = ""
+@@ -1582,23 +1585,35 @@ func Convert_v1_VirtualMachineInstance_To_api_Domain(vmi *v1.VirtualMachineInsta
+ 
+ 		//TODO: for vhostuser blk
+ 		if volume.SpdkVhostBlkDisk != nil {
++			logger := log.DefaultLogger()
++
+ 			diskIndex := spdkVhostBlkVolIndices[disk.Name]
+ 			vhostUserBlkDevID := fmt.Sprintf("spdkvhostblk_%s", disk.Name)
++
+ 			//The spdk vhost socket should like spdkVhostPath := "/var/tmp/vhost.0"
+-			spdkVhostPath := fmt.Sprintf("/var/tmp/vhost.%d", diskIndex)
++			spdkVhostPath := newDisk.Source.Path
++			if spdkVhostPath == "" {
++				// re-visit here.
++				logger.Infof("Empty vhost controller path:'%s', try the default path", spdkVhostPath)
++				spdkVhostPath = fmt.Sprintf("/var/tmp/vhost.%d", diskIndex)
++			}
+ 			blkQueueNum := 2
+ 
+-			logger := log.DefaultLogger()
+-			logger.Infof("Mount SPDK vhost socket: '%s' .", spdkVhostPath)
++			if _, err := os.Stat(spdkVhostPath); os.IsNotExist(err) {
++				logger.Infof("SPDK vhost socket directory: '%s' not present, will not create vhost block device!!", spdkVhostPath)
++			} else if err == nil {
+ 
+-			if util.IsVhostuserVmiSpec(&vmi.Spec) {
+-				initializeQEMUCmdAndQEMUArg(domain)
++				logger.Infof("Mount SPDK vhost socket: '%s' .", spdkVhostPath)
+ 
+-				domain.Spec.QEMUCmd.QEMUArg = append(domain.Spec.QEMUCmd.QEMUArg,
+-					api.Arg{Value: "-chardev"},
+-					api.Arg{Value: fmt.Sprintf("socket,id=%s,path=%s", vhostUserBlkDevID, spdkVhostPath)},
+-					api.Arg{Value: "-device"},
+-					api.Arg{Value: fmt.Sprintf("vhost-user-blk-pci,chardev=%s,num-queues=%d", vhostUserBlkDevID, blkQueueNum)})
++				if util.IsVhostuserVmiSpec(&vmi.Spec) {
++					initializeQEMUCmdAndQEMUArg(domain)
++
++					domain.Spec.QEMUCmd.QEMUArg = append(domain.Spec.QEMUCmd.QEMUArg,
++						api.Arg{Value: "-chardev"},
++						api.Arg{Value: fmt.Sprintf("socket,id=%s,path=%s", vhostUserBlkDevID, spdkVhostPath)},
++						api.Arg{Value: "-device"},
++						api.Arg{Value: fmt.Sprintf("vhost-user-blk-pci,chardev=%s,num-queues=%d", vhostUserBlkDevID, blkQueueNum)})
++				}
+ 			}
+ 		}
+ 
+-- 
+2.27.0
+

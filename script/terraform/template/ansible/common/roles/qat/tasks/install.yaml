@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 ---
 # tasks file for qat
 
@@ -48,7 +53,6 @@
     include_tasks: tasks/configure_qat.yaml
   - debug:
       msg: "qat is loaded on this machine"
-  - meta: end_play
   when: p.stat.exists and ('running' in qat_status.stdout)
 
 - name: Install dependencies on RedHat.
@@ -73,7 +77,7 @@
   delay: 10
   become: true
   ignore_errors: true
-  when: os.stdout in ['centos', 'fedora']
+  when: os.stdout in ['centos', 'fedora'] and ('running' not in qat_status.stdout)
 
 - name: install dependencies on Debian.
   apt:
@@ -107,7 +111,7 @@
   delay: 10
   ignore_errors: true
   become: true
-  when: os.stdout in ['ubuntu', 'debian']
+  when: os.stdout in ['ubuntu', 'debian'] and ('running' not in qat_status.stdout)
 
 - name: check firmware1
   stat:
@@ -145,6 +149,7 @@
   when: 
     - firm1.stat.exists == false or firm2.stat.exists == false
     - os.stdout in ['ubuntu', 'debian', 'fedora']
+    - ('running' not in qat_status.stdout)
 
 - block:
   - name: insatll qatlib on fedora 34+
@@ -157,7 +162,6 @@
     delay: 10
   - name: confiure qat
     include_tasks: tasks/configure_qat.yaml
-  - meta: end_play
   become: true
   when: (os.stdout=="fedora") and (os_ver.stdout | int >= 34)
 
@@ -173,7 +177,7 @@
     executable: /bin/bash
   ignore_errors: true
   become: true
-  when: os.stdout in ['ubuntu', 'debian']
+  when: os.stdout in ['ubuntu', 'debian'] and ('running' not in qat_status.stdout)
 
 # install out-of-tree driver on other os like centos
 - name: install qat driver

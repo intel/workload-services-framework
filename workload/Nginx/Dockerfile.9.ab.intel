@@ -1,53 +1,17 @@
 # nginx-client-ab
 
-FROM rockylinux:8.6 AS build
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
 
-RUN dnf -y install epel-release dnf-plugins-core
-RUN dnf config-manager --set-enabled powertools
-RUN dnf group -y install "Development Tools"
-RUN dnf -y install cpuid cmake wget pcre pcre-devel libarchive *libapr* *libpcre* nasm && yum -y update && dnf -y update
+FROM qatsw-crypto-base-ssl3-ubuntu${RELEASE} AS build
+RUN  apt-get update && apt-get install -y git gcc g++ cmake make autoconf automake libpcre3-dev nasm libtool pkg-config wget zlib1g-dev libapr*
 
-ARG OPENSSL_VER="1_1_1n"
-ARG OPENSSL_REPO=https://github.com/openssl/openssl.git
-RUN git clone -b OpenSSL_${OPENSSL_VER} --depth 1 ${OPENSSL_REPO}
-RUN cd /openssl && \
-    ./config && \
-    make depend && \
-    make -j && \
-    make install_sw
-
-ARG IPP_CRYPTO_VER="ippcp_2021.5"
-ARG IPP_CRYPTO_REPO=https://github.com/intel/ipp-crypto.git
-RUN git clone -b ${IPP_CRYPTO_VER} --depth 1 ${IPP_CRYPTO_REPO} && \
-    cd /ipp-crypto/sources/ippcp/crypto_mb && \
-    cmake . -B"../build" \
-      -DOPENSSL_INCLUDE_DIR=/usr/local/include/openssl \
-      -DOPENSSL_LIBRARIES=/usr/local/lib64 \
-      -DOPENSSL_ROOT_DIR=/usr/local/bin/openssl && \
-    cd ../build && \
-    make -j crypto_mb && \
-    make install
-
-ARG IPSEC_MB_VER="v1.2"
-ARG IPSEC_MB_REPO=https://github.com/intel/intel-ipsec-mb.git
-RUN git clone -b ${IPSEC_MB_VER} --depth 1 ${IPSEC_MB_REPO} && \
-    cd /intel-ipsec-mb && \
-    make -j SAFE_DATA=y SAFE_PARAM=y SAFE_LOOKUP=y && \
-    make install NOLDCONFIG=y PREFIX=/usr/local/
-
-ARG QAT_ENGINE_VER="v0.6.12"
-ARG QAT_ENGINE_REPO=https://github.com/intel/QAT_Engine.git
-RUN git clone -b ${QAT_ENGINE_VER} --depth 1 ${QAT_ENGINE_REPO} && \
-    cd /QAT_Engine && \
-    ./autogen.sh && \
-    ./configure \
-      --with-openssl_install_dir=/usr/local/ \
-      --enable-qat_sw --disable-qat_hw && \
-    make -j && \
-    make install -j 1
-
-ARG NGINX_VER="1.20.2"
-ARG NGINX_PACKAGE=http://nginx.org/download/nginx-${NGINX_VER}.tar.gz
+ARG NGINX_VER="1.22.1"
+ARG NGINX_PACKAGE=https://nginx.org/download/nginx-${NGINX_VER}.tar.gz
 RUN wget ${NGINX_PACKAGE} && tar xf nginx-${NGINX_VER}.tar.gz && \
     cd nginx-${NGINX_VER} && \
     ./configure \
@@ -81,27 +45,17 @@ RUN wget ${APACHE_PACKAGE} && tar xf httpd-${APACHE_VER}.tar.gz && \
     make -j && \
     make install 
 
-FROM rockylinux:8.6
-RUN dnf -y install epel-release dnf-plugins-core && \
-    dnf config-manager --set-enabled powertools && \
-    dnf -y install ufw && \
-    yum install -y wget procps-ng psmisc *libapr* *libpcre* && yum -y update && dnf -y update
+RUN rm -rf /usr/share/man/*
+RUN cp /usr/local/apache2/bin/ab /usr/local/bin
 
+FROM qatsw-crypto-base-ssl3-ubuntu${RELEASE}
+RUN  apt-get update && apt-get install -y wget libpcre3 zlib1g libapr* systemd && apt-get clean
 COPY --from=build /usr/local/ /usr/local/
 COPY --from=build /var/www/ /var/www/
 COPY conf/*.conf /usr/local/share/nginx/conf/
 COPY run_ab.sh /
-RUN cp /usr/local/apache2/bin/ab /usr/bin/ab
-
-ENV  OPENSSL_ENGINES=/usr/local/lib64/engines-1.1
-
-RUN cp /usr/local/lib/engines-1.1/* /usr/local/lib64/engines-1.1/
-
-RUN rm -rf /usr/share/man/* && \
-echo "/usr/local/lib64" >> /etc/ld.so.conf.d/all-libs.conf && ldconfig && \
-strip /usr/bin/*; strip /usr/sbin/*; strip /usr/local/bin/*; strip /usr/local/sbin/* || exit 0;
-
+COPY run_openssl.sh /
 RUN mkfifo /export-logs
 CMD (/run_ab.sh; echo $? > status) 2>&1 | tee output.logs && \
-    tar cf /export-logs status output.logs && \
+    tar cf /export-logs status output.logs concurrency_*.log && \
     sleep infinity

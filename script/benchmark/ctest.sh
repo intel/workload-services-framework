@@ -1,4 +1,9 @@
 #!/bin/bash -e
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 print_help () {
     echo "Usage: [options]"
@@ -7,8 +12,9 @@ print_help () {
     echo "--run <number>        Run the ctest commands on same SUT (only with cumulus)."
     echo "--config <yaml>       Specify the test-config yaml."
     echo "--options <options>   Specify additional backend options."
-    echo "--nohup               Run the script as a daemon."
-    echo "--stop                Kill all ctest sessions."
+    echo "--nohup [logs]        Run the script as a daemon."
+    echo "--daemon [logs]       Run the script via deamonize, with --noenv."
+    echo "--stop [prefix]       Kill ctest sessions."
     echo "--set <vars>          Set variable values between burst and loop iterations."
     echo "--continue            Ignore any error and continue the burst and loop iterations." 
     echo "--prepare-sut         Prepare cloud SUT for reuse."
@@ -34,37 +40,116 @@ if [ "$#" -eq 0 ]; then
     print_help
 fi
 
-run_as_nohup=""
+run_with_nohup=""
+run_with_daemon=""
 no_env=""
 args=()
+stop=""
+last=""
 for var in "$@"; do
     case "$var" in
+    --nohup=*)
+        run_with_nohup="${var#--nohup=}"
+        ;;
     --nohup)
-        run_as_nohup="1"
+        run_with_nohup="nohup.out"
+        ;;
+    --daemon=*)
+        run_with_daemon="${var#--daemon=}"
+        ;;
+    --daemon)
+        run_with_daemon="daemon.out"
         ;;
     --noenv)
         no_env="1"
         ;;
+    --stop=*)
+        stop="$var"
+        ;;
     --stop)
-        kill -9 -a $(ps auxwww | grep ctest | awk '{print$2}') 2> /dev/null || echo -n ""
-        exit 0
+        stop="--stop="
         ;;
     *)
-        args+=("$var")
+        case "$last" in
+        --stop)
+            stop="--stop=$var"
+            ;;
+        --nohup)
+            if [[ "$var" != "--"* ]]; then
+                run_with_nohup="$var"
+            else
+                args+=("$var")
+            fi
+            ;;
+        --daemon)
+            if [[ "$var" != "--"* ]]; then
+                run_with_daemon="$var"
+            else
+                args+=("$var")
+            fi
+            ;;
+        *)
+            args+=("$var")
+            ;;
+        esac
         ;;
     esac
+    last="$var"
 done
 
-if [ -n "$run_as_nohup" ]; then
-    if [ -n "$no_env" ]; then
-        nohup env -i "HOME=$HOME" "http_proxy=$http_proxy" "https_proxy=$https_proxy" "no_proxy=$no_proxy" "PATH=$PATH" "$0" "${args[@]}" > nohup.out 2>&1 &
-        disown -h $!
+if [ -n "$stop" ]; then
+    if [ "$stop" = "--stop=all" ] || [ "$stop" = "--stop=" ]; then
+        OWNER="$( (git config user.name || id -un) 2> /dev/null)-"
+        DIRPATH="$(pwd)"
+        while [[ "$DIRPATH" = */* ]]; do
+            if [ -r "$DIRPATH/CMakeCache.txt" ]; then
+                backend="$(grep "BACKEND:UNINITIALIZED=" "$DIRPATH/CMakeCache.txt" | cut -f2 -d=)"
+                options="$(grep "${backend^^}_OPTIONS:UNINITIALIZED=" "$DIRPATH/CMakeCache.txt" | cut -f2- -d=)"
+                if [[ "$options" = *"--owner="* ]]; then
+                    OWNER="$(echo "x$options" | sed 's|.*--owner=\([^ ]*\).*|\1|')-"
+                fi
+                break
+            fi
+            DIRPATH="${DIRPATH%/*}"
+        done
     else
-        nohup "$0" "${args[@]}" > nohup.out 2>&1 &
-        disown -h $!
+        OWNER="${stop#--stop=}"
+    fi
+    cmd="docker ps -f name=$(echo $OWNER | tr 'A-Z' 'a-z' | tr -c -d 'a-z0-9-' | sed 's|^\(.\{12\}\).*$|\1|')"
+    if [ "$($cmd | wc -l)" -ne 2 ] && [ "$stop" != "--stop=all" ]; then
+        echo "None or multiple ctest instances detected:"
+        echo ""
+        $cmd --format '{{.Names}}\t\t{{.ID}}\t{{.Status}}'
+        echo ""
+        echo "Please identify the instance with: ./ctest.sh --stop=<prefix> or ./ctest.sh --stop=all"
+        exit 3
+    fi
+    for id1 in $($cmd --format '{{.ID}}'); do
+        echo "send SIGINT to $id1"
+        #docker exec -u root $id1 bash -c 'kill -s SIGINT $(ps -o pid= -a -x)' || true
+        docker kill --signal SIGINT $id1 || true
+    done
+    exit 0
+fi
+
+if [ -n "$run_with_nohup" ]; then
+    run_with_nohup="$(readlink -f "$run_with_nohup")"
+    if [ -n "$no_env" ]; then
+        nohup env -i "HOME=$HOME" "http_proxy=$http_proxy" "https_proxy=$https_proxy" "no_proxy=$no_proxy" "PATH=$PATH" "$0" "${args[@]}" > "$run_with_nohup" 2>&1 &
+        disown
+    else
+        nohup "$0" "${args[@]}" > "$run_with_nohup" 2>&1 &
+        disown
     fi
     disown
-    echo "tail -f nohup.out to monitor progress"
+    echo "tail -f $(basename "$run_with_nohup") to monitor progress"
+    exit 0
+elif [ -n "$run_with_daemon" ]; then
+    run_with_daemon="$(readlink -f "$run_with_daemon")"
+    echo "=== daemon: $0 ${args[@]} ===" > "$run_with_daemon"
+    daemonize -a -c "$(pwd)" -e "$run_with_daemon" -o "$run_with_daemon" -p "$run_with_daemon.pid" "$(readlink -f "$0")" "${args[@]}"
+    tail --pid $(cat "$run_with_daemon.pid") -f "$run_with_daemon"
+    rm -f "$run_with_daemon.pid"
     exit 0
 elif [ -n "$no_env" ]; then
     env -i "HOME=$HOME" "http_proxy=$http_proxy" "https_proxy=$https_proxy" "no_proxy=$no_proxy" "PATH=$PATH" "$0" "${args[@]}" 

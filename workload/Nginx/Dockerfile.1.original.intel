@@ -1,24 +1,17 @@
 # nginx-original
 
-FROM rockylinux:8.6 AS build
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
 
-RUN dnf -y install epel-release dnf-plugins-core
-RUN dnf config-manager --set-enabled powertools
-RUN dnf group -y install "Development Tools"
-RUN dnf -y install cpuid cmake numactl wget pcre pcre-devel libarchive nasm
-RUN dnf -y update
+FROM qatsw-crypto-base-ssl3-ubuntu${RELEASE} AS build
+RUN  apt-get update && apt-get install -y git cmake make numactl wget libpcre3-dev libtool nasm zlib1g-dev
 
-ARG OPENSSL_VER="1_1_1n"
-ARG OPENSSL_REPO=https://github.com/openssl/openssl.git
-RUN git clone -b OpenSSL_${OPENSSL_VER} --depth 1 ${OPENSSL_REPO}
-RUN cd /openssl && \
-    ./config && \
-    make depend && \
-    make -j && \
-    make install
-
-ARG NGINX_VER="1.20.2"
-ARG NGINX_PACKAGE=http://nginx.org/download/nginx-${NGINX_VER}.tar.gz
+ARG NGINX_VER="1.22.1"
+ARG NGINX_PACKAGE=https://nginx.org/download/nginx-${NGINX_VER}.tar.gz
 RUN wget ${NGINX_PACKAGE} && tar xf nginx-${NGINX_VER}.tar.gz && \
     cd nginx-${NGINX_VER} && \
     ./configure \
@@ -37,20 +30,11 @@ RUN wget ${NGINX_PACKAGE} && tar xf nginx-${NGINX_VER}.tar.gz && \
     make -j && \
     make install
 
-FROM rockylinux:8.6
-RUN dnf -y install epel-release dnf-plugins-core && \
-    dnf config-manager --set-enabled powertools && \
-    dnf -y install ufw && \
-    dnf install -y numactl iptables net-tools && dnf -y update && \
-    dnf clean all
-
-ENV  OPENSSL_ENGINES=/usr/local/lib64/engines-1.1
+FROM qatsw-crypto-base-ssl3-ubuntu${RELEASE}
+RUN  apt-get update && apt-get install -y numactl iptables net-tools libpcre3 zlib1g systemd && apt-get clean
 
 COPY --from=build /usr/local/ /usr/local/
 COPY --from=build /var/www/ /var/www/
-
-RUN echo "/usr/local/lib64" >> /etc/ld.so.conf.d/all-libs.conf && ldconfig
-
 COPY conf/*.conf /usr/local/share/nginx/conf/
 COPY prepare_nginx.sh /
 

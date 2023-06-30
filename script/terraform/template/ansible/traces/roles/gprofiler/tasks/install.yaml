@@ -1,12 +1,24 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
-- name: Preload gprofile docker image with docker
-  command: "docker pull {{ gprofiler_image }}:{{ gprofiler_version }}"
-  when: trace_from == "docker"
-  ignore_errors: yes
+- name: Check if gprofiler is already installed
+  stat:
+    path: /usr/local/bin/gprofiler
+  register: gprofiler
 
-- name: Preload gprofile docker image with ctr
-  command: "ctr -n k8s.io i pull {{ gprofiler_image }}:{{ gprofiler_version }}"
-  when: trace_from == "kubernetes"
-  become: yes
-  ignore_errors: yes
+- name: Get uname -m
+  command: uname -m
+  register: uname
+  when: not gprofiler.stat.exists
+
+- name: Fetch gprofiler
+  get_url:
+    url: "{{ gprofiler_package }}/gprofiler_{{ uname.stdout }}"
+    dest: /usr/local/bin/gprofiler
+    mode: "a+rx"
+  become: true
+  when: not gprofiler.stat.exists
 

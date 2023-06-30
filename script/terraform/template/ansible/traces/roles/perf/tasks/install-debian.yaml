@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 
 - name: uname -r
@@ -10,6 +15,7 @@
       - linux-tools-common
       - linux-tools-generic
       - "linux-tools-{{ unamer.stdout }}"
+    update_cache: true
     state: present
   become: yes
   register: aptrc

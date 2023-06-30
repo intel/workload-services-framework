@@ -1,10 +1,15 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 ---
 - name: "Docker credential helper setup"
-  hosts: "localhost"
-  any_errors_fatal: true
+  hosts: all
+  any_errors_fatal: false
   gather_facts: false
   tasks:
     - name: "Prepare correct Docker Auth"
       ansible.builtin.include_role:
         name: docker_auth
-        tasks_from: main
+      when: ansible_connection != 'winrm'

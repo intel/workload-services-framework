@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: Create the emon directory
   file:
@@ -9,28 +14,32 @@
 
 - name: Fetch emon files
   fetch:
-    src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon.dat"
-    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-emon/emon.dat"
+    src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon.{{ item.src }}"
+    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-emon/{{ item.dest }}"
     flat: yes
   become: no
   delegate_to: "{{ trace_node.1 }}"
   ignore_errors: yes
+  loop:
+  - src: dat
+    dest: emon.dat
+  - src: start
+    dest: TRACE_START
+  - src: stop
+    dest: TRACE_STOP
 
 - name: Remove any collection files
   file:
-    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon.dat"
+    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon.{{ item }}"
     state: absent
   become: yes
   delegate_to: "{{ trace_node.1 }}"
   ignore_errors: yes
-
-- name: Remove any collection files
-  file:
-    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon.pid"
-    state: absent
-  become: yes
-  delegate_to: "{{ trace_node.1 }}"
-  ignore_errors: yes
+  loop:
+  - dat
+  - start
+  - stop
+  - pid
 
 - name: Post Processing
   include_tasks:

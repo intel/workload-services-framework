@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 cmake_minimum_required (VERSION 2.8...3.24)
 
@@ -34,8 +39,8 @@ else()
 endif()
 
 include(registry OPTIONAL)
-execute_process(COMMAND bash -c "GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo git fetch --tags > /dev/null && GIT_ASKPASS=echo git tag" TIMEOUT 5 OUTPUT_VARIABLE tmp RESULT_VARIABLE status OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
-if (RELEASE MATCHES "^:?v?[0-9]+[.][0-9]+$")
+execute_process(COMMAND bash -c "GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo git fetch --tags > /dev/null;GIT_ASKPASS=echo git tag | sort -V" TIMEOUT 5 OUTPUT_VARIABLE tmp RESULT_VARIABLE status OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+if (RELEASE MATCHES "^:?v?[0-9]+[.][0-9]+[.]*[0-9]*$")
     string(REPLACE ":" "" release1 "${RELEASE}")
     if ((status EQUAL 0) AND (tmp MATCHES "${release1}"))
         if((NOT DEFINED REGISTRY) OR (NOT REGISTRY))
@@ -45,16 +50,22 @@ if (RELEASE MATCHES "^:?v?[0-9]+[.][0-9]+$")
         endif()
     endif()
 else ()
-    string(REGEX REPLACE ".*\nv?" "" tmp "${tmp}")
+    string(REGEX REPLACE ".*\n" "" tmp "${tmp}")
+    string(REGEX REPLACE "(v?[0-9]*[.][0-9]*)[.].*" "\\1" mtmp "${tmp}")
     if (tmp AND (status EQUAL 0))
         message("")
         message("*************************************************************")
         message("")
-        message("${green}INFO:${reset} Detected release ${tmp}.")
-        message("  Switch to release ${tmp} as follows:")
+        if (tmp STREQUAL mtmp)
+            message("${green}INFO:${reset} Detected major release ${mtmp}.")
+        else()
+            message("${green}INFO:${reset} Detected major release ${mtmp} and minor releases up to ${tmp}.")
+            message("${green}INFO:${reset} Minor releases do not cover all workloads. See workload README.")
+        endif()
         message("")
-        message("git checkout ${tmp}")
-        message("cmake -DRELEASE=v${tmp} ..")
+        message("${green}INFO:${reset} Switch to a major/minor release as follows:")
+        message("${green}INFO:${reset} git checkout tags/${mtmp}")
+        message("${green}INFO:${reset} cmake -DRELEASE=${mtmp} ..")
         message("")
         message("*************************************************************")
         message("")

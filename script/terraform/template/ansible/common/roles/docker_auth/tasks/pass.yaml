@@ -1,22 +1,24 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 ---
 - name: 'Check version validity for pass'
   ansible.builtin.set_fact:
     docker_auth_pass_ver: '1.*'
     docker_auth_pass_pkg: 'pass=1.*'
-  when: docker_auth_method == 'pass' and docker_auth_pass_ver | default('undefined') == 'undefined'
-
-- name: 'Check version validity for pass'
-  ansible.builtin.set_fact:
     docker_auth_cred_ver: '0.7.0'
     docker_auth_cred_url: 'https://github.com/docker/docker-credential-helpers/releases/download/v0.7.0/docker-credential-pass-v0.7.0.linux-amd64'
-  when: docker_auth_method == 'pass' and docker_auth_cred_ver | default('undefined') == 'undefined'
+  when: docker_auth_pass_ver | default('undefined') == 'undefined'
 
 - name: 'Find Home path'
   ansible.builtin.shell:
-    cmd: 'echo ~{{ ansible_user }}'
+    cmd: 'echo $HOME'
     executable: /bin/bash
   register: home
-  changed_when: false
+  failed_when: false
+  become: false
 
 - name: 'Create docker auth paths'
   ansible.builtin.file:
@@ -28,28 +30,30 @@
     - "{{ docker_auth_config_json | dirname }}"
     - "{{ docker_auth_pass_keystore_dir }}"
     - "{{ docker_auth_pass_keyring_dir }}"
+  failed_when: false
+  become: false
 
 - name: 'Copy docker auth'
   ansible.builtin.copy:
     src: '/home/{{ item }}'
     dest: '{{ home.stdout }}/{{ item }}'
     mode: preserve
-    owner: '{{ ansible_user }}'
   when: docker_auth_reuse
   failed_when: false
-  become: true
   loop:
     - "{{ docker_auth_config_json }}"
     - "{{ docker_auth_pass_keystore_dir }}"
     - "{{ docker_auth_pass_keyring_dir }}"
+  become: false
 
 - name: 'Try to wget docker-credential-pass executable from remote source'
   ansible.builtin.get_url:
     url: '{{ docker_auth_cred_url }}'
     dest: '{{ home.stdout }}/docker-credential-pass'
     mode: '755'
-  register: wget_docker_credentials_pass
+  register: wgetrc
   failed_when: false
+  become: false
 
 - name: 'Alternative URL for docker-credential-pass workflow'
   ansible.builtin.unarchive:
@@ -57,7 +61,9 @@
     dest: '{{ home.stdout }}/'
     remote_src: true
     mode: '755'
-  when: wget_docker_credentials_pass.status_code >= 400
+  when: wgetrc.status_code >= 400
+  failed_when: false
+  become: false
 
 - name: 'Copy docker-credential-pass to /usr/local/bin folder'
   become: true
@@ -66,6 +72,17 @@
     dest: '/usr/local/bin/docker-credential-pass'
     mode: '755'
     remote_src: true
+  failed_when: false
+
+- name: 'Refresh repository cache'
+  become: true
+  ansible.builtin.apt:
+    update_cache: true
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+  failed_when: false
 
 - name: 'Install pass dependency using package manager'
   become: true
@@ -75,3 +92,4 @@
     update_cache: false
   retries: 10
   delay: 10
+  failed_when: false

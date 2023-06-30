@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 resource "google_compute_instance" "default" {
   for_each = local.vms
 
@@ -13,7 +18,7 @@ resource "google_compute_instance" "default" {
 
   boot_disk {
     initialize_params {
-      image = each.value.image!=null?each.value.image:local.os_images[each.key]
+      image = each.value.os_image!=null?each.value.os_image:local.os_images[each.key]
       size = each.value.os_disk_size
       type = each.value.os_disk_type
     }
@@ -36,7 +41,6 @@ resource "google_compute_instance" "default" {
     for_each = [
       for k,v in local.networks : {
         instance     = k
-        network_type = v.network_type
         lun          = v.lun
       } if v.instance == each.key
     ]

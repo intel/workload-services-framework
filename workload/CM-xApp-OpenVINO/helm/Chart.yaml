@@ -1,0 +1,21 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+apiVersion: v2
+name: cm-xapp
+description: A Helm chart for Intelligent Connection Management for Automated Handover
+
+type: application
+version: 3.0
+
+appVersion: "3.0"
+
+dependencies:
+  - name: sd-ran
+    version: "1.4.124"
+    repository: "https://sdrancharts.onosproject.org"
+  - name: ran-simulator
+    version: "1.4.2"
+    repository: "https://sdrancharts.onosproject.org"

@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 resource "tencentcloud_key_pair" "default" {
   key_name   = substr(replace("wsf-${var.job_id}", "-", "_"), 0, 25)
@@ -10,7 +15,7 @@ resource "tencentcloud_instance" "default" {
   instance_name = "wsf-${var.job_id}-${each.key}-instance"
   hostname = each.key
   availability_zone = tencentcloud_subnet.default.availability_zone
-  image_id = each.value.image!=null?each.value.image:data.tencentcloud_images.search[each.value.profile].images.0.image_id
+  image_id = each.value.os_image!=null?each.value.os_image:data.tencentcloud_images.search[each.value.profile].images.0.image_id
   instance_type = each.value.instance_type
 
   allocate_public_ip = true
@@ -29,7 +34,7 @@ resource "tencentcloud_instance" "default" {
   vpc_id = tencentcloud_vpc.default.id
   subnet_id = tencentcloud_subnet.default.id
 
-  security_groups = [ tencentcloud_security_group.default.id ]
+  orderly_security_groups = [ tencentcloud_security_group.default.id ]
 
   user_data = "${data.template_cloudinit_config.default[each.key].rendered}"
 

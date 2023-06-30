@@ -1,5 +1,10 @@
 ## terraform-base
 
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 ARG RELEASE
 ARG OS_VER=22.04
 ARG OS_IMAGE=ubuntu
@@ -7,7 +12,6 @@ ARG OS_IMAGE=ubuntu
 ARG DOCKER_CLI_VER=20.10.17
 ARG DOCKER_CLI_IMG=docker:${DOCKER_CLI_VER}-dind
 FROM ${DOCKER_CLI_IMG} as dockercli
-FROM csp-common${RELEASE} as configs
 
 FROM ${OS_IMAGE}:${OS_VER} as flamegraph
 RUN  apt-get update && apt-get install -y git
@@ -19,28 +23,35 @@ RUN  git clone ${FLAMEGRAPH_REPO} && \
     git checkout ${FLAMEGRAPH_VER}
 
 FROM ${OS_IMAGE}:${OS_VER}
-RUN  apt-get update && apt-get install -y skopeo zip less gnupg curl gawk netcat sudo openssh-client bzip2 && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN  apt-get update && apt-get install -y skopeo zip less gnupg curl gawk netcat connect-proxy sudo openssh-client bzip2 && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# python3
+# python3, Ansible and various validation tools
 ARG CONDA_DIR=/opt/conda
 ARG CONDA_VER=Miniconda3-py39_4.12.0-Linux-x86_64.sh
 ARG CONDA_REPO=https://repo.anaconda.com/miniconda
-RUN curl -o ~/miniconda.sh ${CONDA_REPO}/${CONDA_VER} && \
+ARG ANSIBLE_VER=7.5.0
+ARG ANSIBLE_REPO=conda
+RUN curl -L -o ~/miniconda.sh ${CONDA_REPO}/${CONDA_VER} && \
     bash ~/miniconda.sh -b -p ${CONDA_DIR} && \
     rm -f ~/miniconda.sh && \
-    chmod oug+x /opt/conda/etc/profile.d/conda.sh
+    chmod oug+x ${CONDA_DIR}/etc/profile.d/conda.sh && \
+    ${CONDA_DIR}/etc/profile.d/conda.sh && \
+    ${CONDA_DIR}/bin/conda install paramiko lxml pywinrm jq && \
+    ${CONDA_DIR}/bin/conda install -c conda-forge ansible==${ANSIBLE_VER} kazoo kafka-python && \
+    ${CONDA_DIR}/bin/conda clean --all
 ENV PATH=${CONDA_DIR}/bin:$PATH
 
 # Install terraform & packer
-RUN  curl https://apt.releases.hashicorp.com/gpg | gpg --dearmor > /usr/share/keyrings/hashicorp-archive-keyring.gpg
-RUN  echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep CODENAME /etc/lsb-release | cut -f2 -d=) main" > /etc/apt/sources.list.d/hashicorp.list
-RUN  apt-get update && apt-get install --fix-missing --fix-broken -y terraform packer && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Install Ansible and various validation tools
-RUN /opt/conda/etc/profile.d/conda.sh && \
-    conda install paramiko lxml pywinrm && \
-    conda install -c conda-forge ansible kazoo && \
-    conda clean --all 
+ARG TERRAFORM_VER=1.4.6
+ARG TERRAFORM_REPO=https://apt.releases.hashicorp.com
+ARG PACKER_VER=1.8.7
+ARG PACKER_REPO=https://apt.releases.hashicorp.com
+RUN  curl ${TERRAFORM_REPO}/gpg | gpg --dearmor > /usr/share/keyrings/hashicorp-archive-keyring.gpg && \
+     echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] ${TERRAFORM_REPO} $(. /etc/os-release;echo $VERSION_CODENAME) main" > /etc/apt/sources.list.d/hashicorp.list && \
+     apt-get update && apt-get install --fix-missing --fix-broken -y terraform=${TERRAFORM_VER}-* packer=${PACKER_VER}-* && \
+     rm -f /etc/apt/sources.list.d/hashicorp.list && \
+     apt-get clean && \
+     rm -rf /var/lib/apt/lists/*
 
 # Install docker CLI
 COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/
@@ -72,9 +83,11 @@ COPY entrypoint.sh /
 ENTRYPOINT [ "/entrypoint.sh" ]
 WORKDIR /opt/workspace
 
-# Copy CSP configurations
-COPY --from=configs /opt/ /opt/ 
-
 # Setup ssh proxy
-RUN echo "Include /opt/workspace/ssh_config*" >> /etc/ssh/ssh_config
+RUN echo "Include /opt/project/script/terraform/ssh_config" >> /etc/ssh/ssh_config
 
+# Link common folders
+RUN ln -s /opt/project/script/terraform/template /opt/template && \
+    ln -s /opt/project/script/terraform/script /opt/script && \
+    ln -s /opt/project/stack /opt/stack && \
+    ln -s /opt/project/script/csp/opt /opt/csp

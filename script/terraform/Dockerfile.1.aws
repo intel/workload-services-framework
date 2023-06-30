@@ -1,14 +1,17 @@
 # terraform-aws
 
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 ARG RELEASE
-FROM csp-common${RELEASE} as csp
 FROM terraform-static${RELEASE}
-RUN apt-get update && apt-get install -y zip
 
 # Install AWS CLI 
 ARG AWSCLI_VER=2.9.15
 ARG AWSCLI_PKG=https://awscli.amazonaws.com/awscli-exe-linux-x86_64-${AWSCLI_VER}.zip
-RUN curl ${AWSCLI_PKG} -o awscliv2.zip && \
+RUN curl -L ${AWSCLI_PKG} -o awscliv2.zip && \
     unzip awscliv2.zip && \
     ./aws/install && \
     rm -rf aws
@@ -20,5 +23,4 @@ RUN curl -o /usr/local/bin/kubectl -L ${KUBECTL_REPO} && \
     chmod a+rx /usr/local/bin/kubectl
 
 # Add cleanup script
-COPY --from=csp /opt/script/cleanup-aws.sh /usr/local/bin/cleanup
-COPY --from=csp /opt/script/cleanup-common.sh /usr/local/bin/
+RUN echo "alias cleanup=/opt/csp/script/cleanup-aws.sh" >> /etc/bash.bashrc

@@ -1,0 +1,27 @@
+From 3a8ac4e71c17cdd1251b50092f39ed18e1845e4c Mon Sep 17 00:00:00 2001
+From: "Michael,Zhang" <michael.m.zhang@intel.com>
+Date: Tue, 6 Sep 2022 13:07:46 +0800
+Subject: [PATCH 09/22] Add a hook for vir-launcher terminated
+
+---
+ cmd/virt-launcher/virt-launcher.go | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/cmd/virt-launcher/virt-launcher.go b/cmd/virt-launcher/virt-launcher.go
+index 870748c9a..0bc8351c8 100644
+--- a/cmd/virt-launcher/virt-launcher.go
++++ b/cmd/virt-launcher/virt-launcher.go
+@@ -521,6 +521,10 @@ func main() {
+ 	close(stopChan)
+ 	<-cmdServerDone
+ 
++	//TODO: Need to notify to destruct the spdk-vhost-blk controller in spdk-vhost daemon.
++	log.Log.Info("Notify the controller to release spdk-vhost-blk.")
++	time.Sleep(10 * time.Second)
++
+ 	log.Log.Info("Exiting...")
+ }
+ 
+-- 
+2.27.0
+

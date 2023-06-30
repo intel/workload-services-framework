@@ -1,6 +1,13 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 - name: Install msr-tool on Debian
   apt:
-    name: msr-tools
+    name:
+    - msr-tools
+    - linux-tools-generic
     update_cache: true
   become: true
   when: ansible_os_family == "Debian"
@@ -12,6 +19,7 @@
   yum:
     name: 
     - msr-tools
+    - kernel-ml-tools
     update_cache: true
   become: true
   when: ansible_os_family == "RedHat"
@@ -28,6 +36,11 @@
   ignore_errors: true
   register: p
 
+- name: Get core current frequency
+  shell: cpupower frequency-info
+  register: frequency_info_output
+  ignore_errors: true
+
 - name: Write variable to file
   lineinfile:
     dest: "{{ wl_logs_dir }}/{{ inventory_hostname }}-msrinfo/{{ ansible_host }}.json"
@@ -37,20 +50,17 @@
   delegate_to: localhost
   ignore_errors: true
 
-# convert the file to json
-# 1. Remove comma from end of last line
-# 2. Add "{" before start file
-# 3. Add "}" endof file
-
-- name: Remove comma from end of last line
+- name: Add core current frequency
   lineinfile:
-    path: "{{ wl_logs_dir }}/{{ inventory_hostname }}-msrinfo/{{ ansible_host }}.json"
-    regexp: "(.*)\\,$"
-    line: "\\1"
-    backrefs: yes
+    dest: "{{ wl_logs_dir }}/{{ inventory_hostname }}-msrinfo/{{ ansible_host }}.json"
+    line: "\"Core_frequency\":\"{{ frequency_info_output.stdout | regex_search('current CPU frequency:.*\\d.*', '\\0') | first | regex_replace('current CPU frequency: *', '') | regex_replace('\\([^\\)]*\\)', '') | trim}}\""
+    insertafter: EOF
   delegate_to: localhost
   ignore_errors: true
 
+# convert the file to json
+# 1. Add "{" before start file
+# 2. Add "}" endof file
 - name: Add symbols to the beginning of the file 
   lineinfile:
     dest: "{{ wl_logs_dir }}/{{ inventory_hostname }}-msrinfo/{{ ansible_host }}.json"

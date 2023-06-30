@@ -1,5 +1,11 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 dev_cert_conf_dir: /usr/local/etc/wsf/certs
+dev_cert_replace: false
 dev_registry_port: 20666
 dev_registry_name: dev-registry
 dev_registry_mirror: ""

@@ -1,8 +1,12 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: set workspace
   set_fact:
     workspace: "/tmp/{{ wl_namespace }}-workspace"
-    cacheable: true
 
 - name: Create remote workspace
   block:
@@ -13,7 +17,7 @@
         state: directory
 
     - name: invoke docker create
-      command: "docker create {{ (wl_registry_map == ',') | ternary('','--pull always') }} {{ wl_docker_options }} {{ wl_docker_image }}"
+      command: "docker create {{ (wl_registry_map == ',') | ternary('','--pull always') }} {{ workload_config.docker_options }} {{ workload_config.docker_image }}"
       register: container_id
       delegate_to: localhost
       become: true
@@ -58,7 +62,7 @@
     cmd: |
       for k in $(compgen -e | grep -iE '_proxy$'); do
         eval 'v=$'$k
-        echo "export $k=\"${v//\"/\\\"}\""
+        echo "export $k=$v"
       done
     executable: /bin/bash
   register: proxies
@@ -85,6 +89,7 @@
 
     - name: mount disks
       shell: |
+        mkdir -p {{ workspace }}{{ item.path }}
         mount --bind {{ item.path }} {{ workspace }}{{ item.path }}
       loop: "{{ disks.files }}"
       become: true
@@ -93,34 +98,35 @@
       shell:
         executable: /bin/bash
         cmd: |
-          chroot --userspec={{ user }} {{ workspace }} /bin/sh -c "cd {{ dir }};{{ env }};{{ proxies.stdout_lines | join(';') | default('true',true) }};{{ cmd }}" > /tmp/{{ wl_namespace }}-logs 2>&1 & echo $!
+          chroot --userspec={{ user }} {{ workspace }} /bin/sh -c "cd {{ dir }};{{ env }};{{ proxies.stdout_lines | join(';') | default('true',true) }};{{ cmd }}" > /tmp/{{ wl_namespace }}-logs 2>&1 & 
+          echo $!
+          disown
       register: pid
       become: true
 
     - name: waitproc to wait for logs complete
       shell:
         cmd: |
-          timeout {{ wl_timeout[0] }}s cat {{ workspace }}{{ wl_export_logs }} > /tmp/{{ wl_namespace }}-logs.tar 2> /dev/null &
+          timeout {{ workload_config.timeout | split(',') | first }}s cat {{ workspace }}{{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-logs.tar 2> /dev/null &
           echo $!
+          disown
         executable: /bin/bash
       register: waitproc
 
-    - name: "wait for the starting phrase: {{ wl_trace_mode.split(',')[1] }}"
+    - name: "wait for the starting phrase: {{ workload_config.trace_mode.split(',')[1] }}"
       shell:
         cmd: |
-          grep -q -F "{{ wl_trace_mode.split(',')[1] }}" <(
-            while kill -0 {{ waitproc.stdout_lines | first }}; do
-              cat /tmp/{{ wl_namespace }}-logs
-              bash -c 'sleep 0.5'
-            done
-          )
+          while kill -0 {{ waitproc.stdout_lines | first }}; do
+            grep -q -F "{{ workload_config.trace_mode.split(',')[1] }}" /tmp/{{ wl_namespace }}-logs && break
+            bash -c 'sleep 0.1'
+          done
         executable: /bin/bash
-      when: (wl_trace_mode | split(',') | first == "roi")
+      when: (workload_config.trace_mode | split(',') | first == "roi")
       ignore_errors: yes
 
-    - name: "wait for timeout {{ wl_trace_mode.split(',')[1] }}s"
-      command: "timeout {{ wl_trace_mode.split(',')[1] | int }}s tail --pid={{ waitproc.stdout_lines[0] }} -f /dev/null"
-      when: (wl_trace_mode | split(',') | first == "time")
+    - name: "wait for timeout {{ workload_config.trace_mode.split(',')[1] }}s"
+      command: "timeout {{ workload_config.trace_mode.split(',')[1] | int }}s tail --pid={{ waitproc.stdout_lines[0] }} -f /dev/null"
+      when: (workload_config.trace_mode | split(',') | first == "time")
       ignore_errors: yes
 
     - name: start trace
@@ -129,22 +135,20 @@
         tasks_from: start
       when: wl_trace_modules is defined
 
-    - name: "wait for the stop phrase: {{ wl_trace_mode.split(',')[2] }}"
+    - name: "wait for the stop phrase: {{ workload_config.trace_mode.split(',')[2] }}"
       shell:
         cmd: |
-          grep -q -F "{{ wl_trace_mode.split(',')[2] }}" <(
-            while kill -0 {{ waitproc.stdout_lines | first }}; do
-              cat /tmp/{{ wl_namespace }}-logs
-              bash -c 'sleep 0.5'
-            done
-          )
+          while kill -0 {{ waitproc.stdout_lines | first }}; do
+            grep -q -F "{{ workload_config.trace_mode.split(',')[2] }}" /tmp/{{ wl_namespace }}-logs && break
+            bash -c 'sleep 0.5'
+          done
         executable: /bin/bash
-      when: (wl_trace_mode | split(',') | first == "roi")
+      when: (workload_config.trace_mode | split(',') | first == "roi")
       ignore_errors: yes
 
-    - name: "wait for timeout {{ wl_trace_mode.split(',')[2] }}s"
-      command: "timeout {{ wl_trace_mode.split(',')[2] | int }}s tail --pid={{ waitproc.stdout_lines[0] }} -f /dev/null"
-      when: (wl_trace_mode | split(',') | first == "time")
+    - name: "wait for timeout {{ workload_config.trace_mode.split(',')[2] }}s"
+      command: "timeout {{ workload_config.trace_mode.split(',')[2] | int }}s tail --pid={{ waitproc.stdout_lines[0] }} -f /dev/null"
+      when: (workload_config.trace_mode | split(',') | first == "time")
       ignore_errors: yes
 
     - name: revoke trace
@@ -153,7 +157,7 @@
         tasks_from: stop
       when: 
       - wl_trace_modules is defined
-      - (wl_trace_mode | split(',') | length == 3)
+      - (workload_config.trace_mode | split(',') | length == 3)
 
     - name: wait until execution compete
       command: "tail --pid={{ waitproc.stdout_lines | first }} -f /dev/null"
@@ -211,31 +215,35 @@
     state: directory
   delegate_to: localhost
 
-- name: copy logs back to the itr directory
-  fetch:
-    src: "/tmp/{{ wl_namespace }}-logs.tar"
-    dest: "{{ wl_logs_dir }}/itr-{{ itr }}/"
-    flat: yes
+- block:
 
-- name: untar the logs
-  unarchive:
-    src: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ wl_namespace }}-logs.tar"
-    dest: "{{ wl_logs_dir}}/itr-{{ itr }}/native"
-  delegate_to: localhost
-  ignore_errors: true
+  - name: copy logs back to the itr directory
+    fetch:
+      src: "/tmp/{{ wl_namespace }}-logs.tar"
+      dest: "{{ wl_logs_dir }}/itr-{{ itr }}/"
+      flat: yes
 
-- name: remove remote logs
-  file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-  - "/tmp/{{ wl_namespace }}-logs.tar"
-  - "/tmp/{{ wl_namespace }}-logs"
-  become: true
+  - name: untar the logs
+    unarchive:
+      src: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ wl_namespace }}-logs.tar"
+      dest: "{{ wl_logs_dir}}/itr-{{ itr }}/native"
+    delegate_to: localhost
 
-- name: remove local logs tarfile
-  file:
-    path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ wl_namespace }}-logs.tar"
-    state: absent
-  delegate_to: localhost
+  always:
 
+  - name: remove remote logs
+    file:
+      path: "{{ item }}"
+      state: absent
+    loop:
+    - "/tmp/{{ wl_namespace }}-logs.tar"
+    - "/tmp/{{ wl_namespace }}-logs"
+    become: true
+    ignore_errors: true
+
+  - name: remove local logs tarfile
+    file:
+      path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ wl_namespace }}-logs.tar"
+      state: absent
+    delegate_to: localhost
+    ignore_errors: true

@@ -1,4 +1,9 @@
 #!/bin/bash -e
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
 
@@ -9,7 +14,7 @@ clouds="$(
 )"
 
 FIND_OPTIONS="-name Dockerfile.*.terraform"
-([[ "$clouds" = *aws* ]] || [ "$REGISTRY" = "amr-registry-pre.caas.intel.com/sf-cwr-test/" ]) && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.aws"
+[[ "$clouds" = *aws* ]] && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.aws"
 [[ "$clouds" = *gcp* ]] && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.gcp"
 [[ "$clouds" = *azure* ]] && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.azure"
 [[ "$clouds" = *tencent* ]] && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.tencent"

@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: remove old versions
   apt:
@@ -24,7 +29,7 @@
 - name: add docker GPG key
   get_url:
     url: "{{ docker_dist_repo }}/linux/debian/gpg"
-    dest: /etc/apt/trusted.gpg.d/docker.asc
+    dest: /usr/share/keyrings/docker.asc
     mode: '0644'
     force: true
   become: true
@@ -41,7 +46,7 @@
 
 - name: add docker repository to apt
   apt_repository:
-    repo: "deb {{ docker_dist_repo }}/linux/debian {{ codename.stdout | lower }} stable"
+    repo: "deb [signed-by=/usr/share/keyrings/docker.asc] {{ docker_dist_repo }}/linux/debian {{ codename.stdout | lower }} stable"
     state: present
     update_cache: false
   become: true

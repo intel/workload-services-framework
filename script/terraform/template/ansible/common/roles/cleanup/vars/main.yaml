@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 cleanup_restore_path: /usr/local/etc/wsf-restore
 cleanup_hugepage_actions:

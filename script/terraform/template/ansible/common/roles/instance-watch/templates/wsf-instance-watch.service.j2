@@ -1,0 +1,8 @@
+[Unit]
+Description=WSF instance watchdog
+
+[Service]
+ExecStart=/bin/bash -c 'echo "Monitoring uptime..."; while [ $(sed "s/[. ].*//" /proc/uptime) -lt {{ (instance_watch_uptime | int)*60 }} ]; do sleep {{ instance_watch_interval }}; done; echo "Monitoring CPU load..."; ct=0; while [ $ct -lt {{ instance_watch_cpu_load_count }} ]; do prev="$(awk "/^cpu /{t=0;for(i=2;i<=NF;i++)t=t+\$i;print\$5;print t}" /proc/stat)"; sleep {{ instance_watch_cpu_load_span }}; load="$(awk -v p="$prev" "/^cpu /{split(p,b);t=0;for(i=2;i<=NF;i++)t=t+\$i;print int(100-(\$5-b[1])*100/(t-b[2]))}" /proc/stat)"; if [ "$load" -lt {{ instance_watch_cpu_load }} ]; then ct=$(( ct + 1 )); else ct=0; fi; echo "ct=$ct, load=$load"; sleep {{ instance_watch_interval }}; done; shutdown -P +{{ instance_watch_shutdown_postpone }}'
+
+[Install]
+WantedBy=multi-user.target

@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - hosts: workload_hosts
   any_errors_fatal: true
@@ -21,14 +26,10 @@
   gather_facts: no
   tasks:
 
-  - name: Check Intel Certificate
-    stat:
-      path: "{{ playbook_dir }}/roles/intel-ca"
-    register: intelca
-    delegate_to: localhost
-
   - name: Intall Intel Certificate
     include_role:
       name: intel-ca
-    when: intelca.stat.exists
+    when:
+    - install_intelca | bool
+    - (playbook_dir + '/roles/intel-ca') is exists
 

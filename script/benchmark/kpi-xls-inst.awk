@@ -1,4 +1,9 @@
 #!/usr/bin/gawk
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 /^#svrinfo: / {
     name=gensub(/^.*logs-([^/]*)[/].*$/,"\\1",1,$2)

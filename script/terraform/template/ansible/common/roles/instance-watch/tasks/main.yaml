@@ -1,0 +1,25 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: setup instance watch
+  block:
+
+    - name: Create wsf-instance-watch.service
+      template:
+        src: wsf-instance-watch.service.j2
+        dest: /etc/systemd/system/wsf-instance-watch.service
+
+    - name: Activate wsf-instance-watch.service
+      systemd:
+        name: wsf-instance-watch
+        enabled: yes
+        daemon_reload: yes
+        state: started
+
+  ignore_errors: true
+  when:
+  - instance_watch | bool
+  - not ((csp | default('static')) in [ 'static', 'kvm' ])

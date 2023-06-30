@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: Create the perf directory
   file:
@@ -35,6 +40,20 @@
   ignore_errors: yes
   when: perf_fetch_data or perf_action == "stat"
 
+- name: Fetch trace start/stop timing
+  fetch:
+    src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.{{ item.src }}"
+    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-perf/{{ item.dest }}"
+    flat: yes
+  delegate_to: "{{ trace_node.1 }}"
+  become: yes
+  ignore_errors: yes
+  loop:
+  - src: start
+    dest: TRACE_START
+  - src: stop
+    dest: TRACE_STOP
+
 - name: Create flame graph
   include_tasks:
     file: flamegraph.yaml
@@ -42,25 +61,15 @@
 
 - name: Remove any collection files
   file:
-    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.record"
+    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.{{ item }}"
     state: absent
   become: yes
   delegate_to: "{{ trace_node.1 }}"
   ignore_errors: yes
-
-- name: Remove any collection files
-  file:
-    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.report"
-    state: absent
-  become: yes
-  delegate_to: "{{ trace_node.1 }}"
-  ignore_errors: yes
-
-- name: Remove any collection files
-  file:
-    path: "/tmp/{{ wl_namespace }}-{{ trace_node | default(inventory_hostname) }}-perf.pid"
-    state: absent
-  become: yes
-  delegate_to: "{{ trace_node.1 }}"
-  ignore_errors: yes
+  loop:
+  - record
+  - data
+  - pid
+  - start
+  - stop
 

@@ -1,0 +1,81 @@
+From 81b3943b3f7980c15cd9e5775b301cb3d97173f1 Mon Sep 17 00:00:00 2001
+From: "Michael,Zhang" <michael.m.zhang@intel.com>
+Date: Sun, 28 Aug 2022 22:37:17 +0800
+Subject: [PATCH 02/22] mount volumes for spdk-vhost for virt-launcher pod
+
+---
+ pkg/virt-controller/services/template.go | 37 +++++++++++++++++++++++-
+ 1 file changed, 36 insertions(+), 1 deletion(-)
+
+diff --git a/pkg/virt-controller/services/template.go b/pkg/virt-controller/services/template.go
+index edb25ab18..366acc57c 100644
+--- a/pkg/virt-controller/services/template.go
++++ b/pkg/virt-controller/services/template.go
+@@ -71,6 +71,8 @@ const (
+ const KvmDevice = "devices.kubevirt.io/kvm"
+ const TunDevice = "devices.kubevirt.io/tun"
+ const VhostNetDevice = "devices.kubevirt.io/vhost-net"
++const SpdkVhostuserSocketDir = "/var/tmp/"
++const SharedHugepageDir = "/dev/hugepages"
+ const SevDevice = "devices.kubevirt.io/sev"
+ 
+ const debugLogs = "debugLogs"
+@@ -405,6 +407,37 @@ func (t *templateService) RenderLaunchManifestNoVm(vmi *v1.VirtualMachineInstanc
+ 	return t.renderLaunchManifest(vmi, nil, true)
+ }
+ 
++func addSpdkVhostuserVolumes(volumeMounts *[]k8sv1.VolumeMount, volumes *[]k8sv1.Volume) {
++	// "spdk-vhost-shared-dir" volume name will be used by userspace cni to place the spdk-vhost-user socket file`
++	*volumeMounts = append(*volumeMounts, k8sv1.VolumeMount{
++		Name:      "spdk-vhost-shared-dir",
++		MountPath: SpdkVhostuserSocketDir,
++	})
++
++	*volumes = append(*volumes, k8sv1.Volume{
++		Name: "spdk-vhost-shared-dir",
++		VolumeSource: k8sv1.VolumeSource{
++			HostPath: &k8sv1.HostPathVolumeSource{
++				Path: SpdkVhostuserSocketDir,
++			},
++		},
++	})
++
++	// Libvirt uses ovs-vsctl commands to get interface stats
++	*volumeMounts = append(*volumeMounts, k8sv1.VolumeMount{
++		Name:      "shared-hugepage",
++		MountPath: SharedHugepageDir,
++	})
++	*volumes = append(*volumes, k8sv1.Volume{
++		Name: "shared-hugepage",
++		VolumeSource: k8sv1.VolumeSource{
++			HostPath: &k8sv1.HostPathVolumeSource{
++				Path: SharedHugepageDir,
++			},
++		},
++	})
++}
++
+ func (t *templateService) RenderMigrationManifest(vmi *v1.VirtualMachineInstance, pod *k8sv1.Pod) (*k8sv1.Pod, error) {
+ 	reproducibleImageIDs, err := containerdisk.ExtractImageIDsFromSourcePod(vmi, pod)
+ 	if err != nil {
+@@ -557,6 +590,8 @@ func (t *templateService) renderLaunchManifest(vmi *v1.VirtualMachineInstance, i
+ 		},
+ 	})
+ 
++	addSpdkVhostuserVolumes(&volumeMounts, &volumes)
++
+ 	serviceAccountName := ""
+ 
+ 	for _, volume := range vmi.Spec.Volumes {
+@@ -1046,7 +1081,7 @@ func (t *templateService) renderLaunchManifest(vmi *v1.VirtualMachineInstance, i
+ 			"echo", "bound PVCs"}
+ 	} else {
+ 		command = []string{"/usr/bin/virt-launcher",
+-			"--qemu-timeout", generateQemuTimeoutWithJitter(t.launcherQemuTimeout),
++			"--qemu-timeout", "1800s", //generateQemuTimeoutWithJitter(t.launcherQemuTimeout),
+ 			"--name", domain,
+ 			"--uid", string(vmi.UID),
+ 			"--namespace", namespace,
+-- 
+2.27.0
+

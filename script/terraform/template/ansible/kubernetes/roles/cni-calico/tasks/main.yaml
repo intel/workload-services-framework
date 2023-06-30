@@ -1,96 +1,69 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
-# - name: Debug variables
-#   debug: 
-#     msg: |
-#       Module Variables ("vars"):
-#       --------------------------------
-#       {{ vars }} 
-#       Host Variables ("hostvars"):
-#       --------------------------------
-#       {{ hostvars }} 
+- name: Install calicoctl as a Kubernetes pod
+  shell: "kubectl create -f {{ k8s_calicoctl_rep }}"
 
-- name: Install tigera-operator.yaml
-  shell: "kubectl create -f {{ k8s_calico_tigera_operator_repository }}"
+- name: Add calicoctl alias
+  lineinfile:
+    path=/home/{{ ansible_user }}/.bashrc
+    line='alias calicoctl="kubectl exec -i -n kube-system calicoctl -- /calicoctl"'
+    state=present
+    insertafter=EOF
 
-- name: Wait for tigera-operator ready
+- name: Download calico.yaml to local
+  delegate_to: localhost
+  get_url:
+    url: "{{ k8s_calico_vxlan_repo if ( k8s_calico_encapsulation == 'vxlan' ) else k8s_calico_ipinip_repo }}"
+    dest: "{{ inventory_dir }}/calico.yaml"
+    mode: +rx
+  register: getrc
+  until: getrc is success
+  retries: 10
+  delay: 5
+
+- name: Set fact for custom cidr
+  set_fact:
+    insert_cidr_lines: "- name: CALICO_IPV4POOL_CIDR\n  value: {{ k8s_pod_cidr }}"
+
+- name: Replace calico.yaml with custom cidr
+  delegate_to: localhost
+  blockinfile:
+    path: "{{ inventory_dir }}/calico.yaml"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK cidr"
+    state: present
+    insertbefore: '# - name: CALICO_IPV4POOL_CIDR'
+    block: "{{ insert_cidr_lines | indent(width=12, first=True) }}"
+
+- name: Replace calico.yaml CrossSubnet with Always if vxlan enabled
+  delegate_to: localhost
+  replace:
+    path: "{{ inventory_dir }}/calico.yaml"
+    regexp: '(\s+)value: "CrossSubnet"(\s+.*)?$'
+    replace: '\1value: "Always"\2'
+  when: (k8s_calico_encapsulation | lower) == 'vxlan'
+
+- name: Copy replaced calico.yaml to remote
+  ansible.builtin.copy:
+    src: "{{ inventory_dir }}/calico.yaml"
+    dest: /tmp/{{ wl_namespace }}-calico.yaml
+
+- name: Install calico.yaml
+  shell: "kubectl create -f /tmp/{{ wl_namespace }}-calico.yaml"
+
+- name: Cleanup remote calico.yaml
+  file:
+    path: "/tmp/{{ wl_namespace }}-calico.yaml"
+    state: absent
+  ignore_errors: true
+
+- name: Wait for calico ready
   shell: |
-    kubectl wait --namespace=tigera-operator pod --for=condition=Ready -l k8s-app=tigera-operator --timeout=60s
+    kubectl wait --namespace=kube-system pod --for=condition=Ready -l k8s-app=calico-node --timeout=300s
   register: wait_ready
   retries: 50
   delay: 3
   until: wait_ready.rc == 0
-
-- block:
-  - name: Download custom-resources.yaml locally
-    delegate_to: localhost
-    get_url:
-      url: "{{ k8s_calico_custom_resources_repository }}"
-      dest: "{{ inventory_dir }}/custom-resources.yaml"
-      mode: 0755
-    register: getrc
-    until: getrc is success
-    retries: 10
-    delay: 5
-  
-  ### Customize custom-resources.yaml 
-  - block:
-    - name: Customize cidr for {{ k8s_cni }}
-      delegate_to: localhost
-      lineinfile:
-        dest: "{{ inventory_dir }}/custom-resources.yaml"
-        regexp: '^.*cidr: (.*)$'
-        line: "      cidr: {{ k8s_pod_cidr }}"
-
-    ### Customize encapsulation
-    - name: Customize encapsulation for {{ k8s_cni }}
-      delegate_to: localhost
-      lineinfile:
-        dest: "{{ inventory_dir }}/custom-resources.yaml"
-        regexp: '^.*encapsulation: (.*)$'
-        line: "      encapsulation: {{ k8s_calico_encapsulation | default('VXLAN') }}"
-    
-    ### Customize linuxDataplane if cni is calicovpp
-    - block:
-      - name: Customize linuxDataplane for {{ k8s_cni }}
-        delegate_to: localhost
-        lineinfile:
-          dest: "{{ inventory_dir }}/custom-resources.yaml"
-          insertafter: '^.*calicoNetwork:'
-          line: "    mtu: {{ k8s_calico_mtu }}"
-
-      - name: Customize mtu for {{ k8s_cni }}
-        delegate_to: localhost
-        lineinfile:
-          dest: "{{ inventory_dir }}/custom-resources.yaml"
-          insertafter: '^.*calicoNetwork:'
-          line: "    linuxDataplane: VPP"
-      when: k8s_cni == "calicovpp"
-
-  # install calico
-  - name: Copy custom-resources.yaml to remote
-    ansible.builtin.copy:
-      src: "{{ inventory_dir }}/custom-resources.yaml"
-      dest: /tmp/{{ wl_namespace }}-custom-resources.yaml
-
-  - name: Install custom-resources.yaml
-    shell: "kubectl create -f /tmp/{{ wl_namespace }}-custom-resources.yaml"
-
-  - name: Wait for calico ready
-    shell: |
-      kubectl wait --namespace=calico-system pod --for=condition=Ready -l k8s-app=calico-node --timeout=60s
-    register: wait_ready
-    retries: 50
-    delay: 3
-    until: wait_ready.rc == 0
-    when: k8s_cni != "calicovpp"
-
-  - name: Remove temp files
-    file:
-      path: "/tmp/{{ wl_namespace }}-custom-resources.yaml"
-      state: absent
-    ignore_errors: true
-
-### privisioning calicoctl tool
-- name: Install calicoctl
-  include_tasks:
-    file: "calicoctl.yaml"

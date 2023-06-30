@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 locals {
   disks_flat = flatten([
@@ -53,7 +58,7 @@ data "template_cloudinit_config" "default" {
   part {
     filename = "init-shellscript"
     content_type = "text/x-shellscript"
-    content = templatefile("./template/terraform/tencent/main/cloud-init.sh", {
+    content = templatefile("${path.module}/templates/cloud-init.sh", {
       disks = [ for k,v in local.disks: {
         serial = each.value.data_disk_spec!=null?(each.value.data_disk_spec.disk_type!="local"?tencentcloud_cbs_storage.default[k].id:""):""
         mount_path = "/mnt/disk${v.lun+1}"

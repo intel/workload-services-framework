@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 variable "common_tags" {
   description = "Resource tags"
@@ -25,6 +30,11 @@ variable "ssh_pub_key" {
   nullable = false
 }
 
+variable "ssh_pri_key_file" {
+  type = string
+  default = "ssh_access.key"
+}
+
 variable "sg_whitelist_cidr_blocks" {
   type     = list(string)
   nullable = false
@@ -46,12 +56,13 @@ variable "instance_profiles" {
 
     vm_count = number
     instance_type = string
+    cpu_model_regex = string
 
     os_type = string
     os_disk_type = string
     os_disk_size = number
     os_disk_performance = string
-    image = string
+    os_image = string
 
     data_disk_spec = list(object({
       disk_count = number
@@ -84,3 +95,7 @@ variable "resource_group_id" {
   default = null
 }
 
+variable "cpu_model_timeout" {
+  type = string
+  default = "5m"
+}
