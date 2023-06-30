@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 perf_record_options: "-a -g"
 perf_report_options: "--header"
@@ -6,7 +11,7 @@ perf_script_options: ""
 perf_flamegraph: no
 perf_flamegraph_collapse_options: "--all"
 perf_flamegraph_svg_options: "--color=java --hash"
-perf_collection_time: 10
+perf_collection_time: infinity
 perf_action: "record"
 perf_stat_options: "-a -I 500 -e cycles -e instructions"
 perf_options: "{{ (perf_action == 'stat') | ternary(perf_stat_options, perf_record_options) }}"

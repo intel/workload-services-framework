@@ -1,0 +1,33 @@
+From bbd272c6cf930382a38f5afc71b10aedd6eaa2cf Mon Sep 17 00:00:00 2001
+From: "Michael,Zhang" <michael.m.zhang@intel.com>
+Date: Fri, 2 Sep 2022 21:16:17 +0800
+Subject: [PATCH 04/22] Add some debug info
+
+---
+ pkg/virt-launcher/virtwrap/manager.go | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/pkg/virt-launcher/virtwrap/manager.go b/pkg/virt-launcher/virtwrap/manager.go
+index cbcd60c56..13941ea2c 100644
+--- a/pkg/virt-launcher/virtwrap/manager.go
++++ b/pkg/virt-launcher/virtwrap/manager.go
+@@ -841,6 +841,8 @@ func (l *LibvirtDomainManager) SyncVMI(vmi *v1.VirtualMachineInstance, allowEmul
+ 		return nil, err
+ 	}
+ 
++	logger.Info("Domain conversion succesed !")
++
+ 	// Set defaults which are not coming from the cluster
+ 	api.NewDefaulter(c.Architecture).SetObjectDefaults_Domain(domain)
+ 
+@@ -858,6 +860,7 @@ func (l *LibvirtDomainManager) SyncVMI(vmi *v1.VirtualMachineInstance, allowEmul
+ 				return nil, err
+ 			}
+ 			logger.Info("Domain defined.")
++			logger.Infof("Domain name is : %s", domain.Spec.Name)
+ 		} else {
+ 			logger.Reason(err).Error(failedGetDomain)
+ 			return nil, err
+-- 
+2.27.0
+

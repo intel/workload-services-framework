@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 resource "alicloud_ecs_key_pair" "default" {
   key_pair_name = replace("wsf-${var.job_id}", "-", "_")
@@ -11,7 +16,7 @@ resource "alicloud_instance" "default" {
 
   instance_name = "wsf-${var.job_id}-${each.key}-instance"
   host_name = each.key
-  image_id = each.value.image!=null?each.value.image:local.images[each.value.profile]
+  image_id = local.images[each.value.profile]
   instance_type = each.value.instance_type
   security_groups = [ alicloud_security_group.default.id ]
   system_disk_category = each.value.os_disk_type

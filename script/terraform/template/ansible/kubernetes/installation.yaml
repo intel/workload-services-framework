@@ -1,65 +1,69 @@
-
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+---
 # global k8s facts stored in localhost
-- hosts: localhost
-  gather_facts: no
+- name: "Cluster check over localhost"
+  hosts: localhost
+  gather_facts: false
   tasks:
+    - name: "Check cluster status"
+      ansible.builtin.include_role:
+        name: installation
+        tasks_from: check-cluster
+      when: ansible_connection != 'winrm'
 
-  - name: Check cluster status
-    include_role:
-      name: installation
-      tasks_from: check-cluster
-    when: ansible_connection != 'winrm'
-
-- hosts: cluster_hosts
+- name: "Cluster hosts preparation"
+  hosts: cluster_hosts
   any_errors_fatal: true
-  gather_facts: no
+  gather_facts: false
   tasks:
+    - name: "Prepare the cluster"
+      ansible.builtin.include_role:
+        name: installation
+        tasks_from: prepare-cluster
+      when: ansible_connection != 'winrm'
 
-  - name: Prepare the cluster
-    include_role:
-      name: installation
-      tasks_from: prepare-cluster
-    when: ansible_connection != 'winrm'
-
-- hosts: "{{ ('controller' in groups) | ternary('controller','localhost') }}"
-  gather_facts: no
+- name: "Create cluster on controller node"
+  hosts: "{{ ('controller' in groups) | ternary('controller','localhost') }}"
+  gather_facts: false
   tasks:
+    - name: "Create the cluster"
+      ansible.builtin.include_role:
+        name: installation
+        tasks_from: create-cluster
+      when: ansible_connection != 'winrm'
 
-  - name: Create the cluster
-    include_role:
-      name: installation
-      tasks_from: create-cluster
-    when: ansible_connection != 'winrm'
-
-- hosts: workload_hosts
+- name: "Join workload hosts to controller"
+  hosts: workload_hosts
   any_errors_fatal: true
-  gather_facts: no
+  gather_facts: false
   tasks:
+    - name: "Join workers"
+      ansible.builtin.include_role:
+        name: installation
+        tasks_from: join-workers
+      when: ansible_connection != 'winrm'
 
-  - name: Join workers
-    include_role:
-      name: installation
-      tasks_from: join-workers
-    when: ansible_connection != 'winrm'
-
-- hosts: "{{ ('controller' in groups) | ternary('controller','localhost') }}"
-  gather_facts: no
+- name: "Finalize controller installation tasks"
+  hosts: "{{ ('controller' in groups) | ternary('controller','localhost') }}"
+  gather_facts: false
   tasks:
-  
-  - name: Finalize controller
-    include_role:
-      name: installation
-      tasks_from: finalize-controller
-    when: ansible_connection != 'winrm'
+    - name: "Finalize controller"
+      ansible.builtin.include_role:
+        name: installation
+        tasks_from: finalize-controller
+      when: ansible_connection != 'winrm'
 
-- hosts: workload_hosts
+- name: "Finalize workload hosts installation tasks"
+  hosts: workload_hosts
   any_errors_fatal: true
-  gather_facts: no
+  gather_facts: false
   tasks:
-
-  - name: Finalize workers
-    include_role:
-      name: installation
-      tasks_from: finalize-workers
-    when: ansible_connection != 'winrm'
-
+    - name: "Finalize workers"
+      ansible.builtin.include_role:
+        name: installation
+        tasks_from: finalize-workers
+      when: ansible_connection != 'winrm'

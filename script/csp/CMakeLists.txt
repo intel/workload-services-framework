@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 add_custom_target(build_csp_common bash -c "PLATFORM=X64 IMAGEARCH=linux/amd64 BACKEND=${BACKEND} RELEASE=${RELEASE} REGISTRY=${REGISTRY} PROJECTROOT='${PROJECT_SOURCE_DIR}' SOURCEROOT='${CMAKE_CURRENT_SOURCE_DIR}' BUILDROOT='${CMAKE_BINARY_DIR}' '${CMAKE_CURRENT_SOURCE_DIR}/build.sh' ${BUILDSH_OPTIONS}")
 
 execute_process(COMMAND bash -c "mkdir -p '${CMAKE_CURRENT_SOURCE_DIR}/.docker' > /dev/null; touch '${CMAKE_CURRENT_SOURCE_DIR}/.gitconfig' 2>/dev/null; chmod 600 '${CMAKE_CURRENT_SOURCE_DIR}'/ssh_config" OUTPUT_QUIET ERROR_QUIET)

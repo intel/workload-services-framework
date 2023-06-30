@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: detect if nfd should be installed or not
   command: "grep -q -F feature.node.kubernetes.io {{ wl_logs_dir }}/kubernetes-config.yaml"
@@ -44,13 +49,4 @@
   when:
   - (install_nfd.rc == 0) or (k8s_enable_nfd | default('false') | bool)
   - nfd_check != 0
-
-- name: Install NFD plugins
-  include_role:
-    name: "nfd-dp-{{ plugin }}"
-  loop: "{{ k8s_nfd_dp_plugins | default([]) }}"
-  loop_control:
-    loop_var: plugin
-  when: 
-  - (install_nfd.rc == 0) or (k8s_enable_nfd | default('false') | bool)
 

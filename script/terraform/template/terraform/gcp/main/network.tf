@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 resource "google_compute_network" "default" {
   name         = "wsf-${var.job_id}-network"
   project      = local.project_id

@@ -1,5 +1,10 @@
 # test-config-aws_m6i-TLS1_2.yaml
 # Overwrite the test cases for performance tunning on AWS m6i instances
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 *_qatsw_off*:
   NGINX_WORKERS: 4

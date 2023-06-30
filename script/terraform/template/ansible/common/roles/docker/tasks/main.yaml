@@ -1,10 +1,15 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
     - name: install containerd
       include_role:
         name: containerd
       
     - name: check if docker already installed
-      command: docker ps
+      command: "docker {{ compose | default(false) | bool | ternary('compose version','ps') }}"
       register: docker
       ignore_errors: yes
 

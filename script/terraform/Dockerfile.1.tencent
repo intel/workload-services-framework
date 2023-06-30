@@ -1,12 +1,17 @@
 # terraform-tencent
 
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 ARG RELEASE
-FROM csp-common${RELEASE} as csp
 FROM terraform-static${RELEASE}
 
 # Install TCCLI 
-RUN python3 -m pip install --no-cache-dir tccli>=3.0.68.1
+ARG TENCENT_CLI_VER=3.0.871.1
+ARG TENCENT_CLI_REPO=conda
+RUN /opt/conda/bin/python3 -m pip install --no-cache-dir tccli==${TENCENT_CLI_VER}
 
 # Add cleanup script
-COPY --from=csp /opt/script/cleanup-tencent.sh /usr/local/bin/cleanup
-COPY --from=csp /opt/script/cleanup-common.sh /usr/local/bin/
+RUN echo "alias cleanup=/opt/csp/script/cleanup-tencent.sh" >> /etc/bash.bashrc

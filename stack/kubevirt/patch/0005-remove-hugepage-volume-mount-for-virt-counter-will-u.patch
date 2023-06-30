@@ -1,0 +1,59 @@
+From 6fbd5cecfa94fba0ade633fec83c43b8c254a793 Mon Sep 17 00:00:00 2001
+From: "Michael,Zhang" <michael.m.zhang@intel.com>
+Date: Fri, 2 Sep 2022 21:18:18 +0800
+Subject: [PATCH 05/22] remove hugepage volume mount for virt-counter, will use
+ the original method
+
+---
+ pkg/virt-controller/services/template.go | 28 ++++++++++++------------
+ 1 file changed, 14 insertions(+), 14 deletions(-)
+
+diff --git a/pkg/virt-controller/services/template.go b/pkg/virt-controller/services/template.go
+index 366acc57c..593345ded 100644
+--- a/pkg/virt-controller/services/template.go
++++ b/pkg/virt-controller/services/template.go
+@@ -423,19 +423,19 @@ func addSpdkVhostuserVolumes(volumeMounts *[]k8sv1.VolumeMount, volumes *[]k8sv1
+ 		},
+ 	})
+ 
+-	// Libvirt uses ovs-vsctl commands to get interface stats
+-	*volumeMounts = append(*volumeMounts, k8sv1.VolumeMount{
+-		Name:      "shared-hugepage",
+-		MountPath: SharedHugepageDir,
+-	})
+-	*volumes = append(*volumes, k8sv1.Volume{
+-		Name: "shared-hugepage",
+-		VolumeSource: k8sv1.VolumeSource{
+-			HostPath: &k8sv1.HostPathVolumeSource{
+-				Path: SharedHugepageDir,
+-			},
+-		},
+-	})
++	// // Libvirt uses ovs-vsctl commands to get interface stats
++	// *volumeMounts = append(*volumeMounts, k8sv1.VolumeMount{
++	// 	Name:      "shared-hugepage",
++	// 	MountPath: SharedHugepageDir,
++	// })
++	// *volumes = append(*volumes, k8sv1.Volume{
++	// 	Name: "shared-hugepage",
++	// 	VolumeSource: k8sv1.VolumeSource{
++	// 		HostPath: &k8sv1.HostPathVolumeSource{
++	// 			Path: SharedHugepageDir,
++	// 		},
++	// 	},
++	// })
+ }
+ 
+ func (t *templateService) RenderMigrationManifest(vmi *v1.VirtualMachineInstance, pod *k8sv1.Pod) (*k8sv1.Pod, error) {
+@@ -502,7 +502,7 @@ func (t *templateService) renderLaunchManifest(vmi *v1.VirtualMachineInstance, i
+ 	var imagePullSecrets []k8sv1.LocalObjectReference
+ 
+ 	var userId int64 = util.RootUser
+-	var privileged bool = false
++	var privileged bool = true //false
+ 
+ 	nonRoot := util.IsNonRootVMI(vmi)
+ 	if nonRoot {
+-- 
+2.27.0
+

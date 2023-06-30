@@ -1,0 +1,256 @@
+From b1a848a60e4cd8667fa9b94b7915ec2d9bbf4c55 Mon Sep 17 00:00:00 2001
+From: "Michael,Zhang" <michael.m.zhang@intel.com>
+Date: Tue, 6 Sep 2022 13:10:16 +0800
+Subject: [PATCH 10/22] attach the vhost-user-blk when empty-disk created
+
+---
+ pkg/virt-launcher/virtwrap/api/schema.go      |   2 +
+ .../virtwrap/converter/converter.go           | 181 ++++++++++++------
+ 2 files changed, 122 insertions(+), 61 deletions(-)
+
+diff --git a/pkg/virt-launcher/virtwrap/api/schema.go b/pkg/virt-launcher/virtwrap/api/schema.go
+index 7fd086831..4abdf08fc 100644
+--- a/pkg/virt-launcher/virtwrap/api/schema.go
++++ b/pkg/virt-launcher/virtwrap/api/schema.go
+@@ -604,6 +604,8 @@ type ReadOnly struct{}
+ 
+ type DiskSource struct {
+ 	Dev           string          `xml:"dev,attr,omitempty"`
++	Type          string          `xml:"type,attr,omitempty"`
++	Path          string          `xml:"path,attr,omitempty"`
+ 	File          string          `xml:"file,attr,omitempty"`
+ 	StartupPolicy string          `xml:"startupPolicy,attr,omitempty"`
+ 	Protocol      string          `xml:"protocol,attr,omitempty"`
+diff --git a/pkg/virt-launcher/virtwrap/converter/converter.go b/pkg/virt-launcher/virtwrap/converter/converter.go
+index 48d6c49b2..797d887e8 100644
+--- a/pkg/virt-launcher/virtwrap/converter/converter.go
++++ b/pkg/virt-launcher/virtwrap/converter/converter.go
+@@ -37,6 +37,7 @@ import (
+ 
+ 	"golang.org/x/sys/unix"
+ 
++	"kubevirt.io/kubevirt/pkg/emptydisk"
+ 	"kubevirt.io/kubevirt/pkg/virt-launcher/virtwrap/converter/vcpu"
+ 
+ 	"kubevirt.io/kubevirt/pkg/virt-controller/services"
+@@ -54,7 +55,6 @@ import (
+ 	"kubevirt.io/kubevirt/pkg/config"
+ 
+ 	containerdisk "kubevirt.io/kubevirt/pkg/container-disk"
+-	"kubevirt.io/kubevirt/pkg/emptydisk"
+ 	ephemeraldisk "kubevirt.io/kubevirt/pkg/ephemeral-disk"
+ 	cmdv1 "kubevirt.io/kubevirt/pkg/handler-launcher-com/cmd/v1"
+ 	hostdisk "kubevirt.io/kubevirt/pkg/host-disk"
+@@ -404,6 +404,10 @@ func SetDriverCacheMode(disk *api.Disk, directIOChecker DirectIOChecker) error {
+ 	mode := v1.DriverCache(disk.Driver.Cache)
+ 	isBlockDev := false
+ 
++	if disk.Type == "vhostuser" {
++		return nil
++	}
++
+ 	if disk.Source.File != "" {
+ 		path = disk.Source.File
+ 	} else if disk.Source.Dev != "" {
+@@ -834,6 +838,30 @@ func Convert_v1_EmptyDiskSource_To_api_Disk(volumeName string, _ *v1.EmptyDiskSo
+ 	return nil
+ }
+ 
++func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, _ *v1.EmptyDiskSource, disk *api.Disk) error {
++	if disk.Type == "lun" {
++		return fmt.Errorf(deviceTypeNotCompatibleFmt, disk.Alias.GetName())
++	}
++
++	disk.Type = "vhostuser"
++	disk.Device = "disk"
++	disk.Model = ""
++	disk.Snapshot = ""
++	//	disk.Alias.name = ""
++	disk.Alias = api.NewUserDefinedAlias("")
++
++	disk.Driver.Name = "qemu"
++	disk.Driver.Type = "raw"
++	disk.Driver.Discard = ""
++	disk.Source.Type = "unix"
++	disk.Source.Path = "/var/tmp/vhost.1"
++	disk.Target.Bus = "virtio"
++	disk.Driver.ErrorPolicy = ""
++	disk.Driver.Cache = ""
++
++	return nil
++}
++
+ func Convert_v1_ContainerDiskSource_To_api_Disk(volumeName string, _ *v1.ContainerDiskSource, disk *api.Disk, c *ConverterContext, diskIndex int) error {
+ 	if disk.Type == "lun" {
+ 		return fmt.Errorf(deviceTypeNotCompatibleFmt, disk.Alias.GetName())
+@@ -1497,6 +1525,36 @@ func Convert_v1_VirtualMachineInstance_To_api_Domain(vmi *v1.VirtualMachineInsta
+ 		} else {
+ 			err = Convert_v1_Hotplug_Volume_To_api_Disk(volume, &newDisk, c)
+ 		}
++
++		if volume.EmptyDisk != nil {
++			diskIndex := volumeIndices[disk.Name]
++			spdkVhostTag := "/var/tmp/vhost.tag" //If the tag is exist, then support the spdk vhost.
++			//			spdkVhostPath := "/var/tmp/vhost.0"
++			spdkVhostPath := fmt.Sprintf("/var/tmp/vhost.%d", diskIndex)
++			if util.IsVhostuserVmiSpec(&vmi.Spec) {
++				if _, err := os.Stat(spdkVhostPath); os.IsNotExist(err) {
++					logger := log.DefaultLogger()
++					logger.Infof("SPDK vhost socket directory: '%s' not present.", spdkVhostPath)
++
++				} else if err == nil {
++					logger := log.DefaultLogger()
++					logger.Infof("SPDK vhost socket directory: '%s' is present.", spdkVhostPath)
++					initializeQEMUCmdAndQEMUArg(domain)
++
++					domain.Spec.QEMUCmd.QEMUArg = append(domain.Spec.QEMUCmd.QEMUArg,
++						api.Arg{Value: "-chardev"},
++						api.Arg{Value: fmt.Sprintf("socket,id=spdk_vhost_blk%d,path=%s", diskIndex, spdkVhostPath)},
++						//api.Arg{Value: fmt.Sprintf("socket,id=spdk_vhost_blk%d,path=/var/tmp/vhost.%d", diskIndex, diskIndex)},
++						api.Arg{Value: "-device"},
++						api.Arg{Value: fmt.Sprintf("vhost-user-blk-pci,chardev=spdk_vhost_blk%d,num-queues=2", diskIndex)})
++					//api.Arg{Value: "vhost-user-blk-pci,chardev=spdk_vhost_blk0,num-queues=2"})
++				}
++			} else {
++				logger := log.DefaultLogger()
++				logger.Infof("Will not create vhost-user-blk device, please create the tag[%s]to support SPDK vhost in kubevirt.", spdkVhostTag)
++			}
++		}
++
+ 		if err != nil {
+ 			return err
+ 		}
+@@ -1883,69 +1941,70 @@ func Convert_v1_VirtualMachineInstance_To_api_Domain(vmi *v1.VirtualMachineInsta
+ 
+ 	//For spdk vhost support, re-visit
+ 	spdkVhostTag := "/var/tmp/vhost.tag" //If the tag is exist, then support the spdk vhost.
+-	spdkVhostPath := "/var/tmp/vhost.0"
+-	spdkVhostPath1 := "/var/tmp/vhost.1"
+-	spdkVhostPath2 := "/var/tmp/vhost.2"
++	//	spdkVhostPath := "/var/tmp/vhost.0"
++	// spdkVhostPath1 := "/var/tmp/vhost.1"
++	// spdkVhostPath2 := "/var/tmp/vhost.2"
+ 	//	if _, err := os.Stat(spdkVhostTag); os.IsNotExist(err) {
+ 	if util.IsVhostuserVmiSpec(&vmi.Spec) {
+-		if _, err := os.Stat(spdkVhostPath); os.IsNotExist(err) {
+-			logger := log.DefaultLogger()
+-			logger.Infof("SPDK vhost socket directory: '%s' not present.", spdkVhostPath)
+-
+-		} else if err == nil {
+-			logger := log.DefaultLogger()
+-			logger.Infof("SPDK vhost socket directory: '%s' is present.", spdkVhostPath)
+-			initializeQEMUCmdAndQEMUArg(domain)
+-			// -object memory-backend-file share=on
+-			// -chardev socket,id=spdk_vhost_scsi0,path=/var/tmp/vhost.0 \
+-			// -device vhost-user-scsi-pci,id=scsi0,chardev=spdk_vhost_scsi0,num_queues=2 \
+-			// -chardev socket,id=spdk_vhost_blk0,path=/var/tmp/vhost.1 \
+-			// -device vhost-user-blk-pci,chardev=spdk_vhost_blk0,num-queues=2
+-			// -numa node,memdev=mem0
+-			domain.Spec.QEMUCmd.QEMUArg = append(domain.Spec.QEMUCmd.QEMUArg,
+-				// api.Arg{Value: "-object"},
+-				// api.Arg{Value: "memory-backend-file,id=mem0,size=4G,mem-path=/dev/hugepages,share=on"},
+-				// api.Arg{Value: "-numa"},
+-				// api.Arg{Value: "node,memdev=mem0"},
+-				api.Arg{Value: "-chardev"},
+-				api.Arg{Value: fmt.Sprintf("socket,id=spdk_vhost_blk0,path=%s", spdkVhostPath)},
+-				api.Arg{Value: "-device"},
+-				api.Arg{Value: "vhost-user-blk-pci,chardev=spdk_vhost_blk0,num-queues=2"})
+-		}
+-		// for vshot.1
+-		if _, err := os.Stat(spdkVhostPath1); os.IsNotExist(err) {
+-			logger := log.DefaultLogger()
+-			logger.Infof("SPDK vhost socket directory: '%s' not present.", spdkVhostPath1)
+-
+-		} else if err == nil {
+-			logger := log.DefaultLogger()
+-			logger.Infof("SPDK vhost socket directory: '%s' is present.", spdkVhostPath1)
+-			initializeQEMUCmdAndQEMUArg(domain)
+-
+-			domain.Spec.QEMUCmd.QEMUArg = append(domain.Spec.QEMUCmd.QEMUArg,
+-				api.Arg{Value: "-chardev"},
+-				api.Arg{Value: fmt.Sprintf("socket,id=spdk_vhost_blk1,path=%s", spdkVhostPath1)},
+-				api.Arg{Value: "-device"},
+-				api.Arg{Value: "vhost-user-blk-pci,chardev=spdk_vhost_blk1,num-queues=2"})
+-		}
+-
+-		// for vhost.2
+-		if _, err := os.Stat(spdkVhostPath2); os.IsNotExist(err) {
+-			logger := log.DefaultLogger()
+-			logger.Infof("SPDK vhost socket directory: '%s' not present.", spdkVhostPath2)
+-
+-		} else if err == nil {
+-			logger := log.DefaultLogger()
+-			logger.Infof("SPDK vhost socket directory: '%s' is present.", spdkVhostPath2)
+-			initializeQEMUCmdAndQEMUArg(domain)
+-
+-			domain.Spec.QEMUCmd.QEMUArg = append(domain.Spec.QEMUCmd.QEMUArg,
+-				api.Arg{Value: "-chardev"},
+-				api.Arg{Value: fmt.Sprintf("socket,id=spdk_vhost_blk2,path=%s", spdkVhostPath2)},
+-				api.Arg{Value: "-device"},
+-				api.Arg{Value: "vhost-user-blk-pci,chardev=spdk_vhost_blk2,num-queues=2"})
+-		}
++		/* 		if _, err := os.Stat(spdkVhostPath); os.IsNotExist(err) {
++		   			logger := log.DefaultLogger()
++		   			logger.Infof("SPDK vhost socket directory: '%s' not present.", spdkVhostPath)
++
++		   		} else if err == nil {
++		   			logger := log.DefaultLogger()
++		   			logger.Infof("SPDK vhost socket directory: '%s' is present.", spdkVhostPath)
++		   			initializeQEMUCmdAndQEMUArg(domain)
++		   			// -object memory-backend-file share=on
++		   			// -chardev socket,id=spdk_vhost_scsi0,path=/var/tmp/vhost.0 \
++		   			// -device vhost-user-scsi-pci,id=scsi0,chardev=spdk_vhost_scsi0,num_queues=2 \
++		   			// -chardev socket,id=spdk_vhost_blk0,path=/var/tmp/vhost.1 \
++		   			// -device vhost-user-blk-pci,chardev=spdk_vhost_blk0,num-queues=2
++		   			// -numa node,memdev=mem0
++		   			domain.Spec.QEMUCmd.QEMUArg = append(domain.Spec.QEMUCmd.QEMUArg,
++		   				// api.Arg{Value: "-object"},
++		   				// api.Arg{Value: "memory-backend-file,id=mem0,size=4G,mem-path=/dev/hugepages,share=on"},
++		   				// api.Arg{Value: "-numa"},
++		   				// api.Arg{Value: "node,memdev=mem0"},
++		   				api.Arg{Value: "-chardev"},
++		   				api.Arg{Value: fmt.Sprintf("socket,id=spdk_vhost_blk0,path=%s", spdkVhostPath)},
++		   				api.Arg{Value: "-device"},
++		   				api.Arg{Value: "vhost-user-blk-pci,chardev=spdk_vhost_blk0,num-queues=2"})
++		   		}
++		*/ /*
++			// for vshot.1
++			if _, err := os.Stat(spdkVhostPath1); os.IsNotExist(err) {
++				logger := log.DefaultLogger()
++				logger.Infof("SPDK vhost socket directory: '%s' not present.", spdkVhostPath1)
++
++			} else if err == nil {
++				logger := log.DefaultLogger()
++				logger.Infof("SPDK vhost socket directory: '%s' is present.", spdkVhostPath1)
++				initializeQEMUCmdAndQEMUArg(domain)
++
++				domain.Spec.QEMUCmd.QEMUArg = append(domain.Spec.QEMUCmd.QEMUArg,
++					api.Arg{Value: "-chardev"},
++					api.Arg{Value: fmt.Sprintf("socket,id=spdk_vhost_blk1,path=%s", spdkVhostPath1)},
++					api.Arg{Value: "-device"},
++					api.Arg{Value: "vhost-user-blk-pci,chardev=spdk_vhost_blk1,num-queues=2"})
++			}
+ 
++			// for vhost.2
++			if _, err := os.Stat(spdkVhostPath2); os.IsNotExist(err) {
++				logger := log.DefaultLogger()
++				logger.Infof("SPDK vhost socket directory: '%s' not present.", spdkVhostPath2)
++
++			} else if err == nil {
++				logger := log.DefaultLogger()
++				logger.Infof("SPDK vhost socket directory: '%s' is present.", spdkVhostPath2)
++				initializeQEMUCmdAndQEMUArg(domain)
++
++				domain.Spec.QEMUCmd.QEMUArg = append(domain.Spec.QEMUCmd.QEMUArg,
++					api.Arg{Value: "-chardev"},
++					api.Arg{Value: fmt.Sprintf("socket,id=spdk_vhost_blk2,path=%s", spdkVhostPath2)},
++					api.Arg{Value: "-device"},
++					api.Arg{Value: "vhost-user-blk-pci,chardev=spdk_vhost_blk2,num-queues=2"})
++			}
++		*/
+ 	} else {
+ 		logger := log.DefaultLogger()
+ 		logger.Infof("Will not create vhost-user-blk device, please create the tag[%s]to support SPDK vhost in kubevirt.", spdkVhostTag)
+-- 
+2.27.0
+

@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - hosts: workload_hosts
   any_errors_fatal: true
@@ -7,10 +12,11 @@
     - name: run docker validation over iterations
       include_role:
         name: deployment
-        tasks_from: "invoke-{{ native | default(false) | bool | ternary('native','docker') }}"
+        tasks_from: "invoke-{{ native | default(false) | bool | ternary('native', docker | default(false) | bool | ternary('docker', 'compose')) }}"
       when: ansible_connection != 'winrm'
       loop: "{{ range(1, run_stage_iterations | default(1) |int+1, 1) | list }}"
       loop_control:
         loop_var: itr
-
+      vars:
+        workload_config: "{{ lookup('file', wl_logs_dir + '/workload-config.yaml') | from_yaml }}"
 

@@ -1,0 +1,43 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: get OS version
+  shell:
+    cmd: ". /etc/os-release;echo ${VERSION_ID%.*}"
+    executable: /bin/bash
+  register: osver
+
+- name: Import gpg key
+  rpm_key:
+    key: "https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ osver.stdout }}"
+    state: present
+  become: true
+
+- name: Install epel-release
+  yum:
+    name: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ osver.stdout }}.noarch.rpm"
+  become: true
+  register: yumrc
+  until: yumrc is success
+  retries: 10
+  delay: 10
+
+- name: Install collectd
+  yum:
+    name:
+    - collectd
+    - collectd-disk
+    update_cache: true
+  become: yes
+  register: yumrc
+  until: yumrc is success
+  retries: 10
+  delay: 10
+
+- name: set collectd path
+  set_fact:
+    config_path: /etc/collectd.conf
+

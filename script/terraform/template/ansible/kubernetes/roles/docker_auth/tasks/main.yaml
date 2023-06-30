@@ -1,13 +1,18 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: Find Home
   shell:
-    cmd: "echo ~{{ ansible_user }}"
+    cmd: "echo $HOME"
     executable: /bin/bash
   register: home
   when: docker_auth_reuse
 
 - name: Create ImagePullSecret
-  command: "kubectl --kubeconfig={{ home.stdout }}/.kube/config create secret docker-registry {{ docker_auth_secret_name }} --from-file=.dockerconfigjson={{ home.stdout }}/{{ docker_auth_config_json }} -n {{ wl_namespace }}"
+  command: "kubectl --kubeconfig={{ home.stdout }}/.kube/config create secret docker-registry {{ docker_auth_secret_name }} --from-file=.dockerconfigjson={{ home.stdout }}/{{ docker_auth_config_json }} -n {{ namespace }}"
   register: secret
   ignore_errors: yes
   become: yes
@@ -16,7 +21,7 @@
 - name: Patch service account
   shell:
     cmd: |
-      kubectl patch serviceaccount default -p '{"imagePullSecrets":[{"name": "{{ docker_auth_secret_name }}"}]}' -n {{ wl_namespace }}
+      kubectl patch serviceaccount default -p '{"imagePullSecrets":[{"name": "{{ docker_auth_secret_name }}"}]}' -n {{ namespace }}
   when: 
   - docker_auth_reuse
   - secret.rc == 0

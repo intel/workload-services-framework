@@ -1,4 +1,9 @@
 #!/bin/bash
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 "sh" "-c" "until nc -z -w5 rtsp-service 8554; do echo waiting for rtsp service; sleep 1; done"
 "sh" "-c" "until nc -z -w5 rtsp-service 1935; do echo waiting for rtsp service; sleep 1; done"

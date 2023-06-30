@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 docker_default_version:
   ubuntu: "5:20.10.23~*"
@@ -7,6 +12,10 @@ docker_cli_default_version:
   ubuntu: "5:20.10.23~*"
   debian: "5:20.10.23~*"
   centos: "1:20.10.23-*"
+docker_compose_plugin_default_version:
+  ubuntu: "2.18.1-*"
+  debian: "2.18.1-*"
+  centos: "2.18.1-*"
 docker_dist_repo: "https://download.docker.com"
 docker_registry_mirrors: []
 docker_data_root: "/var/lib/docker"

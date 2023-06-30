@@ -1,4 +1,9 @@
 #!/bin/bash -e
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 DIR="$(dirname "$(readlink -f "$0")")"
 
@@ -13,7 +18,10 @@ print_help () {
     echo "--var[1-9] value      Specify spreadsheet variables."
     echo "--file filename       Specify the spreadsheet filename."
     echo "--filter filter       Specify the trim filter to shorten the worksheet name."
-    echo "--uri                 Show WSF portal URI"
+    echo "--uri                 Show WSF portal URI."
+    echo "--intel_publish       Publish logs to the WSF dashboard."
+    echo "--owner <name>        Set publisher owner."
+    echo "--tags <tags>         Set publisher tags."
     exit 0
 }
 
@@ -32,6 +40,9 @@ var4="default"
 uri=0
 filter="_(tensorflow|throughput|inference|benchmark|real)"
 last_var=""
+intel_publish=0
+owner=""
+tags=""
 for var in "$@"; do
     case "$var" in
     --primary)
@@ -79,7 +90,16 @@ for var in "$@"; do
     --help)
         print_help
         ;;
-    --var1|--var2|--var3|--var4|--filter|--file|--format|--outlier)
+    --intel_publish)
+        intel_publish=1
+        ;;
+    --owner=*)
+        owner="${var#--owner=}"
+        ;;
+    --tags=*)
+        tags="${var#--tags=}"
+        ;;
+    --var1|--var2|--var3|--var4|--filter|--file|--format|--outlier|--owner|--tags)
         ;;
     *)
         case "$last_var" in
@@ -107,6 +127,12 @@ for var in "$@"; do
         --file)
             xlsfile="$var"
             ;;
+        --owner)
+            owner="$var"
+            ;;
+        --tags)
+            tags="$var"
+            ;;
         *)
             prefixes+=("$var")
             ;;
@@ -126,6 +152,33 @@ fi
 
 if [ ${#prefixes[@]} -eq 0 ]; then
     print_help
+fi
+
+if [ $intel_publish = 1 ]; then
+    for logsdir1 in ${prefixes[@]}; do
+        if [ -r "$logsdir1"/workload-config.yaml ]; then
+            echo "Publishing $logsdir1..."
+            BACKEND="$(sed -n '/cmake_cmdline:/{s/.*-DBACKEND=\([^ ]*\).*/\1/;p}' "$logsdir1"/workload-config.yaml)"
+            BACKEND_OPTIONS="$(sed -n "/cmake_cmdline:/{s/.*-D${BACKEND^^}_OPTIONS='\([^']*\).*/\1/;p}" "$logsdir1"/workload-config.yaml)"
+            RELEASE="$(sed -n '/cmake_cmdline:/{s/.*-DRELEASE=\([^ ]*\).*/\1/;p}' "$logsdir1"/workload-config.yaml)"
+            REGISTRY="$(sed -n '/cmake_cmdline:/{s/.*-DREGISTRY=\([^ ]*\).*/\1/;p}' "$logsdir1"/workload-config.yaml)"
+
+            if [ -r "$logsdir1"/terraform-config.tf ]; then
+                BACKEND_OPTIONS="$BACKEND_OPTIONS --wl_categority=$(sed -n '/^\s*variable\s*"wl_categority"\s*{/,/^\s*}/{s/^\s*default\s*=\s*"\([^"]*\).*/\1/;p}' "$logsdir1"/terraform-config.tf)"
+            elif [ -r "$logsdir1"/runs/*/pkb.log ]; then
+                BACKEND_OPTIONS="$BACKEND_OPTIONS --run_uri=$(sed -n '/^--run_uri=/{s/.*=//;p}' "$logsdir1"/runs/*/pkb.log)"
+            fi
+
+            if [ -n "$owner" ]; then
+                BACKEND_OPTIONS="$BACKEND_OPTIONS --owner=$owner"
+            fi
+            if [ -n "$tags" ]; then
+                BACKEND_OPTIONS="$BACKEND_OPTIONS --tags=$tags"
+            fi
+
+            TERRAFORM_OPTIONS="$BACKEND_OPTIONS" RELEASE="$RELEASE" REGISTRY="$REGISTRY" "$DIR"/../terraform/shell.sh static -v "$(readlink -f "$logsdir1"):/opt/workspace" -- bash -c "/opt/script/publish-intel.py $BACKEND_OPTIONS < <(cat tfplan.json 2> /dev/null || echo)"
+        fi
+    done
 fi
 
 for logsdir1 in ${prefixes[@]}; do

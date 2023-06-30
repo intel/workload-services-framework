@@ -1,10 +1,16 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
   - name: "Start emon on {{ trace_node.1 }}"
     shell: 
       cmd: |
         . ./sep_vars.sh
-        emon -collect-edp {{ emon_options }} > "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon.dat" 2>&1 &
-        echo $! > "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon.pid"
+        date -Ins > /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon.start
+        emon -collect-edp {{ emon_options }} > /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon.dat 2>&1 &
+        echo $! > /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon.pid
         disown
       chdir: "{{ emon_bin_path }}/sep"
       executable: /bin/bash

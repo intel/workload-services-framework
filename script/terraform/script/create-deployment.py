@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 import json
 import yaml
@@ -8,6 +13,7 @@ import os
 
 KUBERNETES_CONFIG = "kubernetes-config.yaml"
 CLUSTER_CONFIG = "cluster-config.yaml"
+COMPOSE_CONFIG = "compose-config.yaml"
 CLUSTER_INFO = "cluster-info.json"
 INVENTORY = "inventory.yaml"
 DEPLOYMENT = "deployment.yaml"
@@ -27,13 +33,17 @@ for argv in sys.argv:
       options[argv.replace('-', '_')] = True
 instances = tfoutput["values"]["outputs"]["instances"]["value"]
 options["wl_logs_dir"] = "/opt/workspace"
-options["wl_docker_options"] = " ".join([ '"{}"'.format(x.replace("%20", " ")) for x in options.get("wl_docker_options","").split(" ") if x])
-
 
 with open(INVENTORY) as fd:
   for doc in yaml.safe_load_all(fd):
     if doc and "all" in doc:
       inventories = doc["all"]["children"]
+
+workload_config = {}
+with open(WORKLOAD_CONFIG) as fd:
+  for doc in yaml.safe_load_all(fd):
+    if doc:
+      workload_config.update(doc)
 
 
 def _ExtendOptions(updates):
@@ -139,18 +149,6 @@ def _UpdateK8sConfig(nodes, registry_map):
   return modified_filename
 
 
-def _GetTunables():
-  with open(WORKLOAD_CONFIG) as fd:
-    tunables = {}
-    for doc in yaml.safe_load_all(fd):
-      if doc:
-        if "tunables" in doc:
-          for kv in doc["tunables"].split(";"):
-            k, _, v = kv.partition(":")
-            tunables[k] = v
-    return tunables
-
-
 # match inventories with Kubernetes nodes
 workload_nodes = {}
 if os.path.exists(CLUSTER_INFO):
@@ -188,27 +186,22 @@ playbooks = [{
   }]
 }]
 
-timeout = options.get("wl_timeout", "28800,600").split(",")
-if len(timeout)<2:
-  timeout.append(timeout[0])
-
 # generic ansible
 if os.path.exists("/opt/workload/template/ansible/custom/deployment.yaml"):
   playbooks.append({
     "name": "deployment",
     "import_playbook": "./template/ansible/custom/deployment.yaml",
     "vars": _ExtendOptions({
-      "wl_tunables": _GetTunables(),
+      "wl_tunables": workload_config.get('tunables', {}),
     }),
   })
 
-if options.get("wl_docker_image", None):
+if ((options.get("docker", False) or options.get("native", False)) and ("docker_image" in workload_config)) or (options.get("compose", False) and os.path.exists(COMPOSE_CONFIG)):
   playbooks.append({
     "name": "deployment",
     "import_playbook": "./template/ansible/docker/deployment.yaml",
     "vars": _ExtendOptions({
-      "wl_timeout": timeout,
-      "wl_tunables": _GetTunables(),
+      "wl_tunables": workload_config.get('tunables', {}),
     })
   })
 
@@ -221,19 +214,13 @@ elif os.path.exists(KUBERNETES_CONFIG):
     if not registry_map[1].endswith("/"):
       registry_map[1] = registry_map[1] + "/"
 
-  job_filter = options["wl_job_filter"].split("=")
-  if len(job_filter)<2:
-    job_filter.append(job_filter[0])
-
   playbooks.append({
     "name": "deployment",
     "import_playbook": "./template/ansible/kubernetes/deployment.yaml",
     "vars": _ExtendOptions({
       "wl_kubernetes_yaml": _UpdateK8sConfig(workload_nodes, registry_map),
-      "wl_timeout": timeout,
-      "wl_job_filter": job_filter,
       "wl_registry_map": registry_map,
-      "wl_tunables": _GetTunables(),
+      "wl_tunables": workload_config.get('tunables', {}),
     }),
   })
 
@@ -249,7 +236,7 @@ if os.path.exists("/opt/workload/kpi.sh"):
         "name": "kpi",
       },
       "vars": _ExtendOptions({
-        "wl_tunables": _GetTunables(),
+        "wl_tunables": workload_config.get('tunables', {}),
       }),
     }],
   })

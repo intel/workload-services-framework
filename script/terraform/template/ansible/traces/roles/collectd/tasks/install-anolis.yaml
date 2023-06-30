@@ -1,0 +1,22 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Install collectd
+  yum:
+    name:
+    - collectd
+    - collectd-disk
+    update_cache: true
+  become: yes
+  register: yumrc
+  until: yumrc is success
+  retries: 10
+  delay: 10
+
+- name: set collectd path
+  set_fact:
+    config_path: /etc/collectd.conf
+

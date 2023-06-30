@@ -1,0 +1,489 @@
+From a678bf9341d9f6adb3e6e1df0f0ce843b97df51b Mon Sep 17 00:00:00 2001
+From: "Michael,Zhang" <michael.m.zhang@intel.com>
+Date: Wed, 7 Sep 2022 00:06:45 +0800
+Subject: [PATCH 11/22] Add the spdkvhost api for support spdkvhost user block
+ device
+
+---
+ api/openapi-spec/swagger.json                 | 17 +++++
+ .../admitters/vmi-create-admitter.go          |  3 +
+ .../virtwrap/converter/converter.go           |  6 +-
+ pkg/virt-launcher/virtwrap/manager.go         |  2 +
+ .../components/validations_generated.go       | 71 +++++++++++++++++++
+ .../api/core/v1/deepcopy_generated.go         | 22 ++++++
+ staging/src/kubevirt.io/api/core/v1/schema.go | 10 +++
+ .../api/core/v1/schema_swagger_generated.go   |  8 +++
+ .../client-go/api/openapi_generated.go        | 39 +++++++++-
+ .../apis/core/v1/openapi_generated.go         | 39 +++++++++-
+ 10 files changed, 212 insertions(+), 5 deletions(-)
+
+diff --git a/api/openapi-spec/swagger.json b/api/openapi-spec/swagger.json
+index 7090c40d3..625aafd52 100644
+--- a/api/openapi-spec/swagger.json
++++ b/api/openapi-spec/swagger.json
+@@ -13125,6 +13125,19 @@
+      }
+     }
+    },
++   "v1.SpdkVhostBlkDiskSource": {
++    "description": "SpdkVhostBlkDisk represents a temporary disk which shares the vmis lifecycle.",
++    "type": "object",
++    "required": [
++     "capacity"
++    ],
++    "properties": {
++     "capacity": {
++      "description": "Capacity of the sparse disk.",
++      "$ref": "#/definitions/k8s.io.apimachinery.pkg.api.resource.Quantity"
++     }
++    }
++   },
+    "v1.EphemeralVolumeSource": {
+     "type": "object",
+     "properties": {
+@@ -16287,6 +16300,10 @@
+       "description": "EmptyDisk represents a temporary disk which shares the vmis lifecycle. More info: https://kubevirt.gitbooks.io/user-guide/disks-and-volumes.html",
+       "$ref": "#/definitions/v1.EmptyDiskSource"
+      },
++     "spdkVhostBlkDisk": {
++      "description": "SpdkVhostBlkDisk represents a temporary disk which shares the vmis lifecycle. More info: https://kubevirt.gitbooks.io/user-guide/disks-and-volumes.html",
++      "$ref": "#/definitions/v1.SpdkVhostBlkDiskSource"
++     },
+      "ephemeral": {
+       "description": "Ephemeral is a special volume source that \"wraps\" specified source and provides copy-on-write image on top of it.",
+       "$ref": "#/definitions/v1.EphemeralVolumeSource"
+diff --git a/pkg/virt-api/webhooks/validating-webhook/admitters/vmi-create-admitter.go b/pkg/virt-api/webhooks/validating-webhook/admitters/vmi-create-admitter.go
+index b2678b668..fbfbfe3b5 100644
+--- a/pkg/virt-api/webhooks/validating-webhook/admitters/vmi-create-admitter.go
++++ b/pkg/virt-api/webhooks/validating-webhook/admitters/vmi-create-admitter.go
+@@ -1889,6 +1889,9 @@ func validateVolumes(field *k8sfield.Path, volumes []v1.Volume, config *virtconf
+ 		if volume.HostDisk != nil {
+ 			volumeSourceSetCount++
+ 		}
++		if volume.SpdkVhostBlkDisk != nil {
++			volumeSourceSetCount++
++		}
+ 		if volume.DataVolume != nil {
+ 			if !config.HasDataVolumeAPI() {
+ 				causes = append(causes, metav1.StatusCause{
+diff --git a/pkg/virt-launcher/virtwrap/converter/converter.go b/pkg/virt-launcher/virtwrap/converter/converter.go
+index 797d887e8..f55c77b23 100644
+--- a/pkg/virt-launcher/virtwrap/converter/converter.go
++++ b/pkg/virt-launcher/virtwrap/converter/converter.go
+@@ -612,6 +612,9 @@ func Convert_v1_Volume_To_api_Disk(source *v1.Volume, disk *api.Disk, c *Convert
+ 	if source.EmptyDisk != nil {
+ 		return Convert_v1_EmptyDiskSource_To_api_Disk(source.Name, source.EmptyDisk, disk)
+ 	}
++	if source.SpdkVhostBlkDisk != nil {
++		return Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(source.Name, source.SpdkVhostBlkDisk, disk)
++	}
+ 	if source.ConfigMap != nil {
+ 		return Convert_v1_Config_To_api_Disk(source.Name, disk, config.ConfigMap)
+ 	}
+@@ -838,7 +841,7 @@ func Convert_v1_EmptyDiskSource_To_api_Disk(volumeName string, _ *v1.EmptyDiskSo
+ 	return nil
+ }
+ 
+-func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, _ *v1.EmptyDiskSource, disk *api.Disk) error {
++func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, _ *v1.SpdkVhostBlkDiskSource, disk *api.Disk) error {
+ 	if disk.Type == "lun" {
+ 		return fmt.Errorf(deviceTypeNotCompatibleFmt, disk.Alias.GetName())
+ 	}
+@@ -1526,6 +1529,7 @@ func Convert_v1_VirtualMachineInstance_To_api_Domain(vmi *v1.VirtualMachineInsta
+ 			err = Convert_v1_Hotplug_Volume_To_api_Disk(volume, &newDisk, c)
+ 		}
+ 
++		//TODO: for vhostuser blk
+ 		if volume.EmptyDisk != nil {
+ 			diskIndex := volumeIndices[disk.Name]
+ 			spdkVhostTag := "/var/tmp/vhost.tag" //If the tag is exist, then support the spdk vhost.
+diff --git a/pkg/virt-launcher/virtwrap/manager.go b/pkg/virt-launcher/virtwrap/manager.go
+index 13941ea2c..7aa8ef533 100644
+--- a/pkg/virt-launcher/virtwrap/manager.go
++++ b/pkg/virt-launcher/virtwrap/manager.go
+@@ -605,6 +605,8 @@ func (l *LibvirtDomainManager) preStartHook(vmi *v1.VirtualMachineInstance, doma
+ 		return domain, fmt.Errorf("failed to craete downwardMetric disk: %v", err)
+ 	}
+ 
++	// TODO: create spdkVhostBlk disk if exists..
++
+ 	// set drivers cache mode
+ 	for i := range domain.Spec.Devices.Disks {
+ 		err := converter.SetDriverCacheMode(&domain.Spec.Devices.Disks[i], l.directIOChecker)
+diff --git a/pkg/virt-operator/resource/generate/components/validations_generated.go b/pkg/virt-operator/resource/generate/components/validations_generated.go
+index 8f1b0eb67..c4a73babc 100644
+--- a/pkg/virt-operator/resource/generate/components/validations_generated.go
++++ b/pkg/virt-operator/resource/generate/components/validations_generated.go
+@@ -6332,6 +6332,20 @@ var CRDsValidation map[string]string = map[string]string{
+                             - claimName
+                             type: object
+                         type: object
++                      spdkVhostBlkDisk:
++                        description: 'SpdkVhostBlkDisk represents a temporary disk which
++                          shares the vmis lifecycle. More info: https://kubevirt.gitbooks.io/user-guide/disks-and-volumes.html'
++                        properties:
++                          capacity:
++                            anyOf:
++                            - type: integer
++                            - type: string
++                            description: Capacity of the sparse disk.
++                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
++                            x-kubernetes-int-or-string: true
++                        required:
++                        - capacity
++                        type: object
+                       hostDisk:
+                         description: HostDisk represents a disk created on the cluster
+                           level
+@@ -9480,6 +9494,20 @@ var CRDsValidation map[string]string = map[string]string{
+                 required:
+                 - capacity
+                 type: object
++              spdkVhostBlkDisk:
++                description: 'SpdkVhostBlkDisk represents a temporary disk which shares the
++                  vmis lifecycle. More info: https://kubevirt.gitbooks.io/user-guide/disks-and-volumes.html'
++                properties:
++                  capacity:
++                    anyOf:
++                    - type: integer
++                    - type: string
++                    description: Capacity of the sparse disk.
++                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
++                    x-kubernetes-int-or-string: true
++                required:
++                - capacity
++                type: object
+               ephemeral:
+                 description: Ephemeral is a special volume source that "wraps" specified
+                   source and provides copy-on-write image on top of it.
+@@ -13750,6 +13778,20 @@ var CRDsValidation map[string]string = map[string]string{
+                         required:
+                         - capacity
+                         type: object
++                      spdkVhostBlkDisk:
++                        description: 'SpdkVhostBlkDisk represents a temporary disk which
++                          shares the vmis lifecycle. More info: https://kubevirt.gitbooks.io/user-guide/disks-and-volumes.html'
++                        properties:
++                          capacity:
++                            anyOf:
++                            - type: integer
++                            - type: string
++                            description: Capacity of the sparse disk.
++                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
++                            x-kubernetes-int-or-string: true
++                        required:
++                        - capacity
++                        type: object
+                       ephemeral:
+                         description: Ephemeral is a special volume source that "wraps"
+                           specified source and provides copy-on-write image on top
+@@ -17437,6 +17479,20 @@ var CRDsValidation map[string]string = map[string]string{
+                                 required:
+                                 - capacity
+                                 type: object
++                              spdkVhostBlkDisk:
++                                description: 'SpdkVhostBlkDisk represents a temporary disk
++                                  which shares the vmis lifecycle. More info: https://kubevirt.gitbooks.io/user-guide/disks-and-volumes.html'
++                                properties:
++                                  capacity:
++                                    anyOf:
++                                    - type: integer
++                                    - type: string
++                                    description: Capacity of the sparse disk.
++                                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
++                                    x-kubernetes-int-or-string: true
++                                required:
++                                - capacity
++                                type: object
+                               ephemeral:
+                                 description: Ephemeral is a special volume source
+                                   that "wraps" specified source and provides copy-on-write
+@@ -21472,6 +21528,21 @@ var CRDsValidation map[string]string = map[string]string{
+                                     required:
+                                     - capacity
+                                     type: object
++                                  spdkVhostBlkDisk:
++                                    description: 'SpdkVhostBlkDisk represents a temporary
++                                      disk which shares the vmis lifecycle. More info:
++                                      https://kubevirt.gitbooks.io/user-guide/disks-and-volumes.html'
++                                    properties:
++                                      capacity:
++                                        anyOf:
++                                        - type: integer
++                                        - type: string
++                                        description: Capacity of the sparse disk.
++                                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
++                                        x-kubernetes-int-or-string: true
++                                    required:
++                                    - capacity
++                                    type: object
+                                   ephemeral:
+                                     description: Ephemeral is a special volume source
+                                       that "wraps" specified source and provides copy-on-write
+diff --git a/staging/src/kubevirt.io/api/core/v1/deepcopy_generated.go b/staging/src/kubevirt.io/api/core/v1/deepcopy_generated.go
+index 1e95b2708..120eeb2ce 100644
+--- a/staging/src/kubevirt.io/api/core/v1/deepcopy_generated.go
++++ b/staging/src/kubevirt.io/api/core/v1/deepcopy_generated.go
+@@ -1132,6 +1132,23 @@ func (in *EphemeralVolumeSource) DeepCopy() *EphemeralVolumeSource {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *SpdkVhostBlkDiskSource) DeepCopyInto(out *SpdkVhostBlkDiskSource) {
++	*out = *in
++	out.Capacity = in.Capacity.DeepCopy()
++	return
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new EmptyDiskSource.
++func (in *SpdkVhostBlkDiskSource) DeepCopy() *SpdkVhostBlkDiskSource {
++	if in == nil {
++		return nil
++	}
++	out := new(SpdkVhostBlkDiskSource)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *FeatureAPIC) DeepCopyInto(out *FeatureAPIC) {
+ 	*out = *in
+@@ -4852,6 +4869,11 @@ func (in *VolumeSource) DeepCopyInto(out *VolumeSource) {
+ 		*out = new(EmptyDiskSource)
+ 		(*in).DeepCopyInto(*out)
+ 	}
++	if in.SpdkVhostBlkDisk != nil {
++		in, out := &in.SpdkVhostBlkDisk, &out.SpdkVhostBlkDisk
++		*out = new(SpdkVhostBlkDiskSource)
++		(*in).DeepCopyInto(*out)
++	}
+ 	if in.DataVolume != nil {
+ 		in, out := &in.DataVolume, &out.DataVolume
+ 		*out = new(DataVolumeSource)
+diff --git a/staging/src/kubevirt.io/api/core/v1/schema.go b/staging/src/kubevirt.io/api/core/v1/schema.go
+index 072468824..f39040eea 100644
+--- a/staging/src/kubevirt.io/api/core/v1/schema.go
++++ b/staging/src/kubevirt.io/api/core/v1/schema.go
+@@ -720,6 +720,10 @@ type VolumeSource struct {
+ 	// DownwardMetrics adds a very small disk to VMIs which contains a limited view of host and guest
+ 	// metrics. The disk content is compatible with vhostmd (https://github.com/vhostmd/vhostmd) and vm-dump-metrics.
+ 	DownwardMetrics *DownwardMetricsVolumeSource `json:"downwardMetrics,omitempty"`
++	// SpdkVhostBlkDisk represents a temporary disk which shares the vmis lifecycle.
++	// More info: https://kubevirt.gitbooks.io/user-guide/disks-and-volumes.html
++	// +optional
++	SpdkVhostBlkDisk *SpdkVhostBlkDiskSource `json:"spdkVhostBlkDisk,omitempty"`
+ }
+ 
+ // HotplugVolumeSource Represents the source of a volume to mount which are capable
+@@ -769,6 +773,12 @@ type EmptyDiskSource struct {
+ 	Capacity resource.Quantity `json:"capacity"`
+ }
+ 
++// SpdkVhostBlkDiskSource represents a temporary disk which shares the vmis lifecycle.
++type SpdkVhostBlkDiskSource struct {
++	// Capacity of the sparse disk.
++	Capacity resource.Quantity `json:"capacity"`
++}
++
+ // Represents a docker image with an embedded disk.
+ type ContainerDiskSource struct {
+ 	// Image is the name of the image with the embedded disk.
+diff --git a/staging/src/kubevirt.io/api/core/v1/schema_swagger_generated.go b/staging/src/kubevirt.io/api/core/v1/schema_swagger_generated.go
+index faa5c1db3..c51ea81ad 100644
+--- a/staging/src/kubevirt.io/api/core/v1/schema_swagger_generated.go
++++ b/staging/src/kubevirt.io/api/core/v1/schema_swagger_generated.go
+@@ -397,6 +397,7 @@ func (VolumeSource) SwaggerDoc() map[string]string {
+ 		"secret":                "SecretVolumeSource represents a reference to a secret data in the same namespace.\nMore info: https://kubernetes.io/docs/concepts/configuration/secret/\n+optional",
+ 		"downwardAPI":           "DownwardAPI represents downward API about the pod that should populate this volume\n+optional",
+ 		"serviceAccount":        "ServiceAccountVolumeSource represents a reference to a service account.\nThere can only be one volume of this type!\nMore info: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/\n+optional",
++		"spdkVhostBlkDisk":      "SpdkVhostBlkDisk represents a temporary disk which shares the vmis lifecycle.\nMore info: https://kubevirt.gitbooks.io/user-guide/disks-and-volumes.html\n+optional",
+ 		"downwardMetrics":       "DownwardMetrics adds a very small disk to VMIs which contains a limited view of host and guest\nmetrics. The disk content is compatible with vhostmd (https://github.com/vhostmd/vhostmd) and vm-dump-metrics.",
+ 	}
+ }
+@@ -446,6 +447,13 @@ func (ContainerDiskSource) SwaggerDoc() map[string]string {
+ 	}
+ }
+ 
++func (SpdkVhostBlkDiskSource) SwaggerDoc() map[string]string {
++	return map[string]string{
++		"":         "SpdkVhostBlkDisk represents a temporary disk which shares the vmis lifecycle.",
++		"capacity": "Capacity of the sparse disk.",
++	}
++}
++
+ func (ClockOffset) SwaggerDoc() map[string]string {
+ 	return map[string]string{
+ 		"":         "Exactly one of its members must be set.",
+diff --git a/staging/src/kubevirt.io/client-go/api/openapi_generated.go b/staging/src/kubevirt.io/client-go/api/openapi_generated.go
+index 71a15fba6..0c7653170 100644
+--- a/staging/src/kubevirt.io/client-go/api/openapi_generated.go
++++ b/staging/src/kubevirt.io/client-go/api/openapi_generated.go
+@@ -340,6 +340,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
+ 		"kubevirt.io/api/core/v1.EFI":                                                                schema_kubevirtio_api_core_v1_EFI(ref),
+ 		"kubevirt.io/api/core/v1.EmptyDiskSource":                                                    schema_kubevirtio_api_core_v1_EmptyDiskSource(ref),
+ 		"kubevirt.io/api/core/v1.EphemeralVolumeSource":                                              schema_kubevirtio_api_core_v1_EphemeralVolumeSource(ref),
++		"kubevirt.io/api/core/v1.SpdkVhostBlkDiskSource":                                             schema_kubevirtio_api_core_v1_SpdkVhostBlkDiskSource(ref),
+ 		"kubevirt.io/api/core/v1.FeatureAPIC":                                                        schema_kubevirtio_api_core_v1_FeatureAPIC(ref),
+ 		"kubevirt.io/api/core/v1.FeatureHyperv":                                                      schema_kubevirtio_api_core_v1_FeatureHyperv(ref),
+ 		"kubevirt.io/api/core/v1.FeatureKVM":                                                         schema_kubevirtio_api_core_v1_FeatureKVM(ref),
+@@ -15838,6 +15839,28 @@ func schema_kubevirtio_api_core_v1_EphemeralVolumeSource(ref common.ReferenceCal
+ 	}
+ }
+ 
++func schema_kubevirtio_api_core_v1_SpdkVhostBlkDiskSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
++	return common.OpenAPIDefinition{
++		Schema: spec.Schema{
++			SchemaProps: spec.SchemaProps{
++				Description: "SpdkVhostBlkDisk represents a temporary disk which shares the vmis lifecycle.",
++				Type:        []string{"object"},
++				Properties: map[string]spec.Schema{
++					"capacity": {
++						SchemaProps: spec.SchemaProps{
++							Description: "Capacity of the sparse disk.",
++							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
++						},
++					},
++				},
++				Required: []string{"capacity"},
++			},
++		},
++		Dependencies: []string{
++			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
++	}
++}
++
+ func schema_kubevirtio_api_core_v1_FeatureAPIC(ref common.ReferenceCallback) common.OpenAPIDefinition {
+ 	return common.OpenAPIDefinition{
+ 		Schema: spec.Schema{
+@@ -21809,6 +21832,12 @@ func schema_kubevirtio_api_core_v1_Volume(ref common.ReferenceCallback) common.O
+ 							Ref:         ref("kubevirt.io/api/core/v1.DataVolumeSource"),
+ 						},
+ 					},
++					"spdkVhostBlkDisk": {
++						SchemaProps: spec.SchemaProps{
++							Description: "SpdkVhostBlkDisk represents a temporary disk which shares the vmis lifecycle. More info: https://kubevirt.gitbooks.io/user-guide/disks-and-volumes.html",
++							Ref:         ref("kubevirt.io/api/core/v1.SpdkVhostBlkDiskSource"),
++						},
++					},
+ 					"configMap": {
+ 						SchemaProps: spec.SchemaProps{
+ 							Description: "ConfigMapSource represents a reference to a ConfigMap in the same namespace. More info: https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/",
+@@ -21844,7 +21873,7 @@ func schema_kubevirtio_api_core_v1_Volume(ref common.ReferenceCallback) common.O
+ 			},
+ 		},
+ 		Dependencies: []string{
+-			"kubevirt.io/api/core/v1.CloudInitConfigDriveSource", "kubevirt.io/api/core/v1.CloudInitNoCloudSource", "kubevirt.io/api/core/v1.ConfigMapVolumeSource", "kubevirt.io/api/core/v1.ContainerDiskSource", "kubevirt.io/api/core/v1.DataVolumeSource", "kubevirt.io/api/core/v1.DownwardAPIVolumeSource", "kubevirt.io/api/core/v1.DownwardMetricsVolumeSource", "kubevirt.io/api/core/v1.EmptyDiskSource", "kubevirt.io/api/core/v1.EphemeralVolumeSource", "kubevirt.io/api/core/v1.HostDisk", "kubevirt.io/api/core/v1.PersistentVolumeClaimVolumeSource", "kubevirt.io/api/core/v1.SecretVolumeSource", "kubevirt.io/api/core/v1.ServiceAccountVolumeSource", "kubevirt.io/api/core/v1.SysprepSource"},
++			"kubevirt.io/api/core/v1.CloudInitConfigDriveSource", "kubevirt.io/api/core/v1.CloudInitNoCloudSource", "kubevirt.io/api/core/v1.ConfigMapVolumeSource", "kubevirt.io/api/core/v1.ContainerDiskSource", "kubevirt.io/api/core/v1.DataVolumeSource", "kubevirt.io/api/core/v1.DownwardAPIVolumeSource", "kubevirt.io/api/core/v1.DownwardMetricsVolumeSource", "kubevirt.io/api/core/v1.EmptyDiskSource", "kubevirt.io/api/core/v1.SpdkVhostBlkDiskSource", "kubevirt.io/api/core/v1.EphemeralVolumeSource", "kubevirt.io/api/core/v1.HostDisk", "kubevirt.io/api/core/v1.PersistentVolumeClaimVolumeSource", "kubevirt.io/api/core/v1.SecretVolumeSource", "kubevirt.io/api/core/v1.ServiceAccountVolumeSource", "kubevirt.io/api/core/v1.SysprepSource"},
+ 	}
+ }
+ 
+@@ -21937,6 +21966,12 @@ func schema_kubevirtio_api_core_v1_VolumeSource(ref common.ReferenceCallback) co
+ 							Ref:         ref("kubevirt.io/api/core/v1.EmptyDiskSource"),
+ 						},
+ 					},
++					"spdkVhostBlkDisk": {
++						SchemaProps: spec.SchemaProps{
++							Description: "SpdkVhostBlkDisk represents a temporary disk which shares the vmis lifecycle. More info: https://kubevirt.gitbooks.io/user-guide/disks-and-volumes.html",
++							Ref:         ref("kubevirt.io/api/core/v1.SpdkVhostBlkDiskSource"),
++						},
++					},
+ 					"dataVolume": {
+ 						SchemaProps: spec.SchemaProps{
+ 							Description: "DataVolume represents the dynamic creation a PVC for this volume as well as the process of populating that PVC with a disk image.",
+@@ -21977,7 +22012,7 @@ func schema_kubevirtio_api_core_v1_VolumeSource(ref common.ReferenceCallback) co
+ 			},
+ 		},
+ 		Dependencies: []string{
+-			"kubevirt.io/api/core/v1.CloudInitConfigDriveSource", "kubevirt.io/api/core/v1.CloudInitNoCloudSource", "kubevirt.io/api/core/v1.ConfigMapVolumeSource", "kubevirt.io/api/core/v1.ContainerDiskSource", "kubevirt.io/api/core/v1.DataVolumeSource", "kubevirt.io/api/core/v1.DownwardAPIVolumeSource", "kubevirt.io/api/core/v1.DownwardMetricsVolumeSource", "kubevirt.io/api/core/v1.EmptyDiskSource", "kubevirt.io/api/core/v1.EphemeralVolumeSource", "kubevirt.io/api/core/v1.HostDisk", "kubevirt.io/api/core/v1.PersistentVolumeClaimVolumeSource", "kubevirt.io/api/core/v1.SecretVolumeSource", "kubevirt.io/api/core/v1.ServiceAccountVolumeSource", "kubevirt.io/api/core/v1.SysprepSource"},
++			"kubevirt.io/api/core/v1.CloudInitConfigDriveSource", "kubevirt.io/api/core/v1.CloudInitNoCloudSource", "kubevirt.io/api/core/v1.ConfigMapVolumeSource", "kubevirt.io/api/core/v1.ContainerDiskSource", "kubevirt.io/api/core/v1.DataVolumeSource", "kubevirt.io/api/core/v1.DownwardAPIVolumeSource", "kubevirt.io/api/core/v1.DownwardMetricsVolumeSource", "kubevirt.io/api/core/v1.EmptyDiskSource", "kubevirt.io/api/core/v1.SpdkVhostBlkDiskSource", "kubevirt.io/api/core/v1.EphemeralVolumeSource", "kubevirt.io/api/core/v1.HostDisk", "kubevirt.io/api/core/v1.PersistentVolumeClaimVolumeSource", "kubevirt.io/api/core/v1.SecretVolumeSource", "kubevirt.io/api/core/v1.ServiceAccountVolumeSource", "kubevirt.io/api/core/v1.SysprepSource"},
+ 	}
+ }
+ 
+diff --git a/staging/src/kubevirt.io/client-go/apis/core/v1/openapi_generated.go b/staging/src/kubevirt.io/client-go/apis/core/v1/openapi_generated.go
+index 1485df609..f83d98d1b 100644
+--- a/staging/src/kubevirt.io/client-go/apis/core/v1/openapi_generated.go
++++ b/staging/src/kubevirt.io/client-go/apis/core/v1/openapi_generated.go
+@@ -432,6 +432,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
+ 		"kubevirt.io/client-go/apis/core/v1.EFI":                                                     schema_client_go_apis_core_v1_EFI(ref),
+ 		"kubevirt.io/client-go/apis/core/v1.EmptyDiskSource":                                         schema_client_go_apis_core_v1_EmptyDiskSource(ref),
+ 		"kubevirt.io/client-go/apis/core/v1.EphemeralVolumeSource":                                   schema_client_go_apis_core_v1_EphemeralVolumeSource(ref),
++		"kubevirt.io/client-go/apis/core/v1.SpdkVhostBlkDiskSource":                                  schema_client_go_apis_core_v1_SpdkVhostBlkDiskSource(ref),
+ 		"kubevirt.io/client-go/apis/core/v1.FeatureAPIC":                                             schema_client_go_apis_core_v1_FeatureAPIC(ref),
+ 		"kubevirt.io/client-go/apis/core/v1.FeatureHyperv":                                           schema_client_go_apis_core_v1_FeatureHyperv(ref),
+ 		"kubevirt.io/client-go/apis/core/v1.FeatureKVM":                                              schema_client_go_apis_core_v1_FeatureKVM(ref),
+@@ -20385,6 +20386,28 @@ func schema_client_go_apis_core_v1_EmptyDiskSource(ref common.ReferenceCallback)
+ 	}
+ }
+ 
++func schema_client_go_apis_core_v1_SpdkVhostBlkDiskSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
++	return common.OpenAPIDefinition{
++		Schema: spec.Schema{
++			SchemaProps: spec.SchemaProps{
++				Description: "SpdkVhostBlkDisk represents a temporary disk which shares the vmis lifecycle.",
++				Type:        []string{"object"},
++				Properties: map[string]spec.Schema{
++					"capacity": {
++						SchemaProps: spec.SchemaProps{
++							Description: "Capacity of the sparse disk.",
++							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
++						},
++					},
++				},
++				Required: []string{"capacity"},
++			},
++		},
++		Dependencies: []string{
++			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
++	}
++}
++
+ func schema_client_go_apis_core_v1_EphemeralVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+ 	return common.OpenAPIDefinition{
+ 		Schema: spec.Schema{
+@@ -26049,6 +26072,12 @@ func schema_client_go_apis_core_v1_Volume(ref common.ReferenceCallback) common.O
+ 							Ref:         ref("kubevirt.io/client-go/apis/core/v1.DataVolumeSource"),
+ 						},
+ 					},
++					"spdkVhostBlkDisk": {
++						SchemaProps: spec.SchemaProps{
++							Description: "SpdkVhostBlkDisk represents a temporary disk which shares the vmis lifecycle. More info: https://kubevirt.gitbooks.io/user-guide/disks-and-volumes.html",
++							Ref:         ref("kubevirt.io/client-go/apis/core/v1.SpdkVhostBlkDiskSource"),
++						},
++					},
+ 					"configMap": {
+ 						SchemaProps: spec.SchemaProps{
+ 							Description: "ConfigMapSource represents a reference to a ConfigMap in the same namespace. More info: https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/",
+@@ -26084,7 +26113,7 @@ func schema_client_go_apis_core_v1_Volume(ref common.ReferenceCallback) common.O
+ 			},
+ 		},
+ 		Dependencies: []string{
+-			"kubevirt.io/client-go/apis/core/v1.CloudInitConfigDriveSource", "kubevirt.io/client-go/apis/core/v1.CloudInitNoCloudSource", "kubevirt.io/client-go/apis/core/v1.ConfigMapVolumeSource", "kubevirt.io/client-go/apis/core/v1.ContainerDiskSource", "kubevirt.io/client-go/apis/core/v1.DataVolumeSource", "kubevirt.io/client-go/apis/core/v1.DownwardAPIVolumeSource", "kubevirt.io/client-go/apis/core/v1.DownwardMetricsVolumeSource", "kubevirt.io/client-go/apis/core/v1.EmptyDiskSource", "kubevirt.io/client-go/apis/core/v1.EphemeralVolumeSource", "kubevirt.io/client-go/apis/core/v1.HostDisk", "kubevirt.io/client-go/apis/core/v1.PersistentVolumeClaimVolumeSource", "kubevirt.io/client-go/apis/core/v1.SecretVolumeSource", "kubevirt.io/client-go/apis/core/v1.ServiceAccountVolumeSource", "kubevirt.io/client-go/apis/core/v1.SysprepSource"},
++			"kubevirt.io/client-go/apis/core/v1.CloudInitConfigDriveSource", "kubevirt.io/client-go/apis/core/v1.CloudInitNoCloudSource", "kubevirt.io/client-go/apis/core/v1.ConfigMapVolumeSource", "kubevirt.io/client-go/apis/core/v1.ContainerDiskSource", "kubevirt.io/client-go/apis/core/v1.DataVolumeSource", "kubevirt.io/client-go/apis/core/v1.DownwardAPIVolumeSource", "kubevirt.io/client-go/apis/core/v1.DownwardMetricsVolumeSource", "kubevirt.io/client-go/apis/core/v1.EmptyDiskSource", "kubevirt.io/client-go/apis/core/v1.SpdkVhostBlkDiskSource", "kubevirt.io/client-go/apis/core/v1.EphemeralVolumeSource", "kubevirt.io/client-go/apis/core/v1.HostDisk", "kubevirt.io/client-go/apis/core/v1.PersistentVolumeClaimVolumeSource", "kubevirt.io/client-go/apis/core/v1.SecretVolumeSource", "kubevirt.io/client-go/apis/core/v1.ServiceAccountVolumeSource", "kubevirt.io/client-go/apis/core/v1.SysprepSource"},
+ 	}
+ }
+ 
+@@ -26183,6 +26212,12 @@ func schema_client_go_apis_core_v1_VolumeSource(ref common.ReferenceCallback) co
+ 							Ref:         ref("kubevirt.io/client-go/apis/core/v1.DataVolumeSource"),
+ 						},
+ 					},
++					"spdkVhostBlkDisk": {
++						SchemaProps: spec.SchemaProps{
++							Description: "SpdkVhostBlkDisk represents a temporary disk which shares the vmis lifecycle. More info: https://kubevirt.gitbooks.io/user-guide/disks-and-volumes.html",
++							Ref:         ref("kubevirt.io/client-go/apis/core/v1.SpdkVhostBlkDiskSource"),
++						},
++					},
+ 					"configMap": {
+ 						SchemaProps: spec.SchemaProps{
+ 							Description: "ConfigMapSource represents a reference to a ConfigMap in the same namespace. More info: https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/",
+@@ -26217,7 +26252,7 @@ func schema_client_go_apis_core_v1_VolumeSource(ref common.ReferenceCallback) co
+ 			},
+ 		},
+ 		Dependencies: []string{
+-			"kubevirt.io/client-go/apis/core/v1.CloudInitConfigDriveSource", "kubevirt.io/client-go/apis/core/v1.CloudInitNoCloudSource", "kubevirt.io/client-go/apis/core/v1.ConfigMapVolumeSource", "kubevirt.io/client-go/apis/core/v1.ContainerDiskSource", "kubevirt.io/client-go/apis/core/v1.DataVolumeSource", "kubevirt.io/client-go/apis/core/v1.DownwardAPIVolumeSource", "kubevirt.io/client-go/apis/core/v1.DownwardMetricsVolumeSource", "kubevirt.io/client-go/apis/core/v1.EmptyDiskSource", "kubevirt.io/client-go/apis/core/v1.EphemeralVolumeSource", "kubevirt.io/client-go/apis/core/v1.HostDisk", "kubevirt.io/client-go/apis/core/v1.PersistentVolumeClaimVolumeSource", "kubevirt.io/client-go/apis/core/v1.SecretVolumeSource", "kubevirt.io/client-go/apis/core/v1.ServiceAccountVolumeSource", "kubevirt.io/client-go/apis/core/v1.SysprepSource"},
++			"kubevirt.io/client-go/apis/core/v1.CloudInitConfigDriveSource", "kubevirt.io/client-go/apis/core/v1.CloudInitNoCloudSource", "kubevirt.io/client-go/apis/core/v1.ConfigMapVolumeSource", "kubevirt.io/client-go/apis/core/v1.ContainerDiskSource", "kubevirt.io/client-go/apis/core/v1.DataVolumeSource", "kubevirt.io/client-go/apis/core/v1.DownwardAPIVolumeSource", "kubevirt.io/client-go/apis/core/v1.DownwardMetricsVolumeSource", "kubevirt.io/client-go/apis/core/v1.EmptyDiskSource", "kubevirt.io/client-go/apis/core/v1.SpdkVhostBlkDiskSource", "kubevirt.io/client-go/apis/core/v1.EphemeralVolumeSource", "kubevirt.io/client-go/apis/core/v1.HostDisk", "kubevirt.io/client-go/apis/core/v1.PersistentVolumeClaimVolumeSource", "kubevirt.io/client-go/apis/core/v1.SecretVolumeSource", "kubevirt.io/client-go/apis/core/v1.ServiceAccountVolumeSource", "kubevirt.io/client-go/apis/core/v1.SysprepSource"},
+ 	}
+ }
+ 
+-- 
+2.27.0
+

@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 locals {
   os_name_regex = {
@@ -12,7 +17,7 @@ locals {
 
 data "tencentcloud_images" "search" {
   for_each = local.profile_map
-  image_id = each.value.image
+  image_id = each.value.os_image
   instance_type = each.value.instance_type
   image_name_regex = local.os_name_regex[each.value.os_type]
 }

@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 include(../../template/config.m4)
 include(template/mysql.yaml.m4)
 include(template/redis.yaml.m4)

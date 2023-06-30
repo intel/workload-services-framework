@@ -1,0 +1,27 @@
+From a049f0e76c3b7bc2c0b928e10ee913fe550c81ac Mon Sep 17 00:00:00 2001
+From: "Michael,Zhang" <michael.m.zhang@intel.com>
+Date: Fri, 2 Sep 2022 21:19:07 +0800
+Subject: [PATCH 06/22] Change the qemu permission to root
+
+---
+ cmd/virt-launcher/qemu.conf | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/cmd/virt-launcher/qemu.conf b/cmd/virt-launcher/qemu.conf
+index 4e4c59e39..758fd77cd 100644
+--- a/cmd/virt-launcher/qemu.conf
++++ b/cmd/virt-launcher/qemu.conf
+@@ -2,8 +2,8 @@ stdio_handler = "logd"
+ vnc_listen = "0.0.0.0"
+ vnc_tls = 0
+ vnc_sasl = 0
+-user = "qemu"
+-group = "qemu"
++user = "root"
++group = "root"
+ dynamic_ownership = 1
+ remember_owner = 0
+ namespaces = [ ]
+-- 
+2.27.0
+

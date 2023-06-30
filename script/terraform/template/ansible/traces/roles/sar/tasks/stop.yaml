@@ -1,7 +1,14 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: "Stop sar on {{ trace_node.1 }}"
   shell: 
-    cmd: "kill -9 $(cat /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar.pid)"
+    cmd: |
+      kill -9 $(cat /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar.pid)
+      date -Ins > /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar.stop
     executable: /bin/bash
   become: yes
   delegate_to: "{{ trace_node.1 }}"

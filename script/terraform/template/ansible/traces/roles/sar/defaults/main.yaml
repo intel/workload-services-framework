@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
-sar_options: "-B -b -d -p -H -I ALL -m ALL -n ALL -q -r -u ALL -P ALL -v -W -w 5"
+sar_options: "-B -b -d -p -H -I ALL -m ALL -n ALL -q -r -u ALL -P ALL -v -W -w -F 5"
 

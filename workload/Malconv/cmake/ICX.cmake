@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 add_workload("malconv")
 foreach (option 
         "tf_fp32_avx_single_1" 

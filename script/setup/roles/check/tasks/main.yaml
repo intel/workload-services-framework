@@ -1,7 +1,13 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: check for internet connectivity as root
   uri:
     url: "{{ item }}"
+    validate_certs: "{{ validate_certs | default('yes') }}"
   loop:
   - "http://hub.docker.com"
   - "https://hub.docker.com"
@@ -11,6 +17,7 @@
 - name: check for internet connectivity as a regular user
   uri:
     url: "{{ item }}"
+    validate_certs: "{{ validate_certs | default('yes') }}"
   loop:
   - "http://hub.docker.com"
   - "https://hub.docker.com"
@@ -28,3 +35,16 @@
   - netrc.stat.mode != '0400'
   - netrc.stat.mode != '0600'
 
+- name: check OS
+  shell:
+    cmd: ". /etc/os-release; echo $ID_LIKE"
+    executable: /bin/bash
+  register: os
+
+- name: check apt-get/yum update functions
+  action: "{{ (os.stdout == 'debian') | ternary('apt','yum') }} update_cache=true"
+  register: pkgrc
+  until: pkgrc is success
+  delay: 10
+  retries: 10
+  become: yes

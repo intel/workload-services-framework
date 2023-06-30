@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: Merge the configrations
   set_fact:
@@ -23,7 +28,7 @@
 
 - name: find out the home directory
   shell:
-    cmd: "echo ~{{ ansible_user }}"
+    cmd: "echo $HOME"
     executable: /bin/bash
   register: home
 

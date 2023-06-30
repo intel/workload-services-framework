@@ -1,7 +1,12 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: invoke docker run
   shell: 
-    cmd: "docker run $(compgen -e | sed -nE '/_(proxy|PROXY)$/{s/^/-e /;p}') {{ wl_docker_options }} --rm -d {{ wl_docker_image }}"
+    cmd: "docker run $(compgen -e | sed -nE '/_(proxy|PROXY)$/{s/^/-e /;p}') {{ workload_config.docker_options }} --rm -d {{ workload_config.docker_image }}"
     executable: /bin/bash
   register: container
 
@@ -11,28 +16,27 @@
     - name: waitproc to wait for logs complete
       shell:
         cmd: |
-          timeout {{ wl_timeout[0] }}s bash -c 'docker exec {{ container.stdout_lines | first }} cat {{ wl_export_logs }} > /tmp/{{ wl_namespace }}-docker-logs.tar' > /dev/null &
+          timeout {{ workload_config.timeout | split(',') | first }}s bash -c 'docker exec {{ container.stdout_lines | first }} cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-docker-logs.tar' > /dev/null 2>&1 &
           echo $!
           disown
         executable: /bin/bash
       register: waitproc
 
-    - name: "wait for the starting phrase: {{ wl_trace_mode.split(',')[1] }}"
+    - name: "wait for the starting phrase: {{ workload_config.trace_mode.split(',')[1] }}"
       shell:
         cmd: |
-          grep -q -F "{{ wl_trace_mode.split(',')[1] }}" <(
-            while kill -0 {{ waitproc.stdout_lines | first }}; do
-              docker logs {{ container.stdout_lines | first }}
-              bash -c 'sleep 0.5'
-            done
-          )
+          while kill -0 {{ waitproc.stdout_lines | first }}; do
+            docker logs {{ container.stdout_lines | first }} | grep -q -F "{{ workload_config.trace_mode.split(',')[1] }}" && break
+            bash -c 'sleep 0.1'
+          done
         executable: /bin/bash
-      when: (wl_trace_mode | split(',') | first == "roi")
+      when: (workload_config.trace_mode | split(',') | first == "roi")
       ignore_errors: yes
 
-    - name: "wait for timeout {{ wl_trace_mode.split(',')[1] }}s"
-      command: "timeout {{ wl_trace_mode.split(',')[1] | int }}s tail --pid={{ waitproc.stdout_lines[0] }} -f /dev/null"
-      when: (wl_trace_mode | split(',') | first == "time")
+    - name: "wait for timeout {{ workload_config.trace_mode.split(',')[1] }}s"
+      command: |
+        timeout {{ workload_config.trace_mode.split(',')[1] | int }}s tail --pid={{ waitproc.stdout_lines | first }} -f /dev/null
+      when: (workload_config.trace_mode | split(',') | first == "time")
       ignore_errors: yes
 
     - name: start trace
@@ -41,22 +45,21 @@
         tasks_from: start
       when: wl_trace_modules is defined
 
-    - name: "wait for the stop phrase: {{ wl_trace_mode.split(',')[2] }}"
+    - name: "wait for the stop phrase: {{ workload_config.trace_mode.split(',')[2] }}"
       shell:
         cmd: |
-          grep -q -F "{{ wl_trace_mode.split(',')[2] }}" <(
-            while kill -0 {{ waitproc.stdout_lines | first }}; do
-              docker logs {{ container.stdout_lines | first }}
-              bash -c 'sleep 0.5'
-            done
-          )
+          while kill -0 {{ waitproc.stdout_lines | first }}; do
+            docker logs {{ container.stdout_lines | first }} | grep -q -F "{{ workload_config.trace_mode.split(',')[2] }}" && break
+            bash -c 'sleep 0.1'
+          done
         executable: /bin/bash
-      when: (wl_trace_mode | split(',') | first == "roi")
+      when: (workload_config.trace_mode | split(',') | first == "roi")
       ignore_errors: yes
 
-    - name: "wait for timeout {{ wl_trace_mode.split(',')[2] }}s"
-      command: "timeout {{ wl_trace_mode.split(',')[2] | int }}s tail --pid={{ waitproc.stdout_lines[0] }} -f /dev/null"
-      when: (wl_trace_mode | split(',') | first == "time")
+    - name: "wait for timeout {{ workload_config.trace_mode.split(',')[2] }}s"
+      command: |
+        timeout {{ workload_config.trace_mode.split(',')[2] | int }}s tail --pid={{ waitproc.stdout_lines | first }} -f /dev/null
+      when: (workload_config.trace_mode | split(',') | first == "time")
       ignore_errors: yes
 
     - name: revoke trace
@@ -65,7 +68,7 @@
         tasks_from: stop
       when: 
       - wl_trace_modules is defined
-      - (wl_trace_mode | split(',') | length == 3)
+      - (workload_config.trace_mode | split(',') | length == 3)
 
     - name: wait until execution compete
       command: "tail --pid={{ waitproc.stdout_lines | first }} -f /dev/null"
@@ -89,40 +92,46 @@
   when: wl_trace_modules is defined
   ignore_errors: yes
 
-- name: print docker logs
-  command: "docker logs {{ container.stdout_lines | first }}"
-  ignore_errors: true
+- block:
 
-- name: stop the docker container
-  command: "docker rm -f {{ container.stdout_lines | first }}"
+  - name: print docker logs
+    command: "docker logs {{ container.stdout_lines | first }}"
+    ignore_errors: true
 
-- name: create the iteration direcctory
-  file:
-    path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ container.stdout_lines | first }}"
-    state: directory
-  delegate_to: localhost
+  - name: stop the docker container
+    command: "docker rm -f {{ container.stdout_lines | first }}"
 
-- name: copy logs back to the itr directory
-  fetch:
-    src: "/tmp/{{ wl_namespace }}-docker-logs.tar"
-    dest: "{{ wl_logs_dir }}/itr-{{ itr }}/"
-    flat: yes
+  - name: create the iteration direcctory
+    file:
+      path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ container.stdout_lines | first }}"
+      state: directory
+    delegate_to: localhost
 
-- name: untar the logs
-  unarchive:
-    src: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ wl_namespace }}-docker-logs.tar"
-    dest: "{{ wl_logs_dir}}/itr-{{ itr }}/{{ container.stdout_lines | first }}"
-  delegate_to: localhost
-  ignore_errors: true
+  - name: copy logs back to the itr directory
+    fetch:
+      src: "/tmp/{{ wl_namespace }}-docker-logs.tar"
+      dest: "{{ wl_logs_dir }}/itr-{{ itr }}/"
+      flat: yes
 
-- name: remove remote logs
-  file:
-    path: "/tmp/{{ wl_namespace }}-docker-logs.tar"
-    state: absent
+  - name: untar the logs
+    unarchive:
+      src: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ wl_namespace }}-docker-logs.tar"
+      dest: "{{ wl_logs_dir}}/itr-{{ itr }}/{{ container.stdout_lines | first }}"
+    delegate_to: localhost
+    ignore_errors: true
 
-- name: remove local logs tarfile
-  file:
-    path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ wl_namespace }}-docker-logs.tar"
-    state: absent
-  delegate_to: localhost
+  always:
+
+  - name: remove remote logs
+    file:
+      path: "/tmp/{{ wl_namespace }}-docker-logs.tar"
+      state: absent
+    ignore_errors: true
+
+  - name: remove local logs tarfile
+    file:
+      path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ wl_namespace }}-docker-logs.tar"
+      state: absent
+    delegate_to: localhost
+    ignore_errors: true
 

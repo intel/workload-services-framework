@@ -1,8 +1,15 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
   - name: "Start collectd on {{ trace_node.1 }}"
     shell:
       cmd: |
-        {{ collectd_bin_path }} -f &
+        mkdir -p {{ collectd_csv_path }}/{{ trace_node.1 }}
+        date -Ins > {{ collectd_csv_path }}/{{ trace_node.1 }}/TRACE_START
+        {{ collectd_bin_path }} -f > /dev/null 2>&1 &
         echo $! > /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.pid
         disown
       executable: /bin/bash

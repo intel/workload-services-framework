@@ -1,46 +1,28 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
-- name: Check OS Version
-  shell:
-    cmd: ". /etc/os-release; echo $VERSION_ID"
-    executable: /bin/bash
-  register: os_version  
-
-- name: uname -i
-  command: uname -i
-  register: arch
-  when: os_version.stdout == "22.04"
-
-- name: Install collectd for ubuntu2204
-  apt:
-    deb: "{{ collectd_ubuntu2204_debs[arch.stdout] }}"
-  when: os_version.stdout == "22.04" and not collectd.stat.exists
-  become: yes
-  register: aptrc
-  until: aptrc is success
-  retries: 10
-  delay: 10
-
-- name: Install collectd for ubuntu2004
+- name: Install collectd
   apt:
     name: collectd
     update_cache: true
-  when: os_version.stdout == "20.04" and not collectd.stat.exists
+    install_recommends: false
+  when: not collectd.stat.exists
   become: yes
   register: aptrc
   until: aptrc is success
   retries: 10
   delay: 10
 
-- name: Make sure /etc/collectd exists
+- name: set collectd path
+  set_fact:
+    config_path: /etc/collectd/collectd.conf
+
+- name: Ensure config path exists
   file:
-    path: /etc/collectd
+    path: "{{ config_path | dirname }}"
     state: directory
   become: yes
-
-- name: Install collectd.conf
-  template:
-    src: collectd.conf.j2
-    dest: /etc/collectd/collectd.conf
-  become: yes
-
 

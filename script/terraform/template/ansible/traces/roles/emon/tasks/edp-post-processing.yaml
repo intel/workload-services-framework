@@ -1,15 +1,34 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: Install emon locally
   shell:
     cmd: |
-      flock /tmp/emon.lock bash -c '
-          which () {
-            echo "x"
-          }
-          [ ! -e {{ emon_bin_path }} ] && mkdir -p {{ emon_bin_path }} && . ./sep-installer.sh -i -u -C {{ emon_bin_path }} --accept-license -ni -i --no-load-driver
-      '
+      which () {
+        echo "x"
+      }
+      [ -e {{ emon_bin_path }} ] || (
+        apt-get update
+        apt-get install -y gcc
+        /opt/conda/bin/python3 -m pip install pandas==1.5.3 numpy defusedxml pytz tdigest xlsxwriter
+        mkdir -p {{ emon_bin_path }}
+        . ./sep-installer.sh -i -u -C {{ emon_bin_path }} --accept-license -ni -i --no-load-driver
+      )
     chdir: "{{ emon_src_path }}"
     executable: /bin/bash
+  delegate_to: localhost
+  become: yes
+  ignore_errors: yes
+  run_once: true
+
+- name: Replace edp config file
+  replace:
+    path: "{{ emon_bin_path }}/sep/{{ emon_edp_config }}"
+    regexp: '^(VIEW=).*$'
+    replace: '\1{{ emon_view }}'
   delegate_to: localhost
   become: yes
   ignore_errors: yes

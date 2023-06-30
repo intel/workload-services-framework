@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 resource "aws_key_pair" "default" {
   key_name   = "wsf-${var.job_id}-key"
   public_key = var.ssh_pub_key
@@ -15,7 +20,7 @@ resource "aws_instance" "default" {
   cpu_core_count = each.value.cpu_core_count
   cpu_threads_per_core = each.value.threads_per_core
 
-  ami = each.value.image==null?data.aws_ami.search[each.value.profile].id:(startswith(each.value.image,"ami-")?each.value.image:data.aws_ami.image[each.key].image_id)
+  ami = each.value.os_image==null?data.aws_ami.search[each.value.profile].id:(startswith(each.value.os_image,"ami-")?each.value.os_image:data.aws_ami.image[each.key].image_id)
 
   key_name = "wsf-${var.job_id}-key"
   vpc_security_group_ids = [aws_default_security_group.default.id]
@@ -24,6 +29,7 @@ resource "aws_instance" "default" {
   depends_on = [aws_internet_gateway.default]
 
   user_data_base64 = "${data.template_cloudinit_config.default[each.key].rendered}"
+  instance_initiated_shutdown_behavior = "terminate"
 
   root_block_device {
     tags = {
@@ -58,7 +64,7 @@ resource "aws_spot_instance_request" "default" {
   instance_type = each.value.instance_type
   cpu_core_count = each.value.cpu_core_count
   cpu_threads_per_core = each.value.threads_per_core
-  ami = each.value.image==null?data.aws_ami.search[each.value.profile].id:(startswith(each.value.image,"ami-")?each.value.image:data.aws_ami.image[each.key].image_id)
+  ami = each.value.os_image==null?data.aws_ami.search[each.value.profile].id:(startswith(each.value.os_image,"ami-")?each.value.os_image:data.aws_ami.image[each.key].image_id)
 
   key_name = "wsf-${var.job_id}-key"
   vpc_security_group_ids = [aws_default_security_group .default.id]
@@ -72,6 +78,7 @@ resource "aws_spot_instance_request" "default" {
   depends_on = [aws_internet_gateway.default]
 
   user_data_base64 = "${data.template_cloudinit_config.default[each.key].rendered}"
+  instance_initiated_shutdown_behavior = "terminate"
 
   root_block_device {
     tags = {

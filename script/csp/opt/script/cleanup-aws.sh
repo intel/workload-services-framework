@@ -1,4 +1,9 @@
 #!/bin/bash
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 scan_vpc_dhcp_option () {
     echo
@@ -205,11 +210,15 @@ scan_images () {
     echo "Scan images..."
     for im in $(aws --region $region ec2 describe-images --output=json --filters Name=tag:owner,Values="$OWNER" | awk '/"ImageId":/{print$NF}' | tr -d '",'); do
         echo "Image: $im"
-        (set -x; aws ec2 --region $region deregister-image --image-id $im)
-        for ss in $(aws ec2 describe-images --image-ids $im --region $region --query 'Images[*].BlockDeviceMappings[*].Ebs.SnapshotId' --output text); do
-            echo "Image snapshot: $ss"
-            (set -x; aws ec2 --region $region delete-snapshot --snapshot-id $ss)
-        done
+        if [[ "$@" = *"--images"* ]]; then
+            (set -x; aws ec2 --region $region deregister-image --image-id $im)
+            for ss in $(aws ec2 describe-images --image-ids $im --region $region --query 'Images[*].BlockDeviceMappings[*].Ebs.SnapshotId' --output text); do
+                echo "Image snapshot: $ss"
+                (set -x; aws ec2 --region $region delete-snapshot --snapshot-id $ss)
+            done
+        else
+            has_image=1
+        fi
     done
 }
 
@@ -294,9 +303,10 @@ scan_repositories () {
 }
 
 export AWS_PAGER=
-. cleanup-common.sh
+. "$(dirname "$0")"/cleanup-common.sh
 
 read_regions aws
+has_image=0
 for regionres in "${REGIONS[@]}"; do
     region="${regionres/,*/}"
     [[ "$region" =~ "[0-9]$" ]] || region="${region%?}"
@@ -337,7 +347,7 @@ for regionres in "${REGIONS[@]}"; do
         scan_placement_group
         scan_internet_gateway
         scan_subnet
-        scan_images
+        scan_images $@
         scan_repositories
 
         [ "${#resources[@]}" -eq 0 ] && break
@@ -348,4 +358,10 @@ for regionres in "${REGIONS[@]}"; do
   
     echo
 done
-delete_regions aws 
+
+if [ $has_image -eq 1 ]; then
+    echo "VM images are left untouched."
+    echo "Use 'cleanup --images' to clean up VM images"
+else
+    delete_regions aws
+fi

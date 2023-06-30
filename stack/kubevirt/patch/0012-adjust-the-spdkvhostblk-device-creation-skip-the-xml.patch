@@ -1,0 +1,214 @@
+From 94ca84c3751226c1b3611c6d1156bf4ba6db3634 Mon Sep 17 00:00:00 2001
+From: "Michael,Zhang" <michael.m.zhang@intel.com>
+Date: Wed, 7 Sep 2022 13:05:54 +0800
+Subject: [PATCH 12/22] adjust the spdkvhostblk device creation, skip the xml
+ part, only use qemu cmd args
+
+---
+ pkg/virt-launcher/virtwrap/api/schema.go      | 22 +++--
+ .../virtwrap/converter/converter.go           | 94 +++++++++++++------
+ 2 files changed, 78 insertions(+), 38 deletions(-)
+
+diff --git a/pkg/virt-launcher/virtwrap/api/schema.go b/pkg/virt-launcher/virtwrap/api/schema.go
+index 4abdf08fc..859bde31e 100644
+--- a/pkg/virt-launcher/virtwrap/api/schema.go
++++ b/pkg/virt-launcher/virtwrap/api/schema.go
+@@ -603,14 +603,15 @@ type DiskSecret struct {
+ type ReadOnly struct{}
+ 
+ type DiskSource struct {
+-	Dev           string          `xml:"dev,attr,omitempty"`
+-	Type          string          `xml:"type,attr,omitempty"`
+-	Path          string          `xml:"path,attr,omitempty"`
+-	File          string          `xml:"file,attr,omitempty"`
+-	StartupPolicy string          `xml:"startupPolicy,attr,omitempty"`
+-	Protocol      string          `xml:"protocol,attr,omitempty"`
+-	Name          string          `xml:"name,attr,omitempty"`
+-	Host          *DiskSourceHost `xml:"host,omitempty"`
++	Dev           string               `xml:"dev,attr,omitempty"`
++	Type          string               `xml:"type,attr,omitempty"`
++	Path          string               `xml:"path,attr,omitempty"`
++	File          string               `xml:"file,attr,omitempty"`
++	StartupPolicy string               `xml:"startupPolicy,attr,omitempty"`
++	Protocol      string               `xml:"protocol,attr,omitempty"`
++	Name          string               `xml:"name,attr,omitempty"`
++	Host          *DiskSourceHost      `xml:"host,omitempty"`
++	Reconnect     *DiskSourceReconnect `xml:"reconnect,omitempty"`
+ }
+ 
+ type DiskTarget struct {
+@@ -636,6 +637,11 @@ type DiskSourceHost struct {
+ 	Port string `xml:"port,attr,omitempty"`
+ }
+ 
++type DiskSourceReconnect struct {
++	Enabled string `xml:"enabled,attr"`
++	Timeout uint64 `xml:"timeout,attr,omitempty"`
++}
++
+ type BackingStore struct {
+ 	Type   string              `xml:"type,attr,omitempty"`
+ 	Format *BackingStoreFormat `xml:"format,omitempty"`
+diff --git a/pkg/virt-launcher/virtwrap/converter/converter.go b/pkg/virt-launcher/virtwrap/converter/converter.go
+index f55c77b23..4f8254320 100644
+--- a/pkg/virt-launcher/virtwrap/converter/converter.go
++++ b/pkg/virt-launcher/virtwrap/converter/converter.go
+@@ -34,6 +34,7 @@ import (
+ 	"strconv"
+ 	"strings"
+ 	"syscall"
++	"time"
+ 
+ 	"golang.org/x/sys/unix"
+ 
+@@ -122,6 +123,9 @@ type ConverterContext struct {
+ 	UseLaunchSecurity     bool
+ }
+ 
++// for record the spdkvhost block disk count.
++var spdkVhostBlkVolIndices = map[string]int{}
++
+ func contains(volumes []string, name string) bool {
+ 	for _, v := range volumes {
+ 		if name == v {
+@@ -846,12 +850,38 @@ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, _ *v1.Spdk
+ 		return fmt.Errorf(deviceTypeNotCompatibleFmt, disk.Alias.GetName())
+ 	}
+ 
++	//Communicate with spdk-vhost daemon to create a new vhost controller.
++
++	//1. create a unique name for spdk-vhost to create vhost controller.
++	//   ctrl_name = A-B-C, full_path = /var/tmp/vhost.${ctrl_name}
++	//   A = suffix of the virt-launcher POD NAME.
++	//	 B = index of the spdkvhostblk volumes.
++	//   C = backend block image ID/name. For ceph, it's the block image name
++	podNameSuffix := "xyz1"
++	diskIndex := spdkVhostBlkVolIndices[volumeName]
++	diskCapcity := 10
++
++	//2. inform the spdk-vhost daemon to create a new vhost controller with shared folder
++	//   write the message to a file.
++	logger := log.DefaultLogger()
++	logger.Infof("Notify the spdk-vhost to create vhost controller: suffix='%s', diskIndex='%d', capacity='%d'GiB .", podNameSuffix, diskIndex, diskCapcity)
++
++	//3. Waiting for new vhost controller created
++	logger.Info("Sleep 10 second to wait spdk-vhost controller created.")
++	time.Sleep(10 * time.Second)
++	logger.Info("Should be created.")
++
++	//TODO: do nothing and return directly, will levearage qemucmd args to create vhost user blk device
++	//for currrent kubevirt version, it failed to create the vhostuser block device via xml define.
++	//re-visit here later
++	//return nil
++
+ 	disk.Type = "vhostuser"
+ 	disk.Device = "disk"
+ 	disk.Model = ""
+ 	disk.Snapshot = ""
+ 	//	disk.Alias.name = ""
+-	disk.Alias = api.NewUserDefinedAlias("")
++	//	disk.Alias = api.NewUserDefinedAlias("")
+ 
+ 	disk.Driver.Name = "qemu"
+ 	disk.Driver.Type = "raw"
+@@ -862,7 +892,12 @@ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, _ *v1.Spdk
+ 	disk.Driver.ErrorPolicy = ""
+ 	disk.Driver.Cache = ""
+ 
++	// Need to re-vist here for reconnect field setting. it's failed.
++	// disk.Source.Reconnect.Enabled = "yes"
++	// disk.Source.Reconnect.Timeout = 10
++
+ 	return nil
++
+ }
+ 
+ func Convert_v1_ContainerDiskSource_To_api_Disk(volumeName string, _ *v1.ContainerDiskSource, disk *api.Disk, c *ConverterContext, diskIndex int) error {
+@@ -1431,9 +1466,14 @@ func Convert_v1_VirtualMachineInstance_To_api_Domain(vmi *v1.VirtualMachineInsta
+ 
+ 	volumeIndices := map[string]int{}
+ 	volumes := map[string]*v1.Volume{}
++	j := 0
+ 	for i, volume := range vmi.Spec.Volumes {
+ 		volumes[volume.Name] = volume.DeepCopy()
+ 		volumeIndices[volume.Name] = i
++		if volume.SpdkVhostBlkDisk != nil {
++			spdkVhostBlkVolIndices[volume.Name] = j
++			j += 1
++		}
+ 	}
+ 
+ 	dedicatedThreads := 0
+@@ -1529,38 +1569,30 @@ func Convert_v1_VirtualMachineInstance_To_api_Domain(vmi *v1.VirtualMachineInsta
+ 			err = Convert_v1_Hotplug_Volume_To_api_Disk(volume, &newDisk, c)
+ 		}
+ 
++		if err != nil {
++			return err
++		}
++
+ 		//TODO: for vhostuser blk
+-		if volume.EmptyDisk != nil {
+-			diskIndex := volumeIndices[disk.Name]
+-			spdkVhostTag := "/var/tmp/vhost.tag" //If the tag is exist, then support the spdk vhost.
+-			//			spdkVhostPath := "/var/tmp/vhost.0"
++		if volume.SpdkVhostBlkDisk != nil {
++			diskIndex := spdkVhostBlkVolIndices[disk.Name]
++			vhostUserBlkDevID := fmt.Sprintf("spdkvhostblk_%s", disk.Name)
++			//The spdk vhost socket should like spdkVhostPath := "/var/tmp/vhost.0"
+ 			spdkVhostPath := fmt.Sprintf("/var/tmp/vhost.%d", diskIndex)
++			blkQueueNum := 2
++
++			logger := log.DefaultLogger()
++			logger.Infof("Mount SPDK vhost socket: '%s' .", spdkVhostPath)
++
+ 			if util.IsVhostuserVmiSpec(&vmi.Spec) {
+-				if _, err := os.Stat(spdkVhostPath); os.IsNotExist(err) {
+-					logger := log.DefaultLogger()
+-					logger.Infof("SPDK vhost socket directory: '%s' not present.", spdkVhostPath)
+-
+-				} else if err == nil {
+-					logger := log.DefaultLogger()
+-					logger.Infof("SPDK vhost socket directory: '%s' is present.", spdkVhostPath)
+-					initializeQEMUCmdAndQEMUArg(domain)
+-
+-					domain.Spec.QEMUCmd.QEMUArg = append(domain.Spec.QEMUCmd.QEMUArg,
+-						api.Arg{Value: "-chardev"},
+-						api.Arg{Value: fmt.Sprintf("socket,id=spdk_vhost_blk%d,path=%s", diskIndex, spdkVhostPath)},
+-						//api.Arg{Value: fmt.Sprintf("socket,id=spdk_vhost_blk%d,path=/var/tmp/vhost.%d", diskIndex, diskIndex)},
+-						api.Arg{Value: "-device"},
+-						api.Arg{Value: fmt.Sprintf("vhost-user-blk-pci,chardev=spdk_vhost_blk%d,num-queues=2", diskIndex)})
+-					//api.Arg{Value: "vhost-user-blk-pci,chardev=spdk_vhost_blk0,num-queues=2"})
+-				}
+-			} else {
+-				logger := log.DefaultLogger()
+-				logger.Infof("Will not create vhost-user-blk device, please create the tag[%s]to support SPDK vhost in kubevirt.", spdkVhostTag)
+-			}
+-		}
++				initializeQEMUCmdAndQEMUArg(domain)
+ 
+-		if err != nil {
+-			return err
++				domain.Spec.QEMUCmd.QEMUArg = append(domain.Spec.QEMUCmd.QEMUArg,
++					api.Arg{Value: "-chardev"},
++					api.Arg{Value: fmt.Sprintf("socket,id=%s,path=%s", vhostUserBlkDevID, spdkVhostPath)},
++					api.Arg{Value: "-device"},
++					api.Arg{Value: fmt.Sprintf("vhost-user-blk-pci,chardev=%s,num-queues=%d", vhostUserBlkDevID, blkQueueNum)})
++			}
+ 		}
+ 
+ 		if err := Convert_v1_BlockSize_To_api_BlockIO(&disk, &newDisk); err != nil {
+@@ -1593,7 +1625,9 @@ func Convert_v1_VirtualMachineInstance_To_api_Domain(vmi *v1.VirtualMachineInsta
+ 		hpStatus, hpOk := c.HotplugVolumes[disk.Name]
+ 		// if len(c.PermanentVolumes) == 0, it means the vmi is not ready yet, add all disks
+ 		if _, ok := c.PermanentVolumes[disk.Name]; ok || len(c.PermanentVolumes) == 0 || (hpOk && (hpStatus.Phase == v1.HotplugVolumeMounted || hpStatus.Phase == v1.VolumeReady)) {
+-			domain.Spec.Devices.Disks = append(domain.Spec.Devices.Disks, newDisk)
++			if volume.SpdkVhostBlkDisk == nil {
++				domain.Spec.Devices.Disks = append(domain.Spec.Devices.Disks, newDisk)
++			}
+ 		}
+ 	}
+ 	// Handle virtioFS
+-- 
+2.27.0
+

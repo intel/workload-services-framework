@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - block:
 
@@ -11,7 +16,7 @@
 
     - name: find home
       shell:
-        cmd: "echo ~{{ ansible_user }}"
+        cmd: "echo $HOME"
         executable: /bin/bash
       register: home
 

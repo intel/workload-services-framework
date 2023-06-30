@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: remove old versions
   apt:
@@ -7,6 +12,10 @@
     - docker.io
     - docker-ce
     - docker-ce-cli
+    - docker-compose-plugin
+    - docker-buildx-plugin
+    - docker-ce-rootless-extras
+    - docker-scan-plugin
     state: absent
   when: ((csp | default('static')) == 'static')
   ignore_errors: true
@@ -24,7 +33,7 @@
 - name: add docker GPG key
   get_url:
     url: "{{ docker_dist_repo }}/linux/ubuntu/gpg"
-    dest: /etc/apt/trusted.gpg.d/docker.asc
+    dest: /usr/share/keyrings/docker.asc
     mode: '0644'
     force: true
   register: getrc
@@ -40,7 +49,7 @@
 
 - name: add docker repository to apt
   apt_repository:
-    repo: "deb {{ docker_dist_repo }}/linux/ubuntu {{ codename.stdout | lower }} stable"
+    repo: "deb [signed-by=/usr/share/keyrings/docker.asc] {{ docker_dist_repo }}/linux/ubuntu {{ codename.stdout | lower }} stable"
     state: present
     update_cache: false
 
@@ -49,6 +58,7 @@
     name:
     - "docker-ce={{ docker_version | default(docker_default_version['ubuntu']) }}"
     - "docker-ce-cli={{ docker_cli_version | default(docker_cli_default_version['ubuntu']) }}"
+    - "docker-compose-plugin={{ docker_compose_plugin_version | default(docker_compose_plugin_default_version['ubuntu']) }}"
     update_cache: true
   register: aptrc
   until: aptrc is success

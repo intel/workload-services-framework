@@ -1,8 +1,13 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 terraform {
   required_providers {
     google = {
       source = "hashicorp/google"
-      version = ">= 4.32.0"
+      version = "= 4.63.1"
     }
   }
 }

@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
   - name: check if containerd is installed
     command: containerd --version
@@ -10,12 +15,12 @@
       cmd: ". /etc/os-release; echo $ID"
       executable: /bin/bash
     register: os
-    when: containerd.rc != 0
+    when: ((containerd.rc != 0) or containerd_reset)
 
   - name: install containerd
     include_tasks:
       file: "install-{{ (os.stdout == 'rhel' or os.stdout == 'anolis') | ternary('centos', os.stdout) }}.yaml"
-    when: containerd.rc != 0
+    when: ((containerd.rc != 0) or containerd_reset)
 
   - name: check containerd configuration
     command: containerd config dump
@@ -24,7 +29,7 @@
 
   - name: check if containerd must be reconfigured
     set_fact:
-      reconfigure: "{{ not (('SystemdCgroup = true' in config.stdout) and (containerd_pause_registry in config.stdout) and (containerd_data_root in config.stdout)) }}"
+      reconfigure: "{{ not (('SystemdCgroup = true' in config.stdout) and (containerd_pause_registry in config.stdout) and (containerd_data_root in config.stdout)) or containerd_reset }}"
 
   - name: "Ensure {{ containerd_config_toml | dirname }} exists"
     file:

@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 docker_dist_repo: "https://download.docker.com"
 containerd_default_version: 
@@ -9,3 +14,4 @@ containerd_config_toml: "/etc/containerd/config.toml"
 containerd_proxy_conf: "/etc/systemd/system/containerd.service.d/99-wsf-proxies.conf"
 containerd_pause_registry: "k8s.gcr.io"
 docker_dist_repo: "https://download.docker.com"
+containerd_reset: false

@@ -1,8 +1,14 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: Install sysstat
   apt:
     name: 
       - sysstat
+    update_cache: true
     state: present
   become: yes
   register: aptrc

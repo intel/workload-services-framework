@@ -1,4 +1,9 @@
 #!/bin/bash -e
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 # args: config
 print_labels () {
@@ -95,8 +100,8 @@ if [ -z "$REGISTRY" ]; then
     fi
 fi
 
-rebuild_config "$CLUSTER_CONFIG_M4" > "$CLUSTER_CONFIG"
-rebuild_kubernetes_config > "$KUBERNETES_CONFIG"
+rebuild_config "$CLUSTER_CONFIG_M4" "$CLUSTER_CONFIG"
+rebuild_kubernetes_config
 # replace %20 to space 
 sed -i '/^\s*-\s*name:/,/^\s*/{/value:/s/%20/ /g}' "$KUBERNETES_CONFIG"
 print_labels "$KUBERNETES_CONFIG"

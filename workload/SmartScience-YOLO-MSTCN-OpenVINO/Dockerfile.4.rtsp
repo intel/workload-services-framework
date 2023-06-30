@@ -1,5 +1,10 @@
 # smartscience-rtsp
 
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 ARG RTSP_VER=0.21.5
 FROM aler9/rtsp-simple-server:v${RTSP_VER} AS rtsp
 FROM ubuntu:18.04

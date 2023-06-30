@@ -1,8 +1,14 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: Install emon prerequisites
   apt:
     name: 
       - build-essential
+    update_cache: true
     state: present
   become: yes
   register: aptrc

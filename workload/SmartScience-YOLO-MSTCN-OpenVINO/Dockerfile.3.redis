@@ -1,3 +1,8 @@
 # smartscience-redis
 
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 FROM redis:5.0.6

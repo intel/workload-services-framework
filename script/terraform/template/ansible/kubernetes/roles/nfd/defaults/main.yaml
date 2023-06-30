@@ -1,4 +1,9 @@
-k8s_nfd_version: "v0.11.1" #  update as required.
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+k8s_nfd_version: "v0.13.1" #  update as required.
 k8s_nfd_namespace: "node-feature-discovery"
 k8s_nfd_url: "https://github.com/kubernetes-sigs/node-feature-discovery/deployment/overlays/default?ref={{ k8s_nfd_version }}"
 k8s_nfd_registry: "k8s.gcr.io/nfd"

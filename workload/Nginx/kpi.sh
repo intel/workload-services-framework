@@ -1,4 +1,9 @@
 #!/bin/bash -e
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 #echo a:$?
 #echo b:$@
@@ -141,7 +146,7 @@ BEGIN {
 if [ ${CLIENT_TYPE} == "openssl" ]; then
 parse_openssl_kpi "output.logs" || true;
 else
-parse_ab_kpi "output.logs" || true;
+parse_ab_kpi "concurrency_max.log" || true;
 fi
 
 # http

@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: Create the gprofiler directory
   file:
@@ -5,54 +10,53 @@
     state: directory
   delegate_to: localhost
   become: no
-  failed_when: false
+  ignore_errors: true
 
 - name: Archive gprofiler files
   command:
-    cmd: "tar cfz /tmp/{{ wl_namespace }}-gprofiler.tgz ."
-    chdir: "/tmp/{{ wl_namespace }}-gprofiler"
+    cmd: "tar cfz /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler.tgz ."
+    chdir: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler"
   become: no
   delegate_to: "{{ trace_node.1 }}"
-  failed_when: false
+  ignore_errors: true
 
 - name: Fetch gprofiler files
   fetch:
-    src: "/tmp/{{ wl_namespace }}-gprofiler.tgz"
+    src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler.tgz"
     dest: "{{ wl_logs_dir }}/"
     flat: yes
   become: no
   delegate_to: "{{ trace_node.1 }}"
-  failed_when: false
+  ignore_errors: true
 
 - name: Untar gprofiler files
   command:
-    cmd: "tar xfz {{ wl_logs_dir }}/{{ wl_namespace }}-gprofiler.tgz"
+    cmd: "tar xfz {{ wl_logs_dir }}/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler.tgz"
     chdir: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-gprofiler"
   delegate_to: localhost
   become: no
-  failed_when: false
+  ignore_errors: true
 
 - name: Remove any collection files
   file:
-    path: "/tmp/{{ wl_namespace }}-gprofiler"
+    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler"
     state: absent
-  become: yes
+  become: true
   delegate_to: "{{ trace_node.1 }}"
-  failed_when: false
+  ignore_errors: true
 
 - name: Remove any gprofiler tar files
   file:
-    path: "/tmp/{{ wl_namespace }}-gprofiler.tgz"
+    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler.tgz"
     state: absent
-  become: no
+  become: false
   delegate_to: "{{ trace_node.1 }}"
-  failed_when: false
+  ignore_errors: true
 
-- name: Remove any gprofiler yaml files
+- name: Remove any gprofiler tar files
   file:
-    path: "/tmp/{{ wl_namespace }}-gprofiler.yaml"
+    path: "{{ wl_logs_dir }}/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler.tgz"
     state: absent
-  become: no
-  delegate_to: "{{ trace_node.1 }}"
-  failed_when: false
-
+  become: false
+  delegate_to: localhost
+  ignore_errors: true

@@ -1,6 +1,0 @@
-
-k8s_istio_profile: ""
-k8s_istio_version: "1.15.3"
-k8s_istio_install_dist_repo: "https://istio.io/downloadIstio"
-k8s_istio_install_parent_dir: "/usr/local"
-k8s_istio_install_dir: "{{ k8s_istio_install_parent_dir }}/istio-{{k8s_istio_version}}"

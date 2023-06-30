@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 import json
 import yaml
@@ -8,6 +13,7 @@ import copy
 
 CLUSTER_CONFIG = "cluster-config.yaml"
 KUBERNETES_CONFIG = "kubernetes-config.yaml"
+COMPOSE_CONFIG = "compose-config.yaml"
 INVENTORY = "inventory.yaml"
 CLUSTER = "cluster.yaml"
 CLEANUP = "cleanup.yaml"
@@ -81,6 +87,11 @@ for host in instances:
       "ansible_winrm_scheme": "https",
     })
 
+workload_config={}
+with open(WORKLOAD_CONFIG) as fd:
+  for doc in yaml.safe_load_all(fd):
+    if doc:
+      workload_config.update(doc)
 
 def _ExtendOptions(updates):
   tmp = options.copy()
@@ -106,17 +117,36 @@ def _WalkTo(node, name):
   return None
 
 
-def _ScanImages():
+def _ScanK8sImages():
   images = {}
-  with open(KUBERNETES_CONFIG) as fd:
-    for doc in yaml.safe_load_all(fd):
-      if doc:
-        for c1 in ["containers", "initContainers"]:
-          spec = _WalkTo(doc, c1)
-          if spec:
-            for c2 in spec[c1]:
-              if "image" in c2:
-                images[c2["image"]] = 1
+  if os.path.exists(KUBERNETES_CONFIG):
+    with open(KUBERNETES_CONFIG) as fd:
+      for doc in yaml.safe_load_all(fd):
+        if doc:
+          for c1 in ["containers", "initContainers"]:
+            spec = _WalkTo(doc, c1)
+            if spec:
+              for c2 in spec[c1]:
+                if "image" in c2:
+                  images[c2["image"]] = 1
+  return list(images.keys())
+
+
+def _ScanDockerImages():
+  images = {}
+
+  if options.get("compose", False) and os.path.exists(COMPOSE_CONFIG):
+    with open(COMPOSE_CONFIG) as fd:
+      for doc in yaml.safe_load_all(fd):
+        if doc:
+          if "services" in doc:
+            for svc in doc["services"]:
+              if "image" in doc["services"][svc]:
+                images[doc["services"][svc]["image"]] = 1
+
+  if options.get("docker", False) and "docker_image" in workload_config:
+    images[workload_config["docker_image"]] = 1
+
   return list(images.keys())
 
 
@@ -166,18 +196,6 @@ def _RegistryEnabled():
     if inventories["cluster_hosts"]["hosts"][h]["private_ip"] in my_ip_list:
       return False
   return str(options.get("k8s_enable_registry", 'True')).lower() == 'true'
-
-
-def _GetTunables():
-  with open(WORKLOAD_CONFIG) as fd:
-    tunables = {}
-    for doc in yaml.safe_load_all(fd):
-      if doc:
-        if "tunables" in doc:
-          for kv in doc["tunables"].split(";"):
-            k, _, v = kv.partition(":")
-            tunables[k] = v
-    return tunables
 
 
 nidx = {}
@@ -249,24 +267,23 @@ playbooks = [{
   })
 }]
 
-if options.get("wl_docker_image", None):
+if ((options.get("docker", False) or options.get("native", False)) and ("docker_image" in workload_config)) or (options.get("compose", False) and os.path.exists(COMPOSE_CONFIG)):
   playbooks.append({
     "name": "docker installation",
     "import_playbook": "./template/ansible/docker/installation.yaml",
     "vars": _ExtendOptions({
-      "wl_tunables": _GetTunables(),
+      "wl_tunables": workload_config.get('tunables', {}),
     })
   })
-  if not _IsSUTAccessible(options["wl_docker_image"]):
-    playbooks.append({
-      "name": "transfer image",
-      "import_playbook": "./template/ansible/common/image_to_daemon.yaml",
-      "vars": _ExtendOptions({
-        "wl_docker_images": {
-          options["wl_docker_image"]: _IsRegistrySecure(options["wl_docker_image"]),
-        },
-      })
+  playbooks.append({
+    "name": "transfer image",
+    "import_playbook": "./template/ansible/common/image_to_daemon.yaml",
+    "vars": _ExtendOptions({
+      "wl_docker_images": {
+        im: _IsRegistrySecure(im) for im in _ScanDockerImages() if not _IsSUTAccessible(im)
+      },
     })
+  })
 
 elif os.path.exists(KUBERNETES_CONFIG) or options.get("k8s_install", False):
   k8s_registry_port = options.get("k8s_registry_port", "20668")
@@ -278,12 +295,12 @@ elif os.path.exists(KUBERNETES_CONFIG) or options.get("k8s_install", False):
     "vars": _ExtendOptions({
       "k8s_registry_port": k8s_registry_port,
       "k8s_registry_ip": k8s_registry_ip,
-      "wl_tunables": _GetTunables(),
+      "wl_tunables": workload_config.get('tunables', {}),
     })
   })
 
-  if _RegistryEnabled() and os.path.exists(KUBERNETES_CONFIG):
-    images = _ScanImages()
+  if _RegistryEnabled():
+    images = options["wl_docker_images"].split(",") if "wl_docker_images" in options else _ScanK8sImages()
     playbooks.append({
       "name": "transfer image",
       "import_playbook": "./template/ansible/common/image_to_registry.yaml",
@@ -295,23 +312,12 @@ elif os.path.exists(KUBERNETES_CONFIG) or options.get("k8s_install", False):
       })
     })
 
-if options.get("docker_auth_reuse", False):
-  playbooks.append({
-    "name": "Docker Auth",
-    "import_playbook": "./template/ansible/common/docker_auth.yaml",
-    "vars": _ExtendOptions({
-      "docker_auth_method": options.get("docker_auth_method", "docker"),
-      "docker_auth_cred_ver": options.get("docker_auth_cred_ver", "undefined"),
-      "docker_auth_pass_ver": options.get("docker_credential_pass_ver", "undefined"),
-    })
-  })
-
 if os.path.exists("/opt/workload/template/ansible/custom/installation.yaml"):
   playbooks.append({
     "name": "create cluster",
     "import_playbook": "./template/ansible/custom/installation.yaml",
     "vars": _ExtendOptions({
-      "wl_tunables": _GetTunables(),
+      "wl_tunables": workload_config.get('tunables', {}),
     })
   })
 
@@ -343,9 +349,9 @@ with open(CLEANUP, "w") as fd:
       "include_role": {
         "name": "breakpoint",
       },
-      "vars": {
+      "vars": _ExtendOptions({
         "breakpoint": "CleanupStage",
-      }
+      })
     }]
   }]
 
@@ -355,7 +361,7 @@ with open(CLEANUP, "w") as fd:
       "name": "Kubernetes cleanup sequence",
       "import_playbook": "./template/ansible/kubernetes/cleanup.yaml",
       "vars": _ExtendOptions({
-        "wl_tunables": _GetTunables(),
+        "wl_tunables": workload_config.get('tunables', {}),
       }),
     })
 
@@ -365,7 +371,7 @@ with open(CLEANUP, "w") as fd:
       "name": "custom cleanup sequence",
       "import_playbook": "./template/ansible/custom/cleanup.yaml",
       "vars": _ExtendOptions({
-        "wl_tunables": _GetTunables(),
+        "wl_tunables": workload_config.get('tunables', {}),
       }),
     })
 
@@ -374,13 +380,21 @@ with open(CLEANUP, "w") as fd:
     "name": "default cleanup sequence",
     "import_playbook": "./template/ansible/common/cleanup.yaml",
     "vars": _ExtendOptions({
-      "wl_tunables": _GetTunables(),
+      "wl_tunables": workload_config.get('tunables', {}),
     }),
   })
 
   yaml.dump(playbooks, fd)
 
 with open(INVENTORY, "w") as fd:
+  inventory_update = options.get("ansible_inventory", {})
+  for group in inventory_update:
+    if "hosts" in inventory_update[group]:
+      inventories.update({
+        group: {
+          "hosts": inventory_update[group]["hosts"]
+        }
+      })
   yaml.dump({
     "all": {
       "children": inventories

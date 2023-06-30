@@ -1,0 +1,21 @@
+# test-config-spr.yaml
+# Overwrite the test cases for performance tunning on SPR
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+*_qatsw_off*:
+  NGINX_WORKERS: 4
+  CLIENT_CPU_NUM: 4
+  CONCURRENCY: 300
+  PROTOCOL: "TLSv1.2"
+  CIPHER: "AES128-GCM-SHA256"
+
+*_qatsw_async*:
+  NGINX_WORKERS: 4
+  CLIENT_CPU_NUM: 4
+  CONCURRENCY: 300
+  PROTOCOL: "TLSv1.2"
+  CIPHER: "AES128-GCM-SHA256"

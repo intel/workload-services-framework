@@ -1,18 +1,12 @@
 #!/bin/bash -e
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
-WORKLOAD_NAME=${WORKLOAD_NAME:-$WORKLOAD}
 TERRAFORM_CONFIG="${TERRAFORM_CONFIG:-$LOGSDIRH/terraform-config.tf}"
 LOGSTARFILE="${LOGSTARFILE:-$LOGSDIRH/output.tar}"
-if [[ "$TERRAFORM_OPTIONS $CTESTSH_OPTIONS" = *--owner=* ]]; then
-    export OWNER="$(echo "$TERRAFORM_OPTIONS $CTESTSH_OPTIONS" | tr ' ' '\n' | grep -E '^--owner=' | cut -f2 -d= | tr -c -d 'a-z0-9-')"
-else
-    export OWNER="$( (git config user.name || id -un) 2> /dev/null | tr -c -d 'a-z0-9-')"
-    TERRAFORM_OPTIONS="$TERRAFORM_OPTIONS --owner=$OWNER"
-fi
-if [ "$OWNER" = "root" ] || [ -z "$OWNER" ]; then
-    echo "Please run as a user or specify --owner=<user> in TERRAFORM_OPTIONS"
-    exit 3
-fi
 
 # add tags
 if [ -n "$WORKLOAD_TAGS" ]; then
@@ -24,28 +18,11 @@ if [ -n "$WORKLOAD_TAGS" ]; then
     fi
 fi
 
-#add category
-if [[ "$TERRAFORM_OPTIONS" = *"--intel_publish"* ]]; then
-    wl_readme="$SOURCEROOT/README.md"
-    wl_category=$(sed -n '/^.*Category:\s*[`].*[`]\s*$/{s/.*[`]\(.*\)[`]\s*$/\1/;p}' "$wl_readme")
-    export WL_CATEGORY="$wl_category"
-fi
-
 # args: s2 s3
 _reconfigure_terraform () {
-    export WL_NAME="$WORKLOAD_NAME"
-    export WL_TIMEOUT="$TIMEOUT"
-    export WL_JOB_FILTER="$JOB_FILTER"
+    export WL_NAME="$WORKLOAD"
     export WL_REGISTRY_MAP="$REGISTRY,$REGISTRY"
     export WL_NAMESPACE="$NAMESPACE"
-    export WL_TRACE_MODE="$EVENT_TRACE_PARAMS"
-    export WL_EXPORT_LOGS="$EXPORT_LOGS"
-}
-
-_reconfigure_reuse_sut_replace_workload_params () {
-    sed -i "s|\"wl_docker_options\":\"[^\"]*\"|\"wl_docker_options\":\"$WL_DOCKER_OPTIONS\"|" "$1"
-    sed -i "s|\"wl_timeout\":\"[^\"]*\"|\"wl_timeout\":\"$WL_TIMEOUT\"|" "$1"
-    sed -i "s|\"wl_trace_mode\":\"[^\"]*\"|\"wl_trace_mode\":\"$WL_TRACE_MODE\"|" "$1"
 }
 
 _reconfigure_reuse_sut () {
@@ -61,7 +38,6 @@ _reconfigure_reuse_sut () {
         cp -f "$sutdir"/ssh_access.key.pub "$LOGSDIRH"
         cp -f "$sutdir"/inventory.yaml "$LOGSDIRH"
         cp -f "$sutdir"/tfplan.json "$LOGSDIRH"
-        _reconfigure_reuse_sut_replace_workload_params "$LOGSDIRH"/tfplan.json
         cp -f "$sutdir"/ssh_config* "$LOGSDIRH" 2>/dev/null || true
         cp -rf "$sutdir"/*-svrinfo "$LOGSDIRH" 2>/dev/null || true
         cp -rf "$sutdir"/*-msrinfo "$LOGSDIRH" 2>/dev/null || true
@@ -84,16 +60,9 @@ _invoke_terraform () {
         "--name" "$NAMESPACE"
         "-v" "$SOURCEROOT:/opt/workload:ro"
         "-v" "$LOGSDIRH:/opt/workspace"
-        "-v" "$PROJECTROOT/script/terraform/template:/opt/template:ro"
-        "-v" "$PROJECTROOT/script/terraform/script:/opt/script"
         "-e" STACK_TEMPLATE_PATH
         "--add-host" "host.docker.internal:host-gateway"
     )
-    if [ -d "$PROJECTROOT/stack" ]; then
-        dk_options+=(
-            "-v" "$PROJECTROOT/stack:/opt/stack"
-        )
-    fi
     if [ -r "$HOME/.netrc" ]; then
         dk_options+=(
             "-v" "$HOME/.netrc:/home/.netrc:ro"
@@ -135,7 +104,7 @@ _invoke_terraform () {
     fi
     if [ -n "$(grep auths "${HOME}/.docker/config.json" 2>&-)" ]; then
         if [ -z "${REGISTRY_AUTH}" ]; then
-            REGISTRY_AUTH=$(cat "${HOME}/.docker/config.json" 2>&- | sed -n 's/\s*"credsStore"\s*:\s*"\(.*\)"/\1/p' || true)
+            REGISTRY_AUTH=$(cat "${HOME}/.docker/config.json" 2>&- | sed -n 's/\s*"credsStore"\s*:\s*"\(.*\)".*/\1/p' || true)
         fi
         if [ "${REGISTRY_AUTH}" = "docker" ]; then
             st_options+=(
@@ -170,43 +139,23 @@ _invoke_terraform () {
             "$(sed -n '/^\s*variable\s*"\(resource_group_id\|compartment\)"\s*{/,/^\s*}/{/^\s*default\s*=\s*/p}' "${TERRAFORM_CONFIG_TF:-$TERRAFORM_CONFIG_IN}" | cut -f2 -d'"')"
         [[ "$TERRAFORM_OPTIONS $CTESTSH_OPTIONS" = *"--dry-run"* ]] && exit 0
         set -o pipefail
-        "$PROJECTROOT"/script/terraform/shell.sh ${csp:-static} "${dk_options[@]}" -- /opt/script/start.sh ${TERRAFORM_OPTIONS} "${st_options[@]}" ${CTESTSH_OPTIONS} 2>&1 | tee "$LOGSDIRH/tfplan.logs"
+        "$PROJECTROOT"/script/terraform/shell.sh ${csp:-static} "${dk_options[@]}" -- /opt/script/start.sh ${TERRAFORM_OPTIONS} "${st_options[@]}" ${CTESTSH_OPTIONS} --owner=$OWNER 2>&1 | tee "$LOGSDIRH/tfplan.logs"
     )
 }
 
-# args: image [options]
-terraform_docker_run () {
-    export WL_DOCKER_IMAGE=$1; shift
-    export WL_DOCKER_OPTIONS="$@"
-    _reconfigure_terraform
-    "$PROJECTROOT/script/terraform/provision.sh" "$CLUSTER_CONFIG" "$TERRAFORM_CONFIG" 0
-    _reconfigure_reuse_sut
-    _invoke_terraform
-}
-
-# args: job-filter
-terraform_kubernetes_run () {
-    _reconfigure_terraform
-    "$PROJECTROOT/script/terraform/provision.sh" "$CLUSTER_CONFIG" "$TERRAFORM_CONFIG" 1
-    _reconfigure_reuse_sut
-    _invoke_terraform
-}
-
-# args: job-filter
-terraform_run () {
-    _reconfigure_terraform
-    "$PROJECTROOT/script/terraform/provision.sh" "$CLUSTER_CONFIG" "$TERRAFORM_CONFIG" 0
-    _reconfigure_reuse_sut
-    _invoke_terraform
-}
-
-if [ -n "$DOCKER_IMAGE" ] && [[ "$TERRAFORM_OPTIONS " = *"--docker "* ]] && [ -n "$(grep wl_docker_image "${TERRAFORM_CONFIG_TF:-$TERRAFORM_CONFIG_IN}")" ]; then
-    IMAGE=$(image_name "$DOCKER_IMAGE")
-    DATASET=($(dataset_images))
-    terraform_docker_run $IMAGE $DOCKER_OPTIONS
-elif [ -r "$KUBERNETES_CONFIG_M4" ] || [ -d "$HELM_CONFIG" ]; then
-    rebuild_kubernetes_config > "$KUBERNETES_CONFIG"
-    terraform_kubernetes_run
+if [[ "$TERRAFORM_OPTIONS $CTESTSH_OPTIONS " = *"--native "* ]] && [ -n "$DOCKER_IMAGE" ]; then
+    nctrs=0
+elif [[ "$TERRAFORM_OPTIONS $CTESTSH_OPTIONS " = *"--docker "* ]] && [ -n "$DOCKER_IMAGE" ]; then
+    nctrs=0
+elif [[ "$TERRAFORM_OPTIONS $CTESTSH_OPTIONS " = *"--compose "* ]] && rebuild_compose_config; then
+    nctrs=0
+elif rebuild_kubernetes_config; then
+    nctrs=1
 else
-    terraform_run
+    nctrs=0
 fi
+
+_reconfigure_terraform
+"$PROJECTROOT/script/terraform/provision.sh" "$CLUSTER_CONFIG" "$TERRAFORM_CONFIG" $nctrs
+_reconfigure_reuse_sut
+_invoke_terraform
