@@ -1,4 +1,9 @@
 #!/bin/bash -e
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 with_arch () {
     if [[ "$IMAGEARCH" = "linux/amd64" ]]; then
@@ -36,22 +41,38 @@ parse_ingredients () {
     done
 }
 
+macro_replacement () {
+    (
+        cd "$SOURCEROOT"
+        find . -name "*.m4" ! -name "*-config.yaml.m4" ! -path "./template/*" -exec /bin/bash -c 'f="{}" && cd "'$SOURCEROOT'" && m4 -Itemplate -I"'$PROJECTROOT'/template" -DPLATFORM='$PLATFORM' -DIMAGEARCH='$IMAGEARCH' -D'$1'='$2' -DREGISTRY='$REGISTRY' -DBACKEND='$BACKEND' -DRELEASE='$RELEASE' "$f" > "${f%.m4}"' \;
+        find . -name "*.j2" ! -name "*-config.yaml.j2" ! -path "./template/*" -exec /bin/bash -c 'f="{}" && cd "'$SOURCEROOT'" && ansible all -i "localhost," -c local -m template -a "src=\"$f\" dest=\"${f%.j2}\"" -e PLATFORM='$PLATFORM' -e IMAGEARCH='$IMAGEARCH' -e '$1'='$2' -e REGISTRY='$REGISTRY' -e BACKEND='$BACKEND' -e RELEASE='$RELEASE \;
+    )
+}
+
 # overwrite SOURCEROOT for image and stack
 this="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
 if [[ "$this" = *"$PROJECTROOT/stack/"* ]] && [ -n "$STACK" ]; then
     export SOURCEROOT="$this"
-fi
-if [[ "$this" = *"$PROJECTROOT/image/"* ]] && [ -n "$IMAGE" ]; then
+elif [[ "$this" = *"$PROJECTROOT/image/"* ]] && [ -n "$IMAGE" ]; then
     export SOURCEROOT="$this"
 fi
 
+# convert BUILD_FILES to FIND_OPTIONS
+if [ ${#BUILD_FILES[@]} -gt 0 ]; then
+    options=""
+    for file1 in ${BUILD_FILES[@]}; do
+        options="$options-name ${file1//*\/} -o "
+    done
+    FIND_OPTIONS="$FIND_OPTIONS ( ${options% -o } )"
+fi
+
 # template substitution
-if [[ "$SOURCEROOT" = */workload/* ]]; then
-    find "$SOURCEROOT" -name "*.m4" ! -name "*-config.yaml.m4" ! -path "*/template/*" -exec /bin/bash -c 'f="{}" && cd "'$SOURCEROOT'" && m4 -Itemplate -I"'$PROJECTROOT'/template" -DPLATFORM='$PLATFORM' -DIMAGEARCH='$IMAGEARCH' -DWORKLOAD='$WORKLOAD' -DREGISTRY='$REGISTRY' -DBACKEND='$BACKEND' -DRELEASE='$RELEASE' "$f" > "${f/.m4/}"' \;
-elif [[ "$SOURCEROOT" = */stack/* ]]; then
-    find "$SOURCEROOT" -name "*.m4" ! -name "*-config.yaml.m4" ! -path "*/template/*" -exec /bin/bash -c 'f="{}" && cd "'$SOURCEROOT'" && m4 -Itemplate -I"'$PROJECTROOT'/template" -DPLATFORM='$PLATFORM' -DIMAGEARCH='$IMAGEARCH' -DSTACK='$STACK' -DREGISTRY='$REGISTRY' -DBACKEND='$BACKEND' -DRELEASE='$RELEASE' "$f" > "${f/.m4/}"' \;
-elif [[ "$SOURCEROOT" = */image/* ]]; then
-    find "$SOURCEROOT" -name "*.m4" ! -name "*-config.yaml.m4" ! -path "*/template/*" -exec /bin/bash -c 'f="{}" && cd "'$SOURCEROOT'" && m4 -Itemplate -I"'$PROJECTROOT'/template" -DPLATFORM='$PLATFORM' -DIMAGEARCH='$IMAGEARCH' -DIMAGE='$IMAGE' -DREGISTRY='$REGISTRY' -DBACKEND='$BACKEND' -DRELEASE='$RELEASE' "$f" > "${f/.m4/}"' \;
+if [[ "$SOURCEROOT" = "$PROJECTROOT"/workload/* ]]; then
+    macro_replacement WORKLOAD $WORKLOAD
+elif [[ "$SOURCEROOT" = "$PROJECTROOT"/stack/* ]]; then
+    macro_replacement STACK $STACK
+elif [[ "$SOURCEROOT" = "$PROJECTROOT"/image/* ]]; then
+    macro_replacement IMAGE $IMAGE
 fi
 
 if [ "${#DOCKER_CONTEXT[@]}" -eq 0 ]; then

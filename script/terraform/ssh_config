@@ -1,0 +1,16 @@
+Host *
+    ControlPath /tmp/wsf-ssh-%h-%p-%r
+    ControlMaster auto
+    ControlPersist 60m
+    TCPKeepAlive yes
+    CheckHostIP no
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+    IdentitiesOnly no
+    PreferredAuthentications publickey,password
+    ConnectTimeout 20
+    GSSAPIAuthentication no
+    ServerAliveInterval 30
+    ServerAliveCountMax 10
+
+Include /opt/workspace/ssh_config*

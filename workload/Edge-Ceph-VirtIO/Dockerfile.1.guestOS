@@ -1,0 +1,49 @@
+# virtio-guest-os-image
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER="36"
+ARG OS_IMAGE="fedora"
+
+FROM ${OS_IMAGE}:${OS_VER} AS build
+
+ARG GUEST_OS_TYPE="ubuntu"
+ARG GUEST_OS_VER="22.04"
+ARG GUEST_OS_IMAGE="${GUEST_OS_TYPE}-${GUEST_OS_VER}-server-cloudimg-amd64.img"
+ARG GUEST_OS_IMAGE_PATH="https://cloud-images.ubuntu.com/releases/22.04/release/${GUEST_OS_IMAGE}"
+
+RUN dnf install -y wget libguestfs libguestfs-tools-c virt-v2v \
+                   libvirt-daemon libvirt-daemon-config-network &&\
+                   dnf clean all
+
+# reference:https://bugzilla.redhat.com/show_bug.cgi?id=1045069
+RUN useradd -ms /bin/bash v2v &&\
+    mkdir -p /disk/ && cd /disk/ &&\
+    wget -q ${GUEST_OS_IMAGE_PATH}
+
+WORKDIR /home/v2v
+
+# This is required for virt-v2v because neither systemd nor
+# root libvirtd runs, and therefore there is no virbr0, and
+# therefore virt-v2v cannot set up the network through libvirt.
+ENV LIBGUESTFS_BACKEND direct
+
+COPY script/IO_test.sh /opt/
+COPY script/run_test.sh /opt/
+COPY script/pre_filled.sh /opt/
+
+RUN export LIBGUESTFS_BACKEND=direct &&\
+    export LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1 &&\
+    virt-customize --format qcow2 -a /disk/${GUEST_OS_IMAGE} \
+    --mkdir /opt/test \
+    --upload /opt/run_test.sh:/opt/test/run_test.sh \
+    --upload /opt/IO_test.sh:/opt/test/IO_test.sh \
+    --upload /opt/pre_filled.sh:/opt/test/pre_filled.sh \
+    --install fio
+
+FROM ${OS_IMAGE}:${OS_VER}
+RUN  mkdir -p /disk/
+COPY --from=build /disk/ /disk/

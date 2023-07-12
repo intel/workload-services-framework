@@ -1,45 +1,21 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
-- name: "Create gprofiler folder on {{ trace_node.1 }}"
-  file:
-    path: "/tmp/{{ wl_namespace }}-gprofiler"
-    state: directory
+- name: "start gprofiler on {{ trace_node.1 }}"
+  shell:
+    cmd: |
+      mkdir -p /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler
+      cd /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler
+      date -Ins > TRACE_START
+      /usr/local/bin/gprofiler {{ gprofiler_options }} --continuous --output /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler > gprofiler.logs 2>&1 &
+      echo $! > pid
+      disown
   delegate_to: "{{ trace_node.1 }}"
-  when: trace_from == "docker"
-  failed_when: false
-  become: yes
-
-- name: "start gprofiler on {{ trace_node.1 }} with docker"
-  command: "docker run --rm --name granulate-gprofiler -d -v /tmp/{{ wl_namespace }}-gprofiler:/opt/data:rw --pid=host --userns=host --privileged {{ gprofiler_image }}:{{ gprofiler_version }} -c -o /opt/data --dont-send-logs {{ gprofiler_options }}"
-  delegate_to: "{{ trace_node.1 }}"
-  when: trace_from == "docker"
-  failed_when: false
+  become: true
+  ignore_errors: true
   async: 5
   poll: 0
 
-- name: Find trace node names
-  shell: 
-    cmd: "kubectl get nodes -o='custom-columns=name:.metadata.name,ip:.status.addresses[?(@.type==\"InternalIP\")].address' --no-headers | grep -E \"{{ groups['trace_hosts'] | map('extract', hostvars, ['private_ip']) | join('|') }}\" | cut -f1 -d' '"
-    executable: /bin/bash
-  register: trace_nodes
-  when:
-  - trace_from == "kubernetes"
-  - trace_node.1 == (groups['trace_hosts'] | list | last)
-  
-  
-- name: Copy gprofiler daemonset
-  template:
-    src: gp.yaml.j2
-    dest: "/tmp/{{ wl_namespace }}-gprofiler.yaml"
-  when:
-  - trace_from == "kubernetes"
-  - trace_node.1 == (groups['trace_hosts'] | list | last)
-  failed_when: false
-
-- name: Start gprofiler daemonset
-  command: "kubectl apply -f /tmp/{{ wl_namespace }}-gprofiler.yaml"
-  when:
-  - trace_from == "kubernetes"
-  - trace_node.1 == (groups['trace_hosts'] | list | last)
-  failed_when: false
-  async: 5
-  poll: 0

@@ -1,5 +1,10 @@
 # test-config-icx.yaml
 # Overwrite the test cases for performance tunning on ICX 8358
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 *_qatsw_off*:
   NGINX_WORKERS: 4

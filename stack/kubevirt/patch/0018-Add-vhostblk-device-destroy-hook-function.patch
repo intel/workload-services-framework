@@ -1,0 +1,84 @@
+From 8ec03714ab0b0bca65f60ffb21593521f895c7e2 Mon Sep 17 00:00:00 2001
+From: "Michael,Zhang" <michael.m.zhang@intel.com>
+Date: Tue, 20 Sep 2022 16:32:26 +0800
+Subject: [PATCH 18/22] Add vhostblk device destroy hook function
+
+---
+ cmd/virt-launcher/BUILD.bazel                  |  1 +
+ cmd/virt-launcher/virt-launcher.go             |  4 ++++
+ .../virtwrap/converter/converter.go            | 18 ++++++++++++++++--
+ 3 files changed, 21 insertions(+), 2 deletions(-)
+
+diff --git a/cmd/virt-launcher/BUILD.bazel b/cmd/virt-launcher/BUILD.bazel
+index 82267a373..75fa618ea 100644
+--- a/cmd/virt-launcher/BUILD.bazel
++++ b/cmd/virt-launcher/BUILD.bazel
+@@ -24,6 +24,7 @@ go_library(
+         "//pkg/virt-launcher/virtwrap/api:go_default_library",
+         "//pkg/virt-launcher/virtwrap/cli:go_default_library",
+         "//pkg/virt-launcher/virtwrap/cmd-server:go_default_library",
++        "//pkg/virt-launcher/virtwrap/converter:go_default_library",
+         "//pkg/virt-launcher/virtwrap/util:go_default_library",
+         "//staging/src/kubevirt.io/api/core/v1:go_default_library",
+         "//staging/src/kubevirt.io/client-go/log:go_default_library",
+diff --git a/cmd/virt-launcher/virt-launcher.go b/cmd/virt-launcher/virt-launcher.go
+index 0bc8351c8..c2608cb0e 100644
+--- a/cmd/virt-launcher/virt-launcher.go
++++ b/cmd/virt-launcher/virt-launcher.go
+@@ -61,6 +61,7 @@ import (
+ 	"kubevirt.io/kubevirt/pkg/virt-launcher/virtwrap/api"
+ 	virtcli "kubevirt.io/kubevirt/pkg/virt-launcher/virtwrap/cli"
+ 	cmdserver "kubevirt.io/kubevirt/pkg/virt-launcher/virtwrap/cmd-server"
++	virtlauncherconverter "kubevirt.io/kubevirt/pkg/virt-launcher/virtwrap/converter"
+ 	"kubevirt.io/kubevirt/pkg/virt-launcher/virtwrap/util"
+ )
+ 
+@@ -523,6 +524,9 @@ func main() {
+ 
+ 	//TODO: Need to notify to destruct the spdk-vhost-blk controller in spdk-vhost daemon.
+ 	log.Log.Info("Notify the controller to release spdk-vhost-blk.")
++
++	virtlauncherconverter.DestroyVhostBlkDisk(vmi)
++
+ 	time.Sleep(10 * time.Second)
+ 
+ 	log.Log.Info("Exiting...")
+diff --git a/pkg/virt-launcher/virtwrap/converter/converter.go b/pkg/virt-launcher/virtwrap/converter/converter.go
+index 44bf9e4ed..04618191f 100644
+--- a/pkg/virt-launcher/virtwrap/converter/converter.go
++++ b/pkg/virt-launcher/virtwrap/converter/converter.go
+@@ -922,6 +922,20 @@ func getQueueIndex(path string) int {
+ 
+ var jobeNameMap = map[string]bool{}
+ 
++func DestroyVhostBlkDisk(vmi *v1.VirtualMachineInstance) {
++
++	logger := log.DefaultLogger()
++	logger.Infof("Start to destroy the created vhost block devices...")
++
++	// Scan the disk buffer to delete all spdk-vhsot user block device.
++	for _, vhostDisk := range spdkVhostBlkVolIndices {
++		log.Log.Infof("Currrent disk index: %d .", vhostDisk)
++
++		//Clean up the disk.
++	}
++
++}
++
+ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, diskSource *v1.SpdkVhostBlkDiskSource, disk *api.Disk) error {
+ 	if disk.Type == "lun" {
+ 		return fmt.Errorf(deviceTypeNotCompatibleFmt, disk.Alias.GetName())
+@@ -1036,8 +1050,8 @@ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, diskSource
+ 	logger.Info("loop to wait spdk-vhost controller created.")
+ 	counter := 0
+ 	//total wait time is wait_times*Sleep_time
+-	var wait_times = 20
+-	var Sleep_time = 3
++	var wait_times = 5
++	var Sleep_time = 1
+ 
+ 	for {
+ 		time.Sleep(time.Duration(Sleep_time) * time.Second)
+-- 
+2.27.0
+

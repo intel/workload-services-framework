@@ -1,4 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 k8s_delete_namespace_timeout: "10m"
-wl_export_logs: /export-logs
 k8s_cni: flannel

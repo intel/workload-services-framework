@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 include(config.m4)
 
 ---
@@ -22,6 +27,15 @@ spec:
 ifelse(defn(`NODE'),1,`dnl
 ',`dnl
       affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: VM-GROUP
+                operator: In
+                values:
+                - "worker"
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
           - labelSelector:
@@ -37,7 +51,7 @@ ifelse(defn(`NODE'),1,`dnl
       dnsPolicy: ClusterFirstWithHostNet
       containers:
       - name: nginx-server
-        image: IMAGENAME(defn(`DOCKER_IMAGE'))
+        image: IMAGENAME(defn(`NGINX_IMAGE'))
         imagePullPolicy: IMAGEPOLICY(Always)
         ports:
         - containerPort: defn(`PORT')
@@ -46,6 +60,8 @@ ifelse(defn(`NODE'),1,`dnl
           value: "defn(`WORKLOAD')"
         - name: `MODE'
           value: "defn(`MODE')"
+        - name: `NODE'
+          value: "defn(`NODE')"
         - name: `PORT'
           value: "defn(`PORT')"
         - name: `QATACCL'
@@ -58,10 +74,14 @@ ifelse(defn(`NODE'),1,`dnl
           value: "defn(`NGINX_CPU_LISTS')"
         - name: `CIPHER'
           value: "defn(`CIPHER')"
-        - name: `CURVE'
-          value: "defn(`CURVE')"
         - name: `NGINX_WORKERS'
           value: "defn(`NGINX_WORKERS')"
+        - name: `MAX_CORE_WORKER_CLIENT'
+          value: "defn(`MAX_CORE_WORKER_CLIENT')"
+        - name: `CURVE'
+          value: "defn(`CURVE')"
+        - name: `QAT_POLICY'
+          value: "defn(`QAT_POLICY')"
         - name: POD_OWN_IP_ADDRESS
           valueFrom:
             fieldRef:
@@ -70,6 +90,32 @@ ifelse(defn(`NODE'),1,`dnl
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
+ifelse(index(WORKLOAD,`_qathw'),-1,,`dnl
+        securityContext:
+           capabilities:
+             add:
+              ["IPC_LOCK"]
+        resources:
+          limits:
+            defn(`QAT_RESOURCE_TYPE'): defn(`QAT_RESOURCE_NUM')
+            hugepages-2Mi: 8Gi
+          requests:
+            defn(`QAT_RESOURCE_TYPE'): defn(`QAT_RESOURCE_NUM')
+            cpu: 8
+            hugepages-2Mi: 8Gi
+')dnl
+ifelse(index(WORKLOAD,`_sgx'),-1,,`dnl
+        securityContext:
+          privileged: true
+')dnl
+      nodeSelector: 
+ifelse(index(WORKLOAD,`_sgx'),-1,,`dnl
+        feature.node.kubernetes.io/cpu-sgx.enabled: "true"
+')dnl
+ifelse(index(WORKLOAD,`_qathw'),-1,,`dnl
+        HAS-SETUP-QAT-V200: "yes"
+        HAS-SETUP-HUGEPAGE-2048kB-4096: "yes"
+')dnl
 
 ---
 
@@ -119,14 +165,34 @@ ifelse(defn(`NODE'),3,`dnl
 ',`dnl
 ')dnl
             topologyKey: "kubernetes.io/hostname"
+ifelse(defn(`NODE'),1,`dnl
+',`dnl
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: VM-GROUP
+                operator: In
+                values:
+                - "client"
+')dnl
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:
       - name: client
 ifelse(defn(`MODE'),https,`dnl
+ifelse(defn(`CLIENT_TYPE'),openssl,`dnl
+        image: IMAGENAME(Dockerfile.7.openssl.K_ARCH)
+',`dnl
+ifelse(defn(`CLIENT_TYPE'),ab,`dnl
         image: IMAGENAME(Dockerfile.9.ab.K_ARCH)
 ',`dnl
         image: IMAGENAME(Dockerfile.8.wrk.K_ARCH)
+')dnl
+')dnl
+',`dnl
+        image: IMAGENAME(Dockerfile.9.ab.K_ARCH)
 ')dnl
         imagePullPolicy: IMAGEPOLICY(Always)
         env:
@@ -158,6 +224,14 @@ ifelse(defn(`MODE'),https,`dnl
           value: "defn(`OPENSSL_CLIENTS')"
         - name: `GETFILE'
           value: "defn(`GETFILE')"
+        - name: `CLIENT_TYPE'
+          value: "defn(`CLIENT_TYPE')"
+        - name: `SWEEPING'
+          value: "defn(`SWEEPING')"
+        - name: `PACE'
+          value: "defn(`PACE')"
+        - name: `MAX_CORE_WORKER_CLIENT'
+          value: "defn(`MAX_CORE_WORKER_CLIENT')"
       restartPolicy: Never
   backoffLimit: 5
 
@@ -200,6 +274,15 @@ spec:
         deployPolicy: server
     spec:
       affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: VM-GROUP
+                operator: In
+                values:
+                - "client"
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
           - labelSelector:
@@ -215,9 +298,17 @@ spec:
       containers:
       - name: client2
 ifelse(defn(`MODE'),https,`dnl
+ifelse(defn(`CLIENT_TYPE'),openssl,`dnl
+        image: IMAGENAME(Dockerfile.7.openssl.K_ARCH)
+',`dnl
+ifelse(defn(`CLIENT_TYPE'),ab,`dnl
         image: IMAGENAME(Dockerfile.9.ab.K_ARCH)
 ',`dnl
         image: IMAGENAME(Dockerfile.8.wrk.K_ARCH)
+')dnl
+')dnl
+',`dnl
+        image: IMAGENAME(Dockerfile.9.ab.K_ARCH)
 ')dnl
         imagePullPolicy: IMAGEPOLICY(Always)
         env:
@@ -249,5 +340,13 @@ ifelse(defn(`MODE'),https,`dnl
           value: "defn(`OPENSSL_CLIENTS')"
         - name: `GETFILE'
           value: "defn(`GETFILE')"
+        - name: `CLIENT_TYPE'
+          value: "defn(`CLIENT_TYPE')"
+        - name: `SWEEPING'
+          value: "defn(`SWEEPING')"
+        - name: `PACE'
+          value: "defn(`PACE')"
+        - name: `MAX_CORE_WORKER_CLIENT'
+          value: "defn(`MAX_CORE_WORKER_CLIENT')"
 ',`dnl
 ')dnl

@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 emon_src_path: "/usr/local/src/sep"
 emon_bin_path: "/usr/local/emon"
@@ -5,4 +10,5 @@ emon_group: "vtune"
 emon_options: ""
 emon_edp_config: "config/edp/pyedp_config.txt"
 emon_post_processing: yes
+emon_view: "--socket-view --core-view --thread-view"
 

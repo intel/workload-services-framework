@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 function(check_git_repo)
     file(RELATIVE_PATH component_path "${PROJECT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -76,6 +81,7 @@ function(add_component_build type name)
 
     if(NOT sut_r)
         string(STRIP "${${sut_var}}" sut_r)
+        string(REGEX REPLACE " -[^ ]+" "" sut_r " ${sut_r} ")
         foreach(sut1 ${sut_d})
             string(REPLACE " ${sut1} " " " sut_r " ${sut_r} ")
         endforeach()

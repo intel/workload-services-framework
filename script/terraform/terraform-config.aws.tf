@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 variable "disk_spec_1" {
   default = {
     disk_count = 1
@@ -51,39 +56,11 @@ variable "wl_name" {
   default = ""
 }
 
-variable "wl_category" {
-   default = ""
-}
-
 variable "wl_namespace" {
   default = ""
 }
 
-variable "wl_docker_image" {
-  default = ""
-}
-
-variable "wl_docker_options" {
-  default = ""
-}
-
-variable "wl_job_filter" {
-  default = ""
-}
-
-variable "wl_export_logs" {
-  default = "/export-logs"
-}
-
-variable "wl_timeout" {
-  default = "28800,300,3000"
-}
-
 variable "wl_registry_map" {
-  default = ""
-}
-
-variable "wl_trace_mode" {
   default = ""
 }
 
@@ -91,11 +68,12 @@ variable "worker_profile" {
   default = {
     name = "worker"
     instance_type = "t2.medium"
+    cpu_model_regex = null
     threads_per_core = null
     cpu_core_count = null
     vm_count = 1
 
-    image = null
+    os_image = null
     os_type = "ubuntu2204"
     os_disk_type = "gp2"
     os_disk_size = 200
@@ -111,11 +89,12 @@ variable "client_profile" {
   default = {
     name = "client"
     instance_type = "t2.medium"
+    cpu_model_regex = null
     threads_per_core = null
     cpu_core_count = null
     vm_count = 1
 
-    image = null
+    os_image = null
     os_type = "ubuntu2204"
     os_disk_type = "gp2"
     os_disk_size = 200
@@ -131,11 +110,12 @@ variable "controller_profile" {
   default = {
     name = "controller"
     instance_type = "t2.medium"
+    cpu_model_regex = null
     threads_per_core = null
     cpu_core_count = null
     vm_count = 1
 
-    image = null
+    os_image = null
     os_type = "ubuntu2204"
     os_disk_type = "gp2"
     os_disk_size = 200
@@ -185,15 +165,8 @@ module "wsf" {
 output "options" {
   value = {
     wl_name : var.wl_name,
-    wl_category : var.wl_category,
-    wl_docker_image : var.wl_docker_image,
-    wl_docker_options : var.wl_docker_options,
-    wl_job_filter : var.wl_job_filter,
-    wl_export_logs: var.wl_export_logs,
-    wl_timeout : var.wl_timeout,
     wl_registry_map : var.wl_registry_map,
     wl_namespace : var.wl_namespace,
-    wl_trace_mode : var.wl_trace_mode,
     # k8s_registry_storage: "aws",
     # k8s_registry_aws_storage_bucket: "registry-content",
     # k8s_registry_aws_storage_region: var.region,
@@ -210,3 +183,9 @@ output "instances" {
   }
 }
 
+output "terraform_replace" {
+  value = lookup(module.wsf, "terraform_replace", null)==null?null:{
+    command = replace(module.wsf.terraform_replace.command, "=", "=module.wsf.")
+    cpu_model = module.wsf.terraform_replace.cpu_model
+  }
+}

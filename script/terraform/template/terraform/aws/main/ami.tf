@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 locals {
   os_image_owner = {
@@ -49,12 +54,12 @@ data "aws_ami" "search" {
 data "aws_ami" "image" {
   for_each = {
     for k,v in local.instances : k => v 
-      if startswith((v.image!=null?v.image:"ami-"), "ami-")==false
+      if startswith((v.os_image!=null?v.os_image:"ami-"), "ami-")==false
   }
 
   filter {
     name = "name"
-    values = [ each.value.image ]
+    values = [ each.value.os_image ]
   }
 
   most_recent = true

@@ -1,4 +1,9 @@
 #!/bin/bash
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 if [ ${#@} -lt 1 ]; then
     echo "Usage: [options] <user@ip> [<user@ip> ...]"
@@ -37,6 +42,12 @@ for v in $@; do
   esac
   last="$v"
 done
+
+if [ "$(ls -lnd "$HOME" | cut -f3-4 -d' ')" != "$(id -u) $(id -g)" ]; then
+  echo "Your HOME directory is not owned by $(id -un):$(id -gn)"
+  echo "Please fix ownership."
+  exit 3
+fi
 
 if [ ! -r ~/.ssh/id_rsa ]; then
   echo "Generating self-signed key file..."

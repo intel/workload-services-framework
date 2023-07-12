@@ -1,53 +1,32 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: Check if collectd is already installed
   stat:
     path: "{{ collectd_bin_path }}"
   register: collectd
 
-- setup:
-
-- name: Install collectd for CentOS and Redhat
-  include_role:
-    name: install_dependencies
-  when: ansible_os_family == 'RedHat'
-
-- name: Install collectd.conf
-  template:
-    src: collectd.conf.j2
-    dest: /etc/collectd.conf
-  become: yes
-  when: ansible_os_family == "RedHat"
-
 - name: Check OS
   shell:
     cmd: ". /etc/os-release; echo $ID"
     executable: /bin/bash
   register: os
-  when: ansible_os_family == "Debian"
 
 - name: Install collectd
   include_tasks:
     file: "install-{{ os.stdout }}.yaml"
-  when: ansible_os_family == "Debian"
 
-- name: "Make sure {{ collectd_plugin_path }} exists"
-  file:
-    path: "{{ collectd_plugin_path }}"
-    state: directory
-  become: yes
+- name: Detect collectd version
+  command: "{{ collectd_bin_path }} -h"
+  register: version
 
-- name: Install plugins
-  copy: 
-    src: "../plugins/{{ plugin }}"
-    dest: "{{ collectd_plugin_path }}/{{ plugin }}"
-    mode: preserve
-  loop:
-  - sysstat_depend.sh
-  - network_irq_affinity.py
-  - sysstat_memstat.py
-  - plugin_utils.sh
-  loop_control:
-    loop_var: plugin
+- name: Install collectd.conf
+  template:
+    src: collectd.conf.j2
+    dest: "{{ config_path }}"
   become: yes
 
 - name: Stop collectd

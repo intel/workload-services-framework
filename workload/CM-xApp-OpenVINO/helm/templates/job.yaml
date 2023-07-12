@@ -1,0 +1,66 @@
+# Copyright (C) 2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    service: "{{ .Values.service.name }}"
+  name: "{{ .Values.name }}"
+spec:
+  template:
+    metadata:
+      annotations:
+        proxy.onosproject.org/inject: "true"
+        proxy.onosproject.org/cpu-limit : "{{ .Values.resources.limits_proxy_cpu }}"
+        proxy.onosproject.org/memory-limit : "{{ .Values.resources.limits_proxy_memory }}"
+        proxy.onosproject.org/cpu-request : "{{ .Values.resources.requests_proxy_cpu }}"
+        proxy.onosproject.org/memory-request:  "{{ .Values.resources.requests_proxy_memory }}"
+      labels:
+        service: "{{ .Values.service.name }}"
+      name: "{{ .Values.name }}"
+    spec:
+      serviceAccountName: "{{ .Values.name }}"
+      nodeSelector:
+        feature.node.kubernetes.io/cpu-cpuid.AVX512VNNI: "true"
+        feature.node.kubernetes.io/system-os_release.ID: "ubuntu"
+      containers:
+        - name: "{{ .Values.name }}"
+          image: "{{ .Values.REGISTRY }}{{ .Values.image.name }}{{ .Values.RELEASE }}"
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          command:
+            - "/bin/bash"
+            - "-c"
+          args:
+            - |
+                ./run_test.sh {{ .Values.parameters.xAppRunTime }} {{ .Values.parameters.corebind }} > output.logs;
+                echo $? > status;
+                tar cf /export-logs status output.logs xapp.log latency.csv;
+                sleep infinity;
+          env:
+            - name: INITIATIONTIME
+              value: {{ .Values.parameters.initiationTime | quote }}
+            - name: CELLINDLIMIT
+              value: {{ .Values.parameters.cellIndLimit | quote }}
+            - name: PARALLELLOOP
+              value: {{ .Values.parameters.parallelLoop | quote }}
+            - name: QVALUE
+              value: {{ .Values.parameters.qValue | quote }}
+            - name: PREPROCESSING
+              value: {{ .Values.parameters.preprocessing | quote }}
+            - name: COREBIND
+              value: {{ .Values.parameters.corebind | quote }}
+          resources:
+            limits:
+              cpu: "{{ .Values.resources.limits_cpu }}"
+              memory: "{{ .Values.resources.limits_memory }}"
+            requests:
+              cpu: "{{ .Values.resources.requests_cpu }}"
+              memory: "{{ .Values.resources.requests_memory }}"
+          securityContext:
+            allowPrivilegeEscalation: false
+      restartPolicy: Never

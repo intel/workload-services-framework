@@ -1,53 +1,20 @@
 # async_nginx_qatsw
 
-FROM rockylinux:8.6 AS build
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=22.04
+ARG OS_IMAGE=ubuntu
+ARG RELEASE
 
-RUN dnf -y install epel-release dnf-plugins-core
-RUN dnf config-manager --set-enabled powertools
-RUN dnf group -y install "Development Tools"
-RUN dnf -y install nasm cpuid cmake wget pcre pcre-devel libarchive libunwind-devel libtool gperftools-devel
-RUN dnf -y update
+FROM qatsw-crypto-base-ssl3-ubuntu${RELEASE} AS build
+RUN  apt-get update && apt-get install -y git make autoconf automake libtool gcc g++ libpcre3-dev zlib1g-dev libtcmalloc-minimal4 libunwind-dev libgoogle-perftools-dev
+RUN  cd /usr/lib/x86_64-linux-gnu && \
+     ln -f -s libtcmalloc_minimal.so.4 libtcmalloc_minimal.so
 
-ARG OPENSSL_VER="1_1_1n"
-ARG OPENSSL_REPO=https://github.com/openssl/openssl.git
-RUN git clone -b OpenSSL_${OPENSSL_VER} --depth 1 ${OPENSSL_REPO}
-RUN cd /openssl && \
-    ./config && \
-    make depend && \
-    make -j && \
-    make install
-
-ARG IPP_CRYPTO_VER="ippcp_2021.5"
-ARG IPP_CRYPTO_REPO=https://github.com/intel/ipp-crypto.git
-RUN git clone -b ${IPP_CRYPTO_VER} --depth 1 ${IPP_CRYPTO_REPO} && \
-    cd /ipp-crypto/sources/ippcp/crypto_mb && \
-    cmake . -B"../build" \
-      -DOPENSSL_INCLUDE_DIR=/usr/local/include/openssl \
-      -DOPENSSL_LIBRARIES=/usr/local/lib64 \
-      -DOPENSSL_ROOT_DIR=/usr/local/bin/openssl && \
-    cd ../build && \
-    make -j crypto_mb && \
-    make install
-
-ARG IPSEC_MB_VER="v1.2"
-ARG IPSEC_MB_REPO=https://github.com/intel/intel-ipsec-mb.git
-RUN git clone -b ${IPSEC_MB_VER} --depth 1 ${IPSEC_MB_REPO} && \
-    cd /intel-ipsec-mb && \
-    make -j SAFE_DATA=y SAFE_PARAM=y SAFE_LOOKUP=y && \
-    make install NOLDCONFIG=y PREFIX=/usr/local/
-
-ARG QAT_ENGINE_VER="v0.6.12"
-ARG QAT_ENGINE_REPO=https://github.com/intel/QAT_Engine.git
-RUN git clone -b ${QAT_ENGINE_VER} --depth 1 ${QAT_ENGINE_REPO} && \
-    cd /QAT_Engine && \
-    ./autogen.sh && \
-    ./configure \
-      --with-openssl_install_dir=/usr/local/ \
-      --enable-qat_sw --disable-qat_hw && \
-    make -j && \
-    make install -j 1
-
-ARG ASYNC_NGINX_VER="v0.4.7"
+ARG ASYNC_NGINX_VER="v0.5.0"
 ARG ASYNC_NGINX_REPO=https://github.com/intel/asynch_mode_nginx.git
 RUN git clone -b $ASYNC_NGINX_VER --depth 1 ${ASYNC_NGINX_REPO} && \
     cd /asynch_mode_nginx && \
@@ -63,24 +30,17 @@ RUN git clone -b $ASYNC_NGINX_VER --depth 1 ${ASYNC_NGINX_REPO} && \
       --with-pcre \
       --add-dynamic-module=modules/nginx_qat_module/ \
       --with-cc-opt="-DNGX_SECURE_MEM -O3 -I/usr/local/include/openssl -Wno-error=deprecated-declarations -Wimplicit-fallthrough=0" \
-      --with-ld-opt="-ltcmalloc -Wl,-rpath=/usr/local/lib64 -L/usr/local/lib64" && \
+      --with-ld-opt="-ltcmalloc_minimal -Wl,-rpath=/usr/local/lib64 -L/usr/local/lib64" && \
     make -j && \
     make install
 
-FROM rockylinux:8.6
-RUN dnf -y install epel-release dnf-plugins-core && \
-    dnf config-manager --set-enabled powertools && \
-    dnf -y install ufw && \
-    dnf install -y numactl iptables libunwind-devel libtool gperftools-devel net-tools procps-ng && dnf -y update && dnf -y update
 
+FROM qatsw-crypto-base-ssl3-ubuntu${RELEASE}
+RUN  apt-get update && apt-get install -y numactl net-tools google-perftools libunwind8 libpcre3 libtcmalloc-minimal4 zlib1g systemd && apt-get clean
+RUN  cd /usr/lib/x86_64-linux-gnu && \
+     ln -f -s libtcmalloc_minimal.so.4 libtcmalloc_minimal.so
 COPY --from=build /usr/local/ /usr/local/
 COPY --from=build /var/www/ /var/www/
-
-ENV  OPENSSL_ENGINES=/usr/local/lib64/engines-1.1
-
-RUN mv /usr/local/lib/engines-1.1/* /usr/local/lib64/engines-1.1/ && \
-echo "/usr/local/lib64" >> /etc/ld.so.conf.d/all-libs.conf && ldconfig
-
 COPY conf/*.conf /usr/local/share/nginx/conf/
 COPY prepare_nginx.sh /
 
@@ -90,8 +50,7 @@ dd bs=1 count=2048 if=/dev/urandom of=/var/www/html/random_content_2KB && \
 dd bs=1 count=4096 if=/dev/urandom of=/var/www/html/random_content_4KB && \
 dd bs=512 count=1024 if=/dev/urandom of=/var/www/html/random_content_512KB && \
 dd bs=1024 count=1024 if=/dev/urandom of=/var/www/html/random_content_1MB && \
-dd bs=1024 count=4096 if=/dev/urandom of=/var/www/html/random_content_4MB && \
-strip /usr/bin/*; strip /usr/sbin/*; strip /usr/local/bin/*; strip /usr/local/sbin/* || exit 0;
+dd bs=1024 count=4096 if=/dev/urandom of=/var/www/html/random_content_4MB
 
 RUN mkfifo /export-logs
 CMD (ldconfig && /prepare_nginx.sh; echo $? > status) 2>&1 | tee output.logs && \

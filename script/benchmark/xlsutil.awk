@@ -1,4 +1,9 @@
 #!/usr/bin/gawk
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 function median(v) {
     n=asort(v, v_sorted, "@val_num_asc")
@@ -12,6 +17,7 @@ function median(v) {
 function escape(text) {
     text=gensub(/</,"\\&lt;","g",text)
     text=gensub(/>/,"\\&gt;","g",text)
+    text=gensub(/.u0026/,"\\&amp;","g",text)
     return text
 }
 

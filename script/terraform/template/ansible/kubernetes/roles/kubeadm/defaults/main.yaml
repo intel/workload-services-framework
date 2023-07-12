@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 k8s_version: "1.24.4"
 k8s_pod_cidr: "10.244.0.0/16"

@@ -1,6 +1,6 @@
-protobuf==3.20.1
+protobuf==3.20.2
 lark-parser==0.12.0
-tornado==6.2
+tornado==6.3.2
 tqdm==4.64.1
 Pillow==9.4.0
 yacs==0.1.8
@@ -26,5 +26,5 @@ termcolor==2.2.0
 easysettings==3.3.3
 pgrep==2020.12.3
 xlsxwriter==3.0.8
-wheel==0.37.1
+wheel==0.38.1
 mlperf-logging @ https://github.com/mlperf/logging/archive/9ea0afa.zip

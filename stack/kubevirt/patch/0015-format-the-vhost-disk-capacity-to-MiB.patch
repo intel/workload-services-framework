@@ -1,0 +1,47 @@
+From ce26b15320af05cb54ca180041e25291f18f638b Mon Sep 17 00:00:00 2001
+From: "Michael,Zhang" <michael.m.zhang@intel.com>
+Date: Fri, 16 Sep 2022 00:28:34 +0800
+Subject: [PATCH 15/22] format the vhost disk capacity to MiB
+
+---
+ pkg/virt-launcher/virtwrap/converter/converter.go | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/pkg/virt-launcher/virtwrap/converter/converter.go b/pkg/virt-launcher/virtwrap/converter/converter.go
+index 4f8254320..633684bc1 100644
+--- a/pkg/virt-launcher/virtwrap/converter/converter.go
++++ b/pkg/virt-launcher/virtwrap/converter/converter.go
+@@ -845,7 +845,7 @@ func Convert_v1_EmptyDiskSource_To_api_Disk(volumeName string, _ *v1.EmptyDiskSo
+ 	return nil
+ }
+ 
+-func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, _ *v1.SpdkVhostBlkDiskSource, disk *api.Disk) error {
++func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, diskSource *v1.SpdkVhostBlkDiskSource, disk *api.Disk) error {
+ 	if disk.Type == "lun" {
+ 		return fmt.Errorf(deviceTypeNotCompatibleFmt, disk.Alias.GetName())
+ 	}
+@@ -859,12 +859,19 @@ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, _ *v1.Spdk
+ 	//   C = backend block image ID/name. For ceph, it's the block image name
+ 	podNameSuffix := "xyz1"
+ 	diskIndex := spdkVhostBlkVolIndices[volumeName]
+-	diskCapcity := 10
++	//Get the request disk capacity with Unit MiB.
++	diskCapcity := diskSource.Capacity.ToDec().ScaledValue(6)
++
++	// intSize := diskSource.Capacity.ToDec().ScaledValue(0)
++	// diskCapcity = util.AlignImageSizeTo1MiB(intSize, logger.With("volume", volumeName))
++	// if intSize == 0 {
++	// 	return fmt.Errorf("the size for volume %s is too low", volumeName)
++	// }
+ 
+ 	//2. inform the spdk-vhost daemon to create a new vhost controller with shared folder
+ 	//   write the message to a file.
+ 	logger := log.DefaultLogger()
+-	logger.Infof("Notify the spdk-vhost to create vhost controller: suffix='%s', diskIndex='%d', capacity='%d'GiB .", podNameSuffix, diskIndex, diskCapcity)
++	logger.Infof("Notify the spdk-vhost to create vhost controller: suffix='%s', diskIndex='%d', capacity='%d'MiB .", podNameSuffix, diskIndex, diskCapcity)
+ 
+ 	//3. Waiting for new vhost controller created
+ 	logger.Info("Sleep 10 second to wait spdk-vhost controller created.")
+-- 
+2.27.0
+

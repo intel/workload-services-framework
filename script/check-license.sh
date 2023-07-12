@@ -1,4 +1,9 @@
 #!/bin/bash -e
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 if [ ${#@} = 0 ]; then
     echo "Usage: <cache-file> <name>:<text> ..."

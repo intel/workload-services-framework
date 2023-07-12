@@ -1,10 +1,16 @@
 #!/bin/bash
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 if [ -z "$1" ]; then
   echo "Usage: [options] <host>[:port] [<user>@<ip> ...]"
   echo ""
-  echo "--mirror=<url>   Launch the registry as a pull-through cache registry."
-  echo "--port=<port>    Specify the SUT ssh port."
+  echo "--mirror=<url>          Launch as a pull-through cache registry."
+  echo "--port=<port>           Specify the SUT ssh port."
+  echo "--force                 Force replacing any existing certificate."
   echo ""
   echo "<host> can be in the form of a FQDN hostname or an IP address."
   echo "The default registry port of a docker registry is 20666."
@@ -25,6 +31,7 @@ ssh_port=22
 mirror_url=""
 host=""
 hosts=()
+replace="false"
 last=""
 for v in $@; do
   case "$v" in
@@ -36,6 +43,9 @@ for v in $@; do
     ;;
   --mirror|--port)
     ;;
+  --force)
+    replace="true"
+    ;;
   *)
     if [ "$last" = "--mirror" ]; then
       mirror_url="$v"
@@ -43,6 +53,7 @@ for v in $@; do
       ssh_port="$v"
     elif [ -z "$host" ]; then
       host="${v/:*/}"
+      host="${host/*@/}"
       [[ "$v" = *":"* ]] && reg_port="${v/*:/}"
     elif [[ "$v" = *"@"* ]]; then
       hosts+=("$v")
@@ -58,7 +69,7 @@ done
 DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
 cd "$DIR"
 
-./setup-ansible.sh
+./setup-ansible.sh || exit 3
 if [ -z "$mirror_url" ]; then
   [[ -z "$reg_port" ]] && reg_port=20666
   options=""
@@ -77,7 +88,7 @@ workers="$(i=0;for h in ${hosts[@]}; do cat <<EOF
 EOF
 i=$((i+1));done)"
 
-ANSIBLE_INVENTORY_ENABLED=yaml ansible-playbook -vv -e dev_cert_host=$host -e dev_registry_port=$reg_port -e wl_logs_dir="$DIR" -e my_ip_list=1.1.1.1 $options -K -i <(cat <<EOF
+ANSIBLE_INVENTORY_ENABLED=yaml ansible-playbook -vv -e dev_cert_host=$host -e dev_registry_port=$reg_port -e wl_logs_dir="$DIR" -e my_ip_list=1.1.1.1 -e dev_cert_replace=$replace $options -K -i <(cat <<EOF
 all:
   children:
     cluster_hosts:

@@ -1,7 +1,11 @@
 # terraform-alicloud
 
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 ARG RELEASE
-FROM csp-common${RELEASE} as csp
 FROM terraform-static${RELEASE}
 
 ARG ALIYUN_CLI_VER=3.0.133
@@ -9,6 +13,5 @@ ARG ALIYUN_CLI_PACKAGE=https://github.com/aliyun/aliyun-cli/releases/download/v$
 RUN curl -L ${ALIYUN_CLI_PACKAGE} | tar -xz -C /usr/local/bin
 
 # Add cleanup script
-COPY --from=csp /opt/script/cleanup-alicloud.sh /usr/local/bin/cleanup
-COPY --from=csp /opt/script/cleanup-common.sh /usr/local/bin/
+RUN echo "alias cleanup=/opt/csp/script/cleanup-alicloud.sh" >> /etc/bash.bashrc
 

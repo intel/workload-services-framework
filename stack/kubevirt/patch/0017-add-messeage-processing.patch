@@ -1,0 +1,248 @@
+From 9b5f2af515213a8ac5e13adb57fee3f099782d80 Mon Sep 17 00:00:00 2001
+From: zhuyongbo <yongbo.zhu@intel.com>
+Date: Mon, 19 Sep 2022 16:43:25 +0800
+Subject: [PATCH 17/22] add messeage processing
+
+---
+ .../virtwrap/converter/converter.go           | 189 +++++++++++++++++-
+ 1 file changed, 182 insertions(+), 7 deletions(-)
+
+diff --git a/pkg/virt-launcher/virtwrap/converter/converter.go b/pkg/virt-launcher/virtwrap/converter/converter.go
+index b6aa9eae9..44bf9e4ed 100644
+--- a/pkg/virt-launcher/virtwrap/converter/converter.go
++++ b/pkg/virt-launcher/virtwrap/converter/converter.go
+@@ -26,8 +26,11 @@ package converter
+ */
+ 
+ import (
++	"bufio"
++	"crypto/rand"
+ 	"encoding/json"
+ 	"fmt"
++	"io"
+ 	"os"
+ 	"os/exec"
+ 	"path/filepath"
+@@ -845,6 +848,80 @@ func Convert_v1_EmptyDiskSource_To_api_Disk(volumeName string, _ *v1.EmptyDiskSo
+ 	return nil
+ }
+ 
++func Exists(path string) bool {
++	_, err := os.Stat(path)
++	if err != nil {
++		if os.IsExist(err) {
++			return true
++		}
++		return false
++	}
++	return true
++}
++func getUuid() string {
++	b := make([]byte, 16)
++	io.ReadFull(rand.Reader, b)
++	b[6] = (b[6] & 0x0f) | 0x40
++	b[8] = (b[8] & 0x3f) | 0x80
++	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
++}
++
++func EditEntrypoint(path string, pre_content string) error {
++	f, err := os.OpenFile(path, os.O_RDWR, 0666)
++	if err != nil {
++		return err
++	} else {
++		pos := int64(0)
++		_, err = f.WriteAt([]byte(pre_content), pos)
++		if err != nil {
++			return err
++		}
++		defer f.Close()
++	}
++	return nil
++}
++
++func getMessage(path string) (string, string) {
++	f, err := os.Open(path)
++	if err != nil {
++		return "nil", "nil"
++	}
++	defer f.Close()
++	Split := func(r rune) bool {
++		return r == ';' || r == ':'
++	}
++	var results []string
++	scanner := bufio.NewScanner(f)
++	for scanner.Scan() {
++		if strings.Contains(scanner.Text(), "RESULT") {
++			results = strings.FieldsFunc(scanner.Text(), Split)
++		}
++	}
++	if len(results) < 9 {
++		return "", ""
++	}
++	return results[1], results[8]
++}
++
++func getQueueIndex(path string) int {
++	f, err := os.Open(path)
++	if err != nil {
++		return 0
++	}
++	defer f.Close()
++	scanner := bufio.NewScanner(f)
++	for scanner.Scan() {
++		if strings.Contains(scanner.Text(), "WorkItem") {
++			results := strings.Split(scanner.Text(), "Queue")
++			index, _ := strconv.Atoi(results[1])
++			return index
++		}
++	}
++	return 1
++}
++
++var jobeNameMap = map[string]bool{}
++
+ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, diskSource *v1.SpdkVhostBlkDiskSource, disk *api.Disk) error {
+ 	if disk.Type == "lun" {
+ 		return fmt.Errorf(deviceTypeNotCompatibleFmt, disk.Alias.GetName())
+@@ -859,10 +936,12 @@ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, diskSource
+ 	//   C = backend block image ID/name. For ceph, it's the block image name
+ 	podNameSuffix := "xyz1"
+ 	diskIndex := spdkVhostBlkVolIndices[volumeName]
++	NAME := podNameSuffix + "-" + strconv.Itoa(diskIndex)
+ 
+ 	//vhostCtrlPath := "/var/tmp/vhost.1"
+ 	vhostCtrlPath := fmt.Sprintf("/var/tmp/vhost.%d", diskIndex)
+-	//Get the request disk capacity with Unit MiB.
++	//Get the request disk capacity with Unit M.
++
+ 	diskCapcity := diskSource.Capacity.ToDec().ScaledValue(6)
+ 
+ 	// intSize := diskSource.Capacity.ToDec().ScaledValue(0)
+@@ -873,14 +952,111 @@ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, diskSource
+ 
+ 	//2. inform the spdk-vhost daemon to create a new vhost controller with shared folder
+ 	//   write the message to a file.
++	//2. inform the spdk-vhost daemon to create a new vhost controller with shared folder
++	//   write the message to a file.
++
++	fileDir := "/var/tmp/"
++	fileName := fileDir + "vhost.message"
++	BridgePath := `"` + fileDir + `"`
++	WorkItemStatus := "New"
++	V_INDEX := diskIndex
++	//TODO : name+=spdk_back_value
++
++	UNIT := "M"
++	WORKSTATUS := "NEW"
++	RESULT := "{}"
++	pre_content := ""
++	content := ""
++	var (
++		file        *os.File
++		err         error
++		QUEUE_INDEX int
++	)
++	UUID := string(getUuid())
++	//UUID, err := exec.Command("/usr/bin/uuidgen").Output()
++	_, hasJob := jobeNameMap[NAME]
++	if err != nil {
++		return fmt.Errorf("uuid generate error")
++	}
++	if Exists(fileName) {
++		file, err = os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
++		if err != nil {
++			return fmt.Errorf("OpenFile error")
++		}
++		defer file.Close()
++		QUEUE_INDEX = getQueueIndex(fileName)
++		if !hasJob || !jobeNameMap[NAME] {
++			QUEUE_INDEX = QUEUE_INDEX + 1
++			entrypoint_content := "BridgePath=" + BridgePath + "\n" + "WorkItem=Queue" + strconv.Itoa(QUEUE_INDEX) + "\nWorkItemStatus=" + WorkItemStatus + "\n---\n"
++			if err = EditEntrypoint(fileName, entrypoint_content); err != nil {
++				return err
++			}
++		}
++	} else {
++		file, err = os.Create(fileName)
++		if err != nil {
++			return fmt.Errorf("Create file error")
++		}
++		defer file.Close()
++		QUEUE_INDEX = 1
++		pre_content = "BridgePath=" + BridgePath + "\n" + "WorkItem=Queue" + strconv.Itoa(QUEUE_INDEX) + "\nWorkItemStatus=" + WorkItemStatus + "\n---\n"
++	}
++
++	content = pre_content + "Queue" + strconv.Itoa(QUEUE_INDEX) + ":\nQ_INDEX=" + strconv.Itoa(QUEUE_INDEX) + "\nV_INDEX=" + strconv.Itoa(V_INDEX) + "\nNAME=" + podNameSuffix + "\nUUID=" + UUID +
++		"\nUNIT=" + UNIT + "\nCAPACITY=" + strconv.FormatInt(diskCapcity, 10) + "\nWORKSTATUS=" + WORKSTATUS + "\nRESULT=" + RESULT + "\n---\n"
++
+ 	logger := log.DefaultLogger()
+-	logger.Infof("Notify the spdk-vhost to create vhost controller: suffix='%s', diskIndex='%d', capacity='%d'MiB .", podNameSuffix, diskIndex, diskCapcity)
++	if hasJob && jobeNameMap[NAME] {
++		logger.Infof("Job has already been processed before.")
++		disk.Type = "vhostuser"
++		disk.Device = "disk"
++		disk.Model = ""
++		disk.Snapshot = ""
++		//	disk.Alias.name = ""
++		//	disk.Alias = api.NewUserDefinedAlias("")
++		disk.Driver.Name = "qemu"
++		disk.Driver.Type = "raw"
++		disk.Driver.Discard = ""
++		disk.Source.Type = "unix"
++		disk.Source.Path = vhostCtrlPath
++		disk.Target.Bus = "virtio"
++		disk.Driver.ErrorPolicy = ""
++		disk.Driver.Cache = ""
++		return nil
++	} else {
++		if _, err = file.WriteString(content); err != nil {
++			return err
++		}
++		jobeNameMap[NAME] = false
++	}
+ 
+-	//3. Waiting for new vhost controller created
+-	logger.Info("Sleep 10 second to wait spdk-vhost controller created.")
+-	time.Sleep(10 * time.Second)
+-	logger.Info("Should be created.")
++	logger.Infof("Notify the spdk-vhost to create vhost controller: suffix='%s', diskIndex='%d', capacity='%d'GiB .", podNameSuffix, diskIndex, diskCapcity)
+ 
++	//3. Waiting for new vhost controller created
++	logger.Info("loop to wait spdk-vhost controller created.")
++	counter := 0
++	//total wait time is wait_times*Sleep_time
++	var wait_times = 20
++	var Sleep_time = 3
++
++	for {
++		time.Sleep(time.Duration(Sleep_time) * time.Second)
++		status, uuid := getMessage(fileName)
++		if status == "complete" {
++			if uuid != UUID {
++				logger.Error("UUID not matched")
++			} else {
++				vhostCtrlPath = fmt.Sprintf("/var/tmp/vhost.%s", NAME)
++			}
++			jobeNameMap[NAME] = true
++			break
++		}
++		if counter >= wait_times {
++			logger.Error("no result message,waiting for too long...")
++			break
++		}
++		counter++
++	}
+ 	//TODO: do nothing and return directly, will levearage qemucmd args to create vhost user blk device
+ 	//for currrent kubevirt version, it failed to create the vhostuser block device via xml define.
+ 	//re-visit here later
+@@ -905,7 +1081,6 @@ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, diskSource
+ 	// Need to re-vist here for reconnect field setting. it's failed.
+ 	// disk.Source.Reconnect.Enabled = "yes"
+ 	// disk.Source.Reconnect.Timeout = 10
+-
+ 	return nil
+ 
+ }
+-- 
+2.27.0
+

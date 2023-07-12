@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: "Check if certificates already exists"
   stat:
@@ -53,12 +58,6 @@
   when: not cert.stat.exists
   become: yes
 
-- name: get home
-  shell:
-    cmd: "echo $HOME"
-    executable: /bin/bash
-  register: home
-
 - name: delete the wsf-registry namespace
   command: kubectl delete ns wsf-registry
   when: not cert.stat.exists
@@ -69,6 +68,18 @@
   register: regns 
   ignore_errors: yes
  
+- name: upload docker auth
+  include_role:
+    name: docker_auth
+  vars:
+    namespace: wsf-registry
+
+- name: get home
+  shell:
+    cmd: "echo $HOME"
+    executable: /bin/bash
+  register: home
+
 - name: create cert secret
   shell: "kubectl create --kubeconfig={{ home.stdout }}/.kube/config --namespace=wsf-registry secret tls wsf-registry-cert --cert {{ k8s_registry_conf_dir }}/{{ k8s_registry_ip }}:{{ k8s_registry_port }}.crt --key {{ k8s_registry_conf_dir }}/{{ k8s_registry_ip }}:{{ k8s_registry_port }}.key"
   when: regns.rc == 0

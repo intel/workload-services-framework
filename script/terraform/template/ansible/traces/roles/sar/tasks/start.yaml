@@ -1,7 +1,13 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
   - name: "Start sar on {{ trace_node.1 }}"
     shell:
       cmd: |
+        date -Ins > /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar.start
         sar {{ sar_options }} > /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar.logs 2>&1 &
         echo $! > /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar.pid
         disown

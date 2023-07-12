@@ -1,4 +1,9 @@
 
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 FROM registry:2
 COPY {{ dev_registry_certs_prefix }}* /usr/local/share/ca-certificates/
 RUN  update-ca-certificates

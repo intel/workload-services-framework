@@ -1,0 +1,160 @@
+From fded38300274fb13d01f36e486a1f198927d7b71 Mon Sep 17 00:00:00 2001
+From: Yongbozzz <yongbo.zhu@intel.com>
+Date: Wed, 21 Sep 2022 09:26:38 +0800
+Subject: [PATCH 19/22] finish destroy function
+
+---
+ .../virtwrap/converter/converter.go           | 53 +++++++++++++------
+ 1 file changed, 37 insertions(+), 16 deletions(-)
+
+diff --git a/pkg/virt-launcher/virtwrap/converter/converter.go b/pkg/virt-launcher/virtwrap/converter/converter.go
+index 04618191f..1b22683b6 100644
+--- a/pkg/virt-launcher/virtwrap/converter/converter.go
++++ b/pkg/virt-launcher/virtwrap/converter/converter.go
+@@ -897,10 +897,10 @@ func getMessage(path string) (string, string) {
+ 			results = strings.FieldsFunc(scanner.Text(), Split)
+ 		}
+ 	}
+-	if len(results) < 9 {
++	if len(results) < 10 {
+ 		return "", ""
+ 	}
+-	return results[1], results[8]
++	return results[1], results[9]
+ }
+ 
+ func getQueueIndex(path string) int {
+@@ -920,17 +920,35 @@ func getQueueIndex(path string) int {
+ 	return 1
+ }
+ 
+-var jobeNameMap = map[string]bool{}
++var jobNameMap = map[string]bool{}
++var Queue_index []int
+ 
+ func DestroyVhostBlkDisk(vmi *v1.VirtualMachineInstance) {
+ 
+ 	logger := log.DefaultLogger()
+ 	logger.Infof("Start to destroy the created vhost block devices...")
+-
++	fileDir := "/var/tmp/"
++	fileName := fileDir + "vhost.message"
++	BridgePath := `"` + fileDir + `"`
++	WorkItemStatus := "Delete"
++	var (
++		file *os.File
++		err  error
++	)
+ 	// Scan the disk buffer to delete all spdk-vhsot user block device.
+-	for _, vhostDisk := range spdkVhostBlkVolIndices {
+-		log.Log.Infof("Currrent disk index: %d .", vhostDisk)
+-
++	for _, vhostDisk := range Queue_index {
++		file, err = os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
++		if err != nil {
++			//return fmt.Errorf("OpenFile error")
++			logger.Error("OpenFile error")
++		}
++		defer file.Close()
++		entrypoint_content := "BridgePath=" + BridgePath + "\n" + "WorkItem=Queue" + strconv.Itoa(vhostDisk) + "\nWorkItemStatus=" + WorkItemStatus + "\n---\n"
++		if err = EditEntrypoint(fileName, entrypoint_content); err != nil {
++			logger.Error("edit file error while destroying")
++		} else {
++			time.Sleep(time.Duration(3) * time.Second)
++		}
+ 		//Clean up the disk.
+ 	}
+ 
+@@ -948,7 +966,7 @@ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, diskSource
+ 	//   A = suffix of the virt-launcher POD NAME.
+ 	//	 B = index of the spdkvhostblk volumes.
+ 	//   C = backend block image ID/name. For ceph, it's the block image name
+-	podNameSuffix := "xyz1"
++	podNameSuffix := os.Getenv("POD_NAME")
+ 	diskIndex := spdkVhostBlkVolIndices[volumeName]
+ 	NAME := podNameSuffix + "-" + strconv.Itoa(diskIndex)
+ 
+@@ -973,6 +991,7 @@ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, diskSource
+ 	fileName := fileDir + "vhost.message"
+ 	BridgePath := `"` + fileDir + `"`
+ 	WorkItemStatus := "New"
++
+ 	V_INDEX := diskIndex
+ 	//TODO : name+=spdk_back_value
+ 
+@@ -988,7 +1007,7 @@ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, diskSource
+ 	)
+ 	UUID := string(getUuid())
+ 	//UUID, err := exec.Command("/usr/bin/uuidgen").Output()
+-	_, hasJob := jobeNameMap[NAME]
++	_, hasJob := jobNameMap[NAME]
+ 	if err != nil {
+ 		return fmt.Errorf("uuid generate error")
+ 	}
+@@ -999,7 +1018,7 @@ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, diskSource
+ 		}
+ 		defer file.Close()
+ 		QUEUE_INDEX = getQueueIndex(fileName)
+-		if !hasJob || !jobeNameMap[NAME] {
++		if !hasJob || !jobNameMap[NAME] {
+ 			QUEUE_INDEX = QUEUE_INDEX + 1
+ 			entrypoint_content := "BridgePath=" + BridgePath + "\n" + "WorkItem=Queue" + strconv.Itoa(QUEUE_INDEX) + "\nWorkItemStatus=" + WorkItemStatus + "\n---\n"
+ 			if err = EditEntrypoint(fileName, entrypoint_content); err != nil {
+@@ -1016,12 +1035,13 @@ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, diskSource
+ 		pre_content = "BridgePath=" + BridgePath + "\n" + "WorkItem=Queue" + strconv.Itoa(QUEUE_INDEX) + "\nWorkItemStatus=" + WorkItemStatus + "\n---\n"
+ 	}
+ 
+-	content = pre_content + "Queue" + strconv.Itoa(QUEUE_INDEX) + ":\nQ_INDEX=" + strconv.Itoa(QUEUE_INDEX) + "\nV_INDEX=" + strconv.Itoa(V_INDEX) + "\nNAME=" + podNameSuffix + "\nUUID=" + UUID +
++	content = pre_content + "Queue" + strconv.Itoa(QUEUE_INDEX) + ":\nQ_INDEX=" + strconv.Itoa(QUEUE_INDEX) + "\nV_INDEX=" + strconv.Itoa(V_INDEX) + "\nNAME=" + NAME + "\nUUID=" + UUID +
+ 		"\nUNIT=" + UNIT + "\nCAPACITY=" + strconv.FormatInt(diskCapcity, 10) + "\nWORKSTATUS=" + WORKSTATUS + "\nRESULT=" + RESULT + "\n---\n"
+ 
+ 	logger := log.DefaultLogger()
+-	if hasJob && jobeNameMap[NAME] {
++	if hasJob && jobNameMap[NAME] {
+ 		logger.Infof("Job has already been processed before.")
++
+ 		disk.Type = "vhostuser"
+ 		disk.Device = "disk"
+ 		disk.Model = ""
+@@ -1032,7 +1052,7 @@ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, diskSource
+ 		disk.Driver.Type = "raw"
+ 		disk.Driver.Discard = ""
+ 		disk.Source.Type = "unix"
+-		disk.Source.Path = vhostCtrlPath
++		disk.Source.Path = fmt.Sprintf("/var/tmp/vhost.%s", NAME)
+ 		disk.Target.Bus = "virtio"
+ 		disk.Driver.ErrorPolicy = ""
+ 		disk.Driver.Cache = ""
+@@ -1041,7 +1061,7 @@ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, diskSource
+ 		if _, err = file.WriteString(content); err != nil {
+ 			return err
+ 		}
+-		jobeNameMap[NAME] = false
++		jobNameMap[NAME] = false
+ 	}
+ 
+ 	logger.Infof("Notify the spdk-vhost to create vhost controller: suffix='%s', diskIndex='%d', capacity='%d'GiB .", podNameSuffix, diskIndex, diskCapcity)
+@@ -1051,7 +1071,7 @@ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, diskSource
+ 	counter := 0
+ 	//total wait time is wait_times*Sleep_time
+ 	var wait_times = 5
+-	var Sleep_time = 1
++	var Sleep_time = 3
+ 
+ 	for {
+ 		time.Sleep(time.Duration(Sleep_time) * time.Second)
+@@ -1060,9 +1080,10 @@ func Convert_v1_SpdkVhostBlkDiskSource_To_api_Disk(volumeName string, diskSource
+ 			if uuid != UUID {
+ 				logger.Error("UUID not matched")
+ 			} else {
++				Queue_index = append(Queue_index, QUEUE_INDEX)
+ 				vhostCtrlPath = fmt.Sprintf("/var/tmp/vhost.%s", NAME)
+ 			}
+-			jobeNameMap[NAME] = true
++			jobNameMap[NAME] = true
+ 			break
+ 		}
+ 		if counter >= wait_times {
+-- 
+2.27.0
+

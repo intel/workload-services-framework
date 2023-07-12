@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - name: "modprobe {{ label_result.item.split('=')[0].split('-')[3:] | join('-') | lower }}"
   set_fact:

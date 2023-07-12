@@ -1,0 +1,154 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: create a workspace folder
+  file:
+    path: "/tmp/{{ wl_namespace }}-compose"
+    state: directory
+
+- name: copy compose-config.yaml
+  copy:
+    src: "{{ wl_logs_dir }}/compose-config.yaml"
+    dest: "/tmp/{{ wl_namespace }}-compose/docker-compose.yaml"
+
+- name: invoke docker compose up
+  shell:
+    cmd: "docker compose up --detach --force-recreate"
+    chdir: "/tmp/{{ wl_namespace }}-compose"
+
+- name: workload execution procedure
+  block:
+
+    - name: waitproc to wait for logs complete
+      shell:
+        cmd: |
+          timeout {{ workload_config.timeout | split(',') | first }}s bash -c 'docker compose exec {{ workload_config.job_filter.split('=')[-1] }} cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-compose/logs.tar' > /dev/null 2>&1 &
+          echo $!
+          disown
+        executable: /bin/bash
+        chdir: "/tmp/{{ wl_namespace }}-compose"
+      register: waitproc
+
+    - name: "wait for the starting phrase: {{ workload_config.trace_mode.split(',')[1] }}"
+      shell:
+        cmd: |
+          while kill -0 {{ waitproc.stdout_lines | first }}; do
+            docker compose logs {{ workload_config.job_filter.split('=')[-1] }} | grep -q -F "{{ workload_config.trace_mode.split(',')[1] }}" && break
+            bash -c 'sleep 0.1'
+          done
+        executable: /bin/bash
+        chdir: "/tmp/{{ wl_namespace }}-compose"
+      when: (workload_config.trace_mode | split(',') | first == "roi")
+      ignore_errors: yes
+
+    - name: "wait for timeout {{ workload_config.trace_mode.split(',')[1] }}s"
+      command: |
+        timeout {{ workload_config.trace_mode.split(',')[1] | int }}s tail --pid={{ waitproc.stdout_lines | first }} -f /dev/null
+      when: (workload_config.trace_mode | split(',') | first == "time")
+      ignore_errors: yes
+
+    - name: start trace
+      include_role:
+        name: trace
+        tasks_from: start
+      when: wl_trace_modules is defined
+
+    - name: "wait for the stop phrase: {{ workload_config.trace_mode.split(',')[2] }}"
+      shell:
+        cmd: |
+          while kill -0 {{ waitproc.stdout_lines | first }}; do
+            docker compose logs {{ workload_config.job_filter.split('=')[-1] }} | grep -q -F "{{ workload_config.trace_mode.split(',')[2] }}" && break
+            bash -c 'sleep 0.1'
+          done
+        executable: /bin/bash
+        chdir: "/tmp/{{ wl_namespace }}-compose"
+      when: (workload_config.trace_mode | split(',') | first == "roi")
+      ignore_errors: yes
+
+    - name: "wait for timeout {{ workload_config.trace_mode.split(',')[2] }}s"
+      command: |
+        timeout {{ workload_config.trace_mode.split(',')[2] | int }}s tail --pid={{ waitproc.stdout_lines | first }} -f /dev/null
+      when: (workload_config.trace_mode | split(',') | first == "time")
+      ignore_errors: yes
+
+    - name: revoke trace
+      include_role:
+        name: trace
+        tasks_from: stop
+      when:
+      - wl_trace_modules is defined
+      - (workload_config.trace_mode | split(',') | length == 3)
+
+    - name: wait until execution compete
+      command: "tail --pid={{ waitproc.stdout_lines | first }} -f /dev/null"
+      ignore_errors: yes
+
+  always:
+
+    - name: revoke trace
+      include_role:
+        name: trace
+        tasks_from: stop
+      when: wl_trace_modules is defined
+
+- name: print docker info
+  shell: |
+    docker version
+    docker compose version
+
+- name: collect trace data
+  include_role:
+    name: trace
+    tasks_from: collect
+  when: wl_trace_modules is defined
+  ignore_errors: yes
+
+- block:
+
+  - name: print docker logs
+    command:
+      cmd: "docker compose logs"
+      chdir: "/tmp/{{ wl_namespace }}-compose"
+    ignore_errors: true
+
+  - name: stop the docker containers
+    command:
+      cmd: "docker compose down --volumes"
+      chdir: "/tmp/{{ wl_namespace }}-compose"
+    ignore_errors: true
+
+  - name: create the iteration direcctory
+    file:
+      path: "{{ wl_logs_dir }}/itr-{{ itr }}/compose"
+      state: directory
+    delegate_to: localhost
+
+  - name: copy logs back to the itr directory
+    fetch:
+      src: "/tmp/{{ wl_namespace }}-compose/logs.tar"
+      dest: "{{ wl_logs_dir }}/itr-{{ itr }}/compose/"
+      flat: yes
+
+  - name: untar the logs
+    unarchive:
+      src: "{{ wl_logs_dir }}/itr-{{ itr }}/compose/logs.tar"
+      dest: "{{ wl_logs_dir}}/itr-{{ itr }}/compose/"
+    delegate_to: localhost
+
+  always:
+
+  - name: remove local logs tarfile
+    file:
+      path: "{{ wl_logs_dir }}/itr-{{ itr }}/compose/logs.tar"
+      state: absent
+    delegate_to: localhost
+    ignore_errors: true
+
+  - name: remove workspace
+    file:
+      path: "/tmp/{{ wl_namespace }}-compose"
+      state: absent
+    ignore_errors: true

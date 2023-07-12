@@ -1,6 +1,11 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
     - name: setup port forwarding
-      command: "ssh -4 -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -fNL {{ local_registry_url }}:{{ k8s_remote_registry_url }} -i {{ ansible_private_key_file }} -o ControlPath={{ control_path }} -M"
+      shell: "ssh -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -fNL {{ local_registry_url }}:{{ k8s_remote_registry_url }} -i {{ ansible_private_key_file }} > /dev/null 2>&1"
       delegate_to: localhost
       when: not (k8s_enable_csp_registry | bool)
 
@@ -52,7 +57,7 @@
       become: yes
 
     - name: cancel port forwarding
-      command: "ssh -4 -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -i {{ ansible_private_key_file }} -o ControlPath={{ control_path }} -O exit"
+      shell: "ssh -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -i {{ ansible_private_key_file }} -O cancel -L {{ local_registry_url }}:{{ k8s_remote_registry_url }} > /dev/null 2>&1"
       delegate_to: localhost
       when: not (k8s_enable_csp_registry | bool)
 

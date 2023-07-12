@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 "sh"  "-c"  "until nc -z -w5 mysql-service 3306; do echo waiting for mysql service; sleep 1; done"
 "sh"  "-c"  "until nc -z -w5 smt-redis 6380; do echo waiting for redis service; sleep 1; done"
 

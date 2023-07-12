@@ -1,0 +1,25 @@
+From 2aba2949f07b5c7b10fa680ea342705c8d04c0b6 Mon Sep 17 00:00:00 2001
+From: "Michael,Zhang" <michael.m.zhang@intel.com>
+Date: Fri, 2 Sep 2022 21:14:58 +0800
+Subject: [PATCH 03/22] Add qemu root permission
+
+---
+ pkg/virt-launcher/virtwrap/util/libvirt_helper.go | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/pkg/virt-launcher/virtwrap/util/libvirt_helper.go b/pkg/virt-launcher/virtwrap/util/libvirt_helper.go
+index f69316fad..cbdd85753 100644
+--- a/pkg/virt-launcher/virtwrap/util/libvirt_helper.go
++++ b/pkg/virt-launcher/virtwrap/util/libvirt_helper.go
+@@ -458,6 +458,8 @@ func configureQemuConf(qemuFilename string) (err error) {
+ 	_, err = os.Stat("/dev/hugepages")
+ 	if err == nil {
+ 		_, err = qemuConf.WriteString("hugetlbfs_mount = \"/dev/hugepages\"\n")
++		_, err = qemuConf.WriteString("user = \"root\"\n")
++		_, err = qemuConf.WriteString("group = \"root\"\n")
+ 	} else if !os.IsNotExist(err) {
+ 		return err
+ 	}
+-- 
+2.27.0
+

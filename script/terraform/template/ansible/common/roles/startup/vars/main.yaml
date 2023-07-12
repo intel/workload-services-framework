@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 startup_restore_path: /usr/local/etc/wsf-restore
 startup_kernel_args_actions:

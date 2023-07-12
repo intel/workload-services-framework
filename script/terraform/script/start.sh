@@ -1,4 +1,16 @@
 #!/bin/bash -e
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+quit () {
+    echo SIGINT/SIGTERM received
+    exit 3
+}
+
+trap quit SIGTERM SIGINT
 
 copy_template () {
     echo copy template $1 to $2
@@ -7,9 +19,12 @@ copy_template () {
 }
 
 destroy () {
-    trap - SIGINT SIGKILL ERR EXIT
+    trap - ERR EXIT
     set +e
+    jobs -p | xargs -rn10 kill
+    wait
 
+    cd /opt/workspace
     if [[ "$stages" = *"--stage=cleanup"* ]]; then
         if [ -r cleanup.yaml ]; then
             echo "Restore SUT settings..."
@@ -17,7 +32,7 @@ destroy () {
         fi
 
         echo "Destroy SUT resources..."
-        TF_LOG=ERROR terraform destroy -auto-approve -input=false -no-color -parallelism=1 >> cleanup.logs 2>&1
+        TF_LOG=ERROR terraform destroy -refresh -auto-approve -input=false -no-color -parallelism=$(nproc) >> cleanup.logs 2>&1
     fi 
 
     rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup tfplan .ssh .netrc
@@ -58,7 +73,7 @@ run_playbook () {
     done
     [ "$playbook" = "cluster.yaml" ] && [[ "$stages" != *"--stage=provision"* ]] && return
     cp -f /opt/template/ansible/ansible.cfg .
-    ANSIBLE_FORKS=$(nproc) ANSIBLE_ROLES_PATH="$ANSIBLE_ROLES_PATH:template/ansible/common/roles:template/ansible/traces/roles" ansible-playbook $options -i inventory.yaml --private-key "$keyfile" $playbook
+    ANSIBLE_FORKS=$(nproc) ANSIBLE_ROLES_PATH="$ANSIBLE_ROLES_PATH:template/ansible/common/roles:template/ansible/traces/roles" ansible-playbook --flush-cache $options -i inventory.yaml --private-key "$keyfile" $playbook
 }
 
 DIR="$(dirname "$0")"
@@ -98,56 +113,65 @@ if [[ "$stages" = *"--stage=provision"* ]]; then
     
     # Create SG white list
     if [ ${#tf_pathes[@]} -ge 1 ]; then
-        "$DIR"/get-ip-list.sh /opt/etc/proxy-ip-list.txt > proxy-ip-list.txt
+        "$DIR"/get-ip-list.sh /opt/csp/etc/proxy-ip-list.txt > proxy-ip-list.txt
         # Create key pair
         ssh-keygen -m PEM -q -f $keyfile -t rsa -N ''
     fi
     # provision VMs
-    terraform init -input=false -no-color -upgrade
+    terraform init -input=false -no-color &
+    wait -n %1
 
-    (
-        set +e
-        retries="$(echo "x $@" | sed -n '/--provision_retries=/{s/.* --provision_retries=\([0-9]*\).*/\1/;p}')"
-        delay="$(echo "x $@" | sed -n '/--provision_delay=/{s/.* --provision_delay=\([0-9]*\).*/\1/;p}')"
+    trap destroy SIGTERM SIGINT SIGKILL ERR EXIT
 
-        sts=1
-        for i in $(seq 1 ${retries:-1}); do 
-            [ $i -ne 1 ] && echo "Provision Retry: $i..."
+    terraform_retries="$(echo "x $@" | sed -n '/--terraform_retries=/{s/.* --terraform_retries=\([0-9,]*\).*/\1/;p}')"
+    terraform_retries="${terraform_retries:-10,3}"
+    terraform_delay="$(echo "x $@" | sed -n '/--terraform_delay=/{s/.* --terraform_delay=\([0-9,.smh]*\).*/\1/;p}')"
+    terraform_delay="${terraform_delay:-10s,0}"
 
-            terraform plan -input=false -out tfplan -no-color
-            sts=$?
-            [ $sts -ne 0 ] && break
+    terraform_replace=()
+    terraform_refresh=""
+    sts=1
+    for i in $(seq ${terraform_retries%,*}); do
+        for j in $(seq ${terraform_retries#*,}); do
+            terraform plan -input=false -no-color --parallelism=$(nproc) "${terraform_replace[@]}" $terraform_refresh -out tfplan &
+            wait -n $! || break
+            terraform_refresh="-refresh"
 
-            terraform apply -input=false --auto-approve -no-color tfplan
-            sts=$?
-            [ $sts -eq 0 ] && break
-
-            TF_LOG=ERROR terraform destroy -auto-approve -input=false -no-color -parallelism=1
-            echo "Provision delay ${delay:-10}s..."
-            sleep ${delay:-10}s
+            terraform apply -input=false --auto-approve -no-color --parallelism=$(nproc) tfplan &
+            if wait -n $!; then
+                sts=0
+                break
+            fi
+            sleep ${terraform_delay#*,}
         done
-        [ $sts -eq 0 ] || exit $sts
-    )
 
-    trap destroy SIGINT SIGKILL ERR EXIT
-    terraform show -json > tfplan.json
+        [ $sts -eq 0 ] || break
+        terraform show -json > tfplan.json
+        terraform_replace=($(sed -n '/"terraform_replace":/{s/.*"terraform_replace":{"sensitive":false,"value":{"command":"\([^"]*\)".*/\1/;p}' tfplan.json | sed 's/[[]\([^]]*\)[]]/["\1"]/g' | tr ' ' '\n'))
+        sts=${#terraform_replace[@]}
+        [ $sts -gt 0 ] || break
+        sleep ${terraform_delay%,*}
+    done
+    [ $sts -eq 0 ] || destroy 3
 fi
 
 # create cluster with ansible
 # for validation only, we still want to prepare cluster.yaml but not execute it.
 locate_trace_modules $@
 cat tfplan.json | $DIR/create-cluster.py $@ $trace_modules_options
-run_playbook -vv cluster.yaml $@
+run_playbook -vv cluster.yaml $@ &
+wait -n %1
 
 if [[ "$stages" = *"--stage=validation"* ]]; then
     # create deployment with ansible
     echo "Create the deployment plan..."
 
-    trap destroy SIGINT SIGKILL ERR EXIT
+    trap destroy SIGTERM SIGINT SIGKILL ERR EXIT
 
     locate_trace_modules $@
     cat tfplan.json | $DIR/create-deployment.py $@ $trace_modules_options
-    run_playbook -vv deployment.yaml $@
+    run_playbook -vv deployment.yaml $@ &
+    wait -n %1
 
     if [ -n "$(ls -1 itr-*/kpi.sh 2> /dev/null)" ]; then
         for publisher in "$DIR"/publish-*.py; do
@@ -165,6 +189,6 @@ if [[ "$stages" = *"--stage=cleanup"* ]]; then
     destroy 0
 fi
 
-trap - SIGINT SIGKILL ERR EXIT
+trap - SIGTERM SIGINT SIGKILL ERR EXIT
 echo "exit with status: 0"
 exit 0

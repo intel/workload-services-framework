@@ -1,5 +1,0 @@
----
-install_dependencies:
-  RedHat:
-    - collectd
-    - collectd-disk

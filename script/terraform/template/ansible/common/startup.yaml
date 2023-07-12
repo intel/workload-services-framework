@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 - hosts: all
   gather_facts: no
@@ -31,6 +36,19 @@
         name: startup
       when: ansible_connection != 'winrm'
 
+    - name: Prepare Docker Auth
+      include_role:
+        name: docker_auth
+      when:
+      - ansible_connection != 'winrm'
+      - docker_auth_reuse | default(False) | bool
+
+    - name: Install instance watch
+      include_role:
+        name: instance-watch
+      when:
+      - ansible_connection != 'winrm'
+
 - hosts: trace_hosts
   become: true
   gather_facts: no
@@ -41,7 +59,7 @@
         name: startup
         tasks_from: trace-block
       when:
-      - trace_module != "gprofiler" and trace_module != ""
+      - trace_module != ""
       - ansible_connection != 'winrm'
       loop: "{{ wl_trace_modules | default('') | split(',') }}"
       loop_control:

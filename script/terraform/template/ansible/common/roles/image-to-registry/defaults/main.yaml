@@ -1,5 +1,9 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 local_registry_url: "localhost:16666"
-control_path: "/tmp/registry-forwarding-%h-%p-%r"
 k8s_remote_registry_url: ""
 k8s_enable_registry: true
 k8s_enable_csp_registry: false

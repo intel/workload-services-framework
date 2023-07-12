@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 locals {
   os_image_publisher = {
@@ -60,8 +65,8 @@ locals {
 
 data "azurerm_resources" "image" {
   for_each = {
-    for k,v in local.vms : k => v if (v.image!=null)
+    for k,v in local.vms : k => v if (v.os_image!=null)
   }
-  name = each.value.image
+  name = each.value.os_image
   type = "Microsoft.Compute/images"
 }

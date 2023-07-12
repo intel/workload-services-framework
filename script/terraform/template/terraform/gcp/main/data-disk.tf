@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 locals {
   prohibit_set_iops_disktype = ["pd-standard", "pd-balanced", "pd-ssd"]
@@ -55,7 +60,7 @@ data "template_cloudinit_config" "default" {
   part {
     filename = "init-shellscript"
     content_type = "text/x-shellscript"
-    content = templatefile("./template/terraform/gcp/main/cloud-init.sh", {
+    content = templatefile("${path.module}/templates/cloud-init.sh", {
       disk_count  = each.value.data_disk_spec!=null?each.value.data_disk_spec.disk_count:0
       disk_format = each.value.data_disk_spec!=null?each.value.data_disk_spec.disk_format:"ext4"
       device_root = each.value.data_disk_spec!=null?(each.value.data_disk_spec.disk_type!="local"?"/dev/disk/by-id/google-wsf-data-disk":local.device_root):""

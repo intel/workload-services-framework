@@ -1,0 +1,143 @@
+From 6d5c63dc4c1ffdbc21a886a3d51a94c79e14cbab Mon Sep 17 00:00:00 2001
+From: "Michael,Zhang" <michael.m.zhang@intel.com>
+Date: Fri, 9 Sep 2022 17:51:40 +0800
+Subject: [PATCH 14/22] Add readme for V3 and add example vm yaml file
+
+---
+ deploy/V3/readme                | 47 ++++++++++++++++++++++
+ deploy/V3/vm-vhostuserblk2.yaml | 69 +++++++++++++++++++++++++++++++++
+ 2 files changed, 116 insertions(+)
+ create mode 100644 deploy/V3/readme
+ create mode 100644 deploy/V3/vm-vhostuserblk2.yaml
+
+diff --git a/deploy/V3/readme b/deploy/V3/readme
+new file mode 100644
+index 000000000..7d7c8a554
+--- /dev/null
++++ b/deploy/V3/readme
+@@ -0,0 +1,47 @@
++2022/09/05
++
++Add the new object type for spdk-vhost-user block device, user need to define new disk with volume type "spdkVhostBlkDisk". 
++Accordingly, the vhostuser block device depends on hugepage config, hence user should also define the hugepage memory for VM.
++
++VM yaml file: vm-vhostuserblk2.yaml
++
++for example: 
++    spec:
++      domain:
++        cpu:
++          cores: 8
++          # sockets: 1
++          #dedicatedCpuPlacement: true
++        memory: 
++          hugepages: 
++            pageSize: "2Mi"
++        devices:
++          disks:
++          - disk:
++              bus: virtio
++            name: spdk-vhost-blk1
++          - disk:
++              bus: virtio
++            name: spdk-vhost-blk2
++        machine:
++          type: ""
++        resources:
++          limits:
++            hugepages-2Mi: 1Gi
++            memory: 1Gi
++          requests:
++            memory: 1Gi
++            hugepages-2Mi: 1Gi
++      terminationGracePeriodSeconds: 0
++      volumes:
++      - name: spdk-vhost-blk1
++        spdkVhostBlkDisk:
++          capacity: 64M
++      - name: spdk-vhost-blk2
++        spdkVhostBlkDisk:
++          capacity: 256M
++
++Rerequisites
++It's a limitation now, user need to create vhost socket (/var/tmp/vhost.[0/1/2]) before deploy VMs. and for a temperary flag, user also need to create a tag file (/var/tmp/vhost.tag)
++to indicate spdk-vhost-user is supported in current nodes.
++
+diff --git a/deploy/V3/vm-vhostuserblk2.yaml b/deploy/V3/vm-vhostuserblk2.yaml
+new file mode 100644
+index 000000000..014bf0ee0
+--- /dev/null
++++ b/deploy/V3/vm-vhostuserblk2.yaml
+@@ -0,0 +1,69 @@
++apiVersion: kubevirt.io/v1alpha3
++kind: VirtualMachine
++metadata:
++  labels:
++    kubevirt.io/vm: ubuntu
++  name: ubuntu
++spec:
++  running: True
++  template:
++    metadata:
++      labels:
++        kubevirt.io/vm: ubuntu
++    spec:
++      domain:
++        cpu:
++          cores: 8
++          # sockets: 1
++          #dedicatedCpuPlacement: true
++        memory: 
++          hugepages: 
++            pageSize: "2Mi"
++        devices:
++          disks:
++          - disk:
++              bus: virtio
++            name: containerdisk
++          - disk:
++              bus: virtio
++            name: cloudinitdisk
++          - disk:
++              bus: virtio
++            name: spdk-vhost-blk1
++          - disk:
++              bus: virtio
++            name: spdk-vhost-blk2
++        machine:
++          type: ""
++        resources:
++          limits:
++            hugepages-2Mi: 1Gi
++            memory: 1Gi
++          requests:
++            memory: 1Gi
++            hugepages-2Mi: 1Gi
++      terminationGracePeriodSeconds: 0
++      volumes:
++      - name: spdk-vhost-blk1
++        spdkVhostBlkDisk:
++          capacity: 64M
++      - name: spdk-vhost-blk2
++        spdkVhostBlkDisk:
++          capacity: 256M
++      - containerDisk:
++          image: fedora_ubuntu16:latest
++          imagePullPolicy: IfNotPresent
++        name: containerdisk
++      - cloudInitNoCloud:
++          userData: |
++            #cloud-configls
++            ssh_pwauth: True
++            disable_root: False
++            chpasswd:
++              list: |
++                ubuntu:ubuntu
++                root:root
++                expire: False
++            ssh_authorized_keys:
++              - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCuMi5nZUr+yI6ReegGne4+VbXiNw3682rLapTv2i6MS/+hv5WRO3XThtN5Wy8z+IX8QPriYYZiFl6yJXwxyzZnYl5u/RGOkjX6itgHG87ruBRwGIs+frSa8pbSlykHtJDnEjYqlCIt9dm0uHR8cGJFB0Nk26YP1Dq+A1gSm65/Snnkksx+/kwXePOTnhflGebtr6Tf6CcZ9LyNGQaRd5mfTnwMbQXV3ap1XZSjSfBfiyWBhMXr4RUX+5BHxeYQdHH4BvSyVOP0pNZ3wCMod1UgHp53WLk/tZJmF5jujWNhOa3Bx9zjtRUGPgKSUQ6ci8VRn38jC/DF3pgVDE4hmHp2xKs52KcFULqmyYTNtsACSrvwcrLGJcIfH79y1SPr6QLeaFuODegegJ+rkfgUbKV1rGzWhT5ypYHOntnpUh9yi8/q++W5WWv8e2vp3yMd4KNY5xeGkIGIrE9/8tYL7LdO3hWjkhnFOpeIgKhNotTVBeipPmkR9YkVZDYD8tDORtM= mzhang2@icx241-zz8-2f
++        name: cloudinitdisk
+-- 
+2.27.0
+

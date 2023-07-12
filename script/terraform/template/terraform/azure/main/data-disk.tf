@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 locals {
   disks_flat = flatten([
@@ -54,7 +59,7 @@ data "template_cloudinit_config" "default" {
   part {
     filename = "init-shellscript"
     content_type = "text/x-shellscript"
-    content = templatefile("${path.module}/templates/cloud-init.sh.tpl", {
+    content = templatefile("${path.module}/templates/cloud-init.sh", {
       disk_count  = each.value.data_disk_spec!=null?each.value.data_disk_spec.disk_count:0
       disk_format = each.value.data_disk_spec!=null?each.value.data_disk_spec.disk_format:"ext4"
       device_root = each.value.data_disk_spec!=null?each.value.data_disk_spec.disk_type!="local"?"/dev/disk/azure/scsi1":"":""
@@ -66,7 +71,7 @@ data "template_cloudinit_config" "default" {
   part {
     filename = "init-cloud"
     content_type = "text/cloud-config"
-    content = "${file("${path.module}/templates/cloud_init_resourcedisk.cfg.tpl")}"
+    content = "${file("${path.module}/templates/cloud_init_resourcedisk.cfg")}"
   }
 }
 

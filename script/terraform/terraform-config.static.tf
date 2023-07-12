@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 variable "wl_name" {
   default = ""
@@ -117,7 +122,7 @@ output "options" {
     intel_publisher_sut_machine_type: var.intel_publisher_sut_machine_type,
     intel_publisher_sut_metadata: var.intel_publisher_sut_metadata,
 
-    # Enable k8s registry only in the DDCW use case. See doc/setup-wsf.md
+    # Enable k8s registry only in the DDCW use case. See doc/user-guide/preparing-infrastructure/setup-wsf.md
     k8s_enable_registry: false,
   }
 }

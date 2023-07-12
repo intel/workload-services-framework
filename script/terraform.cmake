@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 function(show_backend_settings)
     message("-- Setting: TERRAFORM_OPTIONS=${TERRAFORM_OPTIONS_ESC}")

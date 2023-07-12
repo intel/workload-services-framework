@@ -1,4 +1,9 @@
 #!/bin/bash
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 ansible-playbook --version > /dev/null 2> /dev/null || (
   apt --version > /dev/null 2> /dev/null && \
