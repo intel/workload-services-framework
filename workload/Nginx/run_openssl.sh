@@ -5,13 +5,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-#this openssl s_time https connection testing client/method copy from:
-#
-#https://github.com/intel-innersource/frameworks.benchmarking.cumulus.perfkitbenchmarker/blob/main/perfkitbenchmarker/data/nginx_with_qat/connection.sh.j2
-#
-#https://github.com/intel-innersource/frameworks.benchmarking.cumulus.perfkitbenchmarker/tree/main/perfkitbenchmarker/data/nginx_with_qat
-#
-#https://github.com/intel-innersource/frameworks.benchmarking.cumulus.perfkitbenchmarker/blob/main/perfkitbenchmarker/linux_benchmarks/nginx_with_qat_benchmark.py
 
 NODE=${NODE:-2}
 MODE=${MODE:-https}
