@@ -16,13 +16,13 @@ Table 1: Software Components
 | :---        |    :----:   |
 | UBUNTU | [v22.04](https://ubuntu.com/) |
 | YASM | [v1.3.0](https://github.com/OpenVisualCloud/Dockerfiles-Resources/raw/master/yasm-1.3.0.tar.gz) |
-| LIBX264 | [5db6aa6cab1b146e07b60cc1736a01f21da01154](https://code.videolan.org/videolan/x264.git) |
-| LIBX265 | [v3.1](https://github.com/videolan/x265/archive/3.1.tar.gz) |
+| LIBX264 | [baee400fa9ced6f5481a728138fed6e867b0ff7f](https://code.videolan.org/videolan/x264.git) |
+| LIBX265 | [v3.5](https://github.com/videolan/x265.git) |
 | LIBVPX | [v1.9.0](https://chromium.googlesource.com/webm/libvpx.git) |
-| SVT HEVC | [v1.5.1](https://github.com/OpenVisualCloud/SVT-HEVC) |
+| SVT HEVC | [6cca5b932623d3a1953b165ae6b093ca1325ac44](https://github.com/OpenVisualCloud/SVT-HEVC) |
 | DAV1D | [v0.9.0](https://code.videolan.org/videolan/dav1d/-/archive/0.9.0/dav1d-0.9.0.tar.gz) |
-| SVT AV1 | [v0.9.1](https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/v0.9.1/SVT-AV1-v0.9.1.tar.gz) |
-| FFMPEG | [n4.4](https://github.com/FFmpeg/FFmpeg.git) |
+| SVT AV1 | [v1.5.0](https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/v1.5.0/SVT-AV1-v1.5.0.tar.gz) |
+| FFMPEG | [n6.0](https://github.com/FFmpeg/FFmpeg.git) |
 
 ## Configuration Snippets
 This section contains code snippets on build instructions for software components.
@@ -48,7 +48,7 @@ cd /opt/build/yasm-1.3.0 && \
 
 ### LIBX264
 ```
-LIBX264_VER=5db6aa6cab1b146e07b60cc1736a01f21da01154
+LIBX264_VER=baee400fa9ced6f5481a728138fed6e867b0ff7f
 LIBX264_REPO=https://code.videolan.org/videolan/x264.git
 cd /opt/build && \
     git clone ${LIBX264_REPO} -b stable && \
@@ -62,11 +62,12 @@ cd /opt/build && \
 
 ### LIBX265
 ```
-LIBX265_VER=3.1
+LIBX265_VER=3.5
 LIBX265_REPO=https://github.com/videolan/x265/archive/${LIBX265_VER}.tar.gz
 cd /opt/build && \   
-    wget -O - ${LIBX265_REPO} | tar xz && \
-    cd x265-${LIBX265_VER}/build/linux && \
+    git clone ${LIBX265_REPO} && cd x265 && \
+    git checkout ${LIBX265_VER} && \
+    cd build/linux && \
     cmake -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/usr/local -DLIB_INSTALL_DIR=/usr/local/lib64 ../../source && \
     make -j$(nproc) && \
     make install DESTDIR=/opt/dist && \
@@ -88,10 +89,10 @@ cd /opt/build && \
 
 ### SVT HEVC
 ```
-SVT_HEVC_VER=v1.5.1
+SVT_HEVC_VER=6cca5b932623d3a1953b165ae6b093ca1325ac44
 SVT_HEVC_REPO=https://github.com/OpenVisualCloud/SVT-HEVC
 cd /opt/build && \
-    git clone -b ${SVT_HEVC_VER} --depth 1 ${SVT_HEVC_REPO} && cd SVT-HEVC
+    git clone ${SVT_HEVC_REPO}  && cd SVT-HEVC && git checkout ${SVT_HEVC_VER}
 cd /opt/build/SVT-HEVC/Build/linux && \
     cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_INSTALL_LIBDIR=/usr/local/lib64 -DCMAKE_ASM_NASM_COMPILER=yasm ../.. && \
     make -j $(nproc) && \
@@ -114,7 +115,7 @@ cd /opt/build/dav1d-${DAV1D_VER} && \
 
 ### SVT AV1
 ```
-SVT_AV1_VER=v0.9.1
+SVT_AV1_VER=v1.5.0
 SVT_AV1_REPO=https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/${SVT_AV1_VER}/SVT-AV1-${SVT_AV1_VER}.tar.gz
 cd /opt/build && \
     wget -O - ${SVT_AV1_REPO} | tar zx && \
@@ -129,13 +130,13 @@ cd /opt/build && \
 
 ### FFMPEG
 ```
-FFMPEG_VER=n4.4
+FFMPEG_VER=release/6.0
 FFMPEG_REPO=https://github.com/FFmpeg/FFmpeg.git
 cd /opt/build && \
     git clone ${FFMPEG_REPO} -b ${FFMPEG_VER} ffmpeg 
 cd /opt/build/ffmpeg && \
-    git apply /opt/build/SVT-HEVC/ffmpeg_plugin/n4.4-0001-lavc-svt_hevc-add-libsvt-hevc-encoder-wrapper.patch && \
-    ./configure --prefix=/usr/local --libdir=/usr/local/lib64 --bindir=/usr/local/bin --enable-shared --disable-doc --disable-htmlpages \
+    git apply /opt/build/SVT-HEVC/ffmpeg_plugin/master-0001-lavc-svt_hevc-add-libsvt-hevc-encoder-wrapper.patch && \
+    ./configure --cc=${AOCC} --cxx=${AOCXX} --prefix=/usr/local --libdir=/usr/local/lib64 --bindir=/usr/local/bin --enable-shared --disable-doc --disable-htmlpages \
     --disable-manpages --disable-podpages --disable-txtpages \
     --extra-cflags=-w --enable-nonfree --enable-libass --enable-libfreetype --disable-xlib --disable-sdl2 --disable-hwaccels --disable-vaapi \
     --enable-libvpx --enable-libx264 --enable-gpl --enable-libx265 --enable-libsvthevc --enable-libsvtav1 --enable-libdav1d --extra-libs="-lpthread -lm" && \
