@@ -19,9 +19,6 @@ Check if the IOMMU has been enabled via the following command:
 $ dmesg| grep IOMMU
 DMAR: IOMMU enabled
 ```
-
-Firmware for QAT can be found: [wiki](https://wiki.ith.intel.com/display/QAT2XSW/[1]+Firmware+for+QAT+in-tree+stack)
-
 ```
 $ tar xzf qat20-fw-stepping-e.tgz
 $ sudo cp QAT20/quickassist/qat/fw/e/qat_4xxx.bin /usr/lib/firmware/

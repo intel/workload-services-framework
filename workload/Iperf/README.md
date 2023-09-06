@@ -42,7 +42,7 @@ Designed for basic function verification
 ```
 
 ### Customization
-All the configurable parameters are listed in [`validate.sh`](validate.sh). You can use [`TEST_CONFIG`](https://github.com/intel-innersource/applications.benchmarking.benchmark.platform-hero-features/blob/master/doc/ctest.md#customize-configurations) to set those parameters. Besides, CLIENT_OPTIONS & SERVER_OPTIONS can be used to set those options supported by iperf but not listed in validate.sh.
+All the configurable parameters are listed in [`validate.sh`](validate.sh). You can use [`TEST_CONFIG`](https://github.com/intel/workload-services-framework/blob/main/doc/user-guide/executing-workload/ctest.md#customize-configurations) to set those parameters. Besides, CLIENT_OPTIONS & SERVER_OPTIONS can be used to set those options supported by iperf but not listed in validate.sh.
 
 ### KPI
 Run the [`kpi.sh`](kpi.sh) script to parse the KPIs from the output logs.

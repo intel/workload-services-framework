@@ -68,7 +68,7 @@ kubectl delete -f kubernetes-config.yaml
 * kafka_gated - Gated test case, for this test case, PARTITIONS, PRODUCERS and CONSUMERS will be set to 1, and cannot be changed.
 * kafka_1n - Used for single node testing, all pods will be deployed on one K8S worker node.
 * kafka_3n - Used for multi node (3 nodes) testing, need at least 3 K8S worker nodes for this test case.
-* kafka_3n_pkm - Used for multi node (3 nodes) [pkm](https://github.com/intel-innersource/applications.benchmarking.benchmark.platform-hero-features/blob/master/doc/cmakelists.txt.md#special-test-cases) testing, need at least 3 K8S worker nodes for this test case.
+* kafka_3n_pkm - Used for multi node (3 nodes) pkm testing, need at least 3 K8S worker nodes for this test case.
 
 ### KPI
 
