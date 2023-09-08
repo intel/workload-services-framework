@@ -11,60 +11,99 @@ The recommended component version and download location are also provided.
 Table 1: Software Components
 | Component| Version |
 | :---        |    :----:   |
-| Rocky Linux |  [8.5](https://rockylinux.org/news/rocky-linux-8-5-ga-release/)   |
-| Intel oneAPI HPC Toolkit |  [2023.0.0](https://yum.repos.intel.com/oneapi)   |
-| OpenFOAM | [8](https://github.com/OpenFOAM/OpenFOAM-8.git) |
+| Debian|  [12](https://www.debian.org/releases/bookworm/)   |
+| Intel oneAPI HPC Toolkit |  [2023.1.0](https://www.intel.com/content/www/us/en/developer/tools/oneapi/hpc-toolkit-download.html)   |
+| OpenFOAM | [11](https://github.com/OpenFOAM/OpenFOAM-11.git) |
 
 # Configuration Snippets
 This section contains code snippets on build instructions for software components.
 
 Note: Common Linux utilities, such as docker, git, wget, will not be listed here. Please install on demand if it is not provided in base OS installation.
 
-### Rocky Linux
-```
-docker pull rockylinux:8.5
-```
 
 ### Intel oneAPI HPC Toolkit
+
+Install dependencies
 ```
-cat <<EOF > /etc/yum.repos.d/oneAPI.repo
-[oneAPI]
-name=Intel® oneAPI repository
-baseurl=https://yum.repos.intel.com/oneapi
-enabled=1
-gpgcheck=1
-repo_gpgcheck=1
-gpgkey=https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
-
-EOF
-
-yum install -y intel-hpckit
+sudo apt-get -y install gawk g++ gcc make
 ```
 
-### OpenFOAM
+Install oneAPI HPC Toolkit
 ```
-VER_NUM=8
-OPEN_FOAM_REPO=https://github.com/OpenFOAM/OpenFOAM-${VER_NUM}.git
-OPEN_FOAM_VER=version-${VER_NUM}
-git clone -b ${OPEN_FOAM_VER} ${OPEN_FOAM_REPO}
-
-sed -i -e '/export WM_COMPILER/s/Gcc/Icc/' ./OpenFOAM-${VER_NUM}/etc/bashrc
-sed -i -e '/export WM_MPLIB/s/SYSTEMOPENMPI/INTELMPI/' ./OpenFOAM-${VER_NUM}/etc/bashrc
-sed -i -e '/$(LIB_HEADER_DIRS) -fPIC/s/$/ -xCORE-AVX512 -fp-model precise -fp-speculation=safe/' ./OpenFOAM-${VER_NUM}/wmake/rules/linux64Icc/c++
-sed -i '235s|^.*$|    export FOAM_MPI="intelmpi"|' ./OpenFOAM-${VER_NUM}/etc/config.sh/mpi
-sed -i -e '/PINC/d' ./OpenFOAM-${VER_NUM}/wmake/rules/General/mplibINTELMPI64
-sed -i -e '/PLIBS/d' ./OpenFOAM-${VER_NUM}/wmake/rules/General/mplibINTELMPI64
-echo 'PINC       = -isystem $(MPI_ARCH_PATH)/intel64/include'  >> ./OpenFOAM-${VER_NUM}/wmake/rules/General/mplibINTELMPI64
-echo 'PLIBS      = -L$(MPI_ARCH_PATH)/intel64/lib/release -lmpi'  >> ./OpenFOAM-${VER_NUM}/wmake/rules/General/mplibINTELMPI64
-
-cd ./OpenFOAM-${VER_NUM}
-I_MPI_ROOT=/opt/intel/oneapi/mpi/latest
-MPI_ROOT=$I_MPI_ROOT
-source /opt/intel/oneapi/setvars.sh intel64 
-source etc/bashrc 
-./Allwmake -j 
+wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1ff1b38a-8218-4c53-9956-f0b264de35a4/l_HPCKit_p_2023.1.0.46346_offline.sh
+chmod +x l_HPCKit_p_2023.1.0.46346_offline.sh
+sudo ./l_HPCKit_p_2023.1.0.46346_offline.sh -a -s --silent --eula accept
+source /opt/intel/oneapi/setvars.sh
 ```
 
-Workload Services Framework
+### Zlib
+```
+wget https://www.zlib.net/fossils/zlib-1.3.tar.gz -O zlib.tar.gz
+tar -zxf zlib.tar.gz
+cd zlib-* 
+./configure
+make -j 
+sudo make install 
+```
+
+### Community OpenFOAM
+
+Set environment variables 
+```
+export OPENFOAM_VERSION=11
+export MPI_ROOT=${I_MPI_ROOT}
+```
+
+Install dependencies
+```
+sudo apt-get -y install git flex  libptscotch-dev
+```
+
+clone OpenFOAM
+```
+git clone https://github.com/OpenFOAM/OpenFOAM-11.git
+```
+
+Moddify configuration files
+```
+#Change Compiler form gcc to icx
+sed -i -e '/export WM_COMPILER/s/Gcc/Icx/' ./OpenFOAM-${OPENFOAM_VERSION}/etc/bashrc
+
+#Add compiler flags for c++ compilation on Linux
+sed -i -e '/$(LIB_HEADER_DIRS) -fPIC/s/$/ -xCORE-AVX512 -fp-model precise -fp-speculation=safe/' ./OpenFOAM-${OPENFOAM_VERSION}/wmake/rules/linux64Icx/c++
+
+#Change from openMPI to Intel MPI implementation
+sed -i -e '/export WM_MPLIB/s/SYSTEMOPENMPI/INTELMPI/' ./OpenFOAM-${OPENFOAM_VERSION}/etc/bashrc
+
+#Set FOAM mpi implementation to Intel implementation
+sed -i '235s|^.*$|    export FOAM_MPI="intelmpi"|' ./OpenFOAM-${OPENFOAM_VERSION}/etc/config.sh/mpi
+sed -i -e '/PINC/d' ./OpenFOAM-${OPENFOAM_VERSION}/wmake/rules/General/mplibINTELMPI64
+sed -i -e '/PLIBS/d' ./OpenFOAM-${OPENFOAM_VERSION}/wmake/rules/General/mplibINTELMPI64
+echo 'PINC       = -isystem ${I_MPI_ROOT}/include'  >> ./OpenFOAM-${OPENFOAM_VERSION}/wmake/rules/General/mplibINTELMPI64 
+echo 'PLIBS      = -L${I_MPI_ROOT}/lib/release -lmpi'  >> ./OpenFOAM-${OPENFOAM_VERSION}/wmake/rules/General/mplibINTELMPI64 
+
+#Set up OpenFOAM environment and complete build
+cd OpenFOAM-${OPENFOAM_VERSION}
+source etc/bashrc
+./Allwmake -j
+```
+
+### Intel OpenFOAM Implementation (includes motorbike benchmark example)
+
+Download Intel modifications
+```
+git clone https://github.com/do-jason/OpenFOAM-Intel.git
+```
+
+See https://github.com/do-jason/OpenFOAM-Intel/blob/master/benchmarks/motorbike/README.org for more motorbike benchmark configuration information.
+
+```
+# Sample code to run motorbike with 20M cells and 16 processes
+cd OpenFOAM-Intel/benchmarks/motorbike
+./Mesh 100 40 40
+./Setup 16
+./Solve
+```
+
 
 -end of document-
