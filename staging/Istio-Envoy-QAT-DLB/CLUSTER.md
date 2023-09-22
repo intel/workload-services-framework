@@ -141,7 +141,7 @@ Wait till all pods are in `Running` state. If so, check again the QoS. There sho
 
 ## Cluster configuration
 
-The [config](https://github.com/intel-sandbox/benchmark_release/tree/main/config) folder contains several configuration files of Istio and Nighthawk services for the measurement.
+The config folder contains several configuration files of Istio and Nighthawk services for the measurement.
 The files can be used to deploy the appropriate configuration. The example gives the http1 configuration.
 
 Nighthawk server configmap:
