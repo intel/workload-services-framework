@@ -103,7 +103,7 @@ spec:
             done
       containers:
       - name: iperf-client
-        image: IMAGENAME(Dockerfile.1.iperf)
+        image: IMAGENAME(WORKLOAD)
         imagePullPolicy: IMAGEPOLICY(Always)
         env:
         - name: `IPERF_VER'
