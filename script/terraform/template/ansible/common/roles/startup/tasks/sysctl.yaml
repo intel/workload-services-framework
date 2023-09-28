@@ -4,30 +4,46 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+- name: Set sysctl settings
+  set_fact:
+    sysctl_options_dict: "{{ sysctl_options_dict | combine(dict(sut_sysctl_options | split(',') | map('trim') | select('match',item+':.*') | map('regex_replace','^[^:]*:','') | reject('==','') | map('split','=') | map('map','trim'))) }}"
+  loop: "{{ group_names }}"
+  vars:
+    sysctl_options_dict: "{{ wl_sysctls }}"
+
 - name: Check if sysctl restore available
   stat:
     path: "{{ startup_restore_path }}/sysctl"
   register: sysctlsav
+  when:
+  - sysctl_options_dict.keys() | length > 0
 
 - name: Restore sysctl settings
   command: "sysctl -p{{ startup_restore_path }}/sysctls -q"
   when: 
-  - sysctlsav.stat.exists
+  - sysctl_options_dict.keys() | length > 0
   - ((csp | default('static')) == 'static')
+  - sysctlsav.stat.exists
   failed_when: false
 
 - name: Save sysctl values
-  shell: "sysctl -e {{ ((wl_default_sysctls.keys() | list) + (wl_sysctls.keys() | list)) | join(' ')}} > {{ startup_restore_path }}/sysctl"
+  shell: "sysctl -e {{ sysctl_options_dict.keys() | list | join(' ') }} > {{ startup_restore_path }}/sysctl"
   failed_when: false
-  when: ((csp | default('static')) == 'static')
+  when:
+  - ((csp | default('static')) == 'static')
+  - sysctl_options_dict.keys() | length > 0
 
 - name: Add sysctls to /etc/sysctl.d
   template:
     src: 99-wsf-sysctls.conf.j2
     dest: /etc/sysctl.d/99-wsf-sysctls.conf
   failed_when: false
+  when:
+  - sysctl_options_dict.keys() | length > 0
 
 - name: Apply sysctls
   command: "sysctl -p -q"
   failed_when: false
+  when:
+  - sysctl_options_dict.keys() | length > 0
 

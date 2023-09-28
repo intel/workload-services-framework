@@ -1,0 +1,42 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: set workspace
+  set_fact:
+    workspace: "/tmp/{{ wl_namespace }}-workspace"
+
+- name: umount disks
+  shell: |
+    umount -R {{ workspace }}{{ item.path }}
+  loop: "{{ disks | json_query('results[*].files') | flatten }}"
+  ignore_errors: true
+  become: "{{ sut_sudo | default(true) | bool }}"
+  vars:
+    disks: "{{ lookup('file', wl_logs_dir+'/tocleanup.yaml') | from_yaml }}"
+  when: sut_sudo | default(true) | bool
+
+- name: umount /proc, /sys, /dev
+  shell: |
+    umount -R {{ workspace }}/{{ item }}
+  loop:
+  - proc
+  - sys
+  - dev
+  ignore_errors: true
+  become: "{{ sut_sudo | default(true) | bool }}"
+  when: sut_sudo | default(true) | bool
+
+- name: remove workspace and logs
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+  - "{{ workspace }}"
+  - "/tmp/{{ wl_namespace }}-logs"
+  - "/tmp/{{ wl_namespace }}-logs.tar"
+  ignore_errors: true
+  become: "{{ sut_sudo | default(true) | bool }}"
+  when: sut_sudo | default(true) | bool

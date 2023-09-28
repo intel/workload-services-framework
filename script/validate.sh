@@ -43,13 +43,14 @@ image_name () {
     else
         arch="-${IMAGEARCH/*\//}"
     fi
-    if [ -e "$1" ]; then
-        echo $REGISTRY$(head -n 2 "$1" | grep '^# ' | tail -n 1 | cut -d' ' -f2)$arch$RELEASE
-    elif [ -e "$SOURCEROOT/$1" ]; then
-        echo $REGISTRY$(head -n 2 "$SOURCEROOT/$1" | grep '^# ' | tail -n 1 | cut -d' ' -f2)$arch$RELEASE
-    else
-        echo $REGISTRY$1$arch$RELEASE
-    fi
+    (
+        cd "$SOURCEROOT"
+        if [ -e "$1" ]; then
+            echo "$REGISTRY$(head -n2 "$1" | grep '^# ' | tail -n1 | cut -d' ' -f2)$arch$RELEASE"
+        else
+            echo "$REGISTRY$1$arch$RELEASE"
+        fi
+    )
 }
 
 # args: yaml
@@ -161,6 +162,18 @@ rebuild_kubernetes_config () {
     return 1
 }
 
+testcase_suffix () {
+    for k in "${WORKLOAD_PARAMS[@]}"; do
+        if [[ " ${TESTCASE_OVERWRITE_CUSTOMIZED[@]} " = *" $k "* ]]; then
+            echo "_customized"
+            return
+        fi
+    done
+    if [ ${#TESTCASE_OVERWRITE_WITHBKC[@]} -gt 0 ]; then
+        echo "_withbkc"
+    fi
+}
+
 save_workload_params () {
     echo "script_args: \"$SCRIPT_ARGS\""
     eval "bk_opts=\"\$${BACKEND^^}$([ "$BACKEND" != "docker" ] || echo _CMAKE)_OPTIONS\""
@@ -179,27 +192,48 @@ save_workload_params () {
     echo "category: \"$(sed -n '/^.*Category:\s*[`].*[`]\s*$/{s/.*[`]\(.*\)[`]\s*$/\1/;p}' "$SOURCEROOT"/README.md | tail -n1)\""
     echo "export_logs: \"$EXPORT_LOGS\""
 
+    eval "bk_registry=\"\$${BACKEND^^}_REGISTRY\""
+    eval "bk_release=\"\$${BACKEND^^}_RELEASE\""
+    echo "${BACKEND,,}_registry: \"$bk_registry\""
+    echo "${BACKEND,,}_release: \"$bk_release\""
+
     [ "${CTESTSH_EVENT_TRACE_PARAMS-undefined}" = "undefined" ] ||  EVENT_TRACE_PARAMS="$CTESTSH_EVENT_TRACE_PARAMS"
     echo "trace_mode: \"${EVENT_TRACE_PARAMS//%20/ }\""
     echo "job_filter: \"$JOB_FILTER\""
     echo "timeout: \"$TIMEOUT\""
+    echo "ctestsh_cmdline: \"${CTESTSH_CMDLINE//\"/\\\"}\""
+    echo "ctestsh_options: \"$CTESTSH_OPTIONS\""
 
     echo "tunables:"
     for k in "${WORKLOAD_PARAMS[@]}"; do
         eval "v=\"\${$k}\""
         echo "  $k: \"${v//%20/ }\""
     done
-    echo "  testcase: \"$TESTCASE$TESTCASE_CUSTOMIZED\""
+    echo "  testcase: \"$TESTCASE$(testcase_suffix)\""
 
     if [ -n "$DOCKER_IMAGE" ]; then
         echo "docker_image: \"$(image_name "$DOCKER_IMAGE")\""
-        echo "docker_options: \"${DOCKER_OPTIONS//%20/ }\""
+        echo "docker_options: \"${DOCKER_OPTIONS//\"/\\\"}\""
     fi
 
     echo "bom:"
     for line in $("$SOURCEROOT"/build.sh --bom | grep -E '^ARG ' | sed 's/^ARG //'); do
         echo "  ${line/=*/}: \"${line/*=/}\""
     done
+
+    if git --version > /dev/null 2>&1; then
+        commit_id="$(GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo git log -1 2> /dev/null | head -n1 | cut -f2 -d' ' || echo -n "")"
+        if [ -n "$commit_id" ]; then
+            echo "git_commit: \"$commit_id\""
+        fi
+        branch_id="refs/tags/${RELEASE#:}"
+        if [ -z "$(GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo git show-ref -s $branch_id 2> /dev/null || echo -n "")" ]; then
+            branch_id="$(GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo git show-ref 2> /dev/null | grep -F "$commit_id" | tail -n1 | cut -f2 -d' ' || echo -n "")"
+        fi
+        if [ -n "$branch_id" ]; then
+            echo "git_branch: \"${branch_id#refs/}\""
+        fi
+    fi
 }
 
 save_kpish () {
@@ -211,24 +245,24 @@ save_kpish () {
 
 save_git_history () {
     if [[ "$CTESTSH_OPTIONS " != *"--dry-run "* ]]; then
-        mkdir -p "$LOGSDIRH/git-history"
-        git show HEAD | sed  '/^diff/{q}' > "$LOGSDIRH/git-history/HEAD" || true
-        git diff HEAD > "$LOGSDIRH/git-history/DIFF" || true
+        if git --version > /dev/null 2>&1; then
+            mkdir -p "$LOGSDIRH/git-history"
+            GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo git show HEAD | sed  '/^diff/{q}' > "$LOGSDIRH/git-history/HEAD" || true
+            GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo git diff HEAD > "$LOGSDIRH/git-history/DIFF" || true
+        fi
     fi
 }
 
 print_workload_configurations () {
     echo ""
     if [ -r "$CLUSTER_CONFIG" ]; then
-      echo "Workload Labels:"
-      grep -F 'HAS-SETUP-' "$CLUSTER_CONFIG" | awk '{a[$0]=1}END{if(length(a)) for(x in a)print x;else print "N/A"}' | sed 's|^\s*||'
-      echo ""
-      echo "Workload VM Groups:"
-      grep -F 'vm_group:' "$CLUSTER_CONFIG" | awk '{a[$2]=1}END{if(length(a)) for(x in a)print x;else print "worker"}' | sed 's|^\s*||'
-      echo ""
+      awk -f "$PROJECTROOT/script/show-hostsetup.awk" "$CLUSTER_CONFIG"
     fi
     echo "Workload Configuration:"
-    echo "$WORKLOAD_PARAMS" | sed 's/;/\n/g' | sed 's/:/=/'
+    for k in "${WORKLOAD_PARAMS[@]}"; do
+        eval "v=\"\${$k}\""
+        echo "$k=${v//%20/ }"
+    done
     echo ""
     echo "EVENT_TRACE_PARAMS=$EVENT_TRACE_PARAMS"
 }

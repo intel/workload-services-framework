@@ -1,0 +1,35 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: delete vxlan.calico
+  command: "ip link delete vxlan.calico"
+  become: true
+  ignore_errors: yes
+
+- name: delete /var/run/calico
+  file:
+    path: /var/run/calico
+    state: absent
+  become: true
+  ignore_errors: true
+
+- name: remove all calico links
+  shell: |
+    ip link list | grep cali | awk '{print $2}' | cut -c 1-15 | xargs -I {} ip link delete {}
+  become: true
+  ignore_errors: true
+
+- name: remove kernel ipip module
+  shell: modprobe -r ipip
+  become: true
+  ignore_errors: true
+
+- name: flush and delete iptables
+  shell: |
+    iptables-save | grep -i cali | iptables -F
+    iptables-save | grep -i cali | iptables -X
+  become: true
+  ignore_errors: true

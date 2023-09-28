@@ -1,0 +1,50 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: detect if local provisioner should be installed or not
+  command: "grep -q -F PersistentVolumeClaim {{ wl_logs_dir }}/kubernetes-config.yaml"
+  register: install_lsp
+  delegate_to: localhost
+  failed_when: false
+
+- name: detect if local provisioner already be installed or not
+  shell:
+    cmd: "kubectl get pods -A -n {{ k8s_local_static_provisioner_namespace }}  | grep -q -F local-volume-provisioner"
+    executable: /bin/bash
+  ignore_errors: true
+  register: lsp_installed
+
+- name: generate local static provisioner deployment script
+  template:
+    src: deployment.yaml.j2
+    dest: "/tmp/{{ wl_namespace }}-lsp-yaml"
+  when:
+    - lsp_installed.rc != 0
+    - install_lsp.rc == 0
+
+- name: Apply the deployment script
+  command: "kubectl apply -f /tmp/{{ wl_namespace }}-lsp-yaml"
+  when:
+    - lsp_installed.rc != 0
+    - install_lsp.rc == 0
+
+- name: Remove temporary file
+  file:
+    path: "/tmp/{{ wl_namespace }}-lsp-yaml"
+    state: absent
+  when:
+    - lsp_installed.rc != 0
+    - install_lsp.rc == 0
+
+- name: Wait for the daemonset to be ready
+  command: "kubectl wait --namespace={{ k8s_local_static_provisioner_namespace }} pod --for=condition=Ready -l app={{ k8s_local_static_provisioner_app_label }} --timeout=60s"
+  register: wait_ready
+  retries: 10
+  delay: 10
+  until: wait_ready.rc == 0
+  when:
+    - lsp_installed.rc != 0
+    - install_lsp.rc == 0

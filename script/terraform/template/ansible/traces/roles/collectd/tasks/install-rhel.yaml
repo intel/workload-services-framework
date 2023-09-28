@@ -37,7 +37,3 @@
   retries: 10
   delay: 10
 
-- name: set collectd path
-  set_fact:
-    config_path: /etc/collectd.conf
-

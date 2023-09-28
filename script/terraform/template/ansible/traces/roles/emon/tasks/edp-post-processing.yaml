@@ -13,7 +13,7 @@
       [ -e {{ emon_bin_path }} ] || (
         apt-get update
         apt-get install -y gcc
-        /opt/conda/bin/python3 -m pip install pandas==1.5.3 numpy defusedxml pytz tdigest xlsxwriter
+        /opt/conda/bin/python3 -m pip install pandas==1.5.3 numpy defusedxml pytz tdigest xlsxwriter jsonschema
         mkdir -p {{ emon_bin_path }}
         . ./sep-installer.sh -i -u -C {{ emon_bin_path }} --accept-license -ni -i --no-load-driver
       )
@@ -37,7 +37,15 @@
   shell:
     cmd: |
       . {{ emon_bin_path }}/sep/sep_vars.sh
-      emon {{ emon_options }} -process-pyedp {{ emon_bin_path }}/sep/{{ emon_edp_config }}
+      for dat in emon-*.dat; do (
+        mkdir -p ${dat/.*/}-edp
+        cd ${dat/.*/}-edp
+        cp ../$dat emon.dat
+        emon {{ emon_options }} -process-pyedp {{ emon_bin_path }}/sep/{{ emon_edp_config }}
+        rm -f emon.dat
+      ) &
+      done
+      wait
     chdir: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-emon"
     executable: /bin/bash
   delegate_to: localhost

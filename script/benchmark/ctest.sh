@@ -13,8 +13,8 @@ print_help () {
     echo "--config <yaml>       Specify the test-config yaml."
     echo "--options <options>   Specify additional backend options."
     echo "--nohup [logs]        Run the script as a daemon."
-    echo "--daemon [logs]       Run the script via deamonize, with --noenv."
-    echo "--stop [prefix]       Kill ctest sessions."
+    echo "--daemon [logs]       Run the script via daemonize."
+    echo "--stop [prefix]       Kill all ctest sessions without prefix or kill specified session with prefix input as workload benchmark namespace name."
     echo "--set <vars>          Set variable values between burst and loop iterations."
     echo "--continue            Ignore any error and continue the burst and loop iterations." 
     echo "--prepare-sut         Prepare cloud SUT for reuse."
@@ -23,6 +23,8 @@ print_help () {
     echo "--dry-run             Generate the testcase configurations and then exit."
     echo "--testcase            Run the test case exactly as specified."
     echo "--noenv               Clean environment variables before proceeding with the tests."
+    echo "--check-docker-image  Check image availability before running the workload."
+    echo "--push-docker-image <mirror>     Push the workload image(s) to the mirror registry."
     echo ""
     echo "<vars> accepts the following formats:"
     echo "VAR=str1 str2 str3    Enumerate the variable values."
@@ -32,7 +34,7 @@ print_help () {
     echo "The values are repeated if insufficient to cover the loops."
     echo ""
     echo "Subset of the following ctest options apply:"
-    ctest --help | sed -n '/--progress/,/--help/{p}'
+    /usr/bin/ctest --help | sed -n '/--progress/,/--help/{p}'
     exit 3
 }
 
@@ -133,6 +135,14 @@ if [ -n "$stop" ]; then
 fi
 
 if [ -n "$run_with_nohup" ]; then
+    echo "============================================================="
+    echo " Warning: Use the --daemon option instead.                   "
+    echo ""
+    echo " --daemon [logs] Run the script via daemonize.               "
+    echo ""
+    echo " Note --daemon does not take external environment variables. "
+    echo " Use --set or --config to set variables instead.             "
+    echo "============================================================="
     run_with_nohup="$(readlink -f "$run_with_nohup")"
     if [ -n "$no_env" ]; then
         nohup env -i "HOME=$HOME" "http_proxy=$http_proxy" "https_proxy=$https_proxy" "no_proxy=$no_proxy" "PATH=$PATH" "$0" "${args[@]}" > "$run_with_nohup" 2>&1 &
@@ -141,13 +151,16 @@ if [ -n "$run_with_nohup" ]; then
         nohup "$0" "${args[@]}" > "$run_with_nohup" 2>&1 &
         disown
     fi
-    disown
     echo "tail -f $(basename "$run_with_nohup") to monitor progress"
     exit 0
 elif [ -n "$run_with_daemon" ]; then
     run_with_daemon="$(readlink -f "$run_with_daemon")"
     echo "=== daemon: $0 ${args[@]} ===" > "$run_with_daemon"
-    daemonize -a -c "$(pwd)" -e "$run_with_daemon" -o "$run_with_daemon" -p "$run_with_daemon.pid" "$(readlink -f "$0")" "${args[@]}"
+    daemonize -a -c "$(pwd)" -e "$run_with_daemon" -o "$run_with_daemon" -p "$run_with_daemon.pid" "$(readlink -f "$0")" "${args[@]}" || (
+        echo "Failed to daemonize the task."
+        echo "Please install 'daemonize' if you have not."
+        exit 3
+    )
     tail --pid $(cat "$run_with_daemon.pid") -f "$run_with_daemon"
     rm -f "$run_with_daemon.pid"
     exit 0
@@ -172,7 +185,13 @@ run_as_ctest=1
 options=""
 empty_vars=()
 last_var=""
+CTESTSH_CMDLINE=""
 for var in "$@"; do
+    if [[ "$var" = *" "* ]]; then
+        CTESTSH_CMDLINE="$CTESTSH_CMDLINE \"${var//\"/\\\"}\""
+    else
+        CTESTSH_CMDLINE="$CTESTSH_CMDLINE $var"
+    fi
     case "$var" in
     --loop=*)
         loop="${var/--loop=/}"
@@ -233,6 +252,14 @@ for var in "$@"; do
     --dry-run)
         dry_run=1
         ;;
+    --check-docker-image)
+        export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --check-docker-image"
+        ;;
+    --push-docker-image=)
+        export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --push-docker-image=${var#--push-docker-image=}"
+        ;;
+    --push-docker-image)
+        ;;
     --help|-help|-h|-H|"/?")
         print_help
         ;;
@@ -271,6 +298,9 @@ for var in "$@"; do
         -j|--parallel|-O|--output-log|-L|--label-regex|-R|--tests-regex|-E|--exclude-regex|-LE|--label-exclude|--repeat-until-fail|--max-width|-I|--tests-information|--timeout|--stop-time)
             args+=("$var")
             ;;
+        --push-docker-image)
+            export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --push-docker-image=$var"
+            ;;
         *)
             echo "Unknown option: $last_var $var"
             exit 3
@@ -280,6 +310,7 @@ for var in "$@"; do
     esac
     last_var="$var"
 done
+export CTESTSH_CMDLINE="${CTESTSH_CMDLINE## }"
 
 if [ "$loop" = "-1" ]; then
     loop=1
@@ -412,12 +443,28 @@ set_variable () {
     fi
 }
 
+get_uniq_prefix () {
+    (
+        flock -e 9
+        local last_prefix="$(cat .timestamp 2>/dev/null || true)"
+        local loop_prefix="$(date +%m%d-%H%M%S)"
+        while [ "$loop_prefix" = "$last_prefix" ]; do
+            sleep 1s
+            loop_prefix="$(date +%m%d-%H%M%S)"
+        done
+        echo "$loop_prefix" > .timestamp
+        echo "$loop_prefix"
+    ) 9< "$(pwd)"
+}
+
+uniq_prefix="$(get_uniq_prefix)-"
 for loop1 in $(seq 1 $loop); do
-    loop_prefix="$(date +%m%d-%H%M%S)-"
-    while [ -d "$loop_prefix"* ]; do
-        sleep 1s
-        loop_prefix="$(date +%m%d-%H%M%S)-"
-    done
+    if [ "$loop" = "1" ]; then
+        loop_prefix="$uniq_prefix"
+    else
+        loop_prefix="${uniq_prefix}l$loop1-"
+        [[ "$burst" = "1" ]] || loop_prefix="${loop_prefix%-}"
+    fi
     [ $cleanup_sut = 1 ] || [ $run_as_ctest = 1 ] && loop_prefix=""
     [ $prepare_sut = 1 ] && loop_prefix="sut-"
     pids=()
@@ -426,17 +473,18 @@ for loop1 in $(seq 1 $loop); do
         if [ "$burst" = "1" ]; then
             export CTESTSH_PREFIX="$loop_prefix"
         else
-            export CTESTSH_PREFIX="${loop_prefix}r$burst1-"
+            export CTESTSH_PREFIX="${loop_prefix}b$burst1-"
         fi
-        export TEST_CONFIG="$test_config"
+        export CTESTSH_CONFIG="$test_config"
         export CTESTSH_EVENT_TRACE_PARAMS="undefined"
         if [ ${#values[@]} -gt 0 ] || [ ${#empty_vars[@]} -gt 0 ]; then
             tmp="$(mktemp)"
-            if [ -n "$TEST_CONFIG" ]; then
-                cp -f "$TEST_CONFIG" $tmp
+            if [ -r "$CTESTSH_CONFIG" ]; then
+                echo "# ctestsh_config: $CTESTSH_CONFIG" >> "$tmp"
+                cat "$CTESTSH_CONFIG" >> "$tmp"
             fi
-            export TEST_CONFIG="$tmp"
-            echo -e "\n*:" >> $tmp
+            export CTESTSH_CONFIG="$tmp"
+            echo -e "\n# ctestsh_overwrite:\n*:" >> "$tmp"
             for var1 in "${values[@]}"; do
                 values1=($(echo "$var1" | tr ' ' '\n'))
                 key1="${values1[0]}"
@@ -446,7 +494,7 @@ for loop1 in $(seq 1 $loop); do
             for var1 in "${empty_vars[@]}"; do
                 set_variable "${var1%=}" "" "$tmp"
             done
-            tmp_files+=($tmp)
+            tmp_files+=("$tmp")
         fi
         (
             export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --run_stage_iterations=$run"
@@ -458,6 +506,7 @@ for loop1 in $(seq 1 $loop); do
             /usr/bin/ctest "${args[@]}"
         ) &
         pids+=($!)
+        [ "$burst" = "1" ] || sleep 60s
     done
     if [ $contf = 1 ]; then
         wait ${pids[@]} || true

@@ -7,7 +7,15 @@ terraform {
   required_providers {
     tencentcloud = {
       source = "tencentcloudstack/tencentcloud"
-      version = "= 1.80.6"
+      version = "= 1.81.21"
+    }
+    template = {
+      source = "hashicorp/template"
+      version = "= 2.2.0"
+    }
+    external = {
+      source = "hashicorp/external"
+      version = "= 2.3.1"
     }
   }
 }

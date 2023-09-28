@@ -1,0 +1,149 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Get host ip of worker-0
+  set_fact:
+    worker_host_ip: '{{ hostvars["worker-0"]["private_ip"] }}'
+
+- name: Get hostname of worker
+  shell: "kubectl get node -owide|grep {{ worker_host_ip }}|awk '{print $1}'"
+  register: worker_host_name
+
+- name: Generate nighthawk-server yaml file
+  template:
+    src: /opt/workload/template/ansible/custom/pods_template/nighthawk-server.yaml.j2
+    dest: /tmp/istio-wl/nighthawk-server.yaml
+
+- name: Debug Info - Print nh nighthawk-server yaml file
+  shell: "cat /tmp/istio-wl/nighthawk-server.yaml"
+
+- name: Deploy nighthawk-server
+  shell: "kubectl apply -f /tmp/istio-wl/nighthawk-server.yaml"
+
+- name: Generate nighthawk-server-gateway yaml file
+  template:
+    src: /opt/workload/template/ansible/custom/pods_template/nighthawk-server-gateway.yaml.j2
+    dest: /tmp/istio-wl/nighthawk-server-gateway.yaml
+
+- name: Deploy nighthawk-server-gateway
+  shell: "kubectl apply -f /tmp/istio-wl/nighthawk-server-gateway.yaml"
+
+- name: Dump istio-sidecar-injector yaml file
+  shell: "kubectl get cm -n istio-system istio-sidecar-injector -o yaml > /tmp/istio-wl/istio-sidecar-injector.yaml"
+
+- name: Replace the value of cpu in istio-sidecar-injector yaml file
+  replace:
+    path: /tmp/istio-wl/istio-sidecar-injector.yaml
+    regexp: '("cpu": "2000m")|("cpu": "100m")'
+    replace: '"cpu": "1"'
+    before: '"proxy_init": {'
+
+- name: Replace the value of memory in istio-sidecar-injector yaml file
+  replace:
+    path: /tmp/istio-wl/istio-sidecar-injector.yaml
+    regexp: '("memory": "1024Mi")|("memory": "128Mi")'
+    replace: '"memory": "1Gi"'
+    before: '"proxy_init": {'
+
+- name: Deploy istio-sidecar-injector
+  shell: "kubectl apply -f /tmp/istio-wl/istio-sidecar-injector.yaml"
+
+- name: Restart nighthawk server
+  shell: "kubectl rollout restart deployment sm-nighthawk-server --namespace istio-workloads-{{ wl_namespace }}"
+
+- name: Generate istio ingress gateway yaml file to specify resource
+  template:
+    src: /opt/workload/template/ansible/custom/pods_template/istio-ingressgateway.yaml.j2
+    dest: /tmp/istio-wl/istio-ingressgateway.yaml
+
+- name: Debug Info - Print istio ingress gateway yaml file
+  shell: "cat /tmp/istio-wl/istio-ingressgateway.yaml"
+
+- name: Configure istio ingress gateway
+  shell: "kubectl apply -f /tmp/istio-wl/istio-ingressgateway.yaml"
+  when:
+    - wl_tunables['CRYPTO_ACC'] != "qathw"
+    - wl_tunables['CRYPTO_ACC'] != "cryptomb"
+
+- name: Dump istio-gateway service yaml file
+  shell: "kubectl get svc -n istio-system   istio-ingressgateway -o yaml > /tmp/istio-wl/istio-ingressgateway-svc.yaml"
+  register: svc_dump_result
+
+# Disabled when using svc as entrance
+- name: Update istio-gateway service yaml file
+  blockinfile:
+    path: /tmp/istio-wl/istio-ingressgateway-svc.yaml
+    insertafter: "targetPort: 8443"
+    block: |4
+          - name: nh
+            nodePort: 32222
+            port: 10000
+            protocol: TCP
+            targetPort: 10000
+  when:
+    - svc_dump_result.rc == 0
+
+- name: Apply patched istio-ingressgateway-svc yaml
+  shell: "kubectl apply -f /tmp/istio-wl/istio-ingressgateway-svc.yaml"
+  register: istio_igw_svc_result
+
+- name: Create wl_log directory if not exist
+  become: true
+  file:
+    path: "{{ wl_logs_dir }}/server"
+    state: directory
+    mode: "0755"
+
+- name: Generate envoy-filter-cryptomb-stats.yaml
+  template:
+      src: /opt/workload/template/ansible/custom/pods_template/envoy-filter-cryptomb-stats.yaml.j2
+      dest: /tmp/istio-wl/envoy-filter-cryptomb-stats.yaml
+
+- name: Apply envoy-filter-cryptomb-stats.yaml
+  shell: "kubectl apply -f /tmp/istio-wl/envoy-filter-cryptomb-stats.yaml"
+  register: cryptomb_stats_rst
+  when:
+    - wl_tunables['CRYPTO_ACC'] == "cryptomb"
+
+- name: Generate secret script
+  template:
+    src: /opt/workload/template/ansible/custom/pods_template/create_certs_secret.sh.j2
+    dest: /tmp/istio-wl/create_certs_secret.sh
+    mode: +rx
+
+- name: Create a secret for the ingress gateway
+  shell: "/tmp/istio-wl/create_certs_secret.sh"
+  when:
+    - wl_tunables['PROTOCOL'] == "https"
+
+- name: Create a secret for the ingress gateway
+  shell:
+    cmd: "kubectl create -n istio-system secret tls nighthawk-credential --key=/tmp/istio-wl/sm-nighthawk-server.night.com.key --cert=/tmp/istio-wl/sm-nighthawk-server.night.com.crt"
+  register: gateway_secret_rst
+  when:
+    - istio_igw_svc_result.rc == 0
+    - wl_tunables['PROTOCOL'] == "https"
+
+- name: Generate Nighthawk server deployment and service
+  template:
+    src: /opt/workload/template/ansible/custom/pods_template/nighthawk-server-https-deploy.yaml.j2
+    dest: /tmp/istio-wl/nighthawk-server-https-deploy.yaml
+
+- name: Apply nighthawk-server-https-deploy.yaml
+  shell: "kubectl apply -f /tmp/istio-wl/nighthawk-server-https-deploy.yaml"
+  register: nhs_https_deploy_rst
+  when:
+    - wl_tunables['PROTOCOL'] == "https"
+
+- name: Generate Nighthawk server gateway and virtual service
+  template:
+    src: /opt/workload/template/ansible/custom/pods_template/nighthawk-server-https-gateway.yaml.j2
+    dest: /tmp/istio-wl/nighthawk-server-https-gateway.yaml
+
+- name: Apply nighthawk-server-https-gateway.yaml
+  shell: "kubectl apply -f /tmp/istio-wl/nighthawk-server-https-gateway.yaml"
+  register: nhs_https_gateway_rst
+  when:
+    - wl_tunables['PROTOCOL'] == "https"

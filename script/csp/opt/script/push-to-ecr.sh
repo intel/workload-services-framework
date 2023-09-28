@@ -14,4 +14,4 @@ repository_name=${repository_name%:*}
 if [[ "$(aws ecr describe-repositories --region $region)" != *"\"$repository_name\""* ]]; then
     aws ecr create-repository --repository-name $repository_name --region $region > /dev/null
 fi
-docker -D push $1
+[ "$2" = "--create-only" ] || docker -D push $1

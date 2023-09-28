@@ -12,5 +12,7 @@
     - name: Cleanup k8s
       include_role:
         name: cleanup
-      when: ansible_connection != 'winrm'
+      when:
+      - (csp | default('static')) == 'static'
+      - ansible_connection != 'winrm'
 

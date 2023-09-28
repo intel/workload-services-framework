@@ -27,6 +27,10 @@ fi
 # import any certificates
 cp -f /usr/local/etc/wsf/certs/*.crt /usr/local/share/ca-certificates > /dev/null 2>&1 && update-ca-certificates > /dev/null 2>&1 || true
 
+# change timezone if needed
+if [ -n "$TZ" ]; then
+    ln -sf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+fi
 ####INSERT####
 
 chown tfu.tfu /home 2> /dev/null || true

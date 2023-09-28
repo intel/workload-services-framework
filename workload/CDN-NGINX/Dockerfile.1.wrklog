@@ -1,0 +1,18 @@
+# cdn-nginx-wrklog
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=22.04
+ARG OS_IMAGE=ubuntu
+FROM ${OS_IMAGE}:${OS_VER}
+
+RUN mkfifo /export-logs
+
+COPY /script/run_wrklog.sh /
+CMD ./run_wrklog.sh {WRKLOG_TIMEOUT} && \
+    cd OUTPUT && bash -c "if ([ $(cat status1) -eq 0 ] );then echo "0" > status; fi" && \
+    tar cf /export-logs status status1 output1.log && \
+    sleep infinity

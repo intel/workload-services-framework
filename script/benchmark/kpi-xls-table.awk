@@ -39,8 +39,8 @@ index($0,var2)==1 || ($1=="#" && index($2,var2)==1) {
     var4v=var4": "gensub(/"/,"","g",$NF)
 }
 
-/^[*]/ {
-    primary_kpi[name]=gensub(/^[*](.*):.*/,"\\1",1,$0)
+/^[*].*: *([0-9.-][0-9.e+-]*) *#*.*$/ {
+    primary_kpi[name]=gensub(/^.*: *([0-9.-][0-9.-]*).*$/,"\\1",1,$0)
     var34v=""
     if (length(var3)>0) var34v=var3v
     if (length(var4)>0) {

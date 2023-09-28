@@ -1,63 +1,62 @@
+# Executing Workload Testcases
 
-### Run Test
+Use `./ctest.sh` to run a single test or batch of tests. You can do this at the top-level `build` directory or under each workload directory. In the latter case, only the tests of the workload will be executed.
 
-Use `./ctest.sh` to run a single test or batch of tests. You can do this at the top-level `build` directory or under each workload directory. In the latter case, only the tests of the workload will be executed. 
-
-```
+```shell
 cd build
 cd workload/dummy
 ./ctest.sh -N
 ```
 
-### CTest Options
+## CTest Options
 
-There is extensive list of options in `./ctest.sh` to control how tests can be executed. See the `./ctest.sh` manpage. The followings are most common options.  
+There is an extensive list of options in `./ctest.sh` to control how tests can be executed. The followings are most common options which are inherited from ctest. See `man ctest` for all inherited `ctest` options. The `./ctest.sh` extensions are [listed below](#ctestsh).
 
-- *`-R`*: Select tests based on a regular expression string.   
-- *`-E`*: Exclude tests based on a regular expression string.  
-- *`-V`*: Show test execution with details.  
-- *`-N`*: Dry-run the tests only.  
+- **`-R`**: Select tests based on a regular expression string.
+- **`-E`**: Exclude tests based on a regular expression string.
+- **`-V`**: Show test execution with details.
+- **`-N`**: List test vectors only.
 
 Example: list tests with `boringssl` in name excluding those with `_gated`
 
-```
+```shell
 ./ctest.sh -R boringssl -E _gated -N
-
 ```
+
 Example: run only `test_static_boringssl` (exact match)
 
-```
+```shell
 ./ctest.sh -R '^test_static_boringssl$'
 ```
 
-### Customize Configurations
+## Customize Configurations
 
-It is possible to specify a test configuration file to overwrite any configuration parameter of a test case:   
+It is possible to specify a test configuration file to overwrite any configuration parameter of a test case:
 
-```
+```shell
 ./ctest.sh --config=test_config.yaml -V
 ```
 
 The configuration file uses the following format:
 
-```
+```yaml
 *_dummy_pi:
     SCALE: 3000
 ```
 
 where `*_dummy_pi` specifies the test case name. You can use `*` to specify a wildcard match. The subsection underneath specifies the configuration variables and values. Any parameters specified in each test case [`validate.sh`][validate.sh] can be overwritten.
 
-Use with caution as overwriting configuration parameters may lead to invalid parameter combinations.  
+Use with caution as overwriting configuration parameters may lead to invalid parameter combinations.
 
-### Benchmark Scripts
+## Benchmark Scripts
 
-A set of utility scripts are linked under your workload build directory to make it easy for workload benchmark activities.  
+A set of utility scripts are linked under your workload build directory to make it easy for workload benchmark activities.
 
-#### `ctest.sh`
+### `ctest.sh`
 
 - **`ctest.sh`**: This is an extended ctest script extending the following features, besides what ctest supports:
 
-```
+```text
 Usage: [options]
 --nohup          Run the test case(s) in the daemon mode for long benchmark
 --daemon         Run the test case(s) with daemonize for long benchmark with cleaning of environments before workload execution.
@@ -68,119 +67,118 @@ Usage: [options]
 --config         Specify the test-config file.  
 --options        Specify additional validation backend options.  
 --set            Set the workload parameter values during loop and burst iterations.  
---stop [prefix]  Kill all ctest sessions.
+--stop [prefix]  Kill all ctest sessions without prefix or kill specified session with prefix input as workload benchmark namespace name.
 --continue       Ignore any errors and continue the loop and burst iterations.  
 --prepare-sut    Prepare cloud SUT instances for reuse.
 --reuse-sut      Reuse previously prepared cloud SUT instances. 
 --cleanup-sut    Cleanup cloud SUT instances. 
 --dry-run        Generate the testcase configurations and then exit.  
 --testcase       Specify the exact testcase name to be executed.  
+--check-docker-image    Check image availability before running the workload.
+--push-docker-image <registry>   Push the workload image(s) to the mirror registry.
 ```
 
-The followings are some examples:
+#### Examples
 
-```
-# run aws test cases 5 times sequentially
-./ctest.sh -R aws --loop=5 --nohup    
+1. Run `aws` test cases `5` times sequentially (`loop`):
 
-# run aws test cases 5 times simultaneously
-./ctest.sh -R aws --burst=5 --nohup   
+    ```shell
+    ./ctest.sh -R aws --loop=5 --nohup
+    ```
 
-# run aws test cases 4 times simultaneously with the SCALE value
-# incremented linearly as 1000, 1300, 1600, 1900 in each iteration.  
-# "..." uses three previous values to deduce the increment. 
-./ctest.sh -R aws --set "SCALE=1000 1300 1600 ...2000" --burst=4 --nohup
+2. Run `aws` test cases `5` times simultaneously (`burst`):
 
-# run aws test cases 4 times simultaneously with the SCALE value
-# incremented linearly as 1000, 1600, 1000, 1600 in each iteration.  
-# "..." uses three previous values to deduce the increment. 
-# "|200" means the values must be divisible by 200.  
-./ctest.sh -R aws --set "SCALE=1000 1300 1600 ...2000 |200" --burst=4 --nohup
+    ```shell
+    ./ctest.sh -R aws --burst=5 --nohup
+    ```
 
-# run aws test cases 4 times simultaneously with the SCALE value
-# incremented linearly as 1000, 1600, 2000, 1000 in each iteration.  
-# "..." uses three previous values to deduce the increment. 
-# "8000|" means the values must be a factor of 8000. 
-./ctest.sh -R aws --set "SCALE=1000 1200 1400 ...2000 8000|" --burst=4 --nohup
+3. Run `aws` test cases `4` times simultaneously with the `SCALE` value incremented linearly as `1000`, `1300`, `1600`, `1900` in each iteration:
 
-# run aws test cases 4 times simultaneously with the SCALE value
-# incremented exponentially as 1000, 2000, 4000, 8000 in each iteration.  
-# "..." uses three previous values to deduce the multiplication factor. 
-./ctest.sh -R aws --set "SCALE=1000 2000 4000 ...10000" --burst=4 --nohup  
+    > `...` uses three previous values to deduce the increment
 
-# run aws test cases 6 times simultaneously with the SCALE value
-# enumerated repeatedly as 1000, 1500, 1700, 1000, 1500, 1700 in each iteration.  
-./ctest.sh -R aws --set "SCALE=1000 1500 1700" --burst=6 --nohup
+    ```shell
+    ./ctest.sh -R aws --set "SCALE=1000 1300 1600 ...2000" --burst=4 --nohup
+    ```
 
-# run aws test cases 6 times simultaneously with the SCALE and BATCH_SIZE values
-# enumerated separately as (1000,1), (1500,2), (1700,4), (1000,8) in each 
-# iteration. Values are repeated as needed.   
-./ctest.sh -R aws --set "SCALE=1000 1500 1700" --set BATCH_SIZE="1 2 4 8" --burst=6 --nohup
+4. Run `aws` test cases `4` times simultaneously with the `SCALE` value incremented linearly as `1000`, `1600`, `1000`, `1600` in each iteration:
 
-# run aws test cases 8 times simultaneously with the SCALE and BATCH_SIZE values
-# permutated as (1000,1), (1000,2), (1000,4), (1000,8), (1500,1), (1500, 2), 
-# (1500, 4), (1500, 8) in each iteration.   
-./ctest.sh -R aws --set "SCALE=1000 1500 1700/BATCH_SIZE=1 2 4 8" --burst=8 --nohup
+    > `...` uses three previous values to deduce the increment
 
-# for cloud instances, it is possible to test different machine types by 
-# enumerating the AWS_MACHINE_TYPE values (or similar GCP_MACHINE_TYPE):
-./ctest.sh -R aws --set "AWS_MACHINE_TYPE=m6i.xlarge m6i.2xlarge m6i.4xlarge" --loop 3 --nohup
+    > `|200` means the values must be divisible by 200
 
-# for aws disk type/disk size/iops/num_striped_disks
-./ctest.sh -R aws --set "AWS_DISK_TYPE=io1 io2" --loop 2 --nohup
-./ctest.sh -R aws --set "AWS_DISK_SIZE=500 1000" --loop 2 --nohup
-./ctest.sh -R aws --set "AWS_IOPS=16000 32000" --loop 2 --nohup
-./ctest.sh -R aws --set "AWS_NUM_STRIPED_DISKS=1 2" --loop 2 --nohup
-```
+    ```shell
+    ./ctest.sh -R aws --set "SCALE=1000 1300 1600 ...2000 |200" --burst=4 --nohup
+    ```
 
-See Also: [Cloud SUT Reuse][Cloud SUT Reuse]
+5. Run `aws` test cases `4` times simultaneously with the `SCALE` value incremented linearly as `1000`, `1600`, `2000`, `1000` in each iteration:
 
-#### `list-kpi.sh`
+    > `...` uses three previous values to deduce the increment
 
-- **`list-kpi.sh`**: Scan the ctest logs files and export the KPI data.  
+    > `8000|` means the values must be a factor of 8000
 
-```
-Usage: [options] [logs-directory]
---primary             List only the primary KPI.  
---all                 List all KPIs.  
---outlier <n>         Remove outliers beyond N-stdev.  
---params              List workload configurations.  
---svrinfo             List svrinfo information.   
---format list|xls-ai|xls-inst|xls-table  
-                      Specify the output format.
---var[1-9] <value>    Specify the spread sheet variables.   
---filter _(real|throughput)
-                      Specify a trim filter to shorten spreadsheet name.  
---file <filename>     Specify the spread sheet filename. 
---uri                 Show the WSF portal URI if present.   
---intel_publish       Publish to the WSF dashboard.
---owner <name>        Set the publisher owner.
---tags <tags>         Set the publisher tags.
-```
+    ```shell
+    ./ctest.sh -R aws --set "SCALE=1000 1200 1400 ...2000 8000|" --burst=4 --nohup
+    ```
 
-> The `xls-ai` option writes the KPI data in the `kpi-report.xls` spread sheet as follows:
+6. Run `aws` test cases `4` times simultaneously with the `SCALE` value incremented exponentially as `1000`, `2000`, `4000`, `8000` in each iteration:
 
-![image-ss-ai][image-ss-ai]
-    
-> where `--var1=batch_size` `--var2=cores_per_instance` `--var3='*Throughput'` `--var4=Throughput_`.  
+    > `...` uses three previous values to deduce the multiplication factor
 
-> The `xls-inst` option writes the KPI data in the `kpi-report.xls` spread sheet as follows:
+    ```shell
+    ./ctest.sh -R aws --set "SCALE=1000 2000 4000 ...10000" --burst=4 --nohup
+    ```
 
-![image-ss-inst][image-ss-inst]
-    
-> The `xls-table` option writes the KPI data in the `kpi-report.xls` spread sheet as follows:
+7. Run `aws` test cases `6` times simultaneously with the `SCALE` value enumerated repeatedly as `1000`, `1500`, `1700`, `1000`, `1500`, `1700` in each iteration:
 
-![image-ss-table][image-ss-table]
-    
-> where `--var1=scale`, `--var2=sleep_time`. Optionally, you can specify `--var3` and `--var4` variables for multiple tables in the same spreadsheet.  
+    ```shell
+    ./ctest.sh -R aws --set "SCALE=1000 1500 1700" --burst=6 --nohup
+    ```
 
-### Cloud SUT Reuse
+8. Run `aws` test cases `6` times simultaneously with the `SCALE` and `BATCH_SIZE` values enumerated separately as (`1000`,`1`), (`1500`,`2`), (`1700`,`4`), (`1000`,`8`) in each iteration:
+
+    > Values are repeated if needed.
+
+    ```shell
+    ./ctest.sh -R aws --set "SCALE=1000 1500 1700" --set BATCH_SIZE="1 2 4 8" --burst=6 --nohup
+    ```
+
+9. Run `aws` test cases `8` times simultaneously with the `SCALE` and `BATCH_SIZE` values permutated as (`1000`,`1`), (`1000`,`2`), (`1000`,`4`), (`1000`,`8`), (`1500`,`1`), (`1500`, `2`), (`1500`, `4`), (`1500`, `8`) in each iteration:
+
+    ```shell
+    ./ctest.sh -R aws --set "SCALE=1000 1500 1700/BATCH_SIZE=1 2 4 8" --burst=8 --nohup
+    ```
+
+10. For cloud instances, it is possible to test different machine types by enumerating the `<CSP>_MACHINE_TYPE` values (`<CSP>` is Cloud Service Provider's abbreviation, e.g. `AWS_MACHINE_TYPE` or `GCP_MACHINE_TYPE`):
+
+    ```shell
+    ./ctest.sh -R aws --set "AWS_MACHINE_TYPE=m6i.xlarge m6i.2xlarge m6i.4xlarge" --loop 3 --nohup
+    ```
+
+11. For `aws` with specified:
+    - type of disk
+        ```shell
+        ./ctest.sh -R aws --set "AWS_DISK_TYPE=io1 io2" --loop 2 --nohup
+        ```
+    - size of disk
+        ```shell
+        ./ctest.sh -R aws --set "AWS_DISK_SIZE=500 1000" --loop 2 --nohup
+        ```
+    - disk's IOPS
+        ```shell
+        ./ctest.sh -R aws --set "AWS_IOPS=16000 32000" --loop 2 --nohup
+        ```
+    - number of striped disks
+        ```shell
+        ./ctest.sh -R aws --set "AWS_NUM_STRIPED_DISKS=1 2" --loop 2 --nohup
+        ```
+
+## Cloud SUT Reuse
 
 It is possible to reuse the Cloud SUT instances during the benchmark process. This is especially useful in tuning parameters for any workload.   
 
 To reuse any SUT instances, you need to first prepare (provision) the Cloud instances, using the `ctest.sh` `--prepare-sut` command as follows:  
 
-```
+```shell
 ./ctest.sh -R aws_kafka_3n_pkm -V --prepare-sut
 ```
 
@@ -188,7 +186,7 @@ The `--prepare-sut` command provisions and prepares the Cloud instances suitable
 
 Next, you can run any iterations of the test cases, reusing the prepared SUT instances with the `--reuse-sut` command, as follows:
 
-```
+```shell
 ./ctest.sh -R aws_kafka_3n_pkm -V --reuse-sut
 ```
 
@@ -196,7 +194,7 @@ Next, you can run any iterations of the test cases, reusing the prepared SUT ins
 
 Finally, to cleanup the SUT instances, use the `--cleanup-sut` command:
 
-```
+```shell
 ./ctest.sh -R aws_kafka_3n_pkm -V --cleanup-sut
 ```
 
@@ -216,7 +214,6 @@ After using the Cloud instances, please clean them up.
 
 
 [validate.sh]: ../../developer-guide/component-design/validate.md
-[Cloud SUT Reuse]: #cloud-sut-reuse
 
 [image-ss-ai]: ../../image/ss-ai.png
 [image-ss-inst]: ../../image/ss-inst.png

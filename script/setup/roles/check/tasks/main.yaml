@@ -4,23 +4,69 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: check for internet connectivity as root
-  uri:
-    url: "{{ item }}"
-    validate_certs: "{{ validate_certs | default('yes') }}"
-  loop:
-  - "http://hub.docker.com"
-  - "https://hub.docker.com"
-  become: yes
-  become_flags: -E -H
+- name: check OS
+  shell:
+    cmd: ". /etc/os-release; echo $ID_LIKE"
+    executable: /bin/bash
+  register: os
 
-- name: check for internet connectivity as a regular user
-  uri:
-    url: "{{ item }}"
-    validate_certs: "{{ validate_certs | default('yes') }}"
-  loop:
-  - "http://hub.docker.com"
-  - "https://hub.docker.com"
+- name: check apt-get/yum update functions
+  action: "{{ (os.stdout == 'debian') | ternary('apt','yum') }} update_cache=true"
+  register: pkgrc
+  until: pkgrc is success
+  delay: 10
+  retries: 10
+  become: yes
+
+- name: check internet connectivity
+  block:
+
+  - name: check for internet connectivity as root
+    uri:
+      url: "{{ item }}"
+      validate_certs: "{{ validate_certs | default('yes') }}"
+    loop:
+    - "http://hub.docker.com"
+    - "https://hub.docker.com"
+    become: yes
+    become_flags: -E -H
+
+  - name: check for internet connectivity as a regular user
+    uri:
+      url: "{{ item }}"
+      validate_certs: "{{ validate_certs | default('yes') }}"
+    loop:
+    - "http://hub.docker.com"
+    - "https://hub.docker.com"
+
+  rescue:
+
+  - name: Install ca-certificates
+    package:
+      name:
+      - ca-certificates
+      state: present
+    register: pkgrc
+    become: yes
+    until: pkgrc is success
+    delay: 10
+    retries: 10
+
+  - name: re-check for internet connectivity as root
+    uri:
+      url: "{{ item }}"
+    loop:
+    - "http://hub.docker.com"
+    - "https://hub.docker.com"
+    become: yes
+    become_flags: -E -H
+
+  - name: re-check for internet connectivity as a regular user
+    uri:
+      url: "{{ item }}"
+    loop:
+    - "http://hub.docker.com"
+    - "https://hub.docker.com"
 
 - name: get ~/.netrc permission
   stat:
@@ -35,16 +81,3 @@
   - netrc.stat.mode != '0400'
   - netrc.stat.mode != '0600'
 
-- name: check OS
-  shell:
-    cmd: ". /etc/os-release; echo $ID_LIKE"
-    executable: /bin/bash
-  register: os
-
-- name: check apt-get/yum update functions
-  action: "{{ (os.stdout == 'debian') | ternary('apt','yum') }} update_cache=true"
-  register: pkgrc
-  until: pkgrc is success
-  delay: 10
-  retries: 10
-  become: yes

@@ -1,0 +1,24 @@
+# spdk-nvme-o-tcp
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+FROM stack-spdk-nvme-o-tcp-dsa${RELEASE}
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+ENV  BASE_PATH=/opt
+ENV  WORK_PATH=${BASE_PATH}/spdk
+ENV  LOG_PATH=${BASE_PATH}/logs
+
+
+COPY /scripts  ${BASE_PATH}
+RUN chmod +x  ${BASE_PATH}/*.sh && mkdir -p ${LOG_PATH}
+
+# RUN mkfifo /export-logs
+
+CMD (${BASE_PATH}/setup_env.sh; echo $? > status) 2>&1 | tee ${LOG_PATH}/setup_output.logs && \
+    sleep infinity

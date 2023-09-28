@@ -8,7 +8,8 @@ Host *
     UserKnownHostsFile /dev/null
     IdentitiesOnly no
     PreferredAuthentications publickey,password
-    ConnectTimeout 20
+    ConnectionAttempts 5
+    ConnectTimeout 30
     GSSAPIAuthentication no
     ServerAliveInterval 30
     ServerAliveCountMax 10

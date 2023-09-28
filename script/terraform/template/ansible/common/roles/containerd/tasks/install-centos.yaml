@@ -36,7 +36,7 @@
   - name: install containerd
     yum:
       name:
-      - "containerd.io-{{ containerd_version | default(containerd_default_version['centos']) }}"
+      - "containerd.io-{{ containerd_version | default(containerd_default_version.centos) }}"
       update_cache: true
     become: true
     register: yumrc

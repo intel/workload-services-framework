@@ -9,7 +9,7 @@ ARG RELEASE
 FROM terraform-static${RELEASE}
 
 # Install AZure CLI
-ARG AZURE_CLI_VER=2.48.1-1
+ARG AZURE_CLI_VER=2.51.0-1
 ARG AZURE_CLI_REPO=https://packages.microsoft.com
 RUN apt-get update && apt-get install -y ca-certificates curl apt-transport-https gnupg && \
     apt-get clean && rm -rf /var/lib/apt/lists/*

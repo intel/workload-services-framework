@@ -6,56 +6,31 @@
 
 - name: reset kubernetes
   command: "kubeadm reset -f"
-  ignore_errors: yes
   become: true
+  ignore_errors: yes
 
-- name: reset calicovpp
+- name: reset by cni
   include_role:
-    name: cni-calicovpp
+    name: "cni-{{ k8s_cni }}"
     tasks_from: reset.yaml
-  when: k8s_cni == "calicovpp"
+  when: (playbook_dir + '/roles/cni-' + k8s_cni + '/tasks/reset.yaml') is exists
 
-- name: delete ip links
-  command: "ip link delete {{ item }}"
+- name: delete ip link cni0
+  command: "ip link delete cni0"
   become: true
   ignore_errors: yes
-  loop:
-    - cni0
-    - flannel.1
-    - vxlan.calico
 
-- name: remove all calico links
-  become: true
-  shell: |
-    ip link list | grep cali | awk '{print $2}' | cut -c 1-15 | xargs -I {} ip link delete {}
-  ignore_errors: true
-
-- name: remove kernel ipip module
-  become: true
-  shell: |
-    modprobe -r ipip
-  ignore_errors: true
-
-- name: delete cni files
-  become: true
-  ignore_errors: true
+- name: delete /etc/cni/net.d
   file:
-    path: "{{ item }}"
+    path: /etc/cni/net.d
     state: absent
-  with_items: 
-    - "/etc/cni/net.d"
-    - "/var/run/calico/"
+  become: true
+  ignore_errors: true
 
 - name: clear ip route
-  become: true
   shell: |
     ip route flush proto bird
-
-- name: flush and delete calico iptables
   become: true
-  shell: |
-    iptables-save | grep -i cali | iptables -F
-    iptables-save | grep -i cali | iptables -X
   ignore_errors: true
 
 - name: restart containerd

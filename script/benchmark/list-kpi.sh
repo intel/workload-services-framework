@@ -158,10 +158,10 @@ if [ $intel_publish = 1 ]; then
     for logsdir1 in ${prefixes[@]}; do
         if [ -r "$logsdir1"/workload-config.yaml ]; then
             echo "Publishing $logsdir1..."
-            BACKEND="$(sed -n '/cmake_cmdline:/{s/.*-DBACKEND=\([^ ]*\).*/\1/;p}' "$logsdir1"/workload-config.yaml)"
-            BACKEND_OPTIONS="$(sed -n "/cmake_cmdline:/{s/.*-D${BACKEND^^}_OPTIONS='\([^']*\).*/\1/;p}" "$logsdir1"/workload-config.yaml)"
-            RELEASE="$(sed -n '/cmake_cmdline:/{s/.*-DRELEASE=\([^ ]*\).*/\1/;p}' "$logsdir1"/workload-config.yaml)"
-            REGISTRY="$(sed -n '/cmake_cmdline:/{s/.*-DREGISTRY=\([^ ]*\).*/\1/;p}' "$logsdir1"/workload-config.yaml)"
+            BACKEND="$(sed -n '/^backend:/{s/.*"\(.*\)".*/\1/;p}' "$logsdir1"/workload-config.yaml)"
+            BACKEND_OPTIONS="$(sed -n "/^${BACKEND}_options:/{s/.*\"\(.*\)\".*/\1/;p}" "$logsdir1"/workload-config.yaml | tr '\n' ' ') $(sed -n '/^ctestsh_options:/{s/.*\"\(.*\)\".*/\1/;p}' "$logsdir1"/workload-config.yaml | tr '\n' ' ')"
+            RELEASE="$(sed -n '/^release:/{s/.*\"\(.*\)\".*/\1/;p}' "$logsdir1"/workload-config.yaml)"
+            REGISTRY="$(sed -n '/^registry:/{s/.*\"\(.*\)\".*/\1/;p}' "$logsdir1"/workload-config.yaml)"
 
             if [ -r "$logsdir1"/terraform-config.tf ]; then
                 BACKEND_OPTIONS="$BACKEND_OPTIONS --wl_categority=$(sed -n '/^\s*variable\s*"wl_categority"\s*{/,/^\s*}/{s/^\s*default\s*=\s*"\([^"]*\).*/\1/;p}' "$logsdir1"/terraform-config.tf)"
@@ -176,7 +176,7 @@ if [ $intel_publish = 1 ]; then
                 BACKEND_OPTIONS="$BACKEND_OPTIONS --tags=$tags"
             fi
 
-            TERRAFORM_OPTIONS="$BACKEND_OPTIONS" RELEASE="$RELEASE" REGISTRY="$REGISTRY" "$DIR"/../terraform/shell.sh static -v "$(readlink -f "$logsdir1"):/opt/workspace" -- bash -c "/opt/script/publish-intel.py $BACKEND_OPTIONS < <(cat tfplan.json 2> /dev/null || echo)"
+            TERRAFORM_OPTIONS="$BACKEND_OPTIONS" RELEASE="$RELEASE" REGISTRY="$REGISTRY" "$DIR"/../terraform/shell.sh static -v "$(readlink -f "$logsdir1"):/opt/workspace" -- bash -c "/opt/terraform/script/publish-intel.py $BACKEND_OPTIONS < <(cat tfplan.json 2> /dev/null || echo)"
         fi
     done
 fi
@@ -205,7 +205,7 @@ for logsdir1 in ${prefixes[@]}; do
             for itrdir1 in "$logsdir1"/itr-*; do
                 echo "$itrdir1:"
                 if [ $params -eq 1 ]; then
-                    awk '/tunables:/{$1="";print gensub(/"/,"","g")}' "$logsdir1/workload-config.yaml" | tr ';' '\n' | sed 's/^ *\([^:]*\):\(.*\)$/# \1: "\2"/'
+                    sed -n '/^tunables:/,/^[^ ]/{/^ /{s/^ */# /;p}}' "$logsdir1/workload-config.yaml"
                 fi
                 if [ -n "$primary" ]; then
                     ( cd "$itrdir1" && bash ./kpi.sh $script_args 2> /dev/null | grep -E "^\*" ) || true
@@ -216,7 +216,7 @@ for logsdir1 in ${prefixes[@]}; do
         else
             echo "$logsdir1:"
             if [ $params -eq 1 ]; then
-                awk '/tunables:/{$1="";print gensub(/"/,"","g")}' "$logsdir1/workload-config.yaml" | tr ';' '\n' | sed 's/^ *\([^:]*\):\(.*\)$/# \1: "\2"/'
+                sed -n '/^tunables:/,/^[^ ]/{/^ /{s/^ */# /;p}}' "$logsdir1/workload-config.yaml"
             fi
             if [ -n "$primary" ]; then
                 ( cd "$logsdir1" && bash ./kpi.sh $script_args 2> /dev/null | grep -E "^\*" ) || true
@@ -225,8 +225,8 @@ for logsdir1 in ${prefixes[@]}; do
             fi
         fi
     fi
-    if [ -r "$logsdir1/tfplan.logs" ] && [ "$uri" -eq 1 ]; then
-        sed -n '/WSF Portal URL:/{s/^[^:]*:/# portal:/;p;q}' "$logsdir1/tfplan.logs"
+    if [ -r "$logsdir1/publish.logs" ] && [ "$uri" -eq 1 ]; then
+        sed -n '/WSF Portal URL:/{s/^[^:]*:/# portal:/;p;q}' "$logsdir1/publish.logs"
     fi
 done | (
     case "$format" in

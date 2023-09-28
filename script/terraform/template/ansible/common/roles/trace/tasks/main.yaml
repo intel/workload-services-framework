@@ -1,0 +1,32 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: start the trace procedure
+  block:
+
+    - name: start trace
+      include_tasks:
+        file: trace-proc.yaml
+      when:
+      - wl_trace_modules is defined
+      loop: "{{ workload_config.trace_mode | split(',') | slice([((workload_config.trace_mode | split(',') | length)/3)|int,1] | max) }}"
+      loop_control:
+        loop_var: roi_region
+        index_var: roi_index
+
+  always:
+
+    - name: wait until execution compete
+      command: "tail --pid={{ trace_waitproc_pid }} -f /dev/null"
+      ignore_errors: yes
+      delegate_to: "{{ trace_logs_host | default(inventory_hostname) }}"
+
+    - name: revoke trace
+      include_tasks:
+        file: stop.yaml
+      when: wl_trace_modules is defined
+      vars:
+        roi_index: "{{ [(((workload_config.trace_mode | split(',') | length) / 3) | int) - 1, 0] | max }}"

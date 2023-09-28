@@ -148,6 +148,11 @@ module "wsf" {
   ]
 
   spot_instance = var.spot_instance
+
+  #resource_group_name = "custom-resource-name"
+  #virtual_network_name = "custom-virtual-network-name"
+  #subnet_name = "custom-subnet-name"
+  #allocate_public_ip = true
 }
 
 output "options" {

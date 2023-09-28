@@ -28,9 +28,10 @@
   modprobe:
     name: msr
     state: present
+  become: true
 
 - name: Run cmdline
-  command: "ssh -4 -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -i {{ ansible_private_key_file }} -o ControlPath={{ control_path }} sudo rdmsr --processor 0 {{ item['value']}}"
+  command: "ssh -4 -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -i {{ ansible_private_key_file }} sudo rdmsr --processor 0 {{ item['value']}}"
   delegate_to: localhost
   with_items: "{{ INTEL_MSR_ITEMS }}"
   ignore_errors: true
@@ -40,6 +41,19 @@
   shell: cpupower frequency-info
   register: frequency_info_output
   ignore_errors: true
+  become: true
+
+- name: Extract current CPU frequency with unit
+  set_fact:
+    current_frequency: "{{ frequency_info_output.stdout | regex_search('current CPU frequency:.*\\d.*', '\\0') | first | regex_replace('current CPU frequency: *', '') | regex_replace('\\([^\\)]*\\)', '') | trim }}"
+
+- name: Extract current CPU frequency unit
+  set_fact:
+    frequency_unit: "{{ current_frequency | regex_replace('.*\\d', '') | trim }}"
+
+- name: Extract current CPU frequency value
+  set_fact:
+    frequency_value: "{{ current_frequency | regex_replace('[^\\d.]+', '') | float }}"
 
 - name: Write variable to file
   lineinfile:
@@ -53,10 +67,18 @@
 - name: Add core current frequency
   lineinfile:
     dest: "{{ wl_logs_dir }}/{{ inventory_hostname }}-msrinfo/{{ ansible_host }}.json"
-    line: "\"Core_frequency\":\"{{ frequency_info_output.stdout | regex_search('current CPU frequency:.*\\d.*', '\\0') | first | regex_replace('current CPU frequency: *', '') | regex_replace('\\([^\\)]*\\)', '') | trim}}\""
+    line: "\"Core_frequency\":\"{{ (frequency_value|float) / 1000 if frequency_unit == 'MHz' else frequency_value |float }}\""
     insertafter: EOF
   delegate_to: localhost
   ignore_errors: true
+
+- name: Add empty core frequency
+  lineinfile:
+    dest: "{{ wl_logs_dir }}/{{ inventory_hostname }}-msrinfo/{{ ansible_host }}.json"
+    line: "\"Core_frequency\":\"\""
+    insertafter: EOF
+  delegate_to: localhost
+  when: frequency_info_output is failed
 
 # convert the file to json
 # 1. Add "{" before start file

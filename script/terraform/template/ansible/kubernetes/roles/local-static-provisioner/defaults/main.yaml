@@ -1,0 +1,14 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+k8s_local_static_provisioner_version: "2.5.0"
+k8s_local_static_provisioner_repository: "registry.k8s.io/sig-storage"
+k8s_local_static_provisioner_image: "{{ k8s_local_static_provisioner_repository }}/local-volume-provisioner:v{{ k8s_local_static_provisioner_version }}"
+
+k8s_local_static_provisioner_namespace: kube-system
+k8s_local_static_provisioner_hostdir: /mnt
+k8s_local_static_provisioner_storage_class_name: local-static-storage
+k8s_local_static_provisioner_app_label: local-volume-provisioner

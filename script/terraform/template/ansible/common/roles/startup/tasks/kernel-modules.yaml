@@ -4,14 +4,23 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+- name: set kernel args
+  set_fact:
+    kernel_module_list: "{{ (kernel_module_list + (sut_kernel_modules | split(',') | map('trim') | select('match',item+':.*') | map('regex_replace','^[^:]*:','') | map('trim') | map('split',' '))) | flatten | reject('==','') }}"
+  loop: "{{ group_names }}"
+  vars:
+    kernel_module_list: "{{ wl_kernel_modules | list }}"
+
 - name: "modprobe modules"
   command: "modprobe {{ item }}"
-  loop: "{{ wl_kernel_modules | unique }}"
+  loop: "{{ kernel_module_list }}"
   ignore_errors: true
+  when: kernel_module_list | length > 0
 
 - name: Update modules.conf
   blockinfile:
     path: "/etc/modules-load.d/99-wsf-settings.conf"
-    block: "{{ wl_kernel_modules | unique | join('\n') }}"
+    block: "{{ kernel_module_list | join('\n') }}"
     create: yes
+  when: kernel_module_list | length > 0
 

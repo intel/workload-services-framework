@@ -5,9 +5,14 @@
 #
 
     - name: setup port forwarding
-      shell: "ssh -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -fNL {{ local_registry_url }}:{{ k8s_remote_registry_url }} -i {{ ansible_private_key_file }} > /dev/null 2>&1"
+      shell:
+        cmd: |
+          nohup ssh -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -i {{ ansible_private_key_file }} -fNL {{ local_registry_url }}:{{ k8s_remote_registry_url }} > /dev/null 2>&1 &
+          disown
+        executable: /bin/bash
       delegate_to: localhost
       when: not (k8s_enable_csp_registry | bool)
+      become: false
 
     - name: create AWS ECR namespaces
       shell: 
@@ -57,7 +62,11 @@
       become: yes
 
     - name: cancel port forwarding
-      shell: "ssh -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -i {{ ansible_private_key_file }} -O cancel -L {{ local_registry_url }}:{{ k8s_remote_registry_url }} > /dev/null 2>&1"
+      shell:
+        cmd: |
+          ssh -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -i {{ ansible_private_key_file }} -O cancel -L {{ local_registry_url }}:{{ k8s_remote_registry_url }} > /dev/null 2>&1
+        executable: /bin/bash
       delegate_to: localhost
       when: not (k8s_enable_csp_registry | bool)
+      become: false
 

@@ -12,10 +12,9 @@
   when: docker_auth_reuse
 
 - name: Create ImagePullSecret
-  command: "kubectl --kubeconfig={{ home.stdout }}/.kube/config create secret docker-registry {{ docker_auth_secret_name }} --from-file=.dockerconfigjson={{ home.stdout }}/{{ docker_auth_config_json }} -n {{ namespace }}"
+  command: "kubectl create secret docker-registry {{ docker_auth_secret_name }} --from-file=.dockerconfigjson={{ home.stdout }}/{{ docker_auth_config_json }} -n {{ namespace }}"
   register: secret
   ignore_errors: yes
-  become: yes
   when: docker_auth_reuse
 
 - name: Patch service account

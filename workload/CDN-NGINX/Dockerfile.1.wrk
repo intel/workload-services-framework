@@ -1,0 +1,38 @@
+# cdn-nginx-wrk
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=22.04
+ARG OS_IMAGE=ubuntu
+ARG RELEASE
+
+FROM qatsw-crypto-base-ssl3-ubuntu${RELEASE} AS build
+RUN  apt-get update && apt-get install -y --no-install-recommends git build-essential unzip \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
+ARG WRK_VER=4.2.0
+ARG WRK_REPO=https://github.com/wg/wrk.git
+RUN git clone --depth 1 -b ${WRK_VER} ${WRK_REPO}
+WORKDIR /wrk
+RUN sed -i "s/-O2/-O3/g" Makefile && \
+    make -j WITH_OPENSSL=/usr/local && \
+    strip wrk && \
+    cp wrk /usr/local/bin
+
+RUN rm -rf /usr/share/man/*
+
+FROM qatsw-crypto-base-ssl3-ubuntu${RELEASE}
+RUN  apt-get update && apt-get install -y --no-install-recommends wget libpcre3 zlib1g systemd \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /usr/local/ /usr/local/
+COPY /script/run_wrk_cdn.sh /script/query.lua /
+
+RUN mkdir OUTPUT
+CMD (/run_wrk_cdn.sh; echo $? > OUTPUT/${STATUS_FILE}) | tee OUTPUT/${LOG_FILE} && \
+    sleep infinity

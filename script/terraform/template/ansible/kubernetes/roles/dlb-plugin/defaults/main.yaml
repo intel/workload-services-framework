@@ -1,0 +1,11 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+
+dlbplugin_repository: https://github.com/intel/intel-device-plugins-for-kubernetes.git
+dlbplugin_version: v0.26.0
+dlbplugin_namespace: dlb-device-plugin
+dlbplugin_kustomization_url: https://github.com/intel/intel-device-plugins-for-kubernetes/deployments/dlb_plugin?ref=

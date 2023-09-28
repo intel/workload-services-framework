@@ -33,14 +33,14 @@ _reconfigure_reuse_sut () {
         ;;
     *"--reuse-sut"*)
         export CTESTSH_OPTIONS="${CTESTSH_OPTIONS/--reuse-sut/} --stage=validation"
-        cp -f "$sutdir"/ssh_access.key "$LOGSDIRH"
-        chmod 400 "$LOGSDIRH"/ssh_access.key
-        cp -f "$sutdir"/ssh_access.key.pub "$LOGSDIRH"
+        cp -f "$sutdir"/ssh_access.key "$LOGSDIRH" 2> /dev/null || true
+        chmod 400 "$LOGSDIRH"/ssh_access.key 2> /dev/null || true
+        cp -f "$sutdir"/ssh_access.key.pub "$LOGSDIRH" 2> /dev/null || true
         cp -f "$sutdir"/inventory.yaml "$LOGSDIRH"
         cp -f "$sutdir"/tfplan.json "$LOGSDIRH"
-        cp -f "$sutdir"/ssh_config* "$LOGSDIRH" 2>/dev/null || true
-        cp -rf "$sutdir"/*-svrinfo "$LOGSDIRH" 2>/dev/null || true
-        cp -rf "$sutdir"/*-msrinfo "$LOGSDIRH" 2>/dev/null || true
+        cp -f "$sutdir"/ssh_config* "$LOGSDIRH" 2> /dev/null || true
+        cp -rf "$sutdir"/*-svrinfo "$LOGSDIRH" 2> /dev/null || true
+        cp -rf "$sutdir"/*-msrinfo "$LOGSDIRH" 2> /dev/null || true
         ;;
     *"--cleanup-sut"*)
         export CTESTSH_OPTIONS="${CTESTSH_OPTIONS/--cleanup-sut/} --stage=cleanup"
@@ -54,7 +54,7 @@ _reconfigure_reuse_sut () {
 # args: <none>
 _invoke_terraform () {
     st_options=(
-        "--my_ip_list=$(hostname -I | tr ' ' ',')"
+        "--my_ip_list=$(ip -4 addr show scope global | sed -n '/^[0-9]*:.*state UP/,/^[0-9]*:/{/^ *inet /{s|.*inet \([0-9.]*\).*|\1|;p}}' | tr '\n' ',')"
     )
     dk_options=(
         "--name" "$NAMESPACE"
@@ -71,29 +71,18 @@ _invoke_terraform () {
         touch "$LOGSDIRH/.netrc"
     fi
     csp="$(grep -E '^\s*csp\s*=' "$TERRAFORM_CONFIG" | cut -f2 -d'"' | tail -n1)"
-    if [ "${csp:-static}" = "static" ] || [ "${csp}" = "kvm" ]; then
-        if [ -d "$HOME/.ssh" ]; then
+    if [[ " static kvm " != *" ${csp:-static} "* ]] && [ ! -e "$LOGSDIRH/ssh_config" ]; then
+        cp -f "$PROJECTROOT/script/csp/ssh_config" "$LOGSDIRH/ssh_config"
+    fi
+    if [ -n "$REGISTRY" ]; then
+        certdir="/etc/docker/certs.d/${REGISTRY/\/*/}"
+        if [ -d "$certdir" ]; then
             dk_options+=(
-                "-v" "$(readlink -e "$HOME/.ssh"):/home/.ssh"
-                "-v" "$(readlink -e "$HOME/.ssh"):/root/.ssh"
+                "-v" "/etc/docker/certs.d:/etc/docker/certs.d:ro"
             )
-            mkdir -p "$LOGSDIRH/.ssh"
-        fi
-    else
-        dk_options+=(
-            "-v" "$PROJECTROOT/script/csp/ssh_config:/home/.ssh/config:ro"
-            "-v" "$PROJECTROOT/script/csp/ssh_config:/root/.ssh/config:ro"
-        )
-        if [ -n "$REGISTRY" ]; then
-            certdir="/etc/docker/certs.d/${REGISTRY/\/*/}"
-            if [ -d "$certdir" ]; then
-                dk_options+=(
-                    "-v" "/etc/docker/certs.d:/etc/docker/certs.d:ro"
-                )
-                st_options+=(
-                    "--skopeo_options=--src-cert-dir=$certdir"
-                )
-            fi
+            st_options+=(
+                "--skopeo_options=--src-cert-dir=$certdir"
+            )
         fi
     fi
     insecure_registries="$(docker info -f '{{range .RegistryConfig.IndexConfigs}}{{if(not .Secure)}}{{.Name}},{{end}}{{end}}' 2> /dev/null || true)"
@@ -137,9 +126,8 @@ _invoke_terraform () {
             "$(sed -n '/^\s*variable\s*"\(resource_group_id\|compartment\)"\s*{/,/^\s*}/{/^\s*default\s*=\s*/p}' "$TERRAFORM_CONFIG" | cut -f2 -d'"')" \
             "$(sed -n '/^\s*variable\s*"zone"\s*{/,/^\s*}/{/^\s*default\s*=\s*/p}' "${TERRAFORM_CONFIG_TF:-$TERRAFORM_CONFIG_IN}" | cut -f2 -d'"')" \
             "$(sed -n '/^\s*variable\s*"\(resource_group_id\|compartment\)"\s*{/,/^\s*}/{/^\s*default\s*=\s*/p}' "${TERRAFORM_CONFIG_TF:-$TERRAFORM_CONFIG_IN}" | cut -f2 -d'"')"
-        [[ "$TERRAFORM_OPTIONS $CTESTSH_OPTIONS" = *"--dry-run"* ]] && exit 0
-        set -o pipefail
-        "$PROJECTROOT"/script/terraform/shell.sh ${csp:-static} "${dk_options[@]}" -- /opt/script/start.sh ${TERRAFORM_OPTIONS} "${st_options[@]}" ${CTESTSH_OPTIONS} --owner=$OWNER 2>&1 | tee "$LOGSDIRH/tfplan.logs"
+        [[ "$TERRAFORM_OPTIONS $CTESTSH_OPTIONS " = *"--dry-run "* ]] && [[ "$TERRAFORM_OPTIONS $CTESTSH_OPTIONS " != *"--check-docker-image "* ]] && [[ "$TERRAFORM_OPTIONS$CTESTSH_OPTIONS" != *"--push-docker-image="* ]] && exit 0
+        "$PROJECTROOT"/script/terraform/shell.sh ${csp:-static} "${dk_options[@]}" -- /opt/terraform/script/start.sh ${TERRAFORM_OPTIONS} "${st_options[@]}" ${CTESTSH_OPTIONS} --owner=$OWNER
     )
 }
 
@@ -155,6 +143,18 @@ else
     nctrs=0
 fi
 
+_checkdeprecatedoptions () {
+  if [[ "$TERRAFORM_OPTIONS$CTESTSH_OPTIONS" = *" --wl_enable_reboot"* ]]; then
+      echo -e "\033[31mDeprecated:\033[0m --wl_enable_reboot. Use --sut_reboot instead."
+      exit 3
+  fi
+  if [[ "$TERRAFORM_OPTIONS$CTESTSH_OPTIONS" = *" --bios_update"* ]]; then
+      echo -e "\033[31mDeprecated:\033[0m --bios_update. Use --sut_update_bios instead."
+      exit 3
+  fi
+}
+
+_checkdeprecatedoptions
 _reconfigure_terraform
 "$PROJECTROOT/script/terraform/provision.sh" "$CLUSTER_CONFIG" "$TERRAFORM_CONFIG" $nctrs
 _reconfigure_reuse_sut

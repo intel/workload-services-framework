@@ -38,6 +38,7 @@
     when:
     - hostvars['localhost']['ansible_facts']['install_k8s']
     - ((ansible_host != hostvars['controller-0']['ansible_facts']['ip_address'] and inventory_hostname != "controller-0") or inventory_hostname == "controller-0")
+    - ((csp | default('static')) == 'static')
 
   - name: Install k8s packages
     include_role:
