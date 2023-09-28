@@ -12,32 +12,71 @@
   become: no
   ignore_errors: yes
 
+- name: "convert sar log on {{ trace_node.1 }}"
+  shell:
+    cmd: |
+      for logs in sar-*.logs; do
+        sar {{ sar_options }} -f $logs > $logs.txt 2>&1
+      done
+    chdir: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar"
+    executable: /bin/bash
+  become: yes
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: yes
+
+- name: get sar_options for sadf
+  set_fact:
+    sadf_options: >-
+      {{
+        lookup('file', 'sar_profiles.yaml') |
+        regex_findall('sar_options\:.*.*', multiline=True) |
+        map('regex_replace', '.*: *(.*)$', '\1') |  join(" ")
+      }}
+
+- name: Get sadf output
+  shell:
+    cmd: |
+      for logs in sar-*.logs; do
+        sadf -d -U -- {{ sadf_options }} $logs > $logs-sadf.logs 2>&1
+      done
+    chdir: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar"
+    executable: /bin/bash
+  become: yes
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: yes
+
+- name: Copy profile to log folder
+  copy:
+    src: sar_profiles.yaml
+    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-sar/sar_profiles.yaml"
+  delegate_to: localhost
+  ignore_errors: yes
+
+- name: Get sar fles
+  shell:
+    cmd: ls -1
+    chdir: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar"
+    executable: /bin/bash
+  delegate_to: "{{ trace_node.1 }}"
+  register: sar_files
+  ignore_errors: true
+  become: false
+
 - name: Fetch sar files
   fetch:
-    src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar.{{ item.src }}"
-    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-sar/{{ item.dest }}"
+    src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar/{{ item }}"
+    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-sar/"
     flat: yes
   become: no
   delegate_to: "{{ trace_node.1 }}"
+  loop: "{{ sar_files.stdout_lines | reject('==', 'sar.pid') }}"
   ignore_errors: yes
-  loop:
-  - src:  logs
-    dest: sar.logs
-  - src:  start
-    dest: TRACE_START
-  - src:  stop
-    dest: TRACE_STOP
 
 - name: Remove any collection files
   file:
-    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar.{{ item }}"
+    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar"
     state: absent
   become: yes
   delegate_to: "{{ trace_node.1 }}"
   ignore_errors: yes
-  loop:
-  - logs
-  - start
-  - stop
-  - pid
 

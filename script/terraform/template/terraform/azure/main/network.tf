@@ -4,23 +4,29 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 resource "azurerm_virtual_network" "default" {
+  count = var.virtual_network_name!=null?0:1
+
   name                = "wsf-${var.job_id}-net"
   address_space       = [var.vpc_cidr_block]
-  location            = azurerm_resource_group.default.location
-  resource_group_name = azurerm_resource_group.default.name
+  location            = local.location
+  resource_group_name = local.resource_group_name
 }
 
 resource "azurerm_subnet" "default" {
+  count = var.subnet_name!=null?0:1
+
   name                 = "wsf-${var.job_id}-subnet"
-  resource_group_name  = azurerm_resource_group.default.name
-  virtual_network_name = azurerm_virtual_network.default.name
+  resource_group_name  = local.resource_group_name
+  virtual_network_name = local.virtual_network_name
   address_prefixes     = [local.subnet_cidr_block]
 }
 
 resource "azurerm_network_security_group" "default" {
+  count = var.subnet_name!=null?0:1
+
   name                = "wsf-${var.job_id}-nsg"
-  location            = azurerm_resource_group.default.location
-  resource_group_name = azurerm_resource_group.default.name
+  location            = local.location
+  resource_group_name = local.resource_group_name
   
   security_rule {
     name                       = "PING"
@@ -75,18 +81,31 @@ resource "azurerm_network_security_group" "default" {
   }
 }
 
+data "azurerm_subnet" "default" {
+  count = var.subnet_name!=null?1:0
+
+  name = var.subnet_name
+  virtual_network_name = local.virtual_network_name
+  resource_group_name = local.resource_group_name
+}
+
 resource "azurerm_subnet_network_security_group_association" "default" {
-  subnet_id                 = azurerm_subnet.default.id
-  network_security_group_id = azurerm_network_security_group.default.id
+  count = var.subnet_name!=null?0:1
+
+  subnet_id                 = local.subnet_id
+  network_security_group_id = azurerm_network_security_group.default.0.id
 }
 
 resource "azurerm_public_ip" "default" {
-  for_each = local.vms
+  for_each = {
+    for k,v in local.vms : k => v
+      if var.allocate_public_ip
+  }
 
   depends_on = [azurerm_resource_group.default]
   name                = "wsf-${var.job_id}-pub-ip-${each.key}"
-  location            = azurerm_resource_group.default.location
-  resource_group_name = azurerm_resource_group.default.name
+  location            = local.location
+  resource_group_name = local.resource_group_name
   allocation_method   = "Static"
   sku                 = each.value.data_disk_spec!=null?each.value.data_disk_spec.disk_type=="UltraSSD_LRS"?"Standard":null:null
   zones               = each.value.data_disk_spec!=null?each.value.data_disk_spec.disk_type=="UltraSSD_LRS"?[local.availability_zone]:null:null
@@ -96,14 +115,14 @@ resource "azurerm_network_interface" "default" {
   for_each = local.vms
 
   name                = "wsf-${var.job_id}-nic-${each.key}"
-  location            = azurerm_resource_group.default.location
-  resource_group_name = azurerm_resource_group.default.name
+  location            = local.location
+  resource_group_name = local.resource_group_name
 
   ip_configuration {
     name                          = "internal"
-    subnet_id                     = azurerm_subnet.default.id
+    subnet_id                     = local.subnet_id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id = azurerm_public_ip.default[each.key].id
+    public_ip_address_id = var.allocate_public_ip?azurerm_public_ip.default[each.key].id:null
   }
 }
 
@@ -111,12 +130,12 @@ resource "azurerm_network_interface" "secondary" {
   for_each = local.networks
 
   name                = "wsf-${var.job_id}-nic-${each.key}"
-  location            = azurerm_resource_group.default.location
-  resource_group_name = azurerm_resource_group.default.name
+  location            = local.location
+  resource_group_name = local.resource_group_name
 
   ip_configuration {
     name                          = "internal"
-    subnet_id                     = azurerm_subnet.default.id
+    subnet_id                     = local.subnet_id
     private_ip_address_allocation = "Dynamic"
   }
 }

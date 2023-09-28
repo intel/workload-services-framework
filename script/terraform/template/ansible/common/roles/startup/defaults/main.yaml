@@ -6,10 +6,19 @@
 
 wl_sysctls: {}
 wl_sysfs: {}
-wl_default_sysctls: {}
-wl_default_sysfs:
-  /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor: performance
 wl_kernel_args: {}
 wl_kernel_modules: []
-wl_enable_reboot: true
 k8s_node_labels: []
+
+# format: <group>:key=value[ key=value],...
+sut_kernel_args: ""
+
+# format: <group>:module1[ module2],...
+sut_kernel_modules: ""
+
+# format: <group>:key=value,...
+sut_sysctl_options: ""
+
+# format: <group>:key=value,...
+sut_sysfs_options: "workload_hosts:/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor=performance,offcluster_hosts:/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor=performance"
+

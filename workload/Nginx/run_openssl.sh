@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-
+openssl version
 NODE=${NODE:-2}
 MODE=${MODE:-https}
 NGINX_HOST=${NGINX_SERVICE_NAME:-nginx-server-service}

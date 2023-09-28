@@ -1,0 +1,82 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nighthawk-client
+  labels:
+    application: "nighthawk-client"
+spec:
+  template:
+    metadata:
+      labels:
+        app: nighthawk-client
+    spec:
+      hostNetwork: {{ .Values.CLIENT_HOST_NETWORK }}
+      initContainers:
+      - name: wait-for-server-ready
+        image: curlimages/curl:latest
+        imagePullPolicy: IfNotPresent
+        {{- if .Values.CLIENT_HOST_NETWORK }}
+        command: ["/bin/sh","-c","until nc -z -w5 ${ISTIO_ENVOY_SERVER} ${SERVER_PORT};do echo Waiting...;sleep 1s;done"]
+        {{ else }}
+        command: ["/bin/sh","-c","until nc -z -w5 ${ISTIO_SERVICE_DOMAIN_NAME} ${SERVER_PORT};do echo Waiting...;sleep 1s;done"]
+        {{ end }}
+      containers:      
+      # TODO: Init container of client: Wait for server initiation and sync the deployment.
+      - name: nighthawk-client
+        image: {{ .Values.REGISTRY }}istio-envoy-client{{ .Values.RELEASE }}
+        imagePullPolicy: {{ include "imagepolicy" .Values }}
+        env:
+        - name: CLIENT_CPU
+          value: "{{ .Values.CLIENT_CPU }}"
+        - name: CLIENT_CONCURRENCY
+          value: "{{ .Values.CLIENT_CONCURRENCY }}"
+        - name: CLIENT_CONNECTIONS
+          value: "{{ .Values.CLIENT_CONNECTIONS }}"
+        - name: CLIENT_MAR
+          value: "{{ .Values.CLIENT_MAR }}"
+        - name: CLIENT_MCS
+          value: "{{ .Values.CLIENT_MCS }}"
+        - name: CLIENT_MRPC
+          value: "{{ .Values.CLIENT_MRPC }}"
+        - name: CLIENT_MPR
+          value: "{{ .Values.CLIENT_MPR }}"
+        - name: CLIENT_RBS
+          value: "{{ .Values.CLIENT_RBS }}"
+        - name: MODE
+          value: "{{ .Values.MODE }}"
+        - name: PROTOCOL
+          value: "{{ .Values.PROTOCOL }}"
+        - name: CLIENT_RPS
+          value: "{{ .Values.CLIENT_RPS }}"
+        - name: CLIENT_RPS_MAX
+          value: "{{ .Values.CLIENT_RPS_MAX }}"
+        - name: CLIENT_RPS_STEP
+          value: "{{ .Values.CLIENT_RPS_STEP }}"
+        - name: SERVER_IP
+        {{- if .Values.CLIENT_HOST_NETWORK }}
+          value: "${ISTIO_ENVOY_SERVER}"
+        {{ else }}
+          value: "${ISTIO_SERVICE_DOMAIN_NAME}"
+        {{ end }}
+        - name: SERVER_PORT
+          value: "${SERVER_PORT}"
+        - name: CLIENT_LATENCY_BASE
+          value: "{{ .Values.CLIENT_LATENCY_BASE }}"
+        - name: KILL_DELAY
+          value: "{{ .Values.KILL_DELAY }}"
+        - name: DURATION
+          value: "{{ .Values.DURATION }}"
+        - name: AUTO_EXTEND_INPUT
+          value: "{{ .Values.AUTO_EXTEND_INPUT }}"
+        - name: NODES
+          value: "{{ .Values.NODES }}"
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: ${ISTIO_ENVOY_CLIENT_HOSTNAME}
+  backoffLimit: 5
+  

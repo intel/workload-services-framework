@@ -1,0 +1,57 @@
+#jinja2:lstrip_blocks: True
+# Feature: TLS handshake accelera:tion using QAT2.0 crypto
+# Config: Envoy + BoringSSL + QAT2.0 
+# Requires: Sapphire Rapids CPU
+# Applies: Istio ingress gateway and sidecars
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: qat
+  namespace: istio-system
+spec:
+  profile: default
+  tag: 1.16.0-intel.0
+  hub: docker.io/intel
+  
+  components:
+    pilot:
+      k8s:
+        nodeSelector:
+          kubernetes.io/hostname: {{ worker_host_name.stdout }}
+    ingressGateways:
+    - name: istio-ingressgateway
+      enabled: true
+      k8s:
+        # Ingress gateway needs to have IPC_LOCK capability and the
+        # QAT resources manually added, because the template
+        # injection isn't supported for gateways.
+        overlays:
+        - kind: Deployment
+          name: istio-ingressgateway
+          patches:
+          - path: spec.template.spec.containers.[name:istio-proxy].securityContext.capabilities.add
+            value: [ "IPC_LOCK" ]
+          - path: spec.template.spec.containers.[name:istio-proxy].args.[-1]
+            value: "--concurrency={{ wl_tunables['SERVER_INGRESS_GW_CONCURRENCY'] }}"
+        resources:
+          requests:
+            qat.intel.com/generic: "{{ wl_tunables['CY_NUM'] }}"
+            cpu: "{{ wl_tunables['SERVER_INGRESS_GW_CPU'] }}"
+            memory: "{{ wl_tunables['SERVER_INGRESS_GW_MEM'] }}"
+          limits:
+            qat.intel.com/generic: "{{ wl_tunables['CY_NUM'] }}"
+            cpu: "{{ wl_tunables['SERVER_INGRESS_GW_CPU'] }}"
+            memory: "{{ wl_tunables['SERVER_INGRESS_GW_MEM'] }}"
+        podAnnotations: # this controls the SDS service which configures ingress gateway
+          proxy.istio.io/config: |
+            privateKeyProvider:
+              qat:
+                pollDelay: 5ms
+        nodeSelector:
+          kubernetes.io/hostname: {{ worker_host_name.stdout }}

@@ -9,6 +9,11 @@
     while true; do
         if [ -n "${disk.serial}" ]; then
             device="$(lsblk -l -p -o +SERIAL | grep -F ${disk.serial} | cut -f1 -d' ')"
+            # for ubuntu2004 in arm, lsblk can not show serial number, find in /dev/disk/by-id instead.
+            if [ -z "$device" ]; then
+                diskpath="$(find /dev/disk/by-id/ -name "*${disk.serial}")"
+                [ -n "$diskpath" ] && device="$(readlink -f $diskpath)"
+            fi
             [ -b "$device" ] && break
         else
             device="/dev/doesnotexist"

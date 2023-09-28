@@ -1,0 +1,60 @@
+# cdn-nginx-async-qatsw
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=22.04
+ARG OS_IMAGE=ubuntu
+ARG RELEASE
+
+FROM qatsw-crypto-base-ssl3-ubuntu${RELEASE} AS build
+RUN  apt-get update && apt-get install -y --no-install-recommends git build-essential zlib1g-dev libpcre3-dev libtcmalloc-minimal4 \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /usr/lib/x86_64-linux-gnu
+RUN ln -f -s libtcmalloc_minimal.so.4 libtcmalloc_minimal.so
+
+ARG ASYNC_NGINX_VER="v0.5.0"
+ARG ASYNC_NGINX_REPO=https://github.com/intel/asynch_mode_nginx.git
+WORKDIR /
+RUN git clone -b $ASYNC_NGINX_VER --depth 1 ${ASYNC_NGINX_REPO}
+WORKDIR /asynch_mode_nginx
+RUN   ./configure \
+      --prefix=/home/cdn/var/www \
+      --conf-path=/home/cdn/etc/nginx/nginx.conf \
+      --sbin-path=/home/cdn/sbin/nginx \
+      --pid-path=/home/cdn/var/www/nginx.pid \
+      --lock-path=/home/cdn/var/www/nginx.lock \
+      --modules-path=/home/cdn/var/www/modules \
+      --without-http_rewrite_module \
+      --with-http_ssl_module \
+      --with-pcre \
+      --add-dynamic-module=modules/nginx_qat_module/ \
+      --with-cc-opt="-DNGX_SECURE_MEM -O3 -I/usr/local/include/openssl -Wno-error=deprecated-declarations -Wimplicit-fallthrough=0" \
+      --with-ld-opt="-ltcmalloc_minimal -Wl,-rpath=/usr/local/lib64 -L/usr/local/lib64" && \
+    make -j && \
+    make install
+
+
+FROM qatsw-crypto-base-ssl3-ubuntu${RELEASE}
+RUN  apt-get update && apt-get install -y --no-install-recommends numactl zlib1g libpcre3 libtcmalloc-minimal4 systemd \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /usr/lib/x86_64-linux-gnu
+RUN ln -f -s libtcmalloc_minimal.so.4 libtcmalloc_minimal.so
+
+COPY --from=build /home/cdn/ /home/cdn/
+COPY --from=build /usr/local/ /usr/local/
+COPY conf/nginx-async-on.conf /home/cdn/etc/nginx/
+
+COPY /script/prepare_nginx.sh /
+
+WORKDIR /
+RUN mkfifo /export-logs
+CMD (ldconfig && /prepare_nginx.sh; echo $? > status) 2>&1 | tee output.logs && \
+    tar cf /export-logs status output.logs && \
+    sleep infinity

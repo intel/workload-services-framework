@@ -169,6 +169,7 @@ output "options" {
     },
     containerd_pause_registry: "registry.aliyuncs.com/google_containers",
     k8s_nfd_registry: "docker.io/raspbernetes",
+    k8s_nfd_version: "v0.11.3",
   }
 }
 

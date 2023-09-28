@@ -4,5 +4,4 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-k8s_delete_namespace_timeout: "10m"
 k8s_cni: flannel

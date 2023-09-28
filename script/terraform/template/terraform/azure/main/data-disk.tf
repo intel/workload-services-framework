@@ -33,8 +33,8 @@ locals {
 resource "azurerm_managed_disk" "default" {
   for_each             = local.disks
   name                 = "wsf-${var.job_id}-${each.key}-md"
-  location             = azurerm_resource_group.default.location
-  resource_group_name  = azurerm_resource_group.default.name
+  location             = local.location
+  resource_group_name  = local.resource_group_name
   storage_account_type = each.value.disk_type
   create_option        = "Empty"
   disk_size_gb         = each.value.disk_size

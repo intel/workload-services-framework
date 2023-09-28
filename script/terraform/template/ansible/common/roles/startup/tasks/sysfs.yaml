@@ -4,14 +4,23 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+- name: Set sysfs settings
+  set_fact:
+    sysfs_options_dict: "{{ sysfs_options_dict | combine(dict(sut_sysfs_options | split(',') | map('trim') | select('match',item+':.*') | map('regex_replace','^[^:]*:','') | reject('==','') | map('split','=') | map('map','trim'))) }}"
+  loop: "{{ group_names }}"
+  vars:
+    sysfs_options_dict: "{{ wl_sysfs }}"
+
 - name: Check if sysfs restore available
   stat:
     path: "{{ startup_restore_path }}/sysfs"
   register: sysfssav
+  when: sysfs_options_dict.keys() | length > 0
 
 - name: Restore sysfs settings
   shell: "cat {{ startup_restore_path }}/sysfs | bash"
   when: 
+  - sysfs_options_dict.keys() | length > 0
   - sysfssav.stat.exists
   - ((csp | default('static')) == 'static')
   failed_when: false
@@ -19,20 +28,23 @@
 - name: Save sysfs values
   shell:
     cmd: |
-      for p in {{ ((wl_default_sysfs.keys() | list) + (wl_sysfs.keys() | list)) | join(" ") }}; do 
+      for p in {{ sysfs_options_dict.keys() | list | join(' ') }}; do 
         if [ -e $p ]; then
             echo "echo $(cat $p) > $p"
         fi
       done > {{ startup_restore_path }}/sysfs
     executable: /bin/bash
   failed_when: false
-  when: ((csp | default('static')) == 'static')
+  when:
+  - ((csp | default('static')) == 'static')
+  - sysfs_options_dict.keys() | length > 0
 
 - name: Create wsf-sysfs-settings.service
   template:
     src: wsf-sysfs-settings.service.j2
     dest: /etc/systemd/system/wsf-sysfs-settings.service
   failed_when: false
+  when: sysfs_options_dict.keys() | length > 0
 
 - name: Apply sysfs
   systemd:
@@ -41,4 +53,5 @@
     daemon_reload: yes
     state: restarted
   failed_when: false
+  when: sysfs_options_dict.keys() | length > 0
 

@@ -7,7 +7,19 @@ terraform {
   required_providers {
     azurerm = {
       source = "hashicorp/azurerm"
-      version = "= 3.53.0"
+      version = "= 3.70.0"
+    }
+    template = {
+      source = "hashicorp/template"
+      version = "= 2.2.0"
+    }
+    external = {
+      source = "hashicorp/external"
+      version = "= 2.3.1"
+    }
+    random = {
+      source = "hashicorp/random"
+      version = "= 3.5.1"
     }
   }
 }

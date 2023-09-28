@@ -4,11 +4,26 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 ---
+- name: Recording timing
+  hosts: localhost
+  gather_facts: false
+  become: false
+  tasks:
+
+    - name: Record timing
+      shell:
+        cmd: |
+          echo "k8s_setup_start: \"$(date -Ins)\"" >> {{ wl_logs_dir}}/timing.yaml
+        executable: /bin/bash
+      when: ansible_connection != 'winrm'
+
 # global k8s facts stored in localhost
 - name: "Cluster check over localhost"
   hosts: localhost
   gather_facts: false
+  become: false
   tasks:
+
     - name: "Check cluster status"
       ansible.builtin.include_role:
         name: installation
@@ -19,38 +34,52 @@
   hosts: cluster_hosts
   any_errors_fatal: true
   gather_facts: false
+  become: false
   tasks:
+
     - name: "Prepare the cluster"
       ansible.builtin.include_role:
         name: installation
         tasks_from: prepare-cluster
-      when: ansible_connection != 'winrm'
+      when:
+      - ansible_connection != 'winrm'
+      - sut_sudo | default(true) | bool
 
 - name: "Create cluster on controller node"
   hosts: "{{ ('controller' in groups) | ternary('controller','localhost') }}"
   gather_facts: false
+  become: false
   tasks:
+
     - name: "Create the cluster"
       ansible.builtin.include_role:
         name: installation
         tasks_from: create-cluster
-      when: ansible_connection != 'winrm'
+      when:
+      - ansible_connection != 'winrm'
+      - sut_sudo | default(true) | bool
 
 - name: "Join workload hosts to controller"
   hosts: workload_hosts
   any_errors_fatal: true
   gather_facts: false
+  become: false
   tasks:
+
     - name: "Join workers"
       ansible.builtin.include_role:
         name: installation
         tasks_from: join-workers
-      when: ansible_connection != 'winrm'
+      when:
+      - ansible_connection != 'winrm'
+      - sut_sudo | default(true) | bool
 
 - name: "Finalize controller installation tasks"
   hosts: "{{ ('controller' in groups) | ternary('controller','localhost') }}"
   gather_facts: false
+  become: false
   tasks:
+
     - name: "Finalize controller"
       ansible.builtin.include_role:
         name: installation
@@ -61,9 +90,26 @@
   hosts: workload_hosts
   any_errors_fatal: true
   gather_facts: false
+  become: false
   tasks:
+
     - name: "Finalize workers"
       ansible.builtin.include_role:
         name: installation
         tasks_from: finalize-workers
+      when:
+      - ansible_connection != 'winrm'
+      - sut_sudo | default(true) | bool
+
+- name: Recording timing
+  hosts: localhost
+  gather_facts: false
+  become: false
+  tasks:
+
+    - name: Record timing
+      shell:
+        cmd: |
+          echo "k8s_setup_end: \"$(date -Ins)\"" >> {{ wl_logs_dir}}/timing.yaml
+        executable: /bin/bash
       when: ansible_connection != 'winrm'

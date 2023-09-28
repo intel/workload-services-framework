@@ -4,7 +4,30 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: Install prerequisites
+- name: detect OS
+  shell:
+    cmd: ". /etc/os-release;echo $ID;echo $VERSION_ID"
+    executable: /bin/bash
+  register: os
+
+- name: Import gpg key
+  rpm_key:
+    key: "https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ os.stdout_lines | last | join('.') | first }}"
+    state: present
+  become: true
+  when: ((os.stdout_lines | first) in ['centos','rhel'])
+
+- name: Install epel-release
+  yum:
+    name: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ os.stdout_lines | last | join('.') | first }}.noarch.rpm"
+    state: present
+  register: yumrc
+  until: yumrc is success
+  retries: 10
+  delay: 10
+  when: ((os.stdout_lines | first) in ['centos','rhel'])
+
+- name: Install cmake, make, m4, gawk
   package:
     name: 
     - cmake
@@ -16,3 +39,22 @@
   until: pkgrc is success
   retries: 10
   delay: 10
+
+- name: Install daemonize optionally
+  block:
+
+    - name: Install daemonize optionally
+      package:
+        name: daemonize
+        state: present
+      register: pkgrc
+      until: pkgrc is success
+      retries: 10
+      delay: 10
+
+  rescue:
+
+    - name: warning
+      debug:
+        msg: "daemonize not available."
+

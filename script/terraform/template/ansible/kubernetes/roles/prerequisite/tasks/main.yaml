@@ -84,6 +84,8 @@
     command: sysctl --system
     become: yes
 
-  - name: customize prerequisite
-    include_tasks:
-      file: customize-prerequisite.yaml
+  - name: Work on CNI prerequisite
+    include_role:
+      name: "cni-{{ k8s_cni }}"
+      tasks_from: prerequisite.yaml
+    when: (playbook_dir + '/roles/cni-' + k8s_cni + '/tasks/prerequisite.yaml') is exists

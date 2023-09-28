@@ -22,10 +22,7 @@
   when: grubsts.msg == "Block removed"
   ignore_errors: yes
 
-- name: reboot
-  command: "reboot"
-  async: 1
-  poll: 0
-  ignore_errors: yes
-  when: grubsts.msg == "Block removed"
+- name: request reboot
+  set_fact:
+    cleanup_reboot_required: "{{ cleanup_reboot_required or (grubsts.msg == 'Block removed') }}"
 

@@ -1,0 +1,49 @@
+# stack-spdk-nvme-o-tcp-dsa
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER="22.04"
+ARG OS_IMAGE="ubuntu"
+FROM ${OS_IMAGE}:${OS_VER}
+ARG DEBIAN_FRONTEND=noninteractive
+
+ENV  BASE_PATH=/opt
+ENV  WORK_PATH=${BASE_PATH}/spdk
+ENV  LOG_PATH=${BASE_PATH}/logs
+
+RUN apt-get update && \
+    apt-get install -y wget git pciutils iproute2 bc zlib1g kmod jq pkg-config \
+    liburing-dev liburing2
+
+WORKDIR   ${BASE_PATH}
+
+ARG SPDK_VER=v23.01
+ARG SPDK_REPO=https://github.com/spdk/spdk.git
+RUN cd ${BASE_PATH} && git clone -b ${SPDK_VER} ${SPDK_REPO} spdk && \
+    cd ${WORK_PATH} && apt-get update && \
+    git submodule update --init && \
+    ./scripts/pkgdep.sh
+
+ARG NASM_VER="2.14"
+ARG NASM_REPO="https://www.nasm.us/pub/nasm/releasebuilds"
+RUN wget ${NASM_REPO}/${NASM_VER}/nasm-${NASM_VER}.tar.gz && \
+    tar xvf nasm-${NASM_VER}.tar.gz && cd nasm-${NASM_VER} && \
+    ./configure --prefix=/usr && make install
+
+# Build spdk with DSA enabled.
+RUN cd ${WORK_PATH} && \
+    sed -i '/#define MAX_TASKS_PER_CHANNEL*/c\#define MAX_TASKS_PER_CHANNEL  0x1000' ./lib/accel/accel.c && \
+    ./configure --enable-lto --with-idxd && \
+    make -j && \
+    make install
+
+COPY /scripts  ${BASE_PATH}
+RUN chmod +x  ${BASE_PATH}/*.sh && mkdir -p ${LOG_PATH}
+
+# RUN mkfifo /export-logs
+
+CMD (${BASE_PATH}/setup_env.sh; echo $? > status) 2>&1 | tee ${LOG_PATH}/setup_output.logs && \
+    sleep infinity

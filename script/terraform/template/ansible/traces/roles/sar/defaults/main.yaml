@@ -5,4 +5,3 @@
 #
 
 sar_options: "-B -b -d -p -H -I ALL -m ALL -n ALL -q -r -u ALL -P ALL -v -W -w -F 5"
-

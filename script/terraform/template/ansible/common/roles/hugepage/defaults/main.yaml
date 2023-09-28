@@ -5,5 +5,5 @@
 #
 
 wl_kernel_args: {}
-wl_set_default_hugepagesz: false
+sut_default_hugepagesz: false
 

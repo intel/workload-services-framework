@@ -13,8 +13,8 @@ BEGIN {
 }
 
 function get_value() {
-    if ($NF*1 == $NF) return $NF
-    if ($(NF-1)*1 == $(NF-1)) return $(NF-1)
+    v=gensub(/^.*: *([0-9.-][0-9.e+-]*).*$/,"\\1",1,$0)
+    if (v*1 == v) return v
     print "Unable to extract value: "$0 > "/dev/stderr"
     exit 3
 }
@@ -29,11 +29,11 @@ function get_value() {
 }
 
 index($0,var1)==1 || ($1=="#" && index($2,var1)==1) {
-    var1v=gensub(/"(.*)"/,"\\1",1,$NF)
+    var1v=gensub(/.*"(.*)".*/,"\\1",1,$NF)
 }
 
 index($0,var2)==1 || ($1=="#" && index($2,var2)==1) {
-    var2v=gensub(/"(.*)"/,"\\1",1,$NF)
+    var2v=gensub(/.*"(.*)".*/,"\\1",1,$NF)
 }
 
 index($0,var3)==1 {

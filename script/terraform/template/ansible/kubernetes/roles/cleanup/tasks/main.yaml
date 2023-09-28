@@ -4,15 +4,24 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: Restore node labels
+- name: delete namespace
+  include_tasks:
+    file: delete-namespace.yaml
+
+- name: delete k8s script
+  file:
+    path: "/tmp/{{ wl_namespace }}-k8s-script.yaml"
+    state: absent
+
+- name: restore node labels
   include_role:
     name: label
     tasks_from: unset
 
-- name: Uninstall Istio if installed
+- name: cleanup k8s plugins & CNI
   include_role:
-    name: istio
-    tasks_from: uninstall
+    name: "{{ item }}"
+    tasks_from: cleanup.yaml
   when:
-  - k8s_istio_profile is defined
-  - k8s_istio_profile | trim != ""
+  - (playbook_dir + '/roles/' + item + '/tasks/cleanup.yaml') is exists
+  loop: "{{ (k8s_plugins | default([])) + [ 'cni-' + (k8s_cni | default('flannel')) ] }}"

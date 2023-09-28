@@ -81,3 +81,34 @@
   become: yes
   when: emon.stat.exists
 
+- name: Append the start script
+  blockinfile:
+    path: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-start-trace.sh"
+    marker: "# emon {mark}"
+    insertbefore: "^wait"
+    block: |
+      (
+        mkdir -p /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-emon
+        cd /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-emon
+        date -Ins >> TRACE_START
+        . {{ emon_bin_path }}/sep/sep_vars.sh
+        nohup emon -collect-edp {{ emon_options }} -f emon-$1.dat > emon-$1.logs 2>&1 &
+        echo $! > emon.pid
+        disown
+      ) &
+
+- name: Append the stop script
+  blockinfile:
+    path: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-stop-trace.sh"
+    marker: "# emon {mark}"
+    insertbefore: "^wait"
+    block: |
+      (
+        cd /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-emon
+        date -Ins >> TRACE_STOP
+        chmod a+r *
+        . {{ emon_bin_path }}/sep/sep_vars.sh
+        emon -stop
+        sleep 5
+        kill -9 $(cat emon.pid)
+      ) &

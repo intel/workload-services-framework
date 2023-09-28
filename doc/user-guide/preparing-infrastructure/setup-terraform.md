@@ -1,14 +1,13 @@
+# Setup Terraform
 
-### Introduction
+The terraform backend can be used to validate workloads on a remote cluster, On-Premises or on Cloud. 
 
-The terraform backend can be used to validate workloads on a remote cluster, On-Premises or on Cloud.
+## Setup Terraform for Cloud Validation
 
-### Setup Terraform for Cloud Validation
-
-- Follow the instructions in the [WSF Cloud Setup][WSF Cloud Setup] to setup the development host.
+- Follow the instructions in the [WSF Cloud Setup][WSF Cloud Setup] to setup the development host.  
 - The terraform backend supports Cloud vendors such as `aws`, `gcp`, `azure`, `tencent`, `alicloud`, and `oracle`. Each vendor has a corresponding configuration file: `script/terraform/terraform-config.<SUT>.tf`, where `<SUT>` is the Cloud vendor name. You can customize as needed.  
 
-#### Configure Cloud Account
+### Configure Cloud Account
 
 If this is your first time, run the terraform build command:   
 
@@ -20,13 +19,13 @@ make build_terraform
 
 Then proceed with the Cloud account setup as follows:
 
-```
+```shell
 make aws           # or make -C ../.. aws, if under build/workload/<workload>
 $ aws configure    # please specify a region and output format as json
 $ exit
 ```
 
-```
+```shell
 make azure         # or make -C ../.. azure, if under build/workload/<workload>
 $ az login
 # if you have multiple subscriptions in your account, please set
@@ -34,7 +33,7 @@ $ az login
 $ exit
 ```
 
-```
+```shell
 make gcp           # or make -C ../.. gcp, if under build/workload/<workload>
 $ gcloud init --no-launch-browser
 $ gcloud auth application-default login --no-launch-browser # Please make sure quota-project-id is set
@@ -42,75 +41,78 @@ $ gcloud auth activate-service-account --key-file <keyfile> # required only for 
 $ exit
 ```
 
-```
+```shell
 make tencent       # or make -C ../.. tencent, if under build/workload/<workload>
 $ tccli configure  # please specify a region
 $ exit
 ```
 
-```
+```shell
 make alicloud      # make -C ../.. alicloud, if under build/workload/<workload>
 $ aliyun configure # please specify a region
 $ exit
 ```
 
-```
+```shell
 make oracle        # make -C ../.. oracle, if under build/workload/<workload>
 $ oci setup config # please specify a compartment id and upload public key to the oracle cloud console 
 $ exit
 ```
 
-#### Run Workload(s) Through Terraform
+### Run Workload(s) Through Terraform
 
-```
+```shell
 cd workload/<workload>
 make
 ./ctest.sh -N
 ```
 
-#### Cleanup Cloud Resources
+### Cleanup Cloud Resources
 
 If your terraform validation is interrupted for any reason, the Cloud resource may remain active. You can explicitly cleanup any Cloud resources as follows:
 
 > Note: mentioned below commands should be executed from the required workload folder such as ~/applications.benchmarking.benchmark.platform-hero-features/build/workload/OpenSSL3-RSAMB# make -C ../.. azure
 
-```
+```shell
 make -C ../.. [aws|gcp|azure|tencent|alicloud]
 $ cleanup
 $ exit
 ```
 
-### Setup Terraform for On-Premises Validation
+## Setup Terraform for On-Premises Validation
 
-- Follow the instructions in the [WSF On-Premises Setup][WSF On-Premises Setup] to setup the On-Premises hosts.
-- Customize [`terraform-config.static.tf`][terraform-config.static.tf] to specify your cluster information.
+- Follow the instructions in the [WSF On-Premises Setup][WSF On-Premises Setup] to setup the On-Premises hosts.   
+- Customize [`terraform-config.static.tf`][terraform-config.static.tf] to specify your cluster information.  
+
+> Under `script/terraform`, you can create any `terraform-config.mysut.tf` out of `terraform-config.static.tf`, where `mysut` is your sut name. Use `cmake -DTERRAFORM_SUT=mysut ..` to configure it.  
 
 Now you can run any workload as follows:    
 
+```shell
+cd build
+cmake -DTERRAFORM_SUT=static -DBENCHMARK=workload/<workload-name> ..
+make
+./ctest.sh -N
 ```
+
+## Setup Terraform for KVM Validation
+
+- Follow the instructions in the [WSF KVM Setup][WSF KVM Setup] to setup the KVM environment.   
+- Customize [`terraform-config.kvm.tf`][terraform-config.kvm.tf] to specify your KVM host information.  
+
+Now you can run any workload as follows:    
+
+```shell
 cd workload/<workload>
 make
 ./ctest.sh -N
 ```
 
-### Setup Terraform for KVM Validation
+## Telemetry Trace
 
-- Follow the instructions in the [WSF KVM Setup][WSF KVM Setup] to setup the KVM environment.
-- Customize [`terraform-config.kvm.tf`][terraform-config.kvm.tf] to specify your KVM host information.
+See [Trace Module][Trace Module] for available trace options. You can enable telemetry trace modules during the workload validation as follows:  
 
-Now you can run any workload as follows:    
-
-```
-cd workload/<workload>
-make
-./ctest.sh -N
-```
-
-### Telemetry Trace and Publishing Options
-
-See [Trace Module][Trace Module] for available trace options. You can enable telemetry trace modules during the workload validation as follows:
-
-```
+```shell
 cmake -DTERRAFORM_OPTIONS=--collectd ..
 cd workload/<workload>
 ./ctest.sh -N
@@ -119,15 +121,13 @@ cd workload/<workload>
 Additionally, you can use `--svrinfo` to the `TERRAFORM_OPTIONS` to
 automatically detect the platform information as follows:
 
-```
+```shell
 cmake -DTERRAFORM_OPTIONS=--svrinfo ..
 cd workload/<workload>
 ./ctest.sh -N
 ```
 
-See also: [Publishing Module Options][Publishing Module Options].
-
-### Debugging
+## Debugging
 
 While the workload evaluation is in progress, you can logon to the remote instances to debug any encountered issues. As terraform engine runs inside a container, you need to first login to the container as follows:
 
@@ -149,7 +149,7 @@ Files of interest:
 - `ssh_access.key[.pub]`: The SSH keys for accessing to the VM instances.
 - `template/*`: Source code used to provision VMs and evaluate workloads.
 
-```
+```yaml
 $ cat inventory.yaml
 ...
         worker-0:
@@ -168,7 +168,7 @@ Warning: Permanently added '<public_ip>' (ED25519) to the list of known hosts.
 test.log                                                                                                                                                                                                                                                    100%    5     0.1KB/s   00:00
 ```
 
-#### Setting Breakpoint(s)
+## Setting Breakpoint(s)
 
 You can set one or many breakpoints by specifying the `wl_debug` option in `TERRAFORM_OPTIONS` or `terraform-config.<sut>.tf`:  
 
@@ -183,7 +183,7 @@ The following `<BreakPoint>`s are supported:
 
 When a breakpoint is reached, the execution is paused for an hour (as specified by the `wl_debug_timeout` value.) You can explicitly resume the execution by creating a signaling file under `/opt/workspace`, as follows:    
 
-```
+```shell
 ./debug.sh
 $ touch ResumeRunStage
 $ exit
@@ -194,6 +194,4 @@ $ exit
 [WSF On-Premises Setup]: setup-wsf.md#on-premises-development-setup
 [terraform-config.static.tf]: ../../../script/terraform/terraform-config.static.tf
 [WSF KVM Setup]: setup-wsf.md#kvm-development-setup
-[terraform-config.kvm.tf]: ../../../script/terraform/terraform-config.kvm.tf
 [Trace Module]: ../executing-workload/terraform-options.md#trace-module-parameters
-[Publishing Module Options]: ../executing-workload/terraform-options.md#publishing-module-parameters

@@ -1,0 +1,44 @@
+## speccpu-2017-v119-base-nda
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=22.04
+ARG OS_IMAGE=ubuntu
+
+FROM ${OS_IMAGE}:${OS_VER} as build
+
+RUN apt-get update && apt-get install -y p7zip-full wget && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+ARG SPEC2017_ISO_VER=1.1.9
+
+# SPEC_CPU_PKG the file containing the Speccpu binaries packaged as a iso file
+ARG SPEC_CPU_PKG=${SPEC_CPU_PKG:-cpu2017-${SPEC2017_ISO_VER}.iso}
+
+ARG URL=${SPEC_CPU_PKG}
+RUN mkdir -p /data
+COPY data/ /data/
+RUN if [ -e /data/spec.iso ]; then \
+        mv /data/spec.iso /spec.iso; \
+    fi 
+RUN [ -e /spec.iso ] || wget --no-proxy -T 5 --tries=inf -O /spec.iso $URL
+
+RUN rm -rf /data
+WORKDIR /mnt/iso
+RUN 7z x /spec.iso && \
+    find . -type f -exec chmod a+rx {} \;
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+RUN apt-get update && apt-get install -y --no-install-recommends libnsl2 xz-utils && \
+     apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY --from=build /mnt/iso/ /mnt/iso/
+
+WORKDIR /opt/spec2017
+WORKDIR /mnt/iso
+
+RUN sed -i 's|runcpu --test|echo --test|' install.sh && \
+    echo "yes" | ./install.sh -d /opt/spec2017

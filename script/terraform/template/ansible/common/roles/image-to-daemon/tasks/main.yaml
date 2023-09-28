@@ -5,8 +5,13 @@
 #
 
     - name: setup port forwarding
-      shell: "ssh -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -fNL {{ local_daemon_url }}:/var/run/docker.sock -i {{ ansible_private_key_file }} > /dev/null 2>&1"
+      shell:
+        cmd: |
+          nohup ssh -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -fNL {{ local_daemon_url }}:/var/run/docker.sock -i {{ ansible_private_key_file }} > /dev/null 2>&1 &
+          disown
+        executable: /bin/bash
       delegate_to: localhost
+      become: false
 
     - name: inspect images
       command: "docker image inspect {{ item.key }}"
@@ -18,6 +23,9 @@
 
     - name: copy daemon images to daemon
       command: "skopeo copy --src-tls-verify={{ item.item.value }} --dest-daemon-host=http://localhost:12222 docker-daemon:{{ item.item.key }} docker-daemon:{{ item.item.key }}"
+      environment:
+        ALL_PROXY: ""
+        all_proxy: ""
       register: copy_result
       until: copy_result.rc == 0
       retries: 10
@@ -29,6 +37,9 @@
 
     - name: copy registry images to daemon
       command: "skopeo copy {{ skopeo_options | default('') }} --src-tls-verify={{ item.item.value }} --dest-daemon-host=http://{{ local_daemon_url }} docker://{{ item.item.key }} docker-daemon:{{ item.item.key }}"
+      environment:
+        ALL_PROXY: ""
+        all_proxy: ""
       register: copy_result
       until: copy_result.rc == 0
       retries: 10
@@ -39,6 +50,10 @@
       become: yes
 
     - name: cancel port forwarding
-      shell: "ssh -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -i {{ ansible_private_key_file }} -O cancel -L {{ local_daemon_url }}:/var/run/docker.sock > /dev/null 2>&1"
+      shell:
+        cmd: |
+          ssh -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -i {{ ansible_private_key_file }} -O cancel -L {{ local_daemon_url }}:/var/run/docker.sock > /dev/null 2>&1
+        executable: /bin/bash
       delegate_to: localhost
+      become: false
 

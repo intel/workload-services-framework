@@ -65,7 +65,7 @@ variable "wl_namespace" {
 variable "worker_profile" {
   default = {
     name = "worker"
-    instance_type = "n2-standard-4"
+    instance_type = "e2-small"
     cpu_model_regex = null
     vm_count = 1
     min_cpu_platform = null
@@ -86,7 +86,7 @@ variable "worker_profile" {
 variable "client_profile" {
   default = {
     name = "client"
-    instance_type = "n2-standard-4"
+    instance_type = "e2-small"
     cpu_model_regex = null
     vm_count = 1
     min_cpu_platform = null
@@ -107,7 +107,7 @@ variable "client_profile" {
 variable "controller_profile" {
   default = {
     name = "controller"
-    instance_type = "n2-standard-4"
+    instance_type = "e2-small"
     cpu_model_regex = null
     vm_count = 1
     min_cpu_platform = null

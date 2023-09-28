@@ -45,8 +45,6 @@ EOF
         options=(
             "-v" "$this:/opt/workload:ro"
             "-v" "$LOGSDIRH:/opt/workspace:rw"
-            "-v" "$PROJECTROOT/script/terraform/script:/opt/script:ro"
-            "-v" "$PROJECTROOT/script/terraform/template:/opt/template:ro"
 	          "-v" "$PROJECTROOT/stack:/opt/stack:ro"
             "-e" "TERRAFORM_OPTIONS"
             "-e" "NAMESPACE"
@@ -77,7 +75,7 @@ EOF
                     "$(sed -n '/^\s*variable\s*"\(resource_group_id\|compartment\)"\s*{/,/^\s*}/{/^\s*default\s*=\s*/p}' "$TERRAFORM_CONFIG" | cut -f2 -d'"')"
             fi
             set -o pipefail
-            "$PROJECTROOT"/script/terraform/shell.sh $csp "${options[@]}" -- /opt/script/packer.sh $@ ${!project_vars} ${COMMON_PROJECT_VARS[@]} | tee "$LOGSDIRH/packer.logs" 2>&1
+            "$PROJECTROOT"/script/terraform/shell.sh $csp "${options[@]}" -- /opt/terraform/script/packer.sh $@ ${!project_vars} ${COMMON_PROJECT_VARS[@]} | tee "$LOGSDIRH/packer.logs" 2>&1
         )
 
         echo "$signature" > .code-signature.$csp.$PLATFORM.$IMAGE

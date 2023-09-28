@@ -4,83 +4,49 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+- name: record timing
+  shell:
+    cmd: |
+      echo "workload_itr{{ itr }}_start: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
+    executable: /bin/bash
+  delegate_to: localhost
+
 - name: invoke docker run
   shell: 
-    cmd: "docker run $(compgen -e | sed -nE '/_(proxy|PROXY)$/{s/^/-e /;p}') {{ workload_config.docker_options }} --rm -d {{ workload_config.docker_image }}"
+    cmd: "docker run {{ ('True' in pullalways) | ternary('--pull always','') }} $(compgen -e | sed -nE '/_(proxy|PROXY)$/{s/^/-e /;p}') {{ workload_config.docker_options }} --rm -d {{ workload_config.docker_image }}"
     executable: /bin/bash
   register: container
+  vars:
+    pullalways: "x{% for r in (skopeo_sut_accessible_registries | default('') | split(',')) %}{{ ((r!='') and workload_config.docker_image.startswith(r)) }}{% endfor %}x"
 
-- name: workload execution procedure
-  block:
+- name: save container_id for cleanup
+  copy:
+    content: "{{ container | to_yaml }}"
+    dest: "{{ wl_logs_dir }}/tocleanup.yaml"
+  delegate_to: localhost
 
-    - name: waitproc to wait for logs complete
-      shell:
-        cmd: |
-          timeout {{ workload_config.timeout | split(',') | first }}s bash -c 'docker exec {{ container.stdout_lines | first }} cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-docker-logs.tar' > /dev/null 2>&1 &
-          echo $!
-          disown
-        executable: /bin/bash
-      register: waitproc
+- name: waitproc to wait for logs complete
+  shell:
+    cmd: |
+      nohup timeout {{ workload_config.timeout | split(',') | first }}s bash -c 'docker exec {{ container.stdout_lines | first }} sh -c "cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-docker-logs.tar; tar tf /tmp/{{ wl_namespace }}-docker-logs.tar > /dev/null && cat /tmp/{{ wl_namespace }}-docker-logs.tar || tar cf - \$(cat /tmp/{{ wl_namespace }}-docker-logs.tar)" > /tmp/{{ wl_namespace }}-docker-logs.tar' > /dev/null 2>&1 &
+      echo $!
+      disown
+    executable: /bin/bash
+  register: waitproc
 
-    - name: "wait for the starting phrase: {{ workload_config.trace_mode.split(',')[1] }}"
-      shell:
-        cmd: |
-          while kill -0 {{ waitproc.stdout_lines | first }}; do
-            docker logs {{ container.stdout_lines | first }} | grep -q -F "{{ workload_config.trace_mode.split(',')[1] }}" && break
-            bash -c 'sleep 0.1'
-          done
-        executable: /bin/bash
-      when: (workload_config.trace_mode | split(',') | first == "roi")
-      ignore_errors: yes
+- name: invoke the trace procedure
+  include_role:
+    name: trace
+  vars:
+    trace_waitproc_pid: "{{ waitproc.stdout }}"
+    trace_logs_scripts: ["docker logs {{ container.stdout_lines | first }}"]
 
-    - name: "wait for timeout {{ workload_config.trace_mode.split(',')[1] }}s"
-      command: |
-        timeout {{ workload_config.trace_mode.split(',')[1] | int }}s tail --pid={{ waitproc.stdout_lines | first }} -f /dev/null
-      when: (workload_config.trace_mode | split(',') | first == "time")
-      ignore_errors: yes
-
-    - name: start trace
-      include_role:
-        name: trace
-        tasks_from: start
-      when: wl_trace_modules is defined
-
-    - name: "wait for the stop phrase: {{ workload_config.trace_mode.split(',')[2] }}"
-      shell:
-        cmd: |
-          while kill -0 {{ waitproc.stdout_lines | first }}; do
-            docker logs {{ container.stdout_lines | first }} | grep -q -F "{{ workload_config.trace_mode.split(',')[2] }}" && break
-            bash -c 'sleep 0.1'
-          done
-        executable: /bin/bash
-      when: (workload_config.trace_mode | split(',') | first == "roi")
-      ignore_errors: yes
-
-    - name: "wait for timeout {{ workload_config.trace_mode.split(',')[2] }}s"
-      command: |
-        timeout {{ workload_config.trace_mode.split(',')[2] | int }}s tail --pid={{ waitproc.stdout_lines | first }} -f /dev/null
-      when: (workload_config.trace_mode | split(',') | first == "time")
-      ignore_errors: yes
-
-    - name: revoke trace
-      include_role:
-        name: trace
-        tasks_from: stop
-      when: 
-      - wl_trace_modules is defined
-      - (workload_config.trace_mode | split(',') | length == 3)
-
-    - name: wait until execution compete
-      command: "tail --pid={{ waitproc.stdout_lines | first }} -f /dev/null"
-      ignore_errors: yes
-
-  always:
-
-    - name: revoke trace
-      include_role:
-        name: trace
-        tasks_from: stop
-      when: wl_trace_modules is defined
+- name: record timing
+  shell:
+    cmd: |
+      echo "workload_itr{{ itr }}_end: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
+    executable: /bin/bash
+  delegate_to: localhost
 
 - name: print docker info
   command: "docker version"
@@ -90,7 +56,6 @@
     name: trace
     tasks_from: collect
   when: wl_trace_modules is defined
-  ignore_errors: yes
 
 - block:
 
@@ -99,11 +64,12 @@
     ignore_errors: true
 
   - name: stop the docker container
-    command: "docker rm -f {{ container.stdout_lines | first }}"
+    command: "docker rm -v -f {{ container.stdout_lines | first }}"
+    when: ((itr |int) < (run_stage_iterations | default(1) | int)) or ('cleanup' not in (stage | default('cleanup')))
 
   - name: create the iteration direcctory
     file:
-      path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ container.stdout_lines | first }}"
+      path: "{{ wl_logs_dir }}/itr-{{ itr }}/worker-0"
       state: directory
     delegate_to: localhost
 
@@ -116,7 +82,7 @@
   - name: untar the logs
     unarchive:
       src: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ wl_namespace }}-docker-logs.tar"
-      dest: "{{ wl_logs_dir}}/itr-{{ itr }}/{{ container.stdout_lines | first }}"
+      dest: "{{ wl_logs_dir}}/itr-{{ itr }}/worker-0"
     delegate_to: localhost
     ignore_errors: true
 
