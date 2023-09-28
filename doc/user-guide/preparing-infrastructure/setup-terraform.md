@@ -95,19 +95,6 @@ make
 ./ctest.sh -N
 ```
 
-## Setup Terraform for KVM Validation
-
-- Follow the instructions in the [WSF KVM Setup][WSF KVM Setup] to setup the KVM environment.   
-- Customize [`terraform-config.kvm.tf`][terraform-config.kvm.tf] to specify your KVM host information.  
-
-Now you can run any workload as follows:    
-
-```shell
-cd workload/<workload>
-make
-./ctest.sh -N
-```
-
 ## Telemetry Trace
 
 See [Trace Module][Trace Module] for available trace options. You can enable telemetry trace modules during the workload validation as follows:  
