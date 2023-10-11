@@ -35,7 +35,7 @@ $ kubectl create -n istio-system secret tls nighthawk-credential --key=sm-nighth
 
 **Cluster configuration**
 
-The [config](https://github.com/intel-sandbox/benchmark_release/tree/main/config/HTTPS) contains nighthawk configmap, deployment, service, virtual service and gateway. For scaling istio-ingressgateway (2vCPU, 4vCPU, 8vCPU,16vCPU) use: [istio-ingressgateway](https://github.com/intel-sandbox/benchmark_release/tree/main/config/BASELINE)
+The config contains nighthawk configmap, deployment, service, virtual service and gateway. For scaling istio-ingressgateway (2vCPU, 4vCPU, 8vCPU,16vCPU) use: istio-ingressgateway
 
 Nighthawk server configmap:
 ```

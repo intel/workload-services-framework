@@ -95,7 +95,7 @@ workers_ref="$(i=0;for h in ${hosts[@]:1}; do cat <<EOF
 EOF
 i=$((i+1));done)"
 
-ANSIBLE_ROLES_PATH=../terraform/template/ansible/kubernetes/roles:../terraform/template/ansible/common/roles:../terraform/template/ansible/traces/roles ANSIBLE_INVENTORY_ENABLED=yaml ansible-playbook -vv -e install_intelca=$intelcert -e wl_logs_dir="$DIR" -e my_ip_list=1.1.1.1 -e k8s_taint=$k8s_taint -e k8s_reset=$reset -e k8s_purge=$purge --inventory <(cat <<EOF
+ANSIBLE_ROLES_PATH=../terraform/template/ansible/kubernetes/roles:../terraform/template/ansible/common/roles:../terraform/template/ansible/traces/roles ANSIBLE_INVENTORY_ENABLED=yaml ansible-playbook --flush-cache -vv -e install_intelca=$intelcert -e wl_logs_dir="$DIR" -e my_ip_list=1.1.1.1 -e k8s_taint=$k8s_taint -e k8s_reset=$reset -e k8s_purge=$purge --inventory <(cat <<EOF
 all:
   children:
     cluster_hosts:

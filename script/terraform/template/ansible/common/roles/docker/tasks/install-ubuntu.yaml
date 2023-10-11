@@ -56,9 +56,9 @@
 - name: install docker
   apt:
     name:
-    - "docker-ce={{ docker_version | default(docker_default_version['ubuntu']) }}"
-    - "docker-ce-cli={{ docker_cli_version | default(docker_cli_default_version['ubuntu']) }}"
-    - "docker-compose-plugin={{ docker_compose_plugin_version | default(docker_compose_plugin_default_version['ubuntu']) }}"
+    - "docker-ce={{ docker_version | default(docker_default_version.ubuntu) }}"
+    - "docker-ce-cli={{ docker_cli_version | default(docker_cli_default_version.ubuntu) }}"
+    - "docker-compose-plugin={{ docker_compose_plugin_version | default(docker_compose_plugin_default_version.ubuntu) }}"
     update_cache: true
   register: aptrc
   until: aptrc is success

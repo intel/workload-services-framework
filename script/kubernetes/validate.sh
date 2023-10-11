@@ -19,7 +19,7 @@ END {
 }' "$1" | tr '\n' ' ')"
 }
 
-# args: job-filter
+# args: itr
 kubernetes_run () {
     if [ -r "$PROJECTROOT/script/kubernetes/preswa-hook.sh" ]; then
         . "$PROJECTROOT/script/kubernetes/preswa-hook.sh"
@@ -27,7 +27,7 @@ kubernetes_run () {
 
     export LOGSDIRH NAMESPACE
 
-    [[ "$CTESTSH_OPTIONS" = *"--dry-run"* ]] && exit 0
+    [[ " $KUBERNETES_OPTIONS $CTESTSH_OPTIONS " = *" --dry-run "* ]] && exit 0
 
     # create namespace
     kubectl create namespace $NAMESPACE
@@ -41,11 +41,14 @@ kubernetes_run () {
     fi
         
     stop_kubernetes () {
+        trap - ERR SIGINT EXIT
         kubectl get node -o json
         kubectl --namespace=$NAMESPACE describe pod 2> /dev/null || true
         kubectl delete -f "$KUBERNETES_CONFIG" --namespace=$NAMESPACE --ignore-not-found=true || true
-        kubectl delete namespace $NAMESPACE --wait --timeout=0 --ignore-not-found=true || (kubectl replace --raw "/api/v1/namespaces/$NAMESPACE/finalize" -f <(kubectl get ns $NAMESPACE -o json | grep -v '"kubernetes"')) || true
-	}
+        kubectl --namespace=$NAMESPACE delete $(kubectl api-resources --namespaced -o name --no-headers | cut -f1 -d. | tr '\n' ',' | sed 's/,$//') --all --ignore-not-found=true --grace-period=150 --timeout=5m || true
+        kubectl delete namespace $NAMESPACE --wait --grace-period=300 --timeout=10m --ignore-not-found=true || (kubectl replace --raw "/api/v1/namespaces/$NAMESPACE/finalize" -f <(kubectl get ns $NAMESPACE -o json | grep -v '"kubernetes"')) || true
+        [ "$1" = "0" ] || exit 3
+	  }
 
     # set trap for cleanup
     trap stop_kubernetes ERR SIGINT EXIT
@@ -67,26 +70,29 @@ kubernetes_run () {
     timeout ${TIMEOUT/*,/}s bash -c wait_for_pods_ready
 
     extract_logs () {
-        container=$1; shift
-        for pod1 in $@; do
-            mkdir -p "$LOGSDIRH/$pod1"
+        container="${1#*=}"
+        for pod1 in $(kubectl get pod --namespace=$NAMESPACE --selector="$1" -o=jsonpath="{.items[*].metadata.name}"); do
+            mkdir -p "$LOGSDIRH/itr-$2/$pod1"
             kubectl logs -f --namespace=$NAMESPACE $pod1 -c $container &
-            kubectl exec --namespace=$NAMESPACE $pod1 -c $container -- sh -c "cat $EXPORT_LOGS > /tmp/$NAMESPACE-logs.tar"
+            kubectl exec --namespace=$NAMESPACE $pod1 -c $container -- sh -c "cat $EXPORT_LOGS > /tmp/$NAMESPACE-logs.tar;tar tf /tmp/$NAMESPACE-logs.tar > /dev/null 2>&1 || tar cf /tmp/$NAMESPACE-logs.tar \$(cat /tmp/$NAMESPACE-logs.tar)"
             for r in 1 2 3 4 5; do
-                kubectl exec --namespace=$NAMESPACE $pod1 -c $container -- cat /tmp/$NAMESPACE-logs.tar | tar -xf - -C "$LOGSDIRH/$pod1" && break
+                kubectl exec --namespace=$NAMESPACE $pod1 -c $container -- cat /tmp/$NAMESPACE-logs.tar | tar -xf - -C "$LOGSDIRH/itr-$2/$pod1" && break
             done
-            kubectl exec --namespace=$NAMESPACE $pod1 -c $container -- rm -f /tmp/$NAMESPACE-logs.tar
         done
     }
 
     # copy logs
     export -pf extract_logs
-    export EXPORT_LOGS
-    timeout ${TIMEOUT/,*/}s bash -c "extract_logs ${1/*=/} $(kubectl get pod --namespace=$NAMESPACE --selector="$1" -o=jsonpath="{.items[*].metadata.name}")"
+    export EXPORT_LOGS LOGSDIRH NAMESPACE
+    filters=($(echo $JOB_FILTER | tr ',' '\n'))
+    timeout ${TIMEOUT/,*/}s bash -c "extract_logs ${filters[0]} $1"
+
+    for filter1 in ${filters[@]}; do
+        [ "${filters[0]}" = "$filter1" ] || extract_logs $filter1 $1
+    done
 
     # cleanup
-    trap - ERR SIGINT EXIT
-    stop_kubernetes
+    stop_kubernetes 0
 }
 
 if [ -z "$REGISTRY" ]; then
@@ -100,10 +106,16 @@ if [ -z "$REGISTRY" ]; then
     fi
 fi
 
+iterations="$(echo "x--run_stage_iterations=1 $KUBERNETES_OPTIONS $CTESTSH_OPTIONS" | sed 's/.*--run_stage_iterations=\([0-9]*\).*/\1/')"
 rebuild_config "$CLUSTER_CONFIG_M4" "$CLUSTER_CONFIG"
 rebuild_kubernetes_config
 # replace %20 to space 
 sed -i '/^\s*-\s*name:/,/^\s*/{/value:/s/%20/ /g}' "$KUBERNETES_CONFIG"
 print_labels "$KUBERNETES_CONFIG"
-kubernetes_run $JOB_FILTER 2>&1 | tee "$LOGSDIRH/k8s.logs"
+for itr in $(seq 1 $iterations); do
+    mkdir -p "$LOGSDIRH/itr-$itr"
+    cp -f "$LOGSDIRH/kpi.sh" "$LOGSDIRH/itr-$itr"
+    kubernetes_run $itr
+done 2>&1 | tee "$LOGSDIRH/k8s.logs"
+sed -i '1acd itr-1' "$LOGSDIRH/kpi.sh"
 

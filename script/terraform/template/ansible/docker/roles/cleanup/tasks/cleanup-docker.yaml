@@ -1,0 +1,17 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: delete container
+  command: "docker rm -v -f {{ container.stdout_lines | first }}"
+  ignore_errors: true
+  vars:
+    container: "{{ lookup('file',wl_logs_dir+'/tocleanup.yaml') | from_yaml }}"
+
+- name: delete logs tar file
+  file:
+    path: "/tmp/{{ wl_namespace }}-docker-logs.tar"
+    state: absent
+  ignore_errors: true

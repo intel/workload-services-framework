@@ -15,6 +15,10 @@
     recurse: yes
   failed_when: false
 
+- name: set reboot false
+  set_fact:
+    startup_reboot_required: false
+
 - name: apply label kernel-args
   include_role:
     name: "{{ label_name.split('=')[0].split('-')[2]|lower }}"
@@ -26,12 +30,27 @@
   loop_control:
     loop_var: label_name
 
-- name: Apply kernel args
+- name: apply kernel args
   include_tasks:
     file: kernel-args.yaml
+  when: not ansible_host in my_ip_list.split(',')
+
+- name: apply BIOS settings
+  include_role:
+    name: bios
+    tasks_from: startup
   when:
-  - wl_kernel_args.keys() | length > 0
+  - sut_reboot | default(true) | bool
+  - sut_update_bios | default(false) | bool
   - not ansible_host in my_ip_list.split(',')
+  - (playbook_dir + '/roles/bios') is exists
+
+- name: reboot
+  include_tasks:
+    file: reboot.yaml
+  when:
+  - sut_reboot | default(true) | bool
+  - startup_reboot_required
 
 - name: auto-provision labels
   include_role:
@@ -39,7 +58,7 @@
     tasks_from: install
   when:
     - label_name.startswith('HAS-SETUP-')
-    - wl_enable_reboot | default('true') | bool
+    - sut_reboot | default('true') | bool
     - ( playbook_dir + '/roles/' + (label_name.split('=')[0].split('-')[2] | lower) + '/tasks/install.yaml' ) is exists
   loop: "{{ k8s_node_labels }}"
   loop_control:
@@ -48,15 +67,11 @@
 - name: process kernel modules
   include_tasks:
     file: kernel-modules.yaml
-  when: (wl_kernel_modules | length) > 0
 
 - name: process sysctls
   include_tasks:
     file: sysctl.yaml
-  when: (wl_sysctls.keys() | length) + (wl_default_sysctls.keys() | length) > 0
 
 - name: process sysfs
   include_tasks:
     file: sysfs.yaml
-  when: (wl_sysfs.keys() | length) + (wl_default_sysfs.keys() | length) > 0
-

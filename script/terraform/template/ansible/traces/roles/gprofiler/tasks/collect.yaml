@@ -12,29 +12,24 @@
   become: no
   ignore_errors: true
 
-- name: Archive gprofiler files
-  command:
-    cmd: "tar cfz /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler.tgz ."
+- name: Get gprofiler files
+  shell:
+    cmd: ls -1
     chdir: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler"
+    executable: /bin/bash
   become: no
   delegate_to: "{{ trace_node.1 }}"
+  register: gprofiler_files
   ignore_errors: true
 
 - name: Fetch gprofiler files
   fetch:
-    src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler.tgz"
-    dest: "{{ wl_logs_dir }}/"
+    src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler/{{ item }}"
+    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-gprofiler/"
     flat: yes
   become: no
   delegate_to: "{{ trace_node.1 }}"
-  ignore_errors: true
-
-- name: Untar gprofiler files
-  command:
-    cmd: "tar xfz {{ wl_logs_dir }}/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler.tgz"
-    chdir: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-gprofiler"
-  delegate_to: localhost
-  become: no
+  loop: "{{ gprofiler_files.stdout_lines | reject('==', 'gprofiler.pid') }}"
   ignore_errors: true
 
 - name: Remove any collection files
@@ -45,18 +40,3 @@
   delegate_to: "{{ trace_node.1 }}"
   ignore_errors: true
 
-- name: Remove any gprofiler tar files
-  file:
-    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler.tgz"
-    state: absent
-  become: false
-  delegate_to: "{{ trace_node.1 }}"
-  ignore_errors: true
-
-- name: Remove any gprofiler tar files
-  file:
-    path: "{{ wl_logs_dir }}/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler.tgz"
-    state: absent
-  become: false
-  delegate_to: localhost
-  ignore_errors: true

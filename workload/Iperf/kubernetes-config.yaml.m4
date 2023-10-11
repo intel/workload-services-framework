@@ -16,7 +16,7 @@ spec:
       PODANTIAFFINITY(required,app,iperf-client)
       containers:
       - name: iperf-server
-        image: IMAGENAME(Dockerfile.1.iperf)
+        image: IMAGENAME(WORKLOAD)
         imagePullPolicy: IMAGEPOLICY(Always)
         ports:
         - containerPort: defn(`SERVER_POD_PORT')
@@ -103,7 +103,7 @@ spec:
             done
       containers:
       - name: iperf-client
-        image: IMAGENAME(Dockerfile.1.iperf)
+        image: IMAGENAME(WORKLOAD)
         imagePullPolicy: IMAGEPOLICY(Always)
         env:
         - name: `IPERF_VER'

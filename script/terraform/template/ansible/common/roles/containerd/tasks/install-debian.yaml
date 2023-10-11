@@ -54,7 +54,7 @@
 - name: install containerd.io
   apt:
     name:
-    - "containerd.io={{ containerd_default_version['debian'] }}"
+    - "containerd.io={{ containerd_version | default(containerd_default_version.debian) }}"
     update_cache: true
   register: aptrc
   become: true

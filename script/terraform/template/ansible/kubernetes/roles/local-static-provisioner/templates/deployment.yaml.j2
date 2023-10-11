@@ -1,0 +1,131 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+---
+# Source: provisioner/templates/provisioner.yaml
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: local-provisioner-config
+  namespace: "{{ k8s_local_static_provisioner_namespace }}"
+data:
+  storageClassMap: |
+    {{ k8s_local_static_provisioner_storage_class_name }}:
+       hostDir: {{ k8s_local_static_provisioner_hostdir }}
+       mountDir:  {{ k8s_local_static_provisioner_hostdir }}
+       blockCleanerCommand:
+         - /scripts/fsclean.sh
+       volumeMode: Filesystem
+       fsType: ""
+       namePattern: "disk*"
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: local-volume-provisioner
+  namespace: "{{ k8s_local_static_provisioner_namespace }}"
+  labels:
+    app: "{{ k8s_local_static_provisioner_app_label }}"
+spec:
+  selector:
+    matchLabels:
+      app: "{{ k8s_local_static_provisioner_app_label }}"
+  template:
+    metadata:
+      labels:
+        app: "{{ k8s_local_static_provisioner_app_label }}"
+    spec:
+      serviceAccountName: local-storage-admin
+      containers:
+        - image: "{{ k8s_local_static_provisioner_image }}"
+          imagePullPolicy: "IfNotPresent"
+          name: provisioner
+          securityContext:
+            privileged: true
+          env:
+          - name: MY_NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          volumeMounts:
+            - mountPath: /etc/provisioner/config
+              name: provisioner-config
+              readOnly: true
+            - mountPath: "{{ k8s_local_static_provisioner_hostdir }}"
+              name: "{{ k8s_local_static_provisioner_storage_class_name }}"
+              mountPropagation: "HostToContainer"
+            - mountPath: /dev
+              name:  provisioner-dev
+      volumes:
+        - name: provisioner-config
+          configMap:
+            name: local-provisioner-config
+        - name: "{{ k8s_local_static_provisioner_storage_class_name }}"
+          hostPath:
+            path: "{{ k8s_local_static_provisioner_hostdir }}"
+        - name: provisioner-dev
+          hostPath:
+            path: /dev
+
+---
+# Source: provisioner/templates/provisioner-service-account.yaml
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: local-storage-admin
+  namespace: "{{ k8s_local_static_provisioner_namespace }}"
+
+---
+# Source: provisioner/templates/provisioner-cluster-role-binding.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: local-storage-provisioner-pv-binding
+  namespace: "{{ k8s_local_static_provisioner_namespace }}"
+subjects:
+- kind: ServiceAccount
+  name: local-storage-admin
+  namespace: "{{ k8s_local_static_provisioner_namespace }}"
+roleRef:
+  kind: ClusterRole
+  name: system:persistent-volume-provisioner
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: local-storage-provisioner-node-clusterrole
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: local-storage-provisioner-node-binding
+  namespace: "{{ k8s_local_static_provisioner_namespace }}"
+subjects:
+- kind: ServiceAccount
+  name: local-storage-admin
+  namespace: "{{ k8s_local_static_provisioner_namespace }}"
+roleRef:
+  kind: ClusterRole
+  name: local-storage-provisioner-node-clusterrole
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: "{{ k8s_local_static_provisioner_storage_class_name }}"
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete

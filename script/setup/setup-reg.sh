@@ -70,6 +70,7 @@ DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
 cd "$DIR"
 
 ./setup-ansible.sh || exit 3
+./setup-sut-native.sh --port $ssh_port ${hosts[@]} || exit 3
 if [ -z "$mirror_url" ]; then
   [[ -z "$reg_port" ]] && reg_port=20666
   options=""
@@ -88,7 +89,7 @@ workers="$(i=0;for h in ${hosts[@]}; do cat <<EOF
 EOF
 i=$((i+1));done)"
 
-ANSIBLE_INVENTORY_ENABLED=yaml ansible-playbook -vv -e dev_cert_host=$host -e dev_registry_port=$reg_port -e wl_logs_dir="$DIR" -e my_ip_list=1.1.1.1 -e dev_cert_replace=$replace $options -K -i <(cat <<EOF
+ANSIBLE_INVENTORY_ENABLED=yaml ansible-playbook --flush-cache -vv -e dev_cert_host=$host -e dev_registry_port=$reg_port -e wl_logs_dir="$DIR" -e my_ip_list=1.1.1.1 -e dev_cert_replace=$replace $options -K -i <(cat <<EOF
 all:
   children:
     cluster_hosts:

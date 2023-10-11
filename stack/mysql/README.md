@@ -1,3 +1,6 @@
+>
+> **Note: The Workload Services Framework is a benchmarking framework and is not intended to be used for the deployment of workloads in production environments. It is recommended that users consider any adjustments which may be necessary for the deployment of these workloads in a production environment including those necessary for implementing software best practices for workload scalability and security.**
+>
 # MySQL
 
 MySQL is world most popular database. This image is based on [official DockerHub image](https://hub.docker.com/_/mysql) (ver [8.0.31](https://hub.docker.com/layers/library/mysql/8.0.31/images/sha256-cfddf275c8b1ae1583c0f6afb4899d4dbe14111a6462699559a1f4dc8f4d5f6e?context=explore)) and adds Intel optimizations of top of it. This readme focuses on Intel added scripts and configurations.

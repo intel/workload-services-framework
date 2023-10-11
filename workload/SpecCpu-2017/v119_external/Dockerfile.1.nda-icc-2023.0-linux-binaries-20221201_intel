@@ -1,0 +1,55 @@
+# speccpu-2017-v119-icc-2023.0-20221201-nda
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=22.04
+ARG OS_IMAGE=ubuntu
+
+ARG RELEASE
+FROM speccpu-2017-v119-base-nda${RELEASE} as build
+
+ARG SPEC2017_ISO_VER=1.1.9
+ARG SPEC_CPU_ICC_BINARIES_VER=ic2023.0-linux-binaries-20221201
+ARG SPEC_CPU_ICC_BINARIES_REPO=${SPEC_CPU_ICC_BINARIES_REPO:-FOR-INTEL-cpu2017-$SPEC2017_ISO_VER-$SPEC_CPU_ICC_BINARIES_VER.tar.xz}
+ARG WORK_DIR=/opt/spec2017
+
+WORKDIR ${WORK_DIR}
+
+RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates && \
+    mkdir -p ${WORK_DIR}/data/
+
+ARG URL=${SPEC_CPU_ICC_BINARIES_REPO}
+COPY data/ ${WORK_DIR}/data/
+RUN [ -e ${WORK_DIR}/data/icc_binaries.tar.xz ] || wget --no-proxy -T 5 --tries=inf -O ${WORK_DIR}/data/icc_binaries.tar.xz $URL
+RUN tar xfJ ${WORK_DIR}/data/icc_binaries.tar.xz -C ${WORK_DIR}/
+
+RUN rm -rf ${WORK_DIR}/data/
+
+WORKDIR /opt/spec2017/lib
+RUN ln -s libgomp.so libgomp.so.1
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+RUN apt-get update && apt-get install -y --no-install-recommends dmidecode build-essential unzip numactl gawk automake && \
+    apt-get install -y lib32stdc++6 sudo && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN sed -i 's/# deb-src/deb-src/' /etc/apt/sources.list && \
+    apt-get update && apt-get build-dep gcc -y && \
+    apt-get install -y --no-install-recommends gcc g++ gfortran libgcc-12-dev libgcc-s1 glibc-source && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /opt/spec2017 /opt/spec2017
+COPY script/main-icc.sh /opt/spec2017/
+
+ENV LD_LIBRARY_PATH=/opt/spec2017/lib/intel64:/opt/spec2017/lib:/opt/spec2017/je5.0.1-64
+WORKDIR /opt/spec2017
+RUN chmod +x /opt/spec2017/main-icc.sh
+
+RUN mkfifo /export-logs
+CMD (./main-icc.sh; echo $? > status) 2>&1 | tee output.logs && \
+    tar cf /export-logs status output.logs $(find result -type f) && \
+    sleep infinity

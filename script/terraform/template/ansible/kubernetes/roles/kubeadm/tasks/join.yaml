@@ -5,23 +5,21 @@
 #
 
 - block:
-  - name: Join workers
-    command: "{{ hostvars['controller-0']['ansible_facts']['join_cmd'] }} --v={{ k8s_log_verbosity | default(2) }}"
-    become: true
-    register: join_workers
-    async: "{{ k8s_join_workers_timeout | default(180) | int }}"
+
+    - name: Join workers
+      shell: "{{ hostvars['controller-0']['ansible_facts']['join_cmd'] }} --v={{ k8s_logs_level }}"
+      timeout: "{{ k8s_join_timeout }}"
+      become: true
 
   rescue:
-  - name: Rescue if join worker failed
-    include_tasks:
-      file: join-rescue.yaml
-    
-  always:
-  - name: Join workers
-    command: "{{ hostvars['controller-0']['ansible_facts']['join_cmd'] }} --v=5"
-    become: true
-    ignore_errors: true
-    when: join_workers.finished != 0
+
+    - name: kubeadm reset
+      include_tasks:
+        file: reset.yaml
+
+    - name: Rejoin workers
+      shell: "{{ hostvars['controller-0']['ansible_facts']['join_cmd'] }} --v=5"
+      become: true
 
 - name: Customize kubelet
   include_role:

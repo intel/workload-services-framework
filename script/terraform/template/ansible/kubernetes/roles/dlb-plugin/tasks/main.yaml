@@ -1,0 +1,34 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+- name: check DLB Device Plugin installation status
+  command: "kubectl wait --for=condition=Ready pod --all -n {{ dlbplugin_namespace }} --timeout 1s"
+  ignore_errors: true
+  register: dlbplugin_ready
+
+- block:
+  - name: install git
+    package:
+      name: git
+    register: pkgrc
+    until: pkgrc is success
+    retries: 10
+    delay: 10
+    become: true
+
+  - name: create namespace dlb-plugin namespace
+    ignore_errors: true
+    shell: |
+      kubectl create namespace {{ dlbplugin_namespace }}
+
+  - name: Install dlb-plugin
+    shell: |
+      kubectl apply -k {{ dlbplugin_kustomization_url }}{{ dlbplugin_version }} -n {{ dlbplugin_namespace }}
+
+  - name: wait for dlb-plugin to become fully available
+    command: "kubectl wait --for=condition=Ready pod --all -n {{ dlbplugin_namespace }} --timeout 30s"
+
+  when: dlbplugin_ready.rc == 1

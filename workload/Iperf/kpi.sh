@@ -27,7 +27,7 @@ parse_iperf3_kpi () {
 
 parse_iperf2_kpi () {
     find . -name "$1" -exec awk -e "$parse_common" -e '
-/\[SUM\]/ {
+/\[SUM\].*\/sec/ {
     print kvformat("Sample Time: ", $2 $3)
     print kvformat("Transfer: ", $4 $5)
     print kvformat("*Bandwidth: ", $6 $7)

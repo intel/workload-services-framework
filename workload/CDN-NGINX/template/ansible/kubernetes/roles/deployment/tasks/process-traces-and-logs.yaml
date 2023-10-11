@@ -1,0 +1,69 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: wait for cdn ready
+  command: |
+     docker run --rm --network host --entrypoint "/bin/sh" curlimages/curl:latest \
+           "-c" "while [ $(curl -k -sw '%{http_code}' -m 5 '{{ wl_tunables.HTTPMODE }}://{{ wl_tunables.NICIP_W1 }}:{{ wl_tunables.HTTPPORT }}' -o /dev/null) -ne 200 ];do echo Waiting...;sleep 1s;done"
+  register: container0
+  delegate_to: "{{ groups['off_cluster_hosts'] | first }}"
+  when: wl_tunables.GATED != 'gated'
+
+- name: create volume
+  command: |
+     docker volume create shared-data
+  delegate_to: "{{ groups['off_cluster_hosts'] | first }}"
+  when: wl_tunables.GATED != 'gated'
+
+
+- name: launch client 1
+  command: |
+     docker run --rm -d -v shared-data:/OUTPUT \
+          --network host \
+          -e NUSERS={{ wl_tunables.NUSERS }} \
+          -e NTHREADS={{ wl_tunables.NTHREADS }} \
+          -e DURATION={{ wl_tunables.DURATION }} \
+          -e PORT={{ wl_tunables.HTTPPORT }} \
+          -e GATED={{ wl_tunables.GATED }} \
+          -e STORAGE_MEDIUM={{ wl_tunables.STORAGE_MEDIUM }} \
+          -e STATUS_FILE="status1" \
+          -e LOG_FILE="output1.log" \
+          -e NICIP_W1={{ wl_tunables.NICIP_W1 }} \
+          {{ wrk_image }}
+  register: container1
+  delegate_to: "{{ groups['off_cluster_hosts'] | first }}"
+  when: wl_tunables.GATED != 'gated'
+
+- name: launch wrklog
+  command: |
+     docker run --rm -d -v shared-data:/OUTPUT \
+          -e WRKLOG_TIMEOUT={{ wl_tunables.WRKLOG_TIMEOUT }} \
+          {{ wrklog_image }}
+  register: container3
+  delegate_to: "{{ groups['off_cluster_hosts'] | first }}"
+  when: wl_tunables.GATED != 'gated'
+
+- name: monitor the docker execution and process traces and logs
+  include_tasks:
+    file: off-cluster-docker.yaml
+  vars:
+    off_cluster_host: "{{ groups['off_cluster_hosts'] | first }}"
+    off_cluster_container_id: "{{ container3.stdout }}"
+    workload_config: "{{ lookup('file',wl_logs_dir+'/workload-config.yaml') | from_yaml }}"
+  when: wl_tunables.GATED != 'gated'
+
+- name: destroy containers
+  shell: |
+    docker rm -f {{ container1.stdout }}
+    docker rm -f {{ container3.stdout }}
+    docker volume remove shared-data
+  delegate_to: "{{ groups['off_cluster_hosts'] | first }}"
+  when: wl_tunables.GATED != 'gated'
+
+- name: wait for benchmark to complete for gated
+  include_tasks:
+    file: process-traces-and-logs.yaml.origin
+  when: wl_tunables.GATED == 'gated'

@@ -1,0 +1,38 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: record timing
+  shell:
+    cmd: |
+      echo "workload_itr{{ itr }}_roi{{ roi_index }}_start: \"$(date -Ins)\"" >> {{ wl_logs_dir}}/timing.yaml
+    executable: /bin/bash
+  delegate_to: localhost
+  when:
+  - sut_sudo | default(true) | bool
+  - trace_start | default(false) == false
+
+- name: start trace
+  shell:
+    cmd: |
+      {% for h in groups['trace_hosts'] %}
+      ssh -p {{ hostvars[h]['ansible_port'] | default(22) }} {{ hostvars[h]['ansible_user'] }}@{{ hostvars[h]['ansible_host'] }} -i {{ ansible_private_key_file }} sudo -E /tmp/{{ wl_namespace }}-{{ h }}-start-trace.sh {{ roi_index }} &
+      {% endfor %}
+      wait
+    executable: /bin/bash
+  delegate_to: localhost
+  ignore_errors: yes
+  run_once: true
+  become: false
+  when:
+  - sut_sudo | default(true) | bool
+  - trace_start | default(false) == false
+
+- name: set trace started
+  set_fact:
+    trace_started: true
+  when:
+  - sut_sudo | default(true) | bool
+  - trace_start | default(false) == false
+

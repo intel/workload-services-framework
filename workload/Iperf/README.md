@@ -1,3 +1,6 @@
+>
+> **Note: The Workload Services Framework is a benchmarking framework and is not intended to be used for the deployment of workloads in production environments. It is recommended that users consider any adjustments which may be necessary for the deployment of these workloads in a production environment including those necessary for implementing software best practices for workload scalability and security.**
+>
 ### Introduction
 iPerf is a tool for network performance measurement and tuning. It is a cross-platform tool that can produce standardized performance measurements for any network. For each test it reports the bandwidth, loss, and other parameters.
 

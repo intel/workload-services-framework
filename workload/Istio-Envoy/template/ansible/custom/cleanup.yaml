@@ -1,0 +1,19 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- hosts: controller-0
+  gather_facts: no
+  tasks: 
+    - name: Uninstall istio installation
+      include_role:
+        name: istio
+        tasks_from: uninstall
+
+- hosts: client
+  gather_facts: no
+  tasks: 
+    - name: Make sure the workload namespace is removed.
+      command: "kubectl delete namespace {{ wl_namespace }}"
+      ignore_errors: true

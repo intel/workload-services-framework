@@ -4,45 +4,40 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-    - name: Detect OS
-      shell: 
-        cmd: ". /etc/os-release; echo $ID"
-        executable: /bin/bash
-      register: os
+- name: set kernel args
+  set_fact:
+    kernel_args_list: "{{ (kernel_args_list + (sut_kernel_args | split(',') | map('trim') | select('match',item+':.*') | map('regex_replace','^[^:]*:','') | map('trim') | map('split',' '))) | flatten | reject('==','') }}"
+  loop: "{{ group_names }}"
+  vars:
+    kernel_args_list: "{{ wl_kernel_args.values() | list }}"
 
-    - name: add kernel parameters
-      blockinfile:
-        path: "{{ startup_kernel_args_actions[os.stdout]['grub_path'] }}"
-        create: yes
-        block: |
-          GRUB_CMDLINE_LINUX_DEFAULT="${GRUB_CMDLINE_LINUX_DEFAULT} {{ wl_kernel_args.values() | join(' ') }}"
-      register: kargs
-      ignore_errors: yes
+- name: Detect OS
+  shell: 
+    cmd: ". /etc/os-release; echo $ID"
+    executable: /bin/bash
+  register: os
+  when: kernel_args_list | length > 0
 
-    - name: update grub
-      shell: "{{ startup_kernel_args_actions[os.stdout]['update_grub_cmd'] }}"
-      when: (kargs.msg == 'Block inserted') or (kargs.msg == 'File created')
-      ignore_errors: yes
+- name: add kernel parameters
+  blockinfile:
+    path: "{{ startup_kernel_args_actions[os.stdout]['grub_path'] }}"
+    create: yes
+    block: |
+      GRUB_CMDLINE_LINUX_DEFAULT="${GRUB_CMDLINE_LINUX_DEFAULT} {{ kernel_args_list | join(' ') }}"
+  register: kargs
+  ignore_errors: yes
+  when: kernel_args_list | length > 0
 
-    - name: reboot
-      command: "reboot"
-      async: 1
-      poll: 0
-      ignore_errors: yes
-      when:
-      - (kargs.msg == 'Block inserted') or (kargs.msg == 'File created')
-      - wl_enable_reboot | default('true') | bool
-      - kernel_args_reboot_required | default('false') | bool
+- name: update grub
+  shell: "{{ startup_kernel_args_actions[os.stdout]['update_grub_cmd'] }}"
+  when:
+  - kernel_args_list | length > 0
+  - (kargs.msg == 'Block inserted') or (kargs.msg == 'File created')
+  ignore_errors: yes
 
-    - name: wait for the machine to come back
-      wait_for_connection:
-        connect_timeout: 1
-        sleep: 1
-        delay: 1
-        timeout: 1800
-      ignore_errors: yes
-      when:
-      - (kargs.msg == 'Block inserted') or (kargs.msg == 'File created')
-      - wl_enable_reboot | default('true') | bool
-      - kernel_args_reboot_required | default('false') | bool
+- name: request reboot
+  set_fact:
+    startup_reboot_required: "{{ startup_reboot_required or (kargs.msg == 'Block inserted') or (kargs.msg == 'File created') }}"
+  when: kernel_args_list | length > 0
+
 

@@ -4,29 +4,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: Generate out.perf
-  shell: "perf script {{ perf_script_options }} -i /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.record > /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.out"
-  become: yes
-  delegate_to: "{{ trace_node.1 }}"
-  ignore_errors: yes
-
-- name: Fetch out.perf
-  fetch:
-    src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.out"
-    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-perf/perf.out"
-    flat: yes
-  become: yes
-  delegate_to: "{{ trace_node.1 }}"
-  ignore_errors: yes
-
-- name: Remove any collection file
-  file:
-    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.out"
-    state: absent
-  become: yes
-  delegate_to: "{{ trace_node.1 }}"
-  ignore_errors: yes
-
 - name: Install perl
   apt:
     name:
@@ -42,15 +19,15 @@
   delay: 10
 
 - name: Create flamegraph SVG
-  shell: "stackcollapse-perf.pl {{ perf_flamegraph_collapse_options }} {{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-perf/perf.out | flamegraph.pl {{ perf_flamegraph_svg_options }} > {{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-perf/perf.flamegraph.svg"
+  shell:
+    cmd: |
+      for perfout in perf-*.out; do
+        stackcollapse-perf.pl {{ perf_flamegraph_collapse_options }} $perfout | flamegraph.pl {{ perf_flamegraph_svg_options }} > ${perfout/.out/.svg}
+        rm -f $perfout
+      done
+    chdir: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-perf"
+    executable: /bin/bash
   become: no
-  delegate_to: localhost
-  ignore_errors: yes
-
-- name: Remove any collection file
-  file:
-    path: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-perf/perf.out"
-    state: absent
   delegate_to: localhost
   ignore_errors: yes
 

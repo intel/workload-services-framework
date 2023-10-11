@@ -1,0 +1,13 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+    - name: Install trace module
+      include_role:
+        name: "{{ trace_module }}"
+        tasks_from: install
+  ignore_errors: yes
+

@@ -10,8 +10,8 @@ resource "azurerm_linux_virtual_machine" "default" {
 
   name                = "wsf-${var.job_id}-vm-${each.key}"
   computer_name       = each.key
-  resource_group_name = azurerm_resource_group.default.name
-  location            = azurerm_resource_group.default.location
+  resource_group_name = local.resource_group_name
+  location            = local.location
   size                = each.value.instance_type
   admin_username      = local.os_image_user[each.value.os_type]
   source_image_id     = each.value.os_image==null?null:(length(split("/",each.value.os_image))==9?each.value.os_image:tolist(data.azurerm_resources.image[each.key].resources).0.id)
@@ -83,8 +83,8 @@ resource "azurerm_windows_virtual_machine" "default" {
 
   name = "wsf-${var.job_id}-vm-${each.key}"
   computer_name = each.key
-  resource_group_name = azurerm_resource_group.default.name
-  location = azurerm_resource_group.default.location
+  resource_group_name = local.resource_group_name
+  location = local.location
   size = each.value.instance_type
   zone = each.value.data_disk_spec!=null?each.value.data_disk_spec.disk_type=="UltraSSD_LRS"?local.availability_zone:null:null
 

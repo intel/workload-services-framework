@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-k8s_version: "1.24.4"
+k8s_version: "1.26.6"
 k8s_pod_cidr: "10.244.0.0/16"
 k8s_service_cidr: "10.96.0.0/12"
 k8s_cgroup_driver: "systemd"
@@ -37,3 +37,5 @@ k8s_kubelet_config_path:
   debian: /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
   anolis: /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
 
+k8s_join_timeout: "600"
+k8s_logs_level: 2

@@ -17,7 +17,7 @@ COMPOSE_CONFIG = "compose-config.yaml"
 INVENTORY = "inventory.yaml"
 CLUSTER = "cluster.yaml"
 CLEANUP = "cleanup.yaml"
-SSH_CONFIG = "ssh_config"
+SSH_CONFIG = "ssh_config_bastion"
 WORKLOAD_CONFIG = "workload-config.yaml"
 
 tfoutput = json.load(sys.stdin)
@@ -123,6 +123,9 @@ def _ScanK8sImages():
     with open(KUBERNETES_CONFIG) as fd:
       for doc in yaml.safe_load_all(fd):
         if doc:
+          spec = _WalkTo(doc, "spec")
+          if not spec:
+            continue
           for c1 in ["containers", "initContainers"]:
             spec = _WalkTo(doc, c1)
             if spec:
@@ -201,6 +204,7 @@ def _RegistryEnabled():
 nidx = {}
 sysctls = {}
 sysfs = {}
+bios = {}
 with open(CLUSTER_CONFIG) as fd:
   for doc in yaml.safe_load_all(fd):
     if doc and "cluster" in doc:
@@ -246,6 +250,11 @@ with open(CLUSTER_CONFIG) as fd:
             sysfs[vm_group] = {}
           sysfs[vm_group].update(c["sysfs"])
 
+        if "bios" in c:
+          if vm_group not in bios:
+            bios[vm_group] = {}
+          bios[vm_group].update(c["bios"])
+
     if doc and "terraform" in doc:
       for option1 in doc["terraform"]:
         if option1 not in options:
@@ -258,6 +267,7 @@ with open(CLUSTER_CONFIG) as fd:
 
 _CreatePerHostCtls("wl_sysctls", sysctls)
 _CreatePerHostCtls("wl_sysfs", sysfs)
+_CreatePerHostCtls("wl_bios", bios)
 
 playbooks = [{
   "name": "startup sequence",
@@ -321,6 +331,14 @@ if os.path.exists("/opt/workload/template/ansible/custom/installation.yaml"):
     })
   })
 
+if inventories["trace_hosts"]["hosts"]:
+  playbooks.append({
+    "name": "Install traces",
+    "import_playbook": "./template/ansible/common/trace.yaml",
+    "vars": _ExtendOptions({
+    })
+  })
+
 if options.get("svrinfo", True):
   playbooks.append({
     "name": "Invoke svrinfo",
@@ -354,6 +372,15 @@ with open(CLEANUP, "w") as fd:
       })
     }]
   }]
+
+  if ((options.get("docker", False) or options.get("native", False)) and ("docker_image" in workload_config)) or (options.get("compose", False) and os.path.exists(COMPOSE_CONFIG)):
+    playbooks.append({
+      "name": "Docker cleanup sequence",
+      "import_playbook": "./template/ansible/docker/cleanup.yaml",
+      "vars": _ExtendOptions({
+        "wl_tunables": workload_config.get('tunables', {}),
+      }),
+    })
 
   # k8s cleanup
   if os.path.exists(KUBERNETES_CONFIG) or options.get("k8s_install", False):
@@ -390,11 +417,9 @@ with open(INVENTORY, "w") as fd:
   inventory_update = options.get("ansible_inventory", {})
   for group in inventory_update:
     if "hosts" in inventory_update[group]:
-      inventories.update({
-        group: {
-          "hosts": inventory_update[group]["hosts"]
-        }
-      })
+      if group not in inventories:
+        inventories[group] = {"hosts": {}}
+      inventories[group]["hosts"].update(inventories_update[group]["hosts"])
   yaml.dump({
     "all": {
       "children": inventories

@@ -128,6 +128,10 @@ def _UpdateK8sConfig(nodes, registry_map):
   for doc in docs:
     modified_docs.append(doc)
 
+    spec_tmp = _WalkTo(doc, "spec")
+    if not spec_tmp:
+      continue
+
     spec = _WalkTo(doc, "containers")
     if spec and spec["containers"]:
       _AddNodeAffinity(spec, nodes)

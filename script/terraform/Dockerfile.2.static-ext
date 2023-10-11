@@ -11,7 +11,7 @@ FROM terraform-base${RELEASE}
 COPY data/ /usr/local/src/
 
 # Install svrinfo
-ARG SVRINFO_VER=2.5.0
+ARG SVRINFO_VER=2.7.0
 ARG SVRINFO_PKG=https://github.com/intel/svr-info/releases/download/v${SVRINFO_VER}/svr-info.tgz
 RUN curl --retry 5 -o - -L ${SVRINFO_PKG} | tar xfz - -C /usr/local/src
 

@@ -6,7 +6,17 @@
 - hosts: workload_hosts
   any_errors_fatal: true
   gather_facts: no
+  become: false
   tasks:
+
+    - name: Recording timing
+      shell:
+        cmd: |
+          echo "image_transfer_start: \"$(date -Ins)\"" >> "{{ wl_logs_dir }}/timing.yaml"
+        executable: /bin/bash
+      delegate_to: localhost
+      run_once: true
+      when: (wl_docker_images | length) > 0
 
     - name: Transfer image(s) to docker daemon
       include_role:
@@ -14,4 +24,14 @@
       when: 
       - ansible_connection != 'winrm'
       - (native | default(false) | bool) == false
+      - (wl_docker_images | length) > 0
+      - ((','+ansible_host+',') not in (','+my_ip_list+',')) or ((csp | default('static')) != 'static')
 
+    - name: Recording timing
+      shell:
+        cmd: |
+          echo "image_transfer_end: \"$(date -Ins)\"" >> "{{ wl_logs_dir }}/timing.yaml"
+        executable: /bin/bash
+      delegate_to: localhost
+      run_once: true
+      when: (wl_docker_images | length) > 0

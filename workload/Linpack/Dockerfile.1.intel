@@ -1,0 +1,20 @@
+# linpack-intel
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+
+FROM linpack-base-intel${RELEASE}
+
+WORKDIR /root
+
+COPY run_test_intel.sh run_test.sh
+
+RUN mkfifo /export-logs
+
+CMD  (bash run_test.sh; echo $? > status) 2>&1  | tee output.logs && \
+     tar cf /export-logs status output.logs && \
+     sleep infinity

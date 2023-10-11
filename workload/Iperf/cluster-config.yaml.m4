@@ -6,5 +6,5 @@ cluster:
 ifelse(MODE,ingress,`dnl
   off_cluster: true
 terraform:
-  iperf_client_image: IMAGENAME(Dockerfile.1.iperf)
+  iperf_client_image: IMAGENAME(WORKLOAD)
 ')dnl

@@ -34,8 +34,3 @@
 - name: 'Force all notified handlers to run'
   ansible.builtin.meta: flush_handlers
 
-- name: 'Wait for all host to become reachable'
-  failed_when: false
-  ansible.builtin.wait_for_connection:
-    delay: 10
-    timeout: 120

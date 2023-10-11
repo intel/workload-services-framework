@@ -14,3 +14,29 @@
   include_tasks:
     file: "install-{{ (os.stdout == 'rhel' or os.stdout =='anolis') | ternary('centos', os.stdout) }}.yaml"
 
+- name: Append the start script
+  blockinfile:
+    path: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-start-trace.sh"
+    marker: "# sar {mark}"
+    insertbefore: "^wait"
+    block: |
+      (
+        mkdir -p /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-sar
+        cd /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-sar
+        date -Ins >> TRACE_START
+        nohup sar {{ sar_options }} -o sar-$1.logs > /dev/null 2>&1 &
+        echo $! > sar.pid
+        disown
+      ) &
+
+- name: Append the stop script
+  blockinfile:
+    path: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-stop-trace.sh"
+    marker: "# sar {mark}"
+    insertbefore: "^wait"
+    block: |
+      (
+        cd /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-sar
+        date -Ins >> TRACE_STOP
+        kill $(cat sar.pid)
+      ) &

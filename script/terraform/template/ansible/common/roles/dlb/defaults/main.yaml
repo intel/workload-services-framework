@@ -1,0 +1,7 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+dlb_zip_url: https://downloadmirror.intel.com/787629/dlb_linux_src_release_8.5.1.txz
+dlb_zip: dlb_linux_src_release_8.5.1.txz

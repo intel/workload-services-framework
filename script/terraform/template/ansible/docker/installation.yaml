@@ -4,10 +4,19 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 - hosts: workload_hosts
-  become: yes
+  become: "{{ sut_sudo | default(true) | bool }}"
   any_errors_fatal: true
-  gather_facts: no
+  gather_facts: false
   tasks:
+
+    - name: Recording timing
+      shell:
+        cmd: |
+          echo "docker_setup_start: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
+        executable: /bin/bash
+      delegate_to: localhost
+      when: ansible_connection != 'winrm'
+      become: false
 
     - name: Install docker
       include_role:
@@ -15,4 +24,13 @@
       when:
       - ansible_connection != 'winrm'
       - (native | default(false) | bool) == false
+      - sut_sudo | default(true) | bool
 
+    - name: Recording timing
+      shell:
+        cmd: |
+          echo "docker_setup_end: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
+        executable: /bin/bash
+      delegate_to: localhost
+      when: ansible_connection != 'winrm'
+      become: false

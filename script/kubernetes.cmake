@@ -18,4 +18,7 @@ else()
     message("")
 endif()
 
+function(show_backend_settings)
+    message("-- Setting: KUBERNETES_OPTIONS=${KUBERNETES_OPTIONS}")
+endfunction()
 
