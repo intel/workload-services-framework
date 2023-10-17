@@ -16,7 +16,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
       - name: benchmark
-        image: IMAGENAME(Dockerfile.2.ycsb)
+        image: IMAGENAME(ycsb-0.17.0-base)
         resources:
           requests:
             cpu: 1

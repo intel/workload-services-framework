@@ -16,7 +16,7 @@ spec:
         app: config-center
     spec:
       containers:
-      - image: IMAGENAME(Dockerfile.2.ycsb)
+      - image: IMAGENAME(ycsb-0.17.0-base)
         imagePullPolicy: IMAGEPOLICY(Always)
         command: ["/bin/bash", "-c","(exec redis-server --protected-mode no & ) && sleep infinity"]
         name: config-center
