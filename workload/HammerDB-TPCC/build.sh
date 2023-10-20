@@ -23,7 +23,7 @@ case $PLATFORM in
         ARCHSETTING=x86_64
 esac
 
-FIND_OPTIONS="( -name Dockerfile.?.mysql -o -name Dockerfile.?.hammerdb $FIND_OPTIONS)"
+FIND_OPTIONS="( -name Dockerfile.?.mysql.tmp* -o -name Dockerfile.?.hammerdb $FIND_OPTIONS)"
 BUILD_OPTIONS="$BUILD_OPTIONS --build-arg MYSQL_BASE_IMAGE=${MYSQL_BASE_IMAGE}"
 
 # build aarch64 image

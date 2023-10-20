@@ -21,7 +21,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
       - name: mongodb-server-$1
-        image: IMAGENAME(Dockerfile.1.mongodb)
+        image: IMAGENAME(ycsb-amd64-mongodb441-base)
         resources:
           requests:
             cpu: 1
