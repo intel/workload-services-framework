@@ -1,4 +1,4 @@
-# ycsb-0.17.0
+# ycsb-0.17.0-base
 
 ARG OS_VER=22.04
 ARG OS_IMAGE=ubuntu
