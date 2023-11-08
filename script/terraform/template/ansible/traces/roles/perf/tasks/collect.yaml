@@ -6,70 +6,60 @@
 
 - name: Create the perf directory
   file:
-    path: "{{ wl_logs_dir}}/{{ trace_node.1 }}-{{ itr | default(1) }}-perf"
+    path: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-perf"
     state: directory
   delegate_to: localhost
-  become: no
-  ignore_errors: yes
+  become: false
+  ignore_errors: true
 
 - name: Process perf records
-  shell: "perf report {{ perf_report_options }} -i /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.record > /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.report"
+  shell:
+    cmd: |
+      {% if perf_action == 'record' %}
+        for record in perf-*.record; do
+          perf report {{ perf_report_options }} -i $record > ${record/.record/.report}
+          {% if perf_flamegraph %}
+            perf script {{ perf_script_options }} -i $record > $record.out
+          {% endif %}
+        done
+      {% endif %}
+    chdir: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf"
+    executable: /bin/bash
   delegate_to: "{{ trace_node.1 }}"
-  register: report
-  become: yes
-  ignore_errors: yes
-  when: perf_action == "record"
+  ignore_errors: true
+  become: true
+
+- name: Get perf files
+  shell:
+    cmd:   ls -1
+    chdir: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf"
+    executable: /bin/bash
+  register: perf_files
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: false
 
 - name: Fetch perf files
-  fetch:
-    src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.report"
-    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-perf/perf.report"
-    flat: yes
+  ansible.builtin.fetch:
+    src:  "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf/{{ item }}"
+    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-perf/"
+    flat: true
+  when: (perf_action == 'stat') or ('.record' not in item) or ('.out' in item)
+  loop: "{{ perf_files.stdout_lines | reject('==','perf.pid') }}"
   delegate_to: "{{ trace_node.1 }}"
-  become: yes
-  ignore_errors: yes
-  when: perf_action == "record"
+  ignore_errors: true
+  become: false
 
-- name: Fetch perf raw data
-  fetch:
-    src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.record"
-    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-perf/perf.data"
-    flat: yes
+- name: Remove any collection files
+  file:
+    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf"
+    state: absent
   delegate_to: "{{ trace_node.1 }}"
-  become: yes
-  ignore_errors: yes
-  when: perf_fetch_data or perf_action == "stat"
-
-- name: Fetch trace start/stop timing
-  fetch:
-    src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.{{ item.src }}"
-    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-perf/{{ item.dest }}"
-    flat: yes
-  delegate_to: "{{ trace_node.1 }}"
-  become: yes
-  ignore_errors: yes
-  loop:
-  - src: start
-    dest: TRACE_START
-  - src: stop
-    dest: TRACE_STOP
+  ignore_errors: true
+  become: true
 
 - name: Create flame graph
   include_tasks:
     file: flamegraph.yaml
   when: perf_flamegraph and perf_action == "record"
-
-- name: Remove any collection files
-  file:
-    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf.{{ item }}"
-    state: absent
-  become: yes
-  delegate_to: "{{ trace_node.1 }}"
-  ignore_errors: yes
-  loop:
-  - record
-  - data
-  - pid
-  - start
-  - stop
 

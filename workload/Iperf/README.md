@@ -1,3 +1,6 @@
+>
+> **Note: The Workload Services Framework is a benchmarking framework and is not intended to be used for the deployment of workloads in production environments. It is recommended that users consider any adjustments which may be necessary for the deployment of these workloads in a production environment including those necessary for implementing software best practices for workload scalability and security.**
+>
 ### Introduction
 iPerf is a tool for network performance measurement and tuning. It is a cross-platform tool that can produce standardized performance measurements for any network. For each test it reports the bandwidth, loss, and other parameters.
 
@@ -42,7 +45,7 @@ Designed for basic function verification
 ```
 
 ### Customization
-All the configurable parameters are listed in [`validate.sh`](validate.sh). You can use [`TEST_CONFIG`](https://github.com/intel-innersource/applications.benchmarking.benchmark.platform-hero-features/blob/master/doc/ctest.md#customize-configurations) to set those parameters. Besides, CLIENT_OPTIONS & SERVER_OPTIONS can be used to set those options supported by iperf but not listed in validate.sh.
+All the configurable parameters are listed in [`validate.sh`](validate.sh). You can use [`TEST_CONFIG`](https://github.com/intel/workload-services-framework/blob/main/doc/user-guide/executing-workload/ctest.md#customize-configurations) to set those parameters. Besides, CLIENT_OPTIONS & SERVER_OPTIONS can be used to set those options supported by iperf but not listed in validate.sh.
 
 ### KPI
 Run the [`kpi.sh`](kpi.sh) script to parse the KPIs from the output logs.

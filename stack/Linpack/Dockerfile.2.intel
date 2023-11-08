@@ -1,0 +1,42 @@
+# linpack-base-intel
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=22.04
+ARG OS_IMAGE=ubuntu
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+ARG HPCKIT_VER="2023.2.0.49440_offline"
+ARG HPCKIT_REPO="https://registrationcenter-download.intel.com/akdlm/IRC_NAS/0722521a-34b5-4c41-af3f-d5d14e88248d/l_HPCKit_p_${HPCKIT_VER}.sh"
+ARG HPCKIT_SCRIPT="l_HPCKit_p_${HPCKIT_VER}.sh"
+ARG BASEKIT_VER="2023.2.0.49397_offline"
+ARG BASEKIT_REPO="https://registrationcenter-download.intel.com/akdlm/IRC_NAS/992857b9-624c-45de-9701-f6445d845359/l_BaseKit_p_${BASEKIT_VER}.sh"
+ARG BASEKIT_SCRIPT="l_BaseKit_p_${BASEKIT_VER}.sh"
+ARG ONEAPI_PATH="/opt/intel/oneapi"
+ARG MPIKIT_VER="2021.10.0"
+
+# Install Dependencies
+RUN apt-get -y update && \
+    apt-get install build-essential -y && \
+    apt-get install wget numactl bc -y
+
+# Install Intel® oneAPI
+RUN cd / && \
+    no_proxy=$(echo $no_proxy | tr ',' '\n' | grep -v -E '^.?intel.com$' | tr '\n' ',') wget -T 5 --tries=inf ${HPCKIT_REPO} && \
+    bash "${HPCKIT_SCRIPT}" -a -s --silent --eula accept
+
+RUN cd / && \
+    no_proxy=$(echo $no_proxy | tr ',' '\n' | grep -v -E '^.?intel.com$' | tr '\n' ',') wget -T 5 --tries=inf ${BASEKIT_REPO} && \
+    bash "${BASEKIT_SCRIPT}" -a -s --silent --eula accept
+
+RUN ln -s /opt/intel/oneapi/mkl/latest/ /opt/intel/mkl
+
+# Cleanup unneeded oneapi components
+RUN rm -rf ${ONEAPI_PATH}/compiler && \
+    rm -rf ${ONEAPI_PATH}/conda_channel && \
+    rm -rf ${ONEAPI_PATH}/mpi/${MPIKIT_VER}/lib/release/libmpi.a && \
+    rm -rf ${ONEAPI_PATH}/mpi/${MPIKIT_VER}/lib/release/libmpi.dbg

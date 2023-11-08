@@ -17,7 +17,7 @@
 - name: Download calico.yaml to local
   delegate_to: localhost
   get_url:
-    url: "{{ k8s_calico_vxlan_repo if ( k8s_calico_encapsulation == 'vxlan' ) else k8s_calico_ipinip_repo }}"
+    url: "{{ k8s_calico_vxlan_repo if ( k8s_calico_encapsulation | lower == 'vxlan' ) else k8s_calico_ipinip_repo }}"
     dest: "{{ inventory_dir }}/calico.yaml"
     mode: +rx
   register: getrc

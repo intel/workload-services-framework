@@ -23,12 +23,6 @@
   command: "{{ collectd_bin_path }} -h"
   register: version
 
-- name: Install collectd.conf
-  template:
-    src: collectd.conf.j2
-    dest: "{{ config_path }}"
-  become: yes
-
 - name: Stop collectd
   service:
     name: collectd
@@ -36,9 +30,33 @@
     state: stopped
   become: yes
 
-- name: Remove any collection files
-  file:
-    path: "{{ collectd_csv_path }}/"
-    state: absent
-  become: yes
+- name: Append the start script
+  blockinfile:
+    path: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-start-trace.sh"
+    marker: "# collectd {mark}"
+    insertbefore: "^wait"
+    block: |
+      (
+        mkdir -p /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-collectd/csv
+        mkdir -p /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-collectd/conf
+        cd /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-collectd/conf
+        date -Ins >> TRACE_START
+        echo '{{ collectd_conf }}' > collectd.conf
+        nohup {{ collectd_bin_path }} -C collectd.conf -f > collectd.logs 2>&1 &
+        echo $! > collectd.pid
+        disown
+      ) &
+  vars:
+    collectd_conf: "{{ lookup('ansible.builtin.template', role_path+'/templates/collectd.conf.j2') }}"
 
+- name: Append the stop script
+  blockinfile:
+    path: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-stop-trace.sh"
+    marker: "# collectd {mark}"
+    insertbefore: "^wait"
+    block: |
+      (
+          cd /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-collectd/conf
+          date -Ins >> TRACE_STOP
+          kill $(cat collectd.pid)
+      ) &

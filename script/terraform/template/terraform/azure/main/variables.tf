@@ -107,3 +107,23 @@ variable "cpu_model_timeout" {
   type = string
   default = "5m"
 }
+
+variable "allocate_public_ip" {
+  type = bool
+  default = true
+}
+
+variable "resource_group_name" {
+  type = string
+  default = null
+}
+
+variable "virtual_network_name" {
+  type = string
+  default = null
+}
+
+variable "subnet_name" {
+  type = string
+  default = null
+}

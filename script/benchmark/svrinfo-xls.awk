@@ -10,12 +10,27 @@ function add_svrinfo_cell(vv) {
     print "<Cell ss:StyleID=\"svrinfo\"><Data ss:Type=\"" t "\">" escape(vv) "</Data></Cell>"
 }
 
+function ws_p_s_c_g(ws, p, s, c, g) {
+    if (length(svrinfo_values[ws][p][s])>0)
+        if (length(svrinfo_values[ws][p][s][c])>0)
+            return length(svrinfo_values[ws][p][s][c][g])
+    return 0
+}
+
+function ws_p_s_c_g_i(ws, p, s, c, g, i) {
+    if (ws_p_s_c_g(ws, p, s, c, g)==0) return 0
+    return length(svrinfo_values[ws][p][s][c][g][i])
+}
+
 function add_svrinfo_row(ws, c, g, k) {
     print "<Row>"
     add_svrinfo_cell(g"."k)
     for (p in svrinfo_values[ws])
         for (s in svrinfo_values[ws][p])
-            add_svrinfo_cell(svrinfo_values[ws][p][s][c][g][1][k])
+            vv=""
+            if (ws_p_s_c_g_i(ws, p, s, c, g, 1)>0)
+                vv=svrinfo_values[ws][p][s][c][g][1][k]
+            add_svrinfo_cell(vv)
     print "</Row>"
 }
 
@@ -25,10 +40,12 @@ function add_svrinfo_isa_summary(ws, c, g) {
     for (p in svrinfo_values[ws]) {
         for (s in svrinfo_values[ws][p]) {
             vv=""
-            for (i in svrinfo_values[ws][p][s][c][g])
-                for (k in svrinfo_values[ws][p][s][c][g][i])
-                    if (svrinfo_values[ws][p][s][c][g][i][k] == "Yes")
-                        vv=vv", "gensub(/-.*/,"",1,k)
+            if (ws_p_s_c_g(ws, p, s, c, g)>0)
+                for (i in svrinfo_values[ws][p][s][c][g])
+                    if (ws_p_s_c_g_i(ws, p, s, c, g, i)>0)
+                        for (k in svrinfo_values[ws][p][s][c][g][i])
+                            if (svrinfo_values[ws][p][s][c][g][i][k] == "Yes")
+                                vv=vv", "gensub(/-.*/,"",1,k)
             add_svrinfo_cell(gensub(/^, /,"",1,vv))
         }
     }
@@ -41,10 +58,12 @@ function add_svrinfo_accelerator_summary(ws, c, g) {
     for (p in svrinfo_values[ws]) {
         for (s in svrinfo_values[ws][p]) {
             vv=""
-            for (i in svrinfo_values[ws][p][s][c][g])
-                for (k in svrinfo_values[ws][p][s][c][g][i])
-                    if (svrinfo_values[ws][p][s][c][g][i][k] == "1")
-                        vv=vv", "k":"svrinfo_values[ws][p][s][c][g][i][k]
+            if (ws_p_s_c_g(ws, p, s, c, g)>0)
+                for (i in svrinfo_values[ws][p][s][c][g])
+                    if (ws_p_s_c_g_i(ws, p, s, c, g, i)>0)
+                        for (k in svrinfo_values[ws][p][s][c][g][i])
+                            if (svrinfo_values[ws][p][s][c][g][i][k] == "1")
+                                vv=vv", "k":"svrinfo_values[ws][p][s][c][g][i][k]
             add_svrinfo_cell(gensub(/^, /,"",1,vv))
         }
     }
@@ -53,29 +72,29 @@ function add_svrinfo_accelerator_summary(ws, c, g) {
 
 function add_svrinfo_nic_summary(ws, c, g, n, m) {
     n1=0
-    for (p in svrinfo_values[ws]) {
+    for (p in svrinfo_values[ws])
         for (s in svrinfo_values[ws][p]) {
-            n2=length(svrinfo_values[ws][p][s][c][g])
+            n2=ws_p_s_c_g(ws, p, s, c, g)
             if (n2>n1) n1=n2
         }
-    }
     for (n2=1;n2<=n1;n2++) {
         print "<Row>"
         add_svrinfo_cell((n2==1)?g:"")
-        for (p in svrinfo_values[ws]) {
+        for (p in svrinfo_values[ws])
             for (s in svrinfo_values[ws][p]) {
                 vv=""
                 n3=0
-                for (i in svrinfo_values[ws][p][s][c][g]) {
-                    n3++
-                    if (n3==n2) {
-                        vv=svrinfo_values[ws][p][s][c][g][i][n]": "svrinfo_values[ws][p][s][c][g][i][m]
-                        break
+                if (ws_p_s_c_g(ws, p, s, c, g)>0)
+                    for (i in svrinfo_values[ws][p][s][c][g]) {
+                        n3++
+                        if (n3==n2) {
+                            if (ws_p_s_c_g_i(ws, p, s, c, g, i)>0)
+                                vv=svrinfo_values[ws][p][s][c][g][i][n]": "svrinfo_values[ws][p][s][c][g][i][m]
+                            break
+                        }
                     }
-                }
                 add_svrinfo_cell(vv)
             }
-        }
         print "</Row>"
     }
 }
@@ -85,29 +104,34 @@ function add_svrinfo_disk_summary(ws, c, g, n, m) {
     for (p in svrinfo_values[ws]) {
         for (s in svrinfo_values[ws][p]) {
             n2=0
-            for (i in svrinfo_values[ws][p][s][c][g])
-                if (length(svrinfo_values[ws][p][s][c][g][i][m])>0) n2++
-            if (n2>n1) n1=n2
+            if (ws_p_s_c_g(ws, p, s, c, g)>0)
+                for (i in svrinfo_values[ws][p][s][c][g])
+                    if (ws_p_s_c_g_i(ws, p, s, c, g, i)>0)
+                        if (length(svrinfo_values[ws][p][s][c][g][i][m])>0) {
+                            n2++
+                            if (n2>n1) n1=n2
+                        }
         }
     }
 
     for (n2=1;n2<=n1;n2++) {
         print "<Row>"
         add_svrinfo_cell((n2==1)?g:"")
-        for (p in svrinfo_values[ws]) {
+        for (p in svrinfo_values[ws])
             for (s in svrinfo_values[ws][p]) {
                 n3=0
                 vv=""
-                for (i in svrinfo_values[ws][p][s][c][g]) {
-                    if (length(svrinfo_values[ws][p][s][c][g][i][m])>0) n3++
-                    if (n3==n2) {
-                        vv=svrinfo_values[ws][p][s][c][g][i][n]": "svrinfo_values[ws][p][s][c][g][i][m]
-                        break
-                    }
-                }
+                if (ws_p_s_c_g(ws, p, s, c, g)>0)
+                    for (i in svrinfo_values[ws][p][s][c][g])
+                        if (ws_p_s_c_g_i(ws, p, s, c, g, i)>0) {
+                            if (length(svrinfo_values[ws][p][s][c][g][i][m])>0) n3++
+                            if (n3==n2) {
+                                vv=svrinfo_values[ws][p][s][c][g][i][n]": "svrinfo_values[ws][p][s][c][g][i][m]
+                                break
+                            }
+                        }
                 add_svrinfo_cell(vv)
             }
-        }
         print "</Row>"
     }
 }
@@ -116,10 +140,11 @@ function add_svrinfo_security_summary(ws, c, g) {
     n1=0
     for (p in svrinfo_values[ws]) {
         for (s in svrinfo_values[ws][p]) {
-            for (i in svrinfo_values[ws][p][s][c][g]) {
-                n2=length(svrinfo_values[ws][p][s][c][g][i])
-                if (n2>n1) n1=n2
-            }
+            if (ws_p_s_c_g(ws, p, s, c, g)>0)
+                for (i in svrinfo_values[ws][p][s][c][g]) {
+                    n2=ws_p_s_c_g_i(ws, p, s, c, g, i)
+                    if (n2>n1) n1=n2
+                }
         }
     }
     for (n2=1;n2<=n1;n2++) {
@@ -130,15 +155,17 @@ function add_svrinfo_security_summary(ws, c, g) {
             for (s in svrinfo_values[ws][p]) {
                 vv=""
                 n3=0
-                for (i in svrinfo_values[ws][p][s][c][g]) {
-                    for (k in svrinfo_values[ws][p][s][c][g][i]) {
-                        n3++
-                        if (n3==n2) {
-                            vv=k": "gensub(/\s*[(].*[)].*/,"",1,svrinfo_values[ws][p][s][c][g][i][k])
-                            break;
-                        }
+                if (ws_p_s_c_g(ws, p, s, c, g)>0)
+                    for (i in svrinfo_values[ws][p][s][c][g]) {
+                        if (ws_p_s_c_g_i(ws, p, s, c, g, i)>0)
+                            for (k in svrinfo_values[ws][p][s][c][g][i]) {
+                                n3++
+                                if (n3==n2) {
+                                    vv=k": "gensub(/\s*[(].*[)].*/,"",1,svrinfo_values[ws][p][s][c][g][i][k])
+                                    break;
+                                }
+                            }
                     }
-                }
                 add_svrinfo_cell(vv)
             }
         }
@@ -167,7 +194,10 @@ function add_svrinfo_row_ex(ws, psp, ith, c, g, k) {
     np=length(psp)
     for (p1=1;p1<=np;p1++) {
         s=find_svrinfo_phost(ws, psp[p1])
-        add_svrinfo_cell_ex(ith[p1], svrinfo_values[ws][psp[p1]][s][c][g][1][k])
+        vv=""
+        if (ws_p_s_c_g_i(ws,psp[p1],s,c,g,1)>0)
+            vv=svrinfo_values[ws][psp[p1]][s][c][g][1][k]
+        add_svrinfo_cell_ex(ith[p1], vv)
     }
     print "</Row>"
 }
@@ -177,7 +207,7 @@ function add_svrinfo_nic_summary_ex(ws, psp, ith, c, g, n, m) {
     n1=0
     for (p1=1;p1<=np;p1++) {
         s=find_svrinfo_phost(ws, psp[p1])
-        n2=length(svrinfo_values[ws][psp[p1]][s][c][g])
+        n2=ws_p_s_c_g(ws, psp[p1], s, c, g)
         if (n2>n1) n1=n2
     }
     for (n2=1;n2<=n1;n2++) {
@@ -187,13 +217,15 @@ function add_svrinfo_nic_summary_ex(ws, psp, ith, c, g, n, m) {
             s=find_svrinfo_phost(ws, psp[p1])
             vv=""
             n3=0
-            for (i in svrinfo_values[ws][psp[p1]][s][c][g]) {
-                n3++
-                if (n3==n2) {
-                    vv=svrinfo_values[ws][psp[p1]][s][c][g][i][n]": "svrinfo_values[ws][psp[p1]][s][c][g][i][m]
-                    break
+            if (ws_p_s_c_g(ws, psp[p1], s, c, g)>0)
+                for (i in svrinfo_values[ws][psp[p1]][s][c][g]) {
+                    n3++
+                    if (n3==n2) {
+                        if (ws_p_s_c_g_i(ws, psp[p1], s, c, g, i)>0)
+                            vv=svrinfo_values[ws][psp[p1]][s][c][g][i][n]": "svrinfo_values[ws][psp[p1]][s][c][g][i][m]
+                        break
+                    }
                 }
-            }
             add_svrinfo_cell_ex(ith[p1], vv)
         }
         print "</Row>"
@@ -205,10 +237,11 @@ function add_svrinfo_security_summary_ex(ws, psp, ith, c, g) {
     n1=0
     for (p1=1;p1<=np;p1++) {
         s=find_svrinfo_phost(ws, psp[p1])
-        for (i in svrinfo_values[ws][psp[p1]][s][c][g]) {
-            n2=length(svrinfo_values[ws][psp[p1]][s][c][g][i])
-            if (n2>n1) n1=n2
-        }
+        if (ws_p_s_c_g(ws, psp[p1], s, c, g)>0)
+            for (i in svrinfo_values[ws][psp[p1]][s][c][g]) {
+                n2=ws_p_s_c_g_i(ws, psp[p1], s, c, g, i)
+                if (n2>n1) n1=n2
+            }
     }
     for (n2=1;n2<=n1;n2++) {
         print "<Row>"
@@ -217,15 +250,17 @@ function add_svrinfo_security_summary_ex(ws, psp, ith, c, g) {
             s=find_svrinfo_phost(ws, psp[p1])
             vv=""
             n3=0
-            for (i in svrinfo_values[ws][psp[p1]][s][c][g]) {
-                for (k in svrinfo_values[ws][psp[p1]][s][c][g][i]) {
-                    n3++
-                    if (n3==n2) {
-                        vv=k": "gensub(/\s*[(].*[)].*/,"",1,svrinfo_values[ws][psp[p1]][s][c][g][i][k])
-                        break
-                    }
+            if (ws_p_s_c_g(ws, psp[p1], s, c, g)>0)
+                for (i in svrinfo_values[ws][psp[p1]][s][c][g]) {
+                    if (ws_p_s_c_g_i(ws, psp[p1], s, c, g, i)>0)
+                        for (k in svrinfo_values[ws][psp[p1]][s][c][g][i]) {
+                            n3++
+                            if (n3==n2) {
+                                vv=k": "gensub(/\s*[(].*[)].*/,"",1,svrinfo_values[ws][psp[p1]][s][c][g][i][k])
+                                break
+                            }
+                        }
                 }
-            }
             add_svrinfo_cell_ex(ith[p1], vv)
         }
         print "</Row>"
@@ -238,9 +273,12 @@ function add_svrinfo_disk_summary_ex(ws, psp, ith, c, g, n, m) {
     for (p1=1;p1<=np;p1++) {
         s=find_svrinfo_phost(ws, psp[p1])
         n2=0
-        for (i in svrinfo_values[ws][psp[p1]][s][c][g])
-            if (length(svrinfo_values[ws][psp[p1]][s][c][g][i][m])>0) n2++
-        if (n2>n1) n1=n2
+        if (ws_p_s_c_g(ws, psp[p1], s, c, g)>0)
+            for (i in svrinfo_values[ws][psp[p1]][s][c][g]) {
+                if (ws_p_s_c_g_i(ws, psp[p1], s, c, g, i)>0)
+                    if (length(svrinfo_values[ws][psp[p1]][s][c][g][i][m])>0) n2++
+                if (n2>n1) n1=n2
+            }
     }
 
     for (n2=1;n2<=n1;n2++) {
@@ -251,13 +289,15 @@ function add_svrinfo_disk_summary_ex(ws, psp, ith, c, g, n, m) {
             s=find_svrinfo_phost(ws, psp[p1])
             n3=0
             vv=""
-            for (i in svrinfo_values[ws][psp[p1]][s][c][g]) {
-                if (length(svrinfo_values[ws][psp[p1]][s][c][g][i][m])>0) n3++
-                if (n3==n2) {
-                    vv=svrinfo_values[ws][psp[p1]][s][c][g][i][n]":"svrinfo_values[ws][psp[p1]][s][c][g][i][m]
-                    break
-                }
-            }
+            if (ws_p_s_c_g(ws, psp[p1], s, c, g)>0)
+                for (i in svrinfo_values[ws][psp[p1]][s][c][g])
+                    if (ws_p_s_c_g_i(ws, psp[p1], s, c, g, i)>0) {
+                        if (length(svrinfo_values[ws][psp[p1]][s][c][g][i][m])>0) n3++
+                        if (n3==n2) {
+                            vv=svrinfo_values[ws][psp[p1]][s][c][g][i][n]":"svrinfo_values[ws][psp[p1]][s][c][g][i][m]
+                            break
+                        }
+                    }
             add_svrinfo_cell(vv)
         }
         print "</Row>"

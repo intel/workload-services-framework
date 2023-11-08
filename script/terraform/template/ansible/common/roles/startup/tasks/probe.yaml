@@ -1,0 +1,16 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: probe host capacities
+  include_role:
+    name: "{{ label_name.split('=')[0].split('-')[2]|lower }}"
+    tasks_from: probe
+  when:
+    - label_name.startswith('HAS-SETUP-')
+    - (playbook_dir + '/roles/' + (label_name.split('=')[0].split('-')[2] | lower) + '/tasks/probe.yaml') is exists
+  loop: "{{ k8s_node_labels }}"
+  loop_control:
+    loop_var: label_name

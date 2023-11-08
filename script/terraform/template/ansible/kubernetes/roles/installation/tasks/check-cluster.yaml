@@ -7,8 +7,8 @@
   - name: Check if k8s is already installed
     command: kubectl get pod
     register: k8scheck
-    failed_when: false
     delegate_to: "{{ ('controller' in groups) | ternary('controller-0','localhost') }}"
+    ignore_errors: true
 
   - name: Set fact
     set_fact:
@@ -17,3 +17,10 @@
       delegate_to: localhost
       delegate_facts: true
 
+  - name: Abort if k8s is not ready and does not reset
+    fail:
+      msg: "The benchmark cannot be continued because k8s is not ready, Please fix it manually, or change k8s_abort_on_failure to no "
+    when:
+      - k8scheck.rc != 0
+      - (k8s_abort_on_failure | default(false) | bool) or (not (sut_sudo | default(true) | bool))
+      - ((csp | default('static')) == 'static')

@@ -17,7 +17,6 @@ AI workload naming following this format: \<Model Name\>-\<Framework\>-[Platform
 \<WL name\>_training_throuphput               
 \<WL name\>_training_accuracy
 
-[testcase.md][testcase.md]
 
 ###  Configuration:
 AI workload can be run on BareMetal and Cloud VM both.  AWS, GCP and Azure cloud have been suggested to use.
@@ -126,6 +125,5 @@ Cost Per Million Inferences: -1
 **NOTE**: Make sure gprofiler telemetry data is accurate. You need to use the `_pkm` case or set a larger `STEPS`.
 
 
-[testcase.md]: https://github.com/intel-innersource/applications.benchmarking.benchmark.platform-hero-features/blob/master/doc/user-guide/executing-workload/testcase.md
 [Tuning Guide for Deep Learning]: https://www.intel.com/content/www/us/en/developer/articles/guide/deep-learning-with-avx512-and-dl-boost.html
 [Tuning Guide for Deep Learning 4th gen]: https://www.intel.com/content/www/us/en/developer/articles/guide/deep-learning-avx512-and-dl-boost-4th-gen-xeon.html

@@ -33,19 +33,6 @@
   failed_when: false
   become: false
 
-- name: 'Copy docker auth'
-  ansible.builtin.copy:
-    src: '/home/{{ item }}'
-    dest: '{{ home.stdout }}/{{ item }}'
-    mode: preserve
-  when: docker_auth_reuse
-  failed_when: false
-  loop:
-    - "{{ docker_auth_config_json }}"
-    - "{{ docker_auth_pass_keystore_dir }}"
-    - "{{ docker_auth_pass_keyring_dir }}"
-  become: false
-
 - name: 'Try to wget docker-credential-pass executable from remote source'
   ansible.builtin.get_url:
     url: '{{ docker_auth_cred_url }}'

@@ -4,8 +4,9 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- hosts: all
+- hosts: cluster_hosts:off_cluster_hosts
   gather_facts: no
+  become: false
   tasks:
 
     - name: Wait for system to become reachable
@@ -17,6 +18,7 @@
 
 - hosts: localhost
   gather_facts: no
+  become: false
   tasks:
 
     - name: Breakpoint at provisioning
@@ -25,16 +27,24 @@
       vars:
         breakpoint: PrepareStage
 
-- hosts: all
-  become: true
+- hosts: cluster_hosts:off_cluster_hosts
+  become: "{{ sut_sudo | default(true) | bool }}"
   any_errors_fatal: true
   gather_facts: no
   tasks:
 
+    - name: Probe host features
+      include_role:
+        name: startup
+        tasks_from: probe
+      when: ansible_connection != 'winrm'
+
     - name: Startup sequence
       include_role:
         name: startup
-      when: ansible_connection != 'winrm'
+      when:
+      - ansible_connection != 'winrm'
+      - sut_sudo | default(true) | bool
 
     - name: Prepare Docker Auth
       include_role:
@@ -48,20 +58,5 @@
         name: instance-watch
       when:
       - ansible_connection != 'winrm'
-
-- hosts: trace_hosts
-  become: true
-  gather_facts: no
-  tasks:
-
-    - name: Install trace module
-      include_role:
-        name: startup
-        tasks_from: trace-block
-      when:
-      - trace_module != ""
-      - ansible_connection != 'winrm'
-      loop: "{{ wl_trace_modules | default('') | split(',') }}"
-      loop_control:
-        loop_var: trace_module
+      - sut_sudo | default(true) | bool
 

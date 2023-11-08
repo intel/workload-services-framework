@@ -1,0 +1,78 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+    - name: "wait for the starting phrase: {{ start_phrase }}"
+      shell:
+        cmd: |
+          pids=()
+          {% for script1 in trace_logs_scripts %}
+            while kill -0 {{ trace_waitproc_pid }}; do
+              {{ script1 }} | {% if (start_phrase | regex_replace('^/.*/.*[{].*[}]$','')) != '' %}grep -q -F '{{ start_phrase }}'{% else %}[ -n "$(sed -n '{{ start_phrase }}' 2> /dev/null | head -n1)" ]{% endif %} && break
+              bash -c "sleep {{ trace_precision | default(0.25) }}"
+            done > /dev/null 2>&1 &
+            pids+=($!)
+          {% endfor %}
+          wait -n ${pids[@]}
+          kill ${pids[@]} > /dev/null 2>&1 || true
+        executable: /bin/bash
+      when:
+      - ((roi_region | first) == 'roi')
+      - ((start_phrase | regex_replace('^[+][0-9]*[smh]$','')) != '')
+      delegate_to: "{{ trace_logs_host | default(inventory_hostname) }}"
+      vars:
+        start_phrase: "{{ 1 | extract(roi_region) | default('START_TRACE') | replace('%44',',') }}"
+
+    - name: "wait for the starting timeout: {{ timeout }}"
+      shell:
+        cmd: |
+          timeout {{ timeout | regex_replace('^[+]','') }} tail --pid={{ trace_waitproc_pid }} -f /dev/null > /dev/null 2>&1 || true
+        executable: /bin/bash
+      when:
+      - ((roi_region | first) == 'time') or (((roi_region | first) == 'roi') and (timeout | regex_replace('^[+][0-9]*[smh]$','')) == '')
+      delegate_to: "{{ trace_logs_host | default(inventory_hostname) }}"
+      vars:
+        timeout: "{{ 1 | extract(roi_region) | default(0) }}"
+
+    - name: start trace
+      include_tasks:
+        file: start.yaml
+
+    - name: "wait for the stopping phrase: {{ stop_phrase }}"
+      shell:
+        cmd: |
+          pids=()
+          {% for script1 in trace_logs_scripts %}
+            while kill -0 {{ trace_waitproc_pid }}; do
+              {{ script1 }} | {% if (stop_phrase | regex_replace('^/.*/.*[{].*[}]$','')) != '' %}grep -q -F '{{ stop_phrase }}'{% else %}[ -n "$(sed -n '{{ stop_phrase }}' 2> /dev/null | head -n1)" ]{% endif %} && break
+              bash -c "sleep {{ trace_precision | default(0.25) }}"
+            done > /dev/null 2>&1 &
+            pids+=($!)
+          {% endfor %}
+          wait -n ${pids[@]}
+          kill ${pids[@]} > /dev/null 2>&1 || true
+        executable: /bin/bash
+      when:
+      - ((roi_region | first) == 'roi')
+      - ((stop_phrase | regex_replace('^[+][0-9]+[smh]$','')) != '')
+      delegate_to: "{{ trace_logs_host | default(inventory_hostname) }}"
+      vars:
+        stop_phrase: "{{ roi_region | last | replace('%44',',') }}"
+
+    - name: "wait for the stopping timeout: {{ timeout }}"
+      shell:
+        cmd: |
+          timeout {{ timeout | regex_replace('^[+]','') }} tail --pid={{ trace_waitproc_pid }} -f /dev/null > /dev/null 2>&1 || true
+        executable: /bin/bash
+      when:
+      - ((roi_region | first) == 'time') or (((roi_region | first) == 'roi') and ((timeout | regex_replace('^[+][0-9]+[smh]$','')) == ''))
+      delegate_to: "{{ trace_logs_host | default(inventory_hostname) }}"
+      vars:
+        timeout: "{{ roi_region | last }}"
+
+    - name: revoke trace
+      include_tasks:
+        file: stop.yaml
+      when: (roi_region | first) in ['time', 'roi']

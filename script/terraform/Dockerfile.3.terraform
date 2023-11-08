@@ -9,7 +9,7 @@ ARG RELEASE
 ARG OS_VER=22.04
 ARG OS_IMAGE=ubuntu
 
-ARG DOCKER_CLI_VER=20.10.17
+ARG DOCKER_CLI_VER=24.0.5
 ARG DOCKER_CLI_IMG=docker:${DOCKER_CLI_VER}-dind
 FROM ${DOCKER_CLI_IMG} as dockercli
 
@@ -23,28 +23,29 @@ RUN  git clone ${FLAMEGRAPH_REPO} && \
     git checkout ${FLAMEGRAPH_VER}
 
 FROM ${OS_IMAGE}:${OS_VER}
-RUN  apt-get update && apt-get install -y skopeo zip less gnupg curl gawk netcat connect-proxy sudo openssh-client bzip2 && apt-get clean && rm -rf /var/lib/apt/lists/*
+ENV DEBIAN_FRONTEND=noninteractive
+RUN  apt-get update && apt-get install -y skopeo zip less gnupg curl gawk netcat connect-proxy sudo openssh-client bzip2 tzdata && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # python3, Ansible and various validation tools
 ARG CONDA_DIR=/opt/conda
-ARG CONDA_VER=Miniconda3-py39_4.12.0-Linux-x86_64.sh
-ARG CONDA_REPO=https://repo.anaconda.com/miniconda
-ARG ANSIBLE_VER=7.5.0
+ARG CONDA_VER=Miniconda3-py311_23.5.2-0
+ARG CONDA_REPO=https://repo.anaconda.com/miniconda/${CONDA_VER}-Linux-x86_64.sh
+ARG ANSIBLE_VER=8.3.0
 ARG ANSIBLE_REPO=conda
-RUN curl -L -o ~/miniconda.sh ${CONDA_REPO}/${CONDA_VER} && \
+RUN curl -L -o ~/miniconda.sh ${CONDA_REPO} && \
     bash ~/miniconda.sh -b -p ${CONDA_DIR} && \
     rm -f ~/miniconda.sh && \
     chmod oug+x ${CONDA_DIR}/etc/profile.d/conda.sh && \
     ${CONDA_DIR}/etc/profile.d/conda.sh && \
-    ${CONDA_DIR}/bin/conda install paramiko lxml pywinrm jq && \
+    ${CONDA_DIR}/bin/conda install jmespath paramiko lxml pywinrm jq && \
     ${CONDA_DIR}/bin/conda install -c conda-forge ansible==${ANSIBLE_VER} kazoo kafka-python && \
     ${CONDA_DIR}/bin/conda clean --all
 ENV PATH=${CONDA_DIR}/bin:$PATH
 
 # Install terraform & packer
-ARG TERRAFORM_VER=1.4.6
+ARG TERRAFORM_VER=1.5.5
 ARG TERRAFORM_REPO=https://apt.releases.hashicorp.com
-ARG PACKER_VER=1.8.7
+ARG PACKER_VER=1.9.4
 ARG PACKER_REPO=https://apt.releases.hashicorp.com
 RUN  curl ${TERRAFORM_REPO}/gpg | gpg --dearmor > /usr/share/keyrings/hashicorp-archive-keyring.gpg && \
      echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] ${TERRAFORM_REPO} $(. /etc/os-release;echo $VERSION_CODENAME) main" > /etc/apt/sources.list.d/hashicorp.list && \
@@ -69,7 +70,7 @@ RUN groupadd -f docker && usermod -aG docker tfu
 ####
 
 # Install gosu
-ARG GOSU_VER=1.14
+ARG GOSU_VER=1.16
 ARG GOSU_REPO=https://github.com/tianon/gosu/releases/download/${GOSU_VER}/gosu-amd64
 RUN curl -o /usr/local/bin/gosu -SL ${GOSU_REPO} && \
     curl -o /usr/local/bin/gosu.asc ${GOSU_REPO}.asc && \
@@ -84,10 +85,15 @@ ENTRYPOINT [ "/entrypoint.sh" ]
 WORKDIR /opt/workspace
 
 # Setup ssh proxy
-RUN echo "Include /opt/project/script/terraform/ssh_config" >> /etc/ssh/ssh_config
+RUN echo "Include /opt/terraform/ssh_config" >> /etc/ssh/ssh_config
 
-# Link common folders
-RUN ln -s /opt/project/script/terraform/template /opt/template && \
-    ln -s /opt/project/script/terraform/script /opt/script && \
+# Copy script/template
+COPY script/ /opt/terraform/script/
+COPY template/ /opt/terraform/template/
+COPY ssh_config /opt/terraform/
+
+# Link common folders for backward compatibility
+RUN ln -s /opt/terraform/script /opt/script && \
+    ln -s /opt/terraform/template /opt/template && \
     ln -s /opt/project/stack /opt/stack && \
     ln -s /opt/project/script/csp/opt /opt/csp

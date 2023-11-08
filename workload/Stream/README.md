@@ -1,3 +1,6 @@
+>
+> **Note: The Workload Services Framework is a benchmarking framework and is not intended to be used for the deployment of workloads in production environments. It is recommended that users consider any adjustments which may be necessary for the deployment of these workloads in a production environment including those necessary for implementing software best practices for workload scalability and security.**
+>
 ### Introduction
 
 The STREAM benchmark is a simple synthetic benchmark program that measures sustainable memory bandwidth (in MB/s) and the corresponding computation rate for simple vector kernels.
@@ -27,25 +30,6 @@ Test #1: test_stream_sse
 Test #2: test_stream_avx2
 Test #3: test_stream_avx3
 Test #4: test_stream_sse_gated
-```
-
-AMD specific platform(ROME & MILAN) testcases
-
-```plaintext
-Test #1: test_stream_amd_sse
-Test #2: test_stream_amd_avx2
-Test #3: test_stream_amd_sse_gated
-Test #4: test_stream_amd_pkm
-```
-
-AMD specific platform(GENOA) testcases
-
-```plaintext
-Test #1: test_stream_amd_sse
-Test #2: test_stream_amd_avx2
-Test #3: test_stream_amd_avx3
-Test #4: test_stream_amd_sse_gated
-Test #5: test_stream_amd_pkm
 ```
 
 ### Docker Image
@@ -108,5 +92,4 @@ Triad Max time (s): 0.148240
     - HT: ON
     - Turbo: ON
     - NUMA: 2
-    - LLC Prefetch: ON
-    Note that you can try [**BIOSManager**](https://github.com/intel-sandbox/BIOSManager) for checking and setting BIOS knobs.
+    - LLC Prefetch: ON    

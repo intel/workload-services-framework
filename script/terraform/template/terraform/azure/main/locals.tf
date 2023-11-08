@@ -62,3 +62,11 @@ locals {
     }
   }
 }
+
+locals {
+  location = var.region!=null?var.region:replace(var.zone,"/^(.*)..$/","$1")
+  resource_group_name = var.resource_group_name!=null?var.resource_group_name:azurerm_resource_group.default.0.name
+  virtual_network_name = var.virtual_network_name!=null?var.virtual_network_name:azurerm_virtual_network.default.0.name
+  subnet_name = var.subnet_name!=null?var.subnet_name:azurerm_subnet.default.0.name
+  subnet_id = var.subnet_name!=null?data.azurerm_subnet.default.0.id:azurerm_subnet.default.0.id
+}

@@ -17,10 +17,12 @@
   include_role:
     name: "cni-{{ k8s_cni }}"
     tasks_from: customize-deployment.yaml
-  when: ((role_path + '/../cni-' + k8s_cni + '/tasks/customize-deployment.yaml') is exists)
+  when:
+  - ((role_path + '/../cni-' + k8s_cni + '/tasks/customize-deployment.yaml') is exists)
+  - sut_sudo | default(true) | bool
 
 - name: create deployment
-  command: "kubectl create --namespace {{ wl_namespace }} -f /tmp/{{ wl_namespace }}-{{ wl_kubernetes_yaml }}"
+  command: "kubectl create --namespace {{ wl_namespace }} -f /tmp/{{ wl_namespace }}-k8s-script.yaml"
 
 - block:
   
@@ -39,9 +41,23 @@
       fail:
         msg: "abort due to scheduling failure"
 
+- name: record timing
+  shell:
+    cmd: |
+      echo "workload_itr{{ itr }}_start: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
+    executable: /bin/bash
+  delegate_to: localhost
+
 - name: workload-execution
   include_tasks:
     file: process-traces-and-logs.yaml
+
+- name: record timing
+  shell:
+    cmd: |
+      echo "workload_itr{{ itr }}_end: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
+    executable: /bin/bash
+  delegate_to: localhost
 
 - name: collect trace data
   include_role:
@@ -54,40 +70,9 @@
   include_role:
     name: debug
 
-- block:
-
-  - name: calculate deletion condition
-    set_fact: 
-      should_delete_namespace: "{{ ((csp | default('static')) == 'static') or ((itr |int) < (run_stage_iterations | default(1) | int)) or ('cleanup' not in (stage | default('cleanup'))) }}"
-
-  - name: delete deployment
-    command: "kubectl --namespace={{ wl_namespace }} delete -f /tmp/{{ wl_namespace }}-{{ wl_kubernetes_yaml }} --ignore-not-found=true --grace-period=150 --timeout=5m"
-    ignore_errors: yes
-    when: should_delete_namespace
-      
-  - name: get resource types
-    shell: "kubectl api-resources --namespaced -o name --no-headers | cut -f1 -d."
-    register: resources
-    when: should_delete_namespace
-
-  - name: delete resources
-    shell: 
-      cmd: "kubectl --namespace={{ wl_namespace }} delete {{ resources.stdout_lines | join(',') }} --all --ignore-not-found=true --grace-period=150 --timeout=5m"
-      executable: /bin/bash
-    ignore_errors: yes
-    when: should_delete_namespace
-      
-  - name: delete namespace
-    command: "timeout {{ k8s_delete_namespace_timeout}} kubectl delete namespace {{ wl_namespace }} --grace-period=300 --timeout=10m --wait --ignore-not-found=true"
-    register: delns
-    until: delns.rc == 0
-    retries: 10
-    delay: 10
-    when: should_delete_namespace
-
-  rescue:
-
-  - name: perform kill namespace workaround
-    command: "bash -c 'kubectl replace --raw \"/api/v1/namespaces/{{ wl_namespace }}/finalize\" -f <(kubectl get ns {{ wl_namespace }} -o json | grep -v \"\\\"kubernetes\\\"\")'"
-    ignore_errors: yes
+- name: delete namespace
+  include_role:
+    name: cleanup
+    tasks_from: delete-namespace
+  when: ((itr |int) < (run_stage_iterations | default(1) | int)) or ('cleanup' not in (stage | default('cleanup')))
 

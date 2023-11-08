@@ -15,7 +15,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: stress-ng
-        image: IMAGENAME(Dockerfile.1.mongodb)
+        image: IMAGENAME(ycsb-amd64-mongodb441-base)
         imagePullPolicy: IMAGEPOLICY(Always)
         command: ["/bin/bash", "-c", "stress-ng.sh"]
         securityContext:

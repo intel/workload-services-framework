@@ -6,5 +6,4 @@
 
 collectd_interval: "10"
 collectd_bin_path: "/usr/sbin/collectd"
-collectd_csv_path: "/var/lib/collectd/csv"
 

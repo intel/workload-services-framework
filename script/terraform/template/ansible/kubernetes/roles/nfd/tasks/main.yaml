@@ -21,10 +21,11 @@
   package:
     name: 
     - git
-  become: yes
+  become: "{{ sut_sudo | default(true) | bool }}"
   when: 
   - (install_nfd.rc == 0) or (k8s_enable_nfd | default('false') | bool)
   - nfd_check != 0
+  - sut_sudo | default(true) | bool
   register: pkgrc
   until: pkgrc is success
   retries: 10

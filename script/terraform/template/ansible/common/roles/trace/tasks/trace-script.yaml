@@ -1,0 +1,14 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Create start/stop-trace.sh
+  template:
+    src: "{{ item }}.j2"
+    dest: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-{{ item }}"
+    mode: "a+rx"
+  loop:
+  - start-trace.sh
+  - stop-trace.sh

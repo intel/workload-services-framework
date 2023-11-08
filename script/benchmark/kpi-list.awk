@@ -14,11 +14,11 @@
 {   
     print $0
 }
-/^*/ {
-    kpi=$NF
-    $NF=""
-    n[$0]=n[$0]+1
-    kpis[$0][n[$0]]=kpi
+/^[*].*: *([0-9.-][0-9.e+-]*) *#*.*$/ {
+    k=gensub(/^(.*): *[0-9.-][0-9.-]*.*$/,"\\1",1,$0)
+    v=gensub(/^.*: *([0-9.-][0-9.-]*).*$/,"\\1",1,$0)
+    n[k]=n[k]+1
+    kpis[k][n[k]]=v
 }
 END {
     print ""
@@ -32,8 +32,8 @@ END {
         average=sum[x]/n[x]
         stdev=sqrt((sumsq[x]-sum[x]^2/n[x])/n[x])
 
-        print "avg "x,average
-        print "std "x,stdev
+        print "avg "x": "average
+        print "std "x": "stdev
 
         average=sum[x]/n[x]
         stdev=sqrt((sumsq[x]-sum[x]^2/n[x])/n[x])
@@ -41,10 +41,10 @@ END {
         asort(kpis[x], kpis1, "@val_num_asc")
         if(n[x]%2) {
             k=(n[x]+1)/2
-            print "med "x,kpis1[k]
+            print "med "x": "kpis1[k]
         } else {
             k=n[x]/2+1
-            print "med "x,kpis1[k]
+            print "med "x": "kpis1[k]
         }
 
         r=0
@@ -72,16 +72,16 @@ END {
             asort(kpis[x], kpis1, "@val_num_asc")
             if(n[x]%2) {
                 k=(n[x]+1)/2
-                print "med "x,kpis1[k]
+                print "med "x": "kpis1[k]
             } else {
                 k=n[x]/2+1
-                print "med "x,kpis1[k]
+                print "med "x": "kpis1[k]
             }
 
             average=sum[x]/n[x]
             stdev=sqrt((sumsq[x]-sum[x]^2/n[x])/n[x])
-            print "avg "x,average
-            print "std "x,stdev
+            print "avg "x": "average
+            print "std "x": "stdev
         }
     }
 }

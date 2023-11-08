@@ -1,0 +1,12 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+istio_profile: default
+istio_version_custom: "{{ wl_tunables['ISTIO_VERSION'] }}"
+istio_install_dist_repo: https://istio.io/downloadIstio
+istio_install_parent_dir: /usr/local
+istio_install_dir: "{{ istio_install_parent_dir }}/istio-{{ istio_version_custom }}"
+istio_injection_namespace: istio-workloads-{{ wl_namespace }}

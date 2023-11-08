@@ -13,9 +13,10 @@
   ignore_errors: yes
 
 - name: Archive collectd files
-  command:
+  shell:
     cmd: "tar cfz /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.tgz ."
-    chdir: "{{ collectd_csv_path }}"
+    chdir: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd"
+    executable: /bin/bash
   become: no
   delegate_to: "{{ trace_node.1 }}"
   ignore_errors: yes
@@ -23,23 +24,26 @@
 - name: Fetch collectd files
   fetch:
     src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.tgz"
-    dest: "{{ wl_logs_dir }}/"
+    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-collectd/"
     flat: yes
   become: no
   delegate_to: "{{ trace_node.1 }}"
   ignore_errors: yes
 
 - name: Untar collectd files
-  command: 
-    cmd: "tar xfz {{ wl_logs_dir }}/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.tgz --strip-components=2"
+  shell:
+    cmd: |
+      tar xfz {{ wl_namespace }}-{{ trace_node.1 }}-collectd.tgz ./conf/ --strip-components=2
+      tar xfz {{ wl_namespace }}-{{ trace_node.1 }}-collectd.tgz ./csv/ --strip-components=3
     chdir: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-collectd"
+    executable: /bin/bash
   delegate_to: localhost
   become: no
   ignore_errors: yes
 
 - name: Remove any collection files
   file:
-    path: "{{ collectd_csv_path }}/"
+    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd"
     state: absent
   become: yes
   delegate_to: "{{ trace_node.1 }}"
@@ -55,17 +59,9 @@
 
 - name: Remove any collectd tar files
   file:
-    path: "{{ wl_logs_dir }}/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.tgz"
+    path: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-collectd/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.tgz"
     state: absent
   delegate_to: localhost
   become: no
-  ignore_errors: yes
-
-- name: Remove any pid file
-  file:
-    path: "{{ wl_logs_dir }}/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.pid"
-    state: absent
-  delegate_to: "{{ trace_node.1 }}"
-  become: yes
   ignore_errors: yes
 

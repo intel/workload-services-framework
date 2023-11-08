@@ -12,12 +12,16 @@ if [ -r "$PROJECTROOT/script/$BACKEND/vars.sh" ]; then
     done
 fi
 
-if [ -r "$TEST_CONFIG" ]; then
-    TESTCASE_CUSTOMIZED=""
+TESTCASE_OVERWRITE_WITHBKC=()
+TESTCASE_OVERWRITE_CUSTOMIZED=()
+if [ -r "$CTESTSH_CONFIG" ]; then
     _insection=0
     _prefix=undef
+    [[ "$CTESTSH_CONFIG" = "${SOURCEROOT%/}/"* ]] && _overwrite="_withbkc" || _overwrite="_customized"
     while IFS= read _line; do
         _prefix1="$(echo "$_line" | sed 's/[^ ].*$//')"
+        [[ "$_line" = "# ctestsh_config: ${SOURCEROOT%/}/"* ]] && _overwrite="_withbkc"
+        [[ "$_line" = "# ctestsh_overwrite:"* ]] && _overwrite="_customized"
         [[ "$_line" = "#"* ]] && continue
         [[ "$_line" != *:* ]] && continue
         _k="$(echo "$_line" | cut -f1 -d: | sed -e 's|^ *||' -e 's| *$||' | tr -d "\"'")"
@@ -31,8 +35,13 @@ if [ -r "$TEST_CONFIG" ]; then
                 _insection=0;;
             esac
         elif [ $_insection -gt 0 ] && [ ${#_prefix1} -gt $_prefix ]; then
-            if [ "$_v" != "$_tmp2" ]; then
-                TESTCASE_CUSTOMIZED="_customized"
+            eval "_tmp=\"\$$_k\""
+            if [ "$_v" != "$_tmp" ]; then
+                if [ "$_overwrite" = "_withbkc" ]; then
+                    TESTCASE_OVERWRITE_WITHBKC+=($_k)
+                elif [ "$_overwrite" = "_customized" ]; then
+                    TESTCASE_OVERWRITE_CUSTOMIZED+=($_k)
+                fi
                 eval "export $_k=\"$_v\""
                 echo "OVERWRITE: $_k=$_v"
             fi
@@ -40,7 +49,7 @@ if [ -r "$TEST_CONFIG" ]; then
                 . "$PROJECTROOT/script/$BACKEND/vars.sh" "$_k" "$_v"
             fi
         fi
-    done < <(cat "$TEST_CONFIG"; echo)
+    done < <(cat "$CTESTSH_CONFIG"; echo)
     # save test config
-    cp -f "$TEST_CONFIG" "${LOGSDIRH:-$(pwd)}/test-config.yaml" > /dev/null 2>&1 || echo -n ""
+    cp -f "$CTESTSH_CONFIG" "${LOGSDIRH:-$(pwd)}/test-config.yaml" > /dev/null 2>&1 || echo -n ""
 fi

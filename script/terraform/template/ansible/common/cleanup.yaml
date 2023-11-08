@@ -4,8 +4,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- hosts: all
-  become: true
+- hosts: cluster_hosts:off_cluster_hosts
+  become: "{{ sut_sudo | default(true) | bool }}"
   gather_facts: no
   tasks:
 
@@ -13,6 +13,21 @@
       include_role:
         name: cleanup
       when: 
+      - ((csp | default('static')) == 'static')
+      - ansible_connection != 'winrm'
+      - sut_sudo | default(true) | bool
+
+- hosts: trace_hosts
+  become: "{{ sut_sudo | default(true) | bool }}"
+  gather_facts: no
+  tasks:
+
+    - name: Cleanup trace scripts
+      include_role:
+        name: cleanup
+        tasks_from: trace
+      when:
+      - sut_sudo | default(true) | bool
       - ((csp | default('static')) == 'static')
       - ansible_connection != 'winrm'
 

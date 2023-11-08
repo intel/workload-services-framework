@@ -14,3 +14,30 @@
   include_tasks:
     file: "install-{{ (os.stdout == 'rhel' or os.stdout =='anolis') | ternary('centos', os.stdout) }}.yaml"
 
+- name: Append the start script
+  blockinfile:
+    path: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-start-trace.sh"
+    marker: "# perf {mark}"
+    insertbefore: "^wait"
+    block: |
+      (
+        mkdir -p /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-perf
+        cd /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-perf
+        date -Ins >> TRACE_START
+        nohup perf {{ perf_action }} {{ perf_options }} --output perf-$1.record > perf-$1.logs 2>&1 &
+        echo $! > perf.pid
+        disown
+      ) &
+
+- name: Append the stop script
+  blockinfile:
+    path: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-stop-trace.sh"
+    marker: "# perf {mark}"
+    insertbefore: "^wait"
+    block: |
+      (
+        cd /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-perf
+        date -Ins >> TRACE_STOP
+        kill $(cat perf.pid)
+        chmod a+r *.record
+      ) &

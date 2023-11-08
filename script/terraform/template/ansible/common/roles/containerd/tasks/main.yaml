@@ -61,6 +61,23 @@
     when: reconfigure
     become: yes
 
+  - name: Configure insecure registry cert
+    shell: |
+      mkdir -p "/etc/containerd/certs.d/{{ item }}"
+      printf "server = \"http://{{ item }}\"\n[host.\"http://{{ item }}\"]\n  capabilities = [\"pull\", \"resolve\"]\n[plugin.\"io.containerd.grpc.v1.cri\".registry.configs.\"{{ item }}\".tls]\n  insecure_skip_verify = true\n" > "/etc/containerd/certs.d/{{ item }}/hosts.toml"
+    loop: "{{ containerd_insecure_registry.split(',') }}"
+    when: containerd_insecure_registry != "" and reconfigure
+    become: yes
+
+  - name: Configure insecure registry
+    lineinfile:
+      path: "{{ containerd_config_toml }}"
+      regexp: '^(\s*)config_path\s*='
+      line: '\1config_path = "/etc/containerd/certs.d"'
+      backrefs: yes
+    when: reconfigure
+    become: yes
+
   - name: "Ensure {{ containerd_data_root }} exists"
     file:
       path: "{{ containerd_data_root }}"

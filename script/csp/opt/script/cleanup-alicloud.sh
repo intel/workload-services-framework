@@ -85,8 +85,12 @@ for regionres in "${REGIONS[@]}"; do
             echo "Scanning snapshots..."
             for ss in $(aliyun ecs DescribeSnapshots --RegionId $region $rg --PageSize=100 | jq ".Snapshots.Snapshot[] | select(.Tags.Tag[].TagValue | test(\"$OWNER\")) | .SnapshotId" 2>/dev/null | tr -d '"'); do
                 echo "snapshot: $ss"
-                resources+=($ss)
-                (set -x; aliyun ecs DeleteSnapshot --SnapshotId $ss --Force=true)
+                if [[ "$@" = *"--images"* ]]; then
+                    resources+=($ss)
+                    (set -x; aliyun ecs DeleteSnapshot --SnapshotId $ss --Force=true)
+                else
+                    has_image=1
+                fi
             done
         done
 

@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+k8s_version: '1.26.6'
+
 k8s_repo_key_url: 
   ubuntu: "https://dl.k8s.io/apt/doc/apt-key.gpg"
   debian: "https://dl.k8s.io/apt/doc/apt-key.gpg"

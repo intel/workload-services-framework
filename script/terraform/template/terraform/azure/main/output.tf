@@ -6,7 +6,7 @@
 output "instances" {
   value = {
     for k,v in local.vms : k => merge({
-      public_ip = azurerm_public_ip.default[k].ip_address
+      public_ip = var.allocate_public_ip?azurerm_public_ip.default[k].ip_address:azurerm_network_interface.default[k].private_ip_address
       private_ip = azurerm_network_interface.default[k].private_ip_address
       instance_type = v.instance_type
       user_name = local.os_image_user[v.os_type]

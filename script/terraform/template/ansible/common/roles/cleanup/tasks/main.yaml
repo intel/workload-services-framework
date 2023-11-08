@@ -4,6 +4,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+- name: set reboot false
+  set_fact:
+    cleanup_reboot_required: false
+
 - name: Restore sysctls
   include_tasks:
     file: sysctl.yaml
@@ -11,6 +15,15 @@
 - name: Restore sysfs
   include_tasks:
     file: sysfs.yaml
+
+- name: Restore BIOS
+  include_role:
+    name: bios
+    tasks_from: cleanup
+  when:
+  - sut_reboot | default(true) | bool
+  - not ansible_host in my_ip_list.split(',')
+  - (playbook_dir+'/roles/bios') is exists
 
 - name: Remove restore path
   file:
@@ -34,7 +47,7 @@
   vars:
     label_name: "{{ label_result.item }}"
   when:
-    - wl_enable_reboot | default(true) | bool
+    - sut_reboot | default(true) | bool
     - label_result.stat.exists | default(false) | bool
   loop: "{{ label_check.results }}"
   loop_control:
@@ -48,6 +61,14 @@
   include_tasks:
     file: kernel-args.yaml
   when: 
-  - wl_enable_reboot | default(true) | bool
+  - sut_reboot | default(true) | bool
   - not ansible_host in my_ip_list.split(',')
 
+- name: reboot
+  command: "reboot"
+  async: 1
+  poll: 0
+  ignore_errors: yes
+  when:
+  - cleanup_reboot_required
+  - sut_reboot | default(true) | bool
