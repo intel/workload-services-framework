@@ -21,7 +21,7 @@ ARG LIBPYTHON3_DEV_VER=3.10.6-1~22.04
 ARG LIBOPENCV_DEV_REPO=http://archive.ubuntu.com/ubuntu 
 ARG LIBOPENCV_DEV_VER=4.5.4+dfsg-9ubuntu4
 
-
+RUN rm -rf /etc/apt/sources.list.d/intel-openvino.list
 RUN apt-get update && apt-get install -y intel-dlstreamer-gst=${INTEL_DLSTREAMER_GST_VER} libpython3-dev=${LIBPYTHON3_DEV_VER} libopencv-dev=${LIBOPENCV_DEV_VER}
 
 SHELL ["/bin/bash", "-xo", "pipefail", "-c"]
