@@ -1,6 +1,3 @@
->
-> **Note: The Workload Services Framework is a benchmarking framework and is not intended to be used for the deployment of workloads in production environments. It is recommended that users consider any adjustments which may be necessary for the deployment of these workloads in a production environment including those necessary for implementing software best practices for workload scalability and security.**
->
 ### Introduction
 
 The STREAM benchmark is a simple synthetic benchmark program that measures sustainable memory bandwidth (in MB/s) and the corresponding computation rate for simple vector kernels.
@@ -11,6 +8,7 @@ This workload provides several tests  cases with the following configuration par
 
 - **instruction_set**: Specify the instruction set: `sse`, `avx2` or `avx3`, default is `sse`.
 - **ntimes**: Specify the number of iterations of each kernel (Default:100, Min=2).
+- **CLOUDFLAG**: Specify true if you are running on Cloud.(Default:false).
 
 Use the following commands to show the list of test cases:
 
@@ -92,4 +90,5 @@ Triad Max time (s): 0.148240
     - HT: ON
     - Turbo: ON
     - NUMA: 2
-    - LLC Prefetch: ON    
+    - LLC Prefetch: ON
+

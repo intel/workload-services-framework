@@ -18,4 +18,6 @@ spec:
           value: "defn(`NTIMES')"
         - name: `WORKLOAD'
           value: "defn(`WORKLOAD')"
+        - name: `CLOUDFLAG'
+          value: "defn(`CLOUDFLAG')"
       restartPolicy: Never
