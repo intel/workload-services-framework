@@ -1,0 +1,23 @@
+# linpack-base-intel-unittest
+
+ARG RELEASE
+
+ARG OS_VER=22.04
+ARG OS_IMAGE=ubuntu
+
+FROM linpack-base-intel${RELEASE} as base
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+COPY --from=base / /
+
+WORKDIR /root
+
+COPY run_intel_unittest.sh run_unittest.sh
+
+RUN mkfifo /export-logs
+    
+CMD ( bash run_unittest.sh; \
+    echo $? > status) 2>&1 | tee benchmark_$(date +"%m-%d-%y-%H-%M-%S").log && \
+    tar cf /export-logs status $(find . -maxdepth 1 -name "*.log") && \
+    sleep infinity
