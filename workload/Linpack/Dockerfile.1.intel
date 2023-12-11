@@ -1,13 +1,14 @@
 # linpack-intel
 
-#
-# Apache v2 license
-# Copyright (C) 2023 Intel Corporation
-# SPDX-License-Identifier: Apache-2.0
-#
 ARG RELEASE
+ARG OS_VER=22.04
+ARG OS_IMAGE=ubuntu
 
-FROM linpack-base-intel${RELEASE}
+FROM linpack-base-intel${RELEASE} as base
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+COPY --from=base / /
 
 WORKDIR /root
 

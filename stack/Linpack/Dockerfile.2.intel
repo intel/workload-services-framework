@@ -1,14 +1,9 @@
 # linpack-base-intel
 
-#
-# Apache v2 license
-# Copyright (C) 2023 Intel Corporation
-# SPDX-License-Identifier: Apache-2.0
-#
 ARG OS_VER=22.04
 ARG OS_IMAGE=ubuntu
 
-FROM ${OS_IMAGE}:${OS_VER}
+FROM ${OS_IMAGE}:${OS_VER} as base
 
 ARG HPCKIT_VER="2023.2.0.49440_offline"
 ARG HPCKIT_REPO="https://registrationcenter-download.intel.com/akdlm/IRC_NAS/0722521a-34b5-4c41-af3f-d5d14e88248d/l_HPCKit_p_${HPCKIT_VER}.sh"
@@ -24,7 +19,7 @@ RUN apt-get -y update && \
     apt-get install build-essential -y && \
     apt-get install wget numactl bc -y
 
-# Install IntelÂ® oneAPI
+# Install Intel® oneAPI
 RUN cd / && \
     no_proxy=$(echo $no_proxy | tr ',' '\n' | grep -v -E '^.?intel.com$' | tr '\n' ',') wget -T 5 --tries=inf ${HPCKIT_REPO} && \
     bash "${HPCKIT_SCRIPT}" -a -s --silent --eula accept
@@ -38,5 +33,30 @@ RUN ln -s /opt/intel/oneapi/mkl/latest/ /opt/intel/mkl
 # Cleanup unneeded oneapi components
 RUN rm -rf ${ONEAPI_PATH}/compiler && \
     rm -rf ${ONEAPI_PATH}/conda_channel && \
-    rm -rf ${ONEAPI_PATH}/mpi/${MPIKIT_VER}/lib/release/libmpi.a && \
-    rm -rf ${ONEAPI_PATH}/mpi/${MPIKIT_VER}/lib/release/libmpi.dbg
+    rm -rf ${ONEAPI_PATH}/advisor && \
+    rm -rf ${ONEAPI_PATH}/ccl && \
+    rm -rf ${ONEAPI_PATH}/dal && \
+    rm -rf ${ONEAPI_PATH}/debugger && \
+    rm -rf ${ONEAPI_PATH}/dev-utilities && \
+    rm -rf ${ONEAPI_PATH}/diagnostics && \
+    rm -rf ${ONEAPI_PATH}/dnnl && \
+    rm -rf ${ONEAPI_PATH}/dpcpp-ct && \
+    rm -rf ${ONEAPI_PATH}/dpl && \
+    rm -rf ${ONEAPI_PATH}/etc && \
+    rm -rf ${ONEAPI_PATH}/inspector && \
+    rm -rf ${ONEAPI_PATH}/installer && \
+    rm -rf ${ONEAPI_PATH}/ipp && \
+    rm -rf ${ONEAPI_PATH}/ippcp && \
+    rm -rf ${ONEAPI_PATH}/itac && \
+    rm -rf ${ONEAPI_PATH}/licensing && \
+    rm -rf ${ONEAPI_PATH}/tbb && \
+    rm -rf ${ONEAPI_PATH}/vtune && \
+    rm -rf ${ONEAPI_PATH}/mpi/latest/lib/libmpifort.a && \
+    rm -rf ${ONEAPI_PATH}/mpi/latest/lib/release/libmpi.a && \
+    rm -rf ${ONEAPI_PATH}/mpi/latest/lib/release/libmpi.dbg && \
+    rm -rf ${ONEAPI_PATH}/mkl/latest/lib && \
+    rm -rf ${ONEAPI_PATH}/mkl/latest/benchmarks/hpcg && \
+    rm -rf ${ONEAPI_PATH}/mkl/latest/benchmarks/linpack
+
+FROM scratch
+COPY --from=base / /

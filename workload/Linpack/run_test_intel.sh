@@ -1,9 +1,4 @@
 #!/bin/bash
-#
-# Apache v2 license
-# Copyright (C) 2023 Intel Corporation
-# SPDX-License-Identifier: Apache-2.0
-#
 N_SIZE=${N_SIZE:-auto}
 P_SIZE=${P_SIZE:-auto}
 Q_SIZE=${Q_SIZE:-auto}
@@ -21,7 +16,7 @@ source /opt/intel/oneapi/setvars.sh
 
 if [ $N_SIZE == "auto" ]; then
     mem=$(free -b | awk '/Mem:/{print $2}')
-    N_SIZE=$(echo "sqrt(0.9 * $mem / 8)" | bc)
+    N_SIZE=$(echo "sqrt(0.9 * $mem / 32)" | bc)
 fi
 
 if [[ $P_SIZE == "auto" ]]; then
