@@ -15,12 +15,12 @@ Table 1: Software Components
 | Component| Version |
 | :---        |    :----:   |
 | Debian|  [12](https://www.debian.org/releases/bookworm/)   |
-| Intel oneAPI HPC Toolkit |  [2023.1.0](https://www.intel.com/content/www/us/en/developer/tools/oneapi/hpc-toolkit-download.html)   |
+| Intel oneAPI HPC Toolkit |  [2024.0.0.49589](https://www.intel.com/content/www/us/en/developer/tools/oneapi/hpc-toolkit-download.html)   |
 | Szip | [2.1.1](https://support.hdfgroup.org/ftp/lib-external/szip/2.1.1/src/szip-2.1.1.tar.gz) |
-| Zlib | [1.2.13](https://www.zlib.net/fossils/zlib-1.2.13.tar.gz) |
-| HDF5 | [1.10.5](https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.5/src/hdf5-1.10.5.tar.gz) |
-| NetCDF | [4.8.0](https://github.com/Unidata/netcdf-c/archive/refs/tags/v4.8.0.tar.gz) |
-| NetCDF-Fortran | [4.4.5](https://github.com/Unidata/netcdf-fortran/archive/refs/tags/v4.4.5.tar.gz) |
+| Zlib | [1.3](https://www.zlib.net/zlib-1.3.tar.gz) |
+| HDF5 | [1.14.3](https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.14/hdf5-1.14.3/src/hdf5-1.14.3.tar.gz) |
+| NetCDF | [4.9.2](https://github.com/Unidata/netcdf-c/archive/refs/tags/v4.9.2.tar.gz) |
+| NetCDF-Fortran | [4.6.1](https://github.com/Unidata/netcdf-fortran/archive/refs/tags/v4.6.1.tar.gz) |
 | WRF | [4.5](https://github.com/wrf-model/WRF/releases/download/v4.5/v4.5.tar.gz) |
 
 
@@ -39,9 +39,9 @@ sudo apt-get -y install build-essential libpopt-dev autoconf libtool libxml2-dev
 
 Install oneAPI HPC Toolkit
 ```
-wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1ff1b38a-8218-4c53-9956-f0b264de35a4/l_HPCKit_p_2023.1.0.46346_offline.sh
-chmod +x l_HPCKit_p_2023.1.0.46346_offline.sh
-sudo ./l_HPCKit_p_2023.1.0.46346_offline.sh -a -s --silent --eula accept
+wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1b2baedd-a757-4a79-8abb-a5bf15adae9a/l_HPCKit_p_2024.0.0.49589_offline.sh
+chmod +x l_HPCKit_p_2024.0.0.49589_offline.sh
+sudo ./l_HPCKit_p_2024.0.0.49589_offline.sh -a -s --silent --eula accept
 source /opt/intel/oneapi/setvars.sh
 ```
 
@@ -58,7 +58,7 @@ sudo make install
 
 ### Zlib
 ```
-wget https://www.zlib.net/fossils/zlib-1.2.13.tar.gz -O zlib.tar.gz
+wget https://www.zlib.net/zlib-1.3.tar.gz -O zlib.tar.gz
 tar -zxf zlib.tar.gz 
 cd zlib-* 
 source /opt/intel/oneapi/setvars.sh 
@@ -69,7 +69,7 @@ sudo make install
 
 ### HDF5
 ```
-wget "https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.5/src/hdf5-1.10.5.tar.gz -O hdf5.tar.gz 
+wget "https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.14/hdf5-1.14.3/src/hdf5-1.14.3.tar.gz" -O hdf5.tar.gz 
 tar -zxf hdf5.tar.gz 
 cd hdf5-*
 sudo ldconfig
@@ -88,7 +88,7 @@ export HDF5=/usr/local/hdf5
 export ZDIR=/usr/local/zlib
 export NETCDF=/usr/local/netcdf
 NETCDF_C_REPO=
-wget https://github.com/Unidata/netcdf-c/archive/refs/tags/v4.8.0.tar.gz -O netcdf_c.tar.gz 
+wget https://github.com/Unidata/netcdf-c/archive/refs/tags/v4.9.2.tar.gz -O netcdf_c.tar.gz 
 tar -zxf netcdf_c.tar.gz 
 cd netcdf-c-*
 source /opt/intel/oneapi/setvars.sh
@@ -100,7 +100,7 @@ sudo make install
 ### NetCDF - Fortran
 ```
 export HDF5=/usr/local/hdf5 ZDIR=/usr/local/zlib NETCDF=/usr/local/netcdf
-wget https://github.com/Unidata/netcdf-fortran/archive/refs/tags/v4.4.5.tar.gz -O netcdf_fort.tar.gz 
+wget https://github.com/Unidata/netcdf-fortran/archive/refs/tags/v4.6.1.tar.gz -O netcdf_fort.tar.gz 
 tar -zxf netcdf_fort.tar.gz 
 cd netcdf-fortran-*
 source /opt/intel/oneapi/setvars.sh
@@ -112,7 +112,7 @@ sudo make install
 ### WRF
 ```
 WRF_VER="4.5"
-wget https://github.com/wrf-model/WRF/releases/download/v4.5/v4.5.tar.gz -O wrf.tar.gz && tar -zxf wrf.tar.gz && sudo mv WRFV${WRF_VER} /WRF
+wget https://github.com/wrf-model/WRF/archive/refs/tags/v4.5.1.tar.gz -O wrf.tar.gz && tar -zxf wrf.tar.gz && sudo mv WRFV${WRF_VER} /WRF
 export CC=$(which icx)
 export FC=$(which ifx)
 export PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/netcdf/bin:/usr/local/netcdf/lib
