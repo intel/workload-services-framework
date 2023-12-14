@@ -1,0 +1,129 @@
+# pytorch-intel-public
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=22.04
+ARG OS_IMAGE=ubuntu
+
+FROM ${OS_IMAGE}:${OS_VER} as build
+
+ARG PYTORCH_VER="2.0.0+cpu"
+ARG PYTORCH_REPO="https://github.com/pytorch/pytorch"
+ARG PYTHON_VER="3.10"
+ARG PYTHON_REPO="conda"
+ARG MINICONDA_VER="23.1.0-1-Linux-x86_64"
+ARG MINICONDA_REPO="https://repo.anaconda.com/miniconda"
+ARG TORCHVISION_VER="0.15.1+cpu"
+ARG TORCHVISION_REPO="https://download.pytorch.org/whl/cpu"
+ARG TORCHAUDIO_VER="2.0.1+cpu"
+ARG TORCHAUDIO_REPO="https://download.pytorch.org/whl/cpu"
+ARG IPEX_VER="2.0.0"
+ARG IPEX_REPO="https://github.com/intel/intel-extension-for-pytorch"
+ARG ONEDNN_VER="3.0.1"
+ARG ONEDNN_REPO="Built-In IPEX"
+ARG TORCHCCL_WHEEL_VER="2.0.0+cpu"
+ARG TORCHCCL_WHEEL_REPO="https://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/torch_ccl/cpu/oneccl_bind_pt-2.0.0%2Bcpu-cp310-cp310-linux_x86_64.whl"
+ARG JEMALLOC_SHA="c8209150f9d219a137412b06431c9d52839c7272"
+
+ARG PIP_VER="23.1.1"
+ARG PIP_REPO="pip"
+ARG INTEL_OPENMP_VER="2023.1.0"
+ARG INTEL_OPENMP_REPO="conda"
+ARG FAISS_CPU_VER="1.7.4"
+ARG FAISS_CPU_REPO="conda"
+ARG MKL_VER="2023.1.0"
+ARG MKL_REPO="conda"
+ARG MKL_INCLUDE_VER="2023.1.0"
+ARG MKL_INCLUDE_REPO="conda"
+ARG NUMPY_VER="1.23.5"
+ARG NUMPY_REPO="conda"
+ARG GPERFTOOLS_VER="2.10"
+ARG GPERFTOOLS_REPO="conda"
+
+SHELL ["/bin/bash", "-c"]
+
+WORKDIR /root/installs/
+
+RUN apt -o Acquire::Check-Date=false update && \
+    DEBIAN_FRONTEND=noninteractive && \
+    apt install -y \
+    unzip \
+    ca-certificates \
+    git \
+    wget \
+    bsdmainutils \
+    autoconf \
+    build-essential \
+    cmake \
+    numactl \
+    tar \
+    patch && \
+    apt remove -y python3.10 && \
+    apt autoremove -y
+
+COPY requirements.txt ./
+COPY conda-requirements.txt ./
+
+# Prepare the Conda environment
+RUN wget --progress=bar:force:noscroll ${MINICONDA_REPO}/Miniconda3-py${PYTHON_VER//.}_${MINICONDA_VER}.sh -O anaconda3.sh && \
+    chmod +x anaconda3.sh && \
+    ./anaconda3.sh -b -p /root/anaconda3 && \
+    rm ./anaconda3.sh && \
+    export PATH="/root/anaconda3/bin:${PATH}" && \
+    source activate base && \
+    pip install pip==${PIP_VER} && \
+    # Install requirements first
+    pip install --no-cache-dir --no-deps -r requirements.txt && \
+    conda config --add channels intel && \
+    conda install -y --file conda-requirements.txt && \
+    conda install -y intel-openmp==${INTEL_OPENMP_VER} && \
+    conda install -y gperftools==${GPERFTOOLS_VER} -c conda-forge && \
+    conda install -y faiss-cpu==${FAISS_CPU_VER} -c pytorch && \
+    conda install -y mkl==${MKL_VER} mkl-include==${MKL_INCLUDE_VER} numpy==${NUMPY_VER} -c intel --no-update-deps
+
+RUN git clone https://github.com/jemalloc/jemalloc.git && \
+    cd jemalloc && \
+    git checkout ${JEMALLOC_SHA} && \
+    ./autogen.sh && \
+    mkdir /root/lib/ && \
+    ./configure --prefix=/root/lib/jemalloc/ && \
+    make && \
+    make install
+
+ENV LD_LIBRARY_PATH="/root/anaconda3/lib:${LD_LIBRARY_PATH}"
+ENV CONDA_PREFIX="/root/anaconda3"
+ENV LD_PRELOAD="/root/lib/jemalloc/lib/libjemalloc.so:$LD_PRELOAD"
+ENV DNNL_MAX_CPU_ISA="AVX512_CORE_AMX"
+ENV PATH="/root/anaconda3/bin:${PATH}"
+ENV MALLOC_CONF="oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:9000000000,muzzy_decay_ms:9000000000"
+
+# Install IPEX, PyTorch, TorchCCL, TorchVision and TorchAudio from official release 
+RUN source activate base && \
+    pip uninstall torch torchvision -y && \
+    pip install --no-cache-dir intel_extension_for_pytorch==${IPEX_VER} && \
+    pip install --no-cache-dir torch==${PYTORCH_VER} \
+                torchvision==${TORCHVISION_VER} \
+                torchaudio==${TORCHAUDIO_VER} \
+                --extra-index-url ${TORCHVISION_REPO} && \
+    wget --progress=bar:force:noscroll ${TORCHCCL_WHEEL_REPO} && \
+    pip install --no-cache-dir oneccl_bind_pt-${TORCHCCL_WHEEL_VER}*.whl && \
+    ln -fs /usr/lib/x86_64-linux-gnu/libstdc++.so.6 /root/anaconda3/lib/libstdc++.so.6 && \
+    rm -rf /root/installs/* && \
+    rm -rf /root/anaconda3/lib/libtinfo.so.6 && \
+    rm -rf /root/anaconda3/pkgs/*
+
+FROM scratch
+
+COPY --from=build / /
+
+ENV LD_LIBRARY_PATH="/root/anaconda3/lib:${LD_LIBRARY_PATH}"
+ENV CONDA_PREFIX="/root/anaconda3"
+ENV LD_PRELOAD="/root/lib/jemalloc/lib/libjemalloc.so:$LD_PRELOAD"
+ENV DNNL_MAX_CPU_ISA="AVX512_CORE_AMX"
+ENV PATH="/root/anaconda3/bin:${PATH}"
+ENV MALLOC_CONF="oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:9000000000,muzzy_decay_ms:9000000000"
+
+WORKDIR /
