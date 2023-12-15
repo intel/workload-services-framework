@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 {{- $brokerServerList := include "brokerServerList" .Values -}}
 {{- $zkServerList := include "zkServerList" .Values -}}
 {{- $IMAGESUFFIX := include "IMAGESUFFIX" .Values -}}
@@ -57,10 +62,14 @@ spec:
             value: "{{ .Values.SERVER_PROTECTION }}"
           - name: K_PRODUCER_NUMACTL_OPTIONS
             value: "{{ .Values.PRODUCER_NUMACTL_OPTIONS }}"
+          - name: K_KAFKA_HEAP_OPTS
+            value: "{{ .Values.KAFKA_HEAP_OPTS }}"
       restartPolicy: Never
 {{- if contains "_3n" .Values.TESTCASE }}
         {{- $args := dict "key" "zoo-producer-consumer" "value" "anti" }}
         {{- include "podAntiAffinity" $args }}
+        {{- $args2 := dict "nkey" "VM-GROUP" "nvalue" "client" }}
+        {{- include "nodeAffinity" $args2 }}
 {{- else }}
         {{- $args := dict "key" "app" "value" "zookeeper-kafka-server" }}
         {{- include "podAffinity" $args }}
@@ -110,6 +119,8 @@ spec:
 {{- if contains "_3n" .Values.TESTCASE }}
         {{- $args := dict "key" "zoo-producer-consumer" "value" "anti" }}
         {{- include "podAntiAffinity" $args }}
+        {{- $args2 := dict "nkey" "VM-GROUP" "nvalue" "client" }}
+        {{- include "nodeAffinity" $args2 }}
 {{- else }}
         {{- $args := dict "key" "app" "value" "zookeeper-kafka-server" }}
         {{- include "podAffinity" $args }}

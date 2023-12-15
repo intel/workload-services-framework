@@ -1,6 +1,24 @@
 #!/bin/bash
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 # This script is used to start Kafka and Zookeeper server
+
+if [[ ${K_ENABLE_MUL_DISK} == true ]]; then
+    kafka_disk=""
+    for ((i=0; i<${K_MOUNT_DISK_COUNT}; i++)); do
+        if [[ -n $kafka_disk ]]; then
+            kafka_disk="$kafka_disk,/data/kafka$i"
+	else
+            kafka_disk="/data/kafka$i"
+	fi
+    done
+    echo "mount disk: $kafka_disk"
+    sed -i "s|^log.dirs=.*$|log.dirs=${kafka_disk}|" ${KAFKA_HOME}/config/server.properties
+fi
 
 source ${BASE_DIR}/common.sh
 
@@ -40,13 +58,20 @@ sed -i "s|^zookeeper.connect=.*$|zookeeper.connect=${zk_server_ip}:2181|" ${KAFK
 sed -i "s|^broker.id=.*$|broker.id=${BROKER_ID}|" ${KAFKA_SERVER_CONFIG}
 sed -i "s|^num.network.threads=.*$|num.network.threads=${network_threads}|" ${KAFKA_SERVER_CONFIG}
 sed -i "s|^num.io.threads=.*$|num.io.threads=${io_threads}|" ${KAFKA_SERVER_CONFIG}
-
-
+echo "num.replica.fetchers=${K_NUM_REPLICA_FETCHERS}" >> ${KAFKA_SERVER_CONFIG}
+echo "replica.fetch.max.bytes=${K_REPLICA_FETCH_MAX_BYTES}" >> ${KAFKA_SERVER_CONFIG}
+echo "replica.socket.receive.buffer.bytes=${K_REPLICA_SOCKET_RECEIVE_BUFFER_BYTES}" >> ${KAFKA_SERVER_CONFIG}
 
 sysctl -w vm.dirty_background_ratio=60
 sysctl -w vm.dirty_ratio=90
 sysctl -w vm.dirty_writeback_centisecs=2000
 sysctl -w vm.dirty_expire_centisecs=12000
+
+if [ "x$K_KAFKA_HEAP_OPTS" = "x" ]; then
+    export KAFKA_HEAP_OPTS="-Xmx1G -Xms1G"
+else
+    export KAFKA_HEAP_OPTS=${K_KAFKA_HEAP_OPTS//_/ }
+fi
 
 if [[ ${BROKER_ID} == "0" ]]; then
     $NUMACTL_CMD ${KAFKA_HOME}/bin/zookeeper-server-start.sh -daemon ${KAFKA_HOME}/config/zookeeper.properties >> ${ZOOKEEPER_HOME}/zookeeper_start.out 2>&1 

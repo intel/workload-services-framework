@@ -1,4 +1,9 @@
 #!/bin/bash
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 # This script is used to run producer tasks, consumer tasks and create Kafka topic
 
@@ -77,6 +82,11 @@ if [[ ${K_IDENTIFIER} == topic ]]; then
         
     fi
 elif [[ ${K_IDENTIFIER} == producer ]]; then
+    if [ "x$K_KAFKA_HEAP_OPTS" = "x" ]; then
+        export KAFKA_HEAP_OPTS="-Xmx1G -Xms1G"
+    else
+        export KAFKA_HEAP_OPTS=${K_KAFKA_HEAP_OPTS//_/ }
+    fi
     if [[ ${K_SERVER_PROTECTION} == true ]]; then
         limit_num_records
         limit_producers

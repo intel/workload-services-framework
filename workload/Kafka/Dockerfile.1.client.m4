@@ -2,9 +2,14 @@ changecom(`@')
 # kafka-client-patsubst(WORKLOAD,`.*_',`')
 changecom(`#')
 
-ARG RELEASE
-ARG IMAGESUFFIX
-FROM patsubst(WORKLOAD,`_',`-')-base${IMAGESUFFIX}RELEASE
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG `RELEASE'
+ARG `IMAGESUFFIX'
+FROM patsubst(WORKLOAD,`_',`-')-base`${IMAGESUFFIX}${RELEASE}'
 
 # Copy helper script and testcases
 COPY script/common.sh ${BASE_DIR}

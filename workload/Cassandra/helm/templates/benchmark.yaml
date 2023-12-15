@@ -1,0 +1,252 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+{{- $cassandra_service := .Values.CASSANDRA_SERVICE -}}
+{{- $startPort := .Values.CASSANDRA_NATIVE_TRANSPORT_PORT -}}
+{{- $nInstance := .Values.INSTANCE_NUM -}}
+---
+{{- if eq (.Values.DEPLOY_MODE | toString) "standalone" }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: benchmark
+spec:
+  template:
+    metadata:
+      labels:
+        deployPolicy: standalone
+    spec: 
+      initContainers:
+      - name: wait-for-cassandra-server
+{{- if eq (.Values.JDK_VERSION | toString) "JDK14" }}
+        image: {{ .Values.REGISTRY }}wl-cassandra-client-jdk14{{ .Values.IMAGE_ARCH }}{{ .Values.RELEASE }}
+{{- else }}
+        image: {{ .Values.REGISTRY }}wl-cassandra-client-jdk11{{ .Values.IMAGE_ARCH }}{{ .Values.RELEASE }}
+{{- end }}
+{{- if eq (.Values.CLIENT_POD_LEVEL | toString) "Guaranteed" }}
+        resources:
+          requests:           
+            cpu: "0.5"
+            memory: "1Gi"
+          limits:
+            cpu: "0.5"
+            memory: "1Gi"
+{{- end }}
+        # Wait the last Cassandra instance start up
+{{- range $i, $e := until (int $nInstance) }}
+        command: [ 'sh', '-c', "until nc -z -w5 {{ $cassandra_service }} {{ add $startPort $i }}; do echo waiting for {{ $cassandra_service }} on port {{ add $startPort $i}}; sleep 2; done" ]       
+{{- end }}
+{{- if .Values.HOST_NETWORK_ENABLE}}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+{{- end }}
+      containers:
+      - name: benchmark
+{{- if eq (.Values.JDK_VERSION | toString) "JDK14" }}
+        image: {{ .Values.REGISTRY }}wl-cassandra-client-jdk14{{ .Values.IMAGE_ARCH }}{{ .Values.RELEASE }}
+{{- else }}
+        image: {{ .Values.REGISTRY }}wl-cassandra-client-jdk11{{ .Values.IMAGE_ARCH }}{{ .Values.RELEASE }}
+{{- end }}
+        imagePullPolicy: {{ include "imagepolicy" .Values }}
+{{- if eq (.Values.CLIENT_POD_LEVEL | toString) "Burstable" }}
+        resources:
+          requests:           
+            cpu: "{{ .Values.CLIENT_POD_CPU }}"          
+{{- end }}
+{{- if eq (.Values.CLIENT_POD_LEVEL | toString) "Guaranteed" }}
+        resources:
+          requests:           
+            cpu: "{{ .Values.CLIENT_POD_CPU }}"
+            memory: "{{ .Values.CLIENT_POD_MEMORY }}"
+          limits:
+            cpu: "{{ .Values.CLIENT_POD_CPU }}"
+            memory: "{{ .Values.CLIENT_POD_MEMORY }}"
+{{- end }}
+        volumeMounts:
+        - name: hook-folder
+          mountPath: /usr/src/hook
+        env:
+        - name: CONFIG
+          value: "{{ .Values.CONFIG }}"
+        - name: test_case
+          value: "{{ .Values.TESTCASE }}"
+        - name: node
+          value: "{{ .Values.NODE }}"
+        - name: duration
+          value: "{{ .Values.CLIENT_DURATION }}"
+        - name: threads
+          value: "{{ .Values.CLIENT_THREADS }}"
+        - name: insert
+          value: "{{ .Values.CLIENT_INSERT }}"
+        - name: simple
+          value: "{{ .Values.CLIENT_SIMPLE }}"
+        - name: retries
+          value: "{{ .Values.CLIENT_RETRIES }}"
+        - name: cl
+          value: "{{ .Values.CLIENT_CL }}"        
+        - name: client_instance_num
+          value: "{{ .Values.INSTANCE_NUM }}"
+        - name: stress_number
+          value: "{{.Values.STRESS_NUM_PER_INSTANCE}}"
+        - name: server_port
+          value: "{{ .Values.CASSANDRA_NATIVE_TRANSPORT_PORT }}"
+        - name: pop_min
+          value: "{{ .Values.CLIENT_POP_MIN }}"
+        - name: pop_max
+          value: "{{ .Values.CLIENT_POP_MAX }}"
+        - name: pop_performance_div
+          value: "{{ .Values.CLIENT_POP_MAX_PERFORMANCE_DIV }}"
+        - name: data_compaction
+          value: "{{ .Values.DATA_COMPACTION }}"
+        - name: data_compression
+          value: "{{ .Values.DATA_COMPRESSION }}"
+        - name: data_chunk_size
+          value: "{{ .Values.DATA_CHUNK_SIZE }}"     
+        - name: m_debug_mode
+          value: "{{ .Values.DEBUG_MODE }}"
+        - name: fill_data
+          value: "{{ .Values.CASSANDRA_FILL_DATA }}" 
+        - name: clean_port
+          value: "{{ .Values.CLEAN_PORT }}"
+        - name: kernel_tune
+          value: "{{ .Values.KERNEL_TUNE_ENABLE }}"
+      volumes:
+        - name: hook-folder
+          hostPath:
+            path: /opt/pkb 
+      restartPolicy: Never
+      {{- $args1 := dict "key" "deployPolicy" "value" "standalone" }}
+        {{- include "podAntiAffinity" $args1 }}
+      {{- $args2 := dict "nkey" "VM-GROUP" "nvalue" "client" }}
+        {{- include "nodeAffinity" $args2 }}
+{{- end }} #end for standalone
+
+{{- if eq ($.Values.DEPLOY_MODE | toString) "cluster" }}
+  {{- $node_num := (int $.Values.CLIENT_NODE_NUM) -}}
+  {{- range $i, $e := until $node_num }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: benchmark
+spec:
+  template:
+    metadata:
+      labels:
+        app: cassandra-node
+        deployPolicy: standalone
+    spec: 
+      initContainers:
+      - name: wait-for-cassandra-server
+        image: busybox:1.28
+{{- if eq ($.Values.CLIENT_POD_LEVEL | toString) "Guaranteed" }}
+        resources:
+          requests:           
+            cpu: "0.5"
+            memory: "1Gi"
+          limits:
+            cpu: "0.5"
+            memory: "1Gi"
+{{- end }}
+{{- if $.Values.HOST_NETWORK_ENABLE}}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+{{- end }}
+      hostname: {{ $.Values.HOSTNAME_PREFIX }}client-{{ add $i 1 }}
+      subdomain: {{ $.Values.CASSANDRA_SERVICE }}
+      dnsConfig:
+        searches:
+        - "{{ $.Values.CASSANDRA_SERVICE }}.{{ $.Values.NAMESPACE }}.svc.cluster.local" 
+      containers:
+      - name: benchmark
+{{- if eq ($.Values.JDK_VERSION | toString) "JDK14" }}
+        image: {{ $.Values.REGISTRY }}wl-cassandra-client-jdk14{{ $.Values.IMAGE_ARCH }}{{ $.Values.RELEASE }}
+{{- else }}
+        image: {{ $.Values.REGISTRY }}wl-cassandra-client-jdk11{{ $.Values.IMAGE_ARCH }}{{ $.Values.RELEASE }}
+{{- end }}
+        imagePullPolicy: {{ include "imagepolicy" $.Values }}
+{{- if eq ($.Values.CLIENT_POD_LEVEL | toString) "Burstable" }}
+        resources:
+          requests:           
+            cpu: "{{ $.Values.CLIENT_POD_CPU }}"          
+{{- end }}
+{{- if eq ($.Values.CLIENT_POD_LEVEL | toString) "Guaranteed" }}
+        resources:
+          requests:           
+            cpu: "{{ $.Values.CLIENT_POD_CPU }}"
+            memory: "{{ $.Values.CLIENT_POD_MEMORY }}"
+          limits:
+            cpu: "{{ $.Values.CLIENT_POD_CPU }}"
+            memory: "{{ $.Values.CLIENT_POD_MEMORY }}"
+{{- end }}
+        volumeMounts:
+        - name: hook-folder
+          mountPath: /usr/src/hook
+        env:
+        - name: deploy_mode
+          value: "{{ $.Values.DEPLOY_MODE }}"
+        - name: node_num
+          value: "{{ $.Values.NODE_NUM }}"
+        - name: hostname_prefix
+          value: "{{ $.Values.HOSTNAME_PREFIX }}"
+        - name: CONFIG
+          value: "{{ $.Values.CONFIG }}"
+        - name: test_case
+          value: "{{ $.Values.TESTCASE }}"
+        - name: node
+          value: "{{ $.Values.HOSTNAME_PREFIX }}{{ add $i 1 }}" #server hostname
+        - name: duration
+          value: "{{ $.Values.CLIENT_DURATION }}"
+        - name: threads
+          value: "{{ $.Values.CLIENT_THREADS }}"
+        - name: insert
+          value: "{{ $.Values.CLIENT_INSERT }}"
+        - name: simple
+          value: "{{ $.Values.CLIENT_SIMPLE }}"
+        - name: retries
+          value: "{{ $.Values.CLIENT_RETRIES }}"
+        - name: cl
+          value: "{{ $.Values.CLIENT_CL }}"        
+        - name: client_instance_num
+          value: "{{ $.Values.INSTANCE_NUM }}"
+        - name: stress_number
+          value: "{{ $.Values.STRESS_NUM_PER_INSTANCE }}"
+        - name: server_port
+          value: "{{ $.Values.CASSANDRA_NATIVE_TRANSPORT_PORT }}"
+        - name: pop_min
+          value: "{{ $.Values.CLIENT_POP_MIN }}"
+        - name: pop_max
+          value: "{{ $.Values.CLIENT_POP_MAX }}"
+        - name: pop_performance_div
+          value: "{{ $.Values.CLIENT_POP_MAX_PERFORMANCE_DIV}}"
+        - name: data_compaction
+          value: "{{ $.Values.DATA_COMPACTION }}"
+        - name: data_compression
+          value: "{{ $.Values.DATA_COMPRESSION }}"
+        - name: data_chunk_size
+          value: "{{ $.Values.DATA_CHUNK_SIZE }}"     
+        - name: replicate_num
+          value: "{{ $.Values.REPLICATE_NUM }}"
+        - name: m_debug_mode
+          value: "{{ $.Values.DEBUG_MODE }}"
+        - name: fill_data
+          value: "{{ $.Values.CASSANDRA_FILL_DATA }}"
+        - name: cluster_on_single_node
+          value: "{{ $.Values.CLUSTER_ON_SINGLE_NODE }}"
+        - name: clean_port
+          value: "{{ $.Values.CLEAN_PORT }}"
+        - name: kernel_tune
+          value: "{{ $.Values.KERNEL_TUNE_ENABLE }}" 
+      volumes:
+        - name: hook-folder
+          hostPath:
+            path: /opt/pkb 
+      restartPolicy: Never      
+      {{- $args1 := dict "key" "deployPolicy" "value" "standalone" }}
+        {{- include "podAntiAffinity" $args1 }}
+      {{- $args2 := dict "nkey" "VM-GROUP" "nvalue" "client" }}
+        {{- include "nodeAffinity" $args2 }}
+  {{- end }} #end for CLIENT_NODE_NUM
+{{- end }} #end for DEPLOY_MODE cluster

@@ -40,6 +40,18 @@ Expand to pod affinity
             topologyKey: "kubernetes.io/hostname"
 {{- end }}
 
+{{- define "nodeAffinity" }}
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            preference:
+              matchExpressions:
+              - key: {{ .nkey }}
+                operator: In
+                values:
+                - {{ .nvalue }}
+{{- end }}
+
 {{- define "brokerServerList" }}
   {{- $loop := (int .BROKER_SERVER_NUM) -}}
   {{- range $i := until $loop }}

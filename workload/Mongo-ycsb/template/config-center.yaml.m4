@@ -1,4 +1,9 @@
-define(`configCenter', `
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+define(`configCenter', `dnl
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -16,7 +21,7 @@ spec:
         app: config-center
     spec:
       containers:
-      - image: IMAGENAME(ycsb-0.17.0-base)
+      - image: IMAGENAME(amd64-ycsb-0.17.0-base)
         imagePullPolicy: IMAGEPOLICY(Always)
         command: ["/bin/bash", "-c","(exec redis-server --protected-mode no & ) && sleep infinity"]
         name: config-center
@@ -32,7 +37,7 @@ ifelse(RUN_SINGLE_NODE,false,`dnl
               - key: name
                 operator: In
                 values:
-                - MONGODB-SERVER
+                - mongodb-server
             topologyKey: kubernetes.io/hostname              
         podAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -43,9 +48,9 @@ ifelse(RUN_SINGLE_NODE,false,`dnl
                 - key: name
                   operator: In
                   values:
-                  - MONGODB-CLIENT
+                  - mongodb-client
               topologyKey: kubernetes.io/hostname
-        node_Affinity(`VM-GROUP',`client')
+        node_Affinity(`VM-GROUP',`client')dnl
 ',)
 ---
 apiVersion: v1

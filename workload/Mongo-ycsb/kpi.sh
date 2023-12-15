@@ -1,4 +1,9 @@
 #!/bin/bash -e
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 awk '
 BEGIN{
@@ -160,7 +165,6 @@ BEGIN{
 }
 
 END{
-    print "Summary:"
    
     sum_of_run_p99_insert_latency=0
     for(i in run_insert_p99latency_list){

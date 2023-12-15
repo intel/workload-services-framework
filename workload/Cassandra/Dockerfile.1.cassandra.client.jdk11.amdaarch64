@@ -1,0 +1,27 @@
+# wl-cassandra-client-jdk11
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG IMAGESUFFIX=
+from cassandra-server-jdk11${IMAGESUFFIX}
+
+
+VOLUME /var/lib/cassandra
+WORKDIR ${CASSANDRA_HOME}
+
+COPY jvm11-server.options.new  /cassandra/conf/jvm11-server.options
+COPY script/entrypoint.sh ${CASSANDRA_HOME}
+COPY script/clean_data_client.py ${CASSANDRA_HOME}
+COPY script/kernel_tune.sh ${CASSANDRA_HOME}
+RUN chown -R cassandra:cassandra /cassandra \
+    && chmod +x entrypoint.sh \
+    && chmod +x kernel_tune.sh \
+    && mkfifo /export-logs
+
+CMD (./entrypoint.sh; echo $? > status) 2>&1 | tee output.logs && \   
+    tar cf /export-logs status *output* && \
+    sleep infinity
+

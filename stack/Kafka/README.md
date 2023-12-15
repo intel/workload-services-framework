@@ -1,6 +1,3 @@
->
-> **Note: The Workload Services Framework is a benchmarking framework and is not intended to be used for the deployment of workloads in production environments. It is recommended that users consider any adjustments which may be necessary for the deployment of these workloads in a production environment including those necessary for implementing software best practices for workload scalability and security.**
->
 ### Introduction
 
 This is a base stack for Kafka workload with version 3.2.0. It supports both amd64 and arm64 platforms with JDK8, JDK11 and JDK17 options. It is used by workload [Kafka](../../workload/Kafka/), please refer to it for more comprehesive test scenarios.
@@ -29,3 +26,7 @@ make
 ./ctest.sh -R test_static_kafka-jdk8_version_check -VV
 ```
 
+### Contact
+
+- Stage1 Contact: `Xiangling Yu`;`Kailiu Wang`;`Xiaofang Chen`
+- Stage2 Contact: `Madhanagopal Murali` 

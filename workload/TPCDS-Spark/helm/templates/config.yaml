@@ -1,0 +1,18 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+{{- $worker_num := (int $.Values.NUM_WORKERS) -}}
+{{- $namespace := $.Values.NAMESPACE -}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: conf-file
+  namespace: {{ $namespace }}
+data:
+  workers: |-
+{{- range $k, $f := until $worker_num }}
+    node{{ add $k 1 }}.hadoop-svc.{{ $namespace }}
+{{- end }}
