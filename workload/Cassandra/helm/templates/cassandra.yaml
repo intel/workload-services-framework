@@ -1,0 +1,303 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+{{- $startPort := .Values.CASSANDRA_NATIVE_TRANSPORT_PORT -}}
+{{- $nInstance := .Values.INSTANCE_NUM -}}
+
+{{- if eq (.Values.DEPLOY_MODE | toString) "standalone" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Values.CASSANDRA_SERVICE }}"
+  labels:
+    app: "{{ .Values.CASSANDRA_SERVICE }}"
+spec:
+  ports: 
+  {{- range $i, $e := until (int $nInstance) }} 
+  - port: {{ add $startPort $i }} 
+    name: cassandra-port-{{ add $startPort $i }}
+    protocol: TCP
+  {{- end }}
+  - port: {{ .Values.CLEAN_PORT }}
+    name: cassandra-clean-port
+    protocol: TCP
+  selector:
+    app: cassandra-node
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cassandra-node
+  labels:
+     app: cassandra-node
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cassandra-node
+  template:
+    metadata:
+      labels:
+        app: cassandra-node
+        deployPolicy: standalone
+    spec:
+  {{- if .Values.HOST_NETWORK_ENABLE}}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+  {{- end }}
+      containers:
+      - name: cassandra-node
+  {{- if eq (.Values.JDK_VERSION | toString) "JDK14" }}
+        image: {{ .Values.REGISTRY }}wl-cassandra-server-jdk14{{ .Values.IMAGE_ARCH }}{{ .Values.RELEASE }}
+  {{- else }}
+        image: {{ .Values.REGISTRY }}wl-cassandra-server-jdk11{{ .Values.IMAGE_ARCH }}{{ .Values.RELEASE }}
+  {{- end }}
+        imagePullPolicy: {{ include "imagepolicy" .Values }}
+  {{- if eq (.Values.SERVER_POD_LEVEL | toString) "Burstable" }}
+        resources:
+          requests:
+            cpu: "{{ .Values.SERVER_POD_CPU }}"   
+  {{- end }}
+  {{- if eq (.Values.SERVER_POD_LEVEL | toString) "Guaranteed" }}
+        resources:
+          requests:           
+            cpu: "{{ .Values.SERVER_POD_CPU }}"
+            memory: "{{ .Values.SERVER_POD_MEMORY }}" 
+          limits:
+            cpu: "{{ .Values.SERVER_POD_CPU }}"
+            memory: "{{ .Values.SERVER_POD_MEMORY }}"
+  {{- end }}
+        securityContext:
+          privileged: true
+  {{- if .Values.CASSANDRA_DISK_MOUNT }}
+        volumeMounts:
+    {{- range $i, $e := until (int $nInstance) }}        
+        - name: cassandra{{ $i }}-disk
+          mountPath: /cassandra{{ $i }}/current_data
+    {{- end }}
+  {{- end }}
+        env:
+        - name: deploy_mode
+          value: "{{ .Values.DEPLOY_MODE }}"
+        - name: cassandra_cluster_name
+          value: "{{ .Values.CASSANDRA_SERVICE }}"
+        - name: cassandra_native_transport_port
+          value: "{{ .Values.CASSANDRA_NATIVE_TRANSPORT_PORT }}"
+        - name: cassandra_storage_port
+          value: "{{ .Values.CASSANDRA_STORAGE_PORT }}"
+        - name: cassandra_JMX_port
+          value: "{{ .Values.CASSANDRA_JMX_PORT }}"
+        - name: cassandra_rpc_address
+          value: "0.0.0.0"
+        - name: cassandra_broadcast_address
+          value: "{{ .Values.CASSANDRA_SERVICE }}"
+        - name: cassandra_broadcast_rpc_address
+          value: "{{ .Values.CASSANDRA_SERVICE }}"
+        - name: cassandra_seeds
+          value: "{{ .Values.CASSANDRA_SERVICE }}"        
+        - name: cassandra_concurrent_reads
+          value: "{{ .Values.CASSANDRA_CONCURENT_READS }}"
+        - name: cassandra_concurrent_writes
+          value: "{{ .Values.CASSANDRA_CONCURENT_WRITES }}"
+        - name: cassandra_compaction_throughput_mb_per_sec
+          value: "{{ .Values.CASSANDRA_COMPACTION_THROUGHTPUT_MB_PER_SEC }}"
+        - name: cassandra_cross_node_timeout
+          value: "{{ .Values.CASSANDRA_CROSS_NODE_TIMEOUT }}"
+        - name: cassandra_dynamic_snitch_badness_threshold
+          value: "{{ .Values.CASSANDRA_DYNAMIC_SNITCH_BADNESS_THRESHOLD }}"
+        - name: cassandra_gc_warn_threshold_in_ms
+          value: "{{ .Values.CASSANDRA_GC_WARN_THRESHOLD_IN_MS }}"
+        - name : cassandra_server_instance_num
+          value: "{{ .Values.INSTANCE_NUM }}"
+        - name: cassandra_numactl_enable
+          value: "{{ .Values.CASSANDRA_NUMACTL_ENABLE }}"
+        - name: cassandra_numactl_vcores_enable
+          value: "{{ .Values.CASSANDRA_NUMACTL_VCORES_ENABLE }}"
+        - name: numa_options
+          value: "{{ .Values.NUMA_OPTIONS }}"
+        - name : cassandra_slow_query_log_timeout_in_ms
+          value: "{{ .Values.CASSANDRA_SLOW_QUERY_TIMEOUT }}"
+        - name: CASSANDRA_JVM_HEAP_SIZE
+          value: "{{ .Values.JVM_HEAP_SIZE }}"
+        - name: CASSANDRA_JVM_GC_TYPE
+          value: "{{ .Values.JVM_GC_TYPE }}"
+        - name : HOST_NETWORK
+          value: "{{ .Values.HOST_NETWORK_ENABLE }}"
+        - name: RPS_TUNE
+          value: "{{ .Values.NETWORK_RPS_TUNE_ENABLE }}"
+        - name: KERNEL_TUNE
+          value: "{{ .Values.KERNEL_TUNE_ENABLE }}"
+        - name: RAM_DISK_EANBLE
+          value: "{{ .Values.RAM_DISK_EANBLE }}"
+        - name: CLEAN_PORT
+          value: "{{ .Values.CLEAN_PORT }}"
+  {{- if .Values.CASSANDRA_DISK_MOUNT }}
+      volumes:
+    {{- range $i, $e := until (int $nInstance) }}
+      - name: cassandra{{ $i }}-disk
+        hostPath:
+          path: /mnt/disk{{ add $i 1 }}
+    {{- end }}
+  {{- end }} #end for Values.CASSANDRA_DISK_MOUNT
+  {{- if .Values.CASSANDRA_DISK_MOUNT }}
+      nodeSelector:  
+        HAS-SETUP-DISK-MOUNT-1: "yes"
+  {{- end }}
+    {{- $args1 := dict "key" "deployPolicy" "value" "standalone" }}
+      {{- include "podAntiAffinity" $args1 }}
+    {{- $args2 := dict "nkey" "VM-GROUP" "nvalue" "worker" }}
+      {{- include "nodeAffinity" $args2 }}
+{{- end }} #end for .Values.DEPLOY_MODE standalone
+
+{{- if eq ($.Values.DEPLOY_MODE | toString) "cluster" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.CASSANDRA_SERVICE }}
+  labels:
+    app: {{ .Values.CASSANDRA_SERVICE }}
+spec:
+  selector:
+    app: cassandra-node
+  clusterIP: None
+
+  {{- $node_num := (int $.Values.SERVER_POD_NUM) -}}
+  {{- range $i, $e := until $node_num }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cassandra-node-{{ add $i 1 }}  
+spec:
+  template:
+    metadata:
+      name: cassandra-node-{{ add $i 1 }}   
+      labels:
+        app: cassandra-node     
+        deployPolicy: standalone
+    spec:
+      hostname: {{ $.Values.HOSTNAME_PREFIX }}{{ add $i 1 }}
+      subdomain: {{ $.Values.CASSANDRA_SERVICE }}
+      dnsConfig:
+        searches:
+        - "{{ $.Values.CASSANDRA_SERVICE }}.{{ $.Values.NAMESPACE }}.svc.cluster.local"  
+      containers:
+      - name: {{ $.Values.HOSTNAME_PREFIX }}{{ add $i 1 }}
+  {{- if eq ($.Values.JDK_VERSION | toString) "JDK14" }}
+        image: {{ $.Values.REGISTRY }}wl-cassandra-server-jdk14{{ $.Values.IMAGE_ARCH }}{{ $.Values.RELEASE }}
+  {{- else }}
+        image: {{ $.Values.REGISTRY }}wl-cassandra-server-jdk11{{ $.Values.IMAGE_ARCH }}{{ $.Values.RELEASE }}
+  {{- end }}
+        imagePullPolicy: {{ include "imagepolicy" $.Values }}
+  {{- if eq ($.Values.SERVER_POD_LEVEL | toString) "Burstable" }}
+        resources:
+          requests:
+            cpu: "{{ $.Values.SERVER_POD_CPU }}"
+  {{- end }}
+  {{- if eq ($.Values.SERVER_POD_LEVEL | toString) "Guaranteed" }}
+        resources:
+          requests:           
+            cpu: "{{ $.Values.SERVER_POD_CPU }}"
+            memory: "{{ $.Values.SERVER_POD_MEMORY }}"
+          limits:
+            cpu: "{{ $.Values.SERVER_POD_CPU }}"
+            memory: "{{ $.Values.SERVER_POD_MEMORY }}"
+  {{- end }}
+        securityContext:
+          privileged: true
+  {{- if $.Values.CASSANDRA_DISK_MOUNT }}
+        volumeMounts: 
+        - name: cassandra-disk
+          mountPath: /cassandra0/current_data #for cluster only one cassandra server process in a pod
+  {{- end }}
+        env:
+        - name: deploy_mode
+          value: "{{ $.Values.DEPLOY_MODE }}"
+        - name: service_name
+          value: "{{ $.Values.CASSANDRA_SERVICE }}"
+        - name: NODE_NUM
+          value: "{{ $.Values.NODE_NUM }}"
+        - name: hostname_prefix
+          value: "{{ $.Values.HOSTNAME_PREFIX }}"
+        - name: node_index
+          value: "{{ $i }}"
+        - name: cluster_on_single_node
+          value: "{{ $.Values.CLUSTER_ON_SINGLE_NODE }}"
+        - name: RAM_DISK_EANBLE
+          value: "{{ $.Values.RAM_DISK_EANBLE }}"
+        - name: cassandra_cluster_name
+          value: "Test Cluster"        
+        - name: cassandra_native_transport_port
+          value: "{{ $.Values.CASSANDRA_NATIVE_TRANSPORT_PORT }}"
+        - name: cassandra_storage_port
+          value: "{{ $.Values.CASSANDRA_STORAGE_PORT }}"
+        - name: cassandra_JMX_port
+          value: "{{ $.Values.CASSANDRA_JMX_PORT }}"
+        - name: cassandra_listen_address
+          value: "{{ $.Values.HOSTNAME_PREFIX }}{{ add $i 1 }}"
+        - name: cassandra_rpc_address
+          value: "{{ $.Values.HOSTNAME_PREFIX }}{{ add $i 1 }}"
+        - name: cassandra_broadcast_address
+          value: "{{ $.Values.HOSTNAME_PREFIX }}{{ add $i 1 }}"
+        - name: cassandra_broadcast_rpc_address
+          value: "{{ $.Values.HOSTNAME_PREFIX }}{{ add $i 1 }}"     
+        - name: cassandra_concurrent_reads
+          value: "{{ $.Values.CASSANDRA_CONCURENT_READS }}"
+        - name: cassandra_concurrent_writes
+          value: "{{ $.Values.CASSANDRA_CONCURENT_WRITES }}"
+        - name: cassandra_compaction_throughput_mb_per_sec
+          value: "{{ $.Values.CASSANDRA_COMPACTION_THROUGHTPUT_MB_PER_SEC }}"
+        - name: cassandra_cross_node_timeout
+          value: "{{ $.Values.CASSANDRA_CROSS_NODE_TIMEOUT }}"
+        - name: cassandra_dynamic_snitch_badness_threshold
+          value: "{{ $.Values.CASSANDRA_DYNAMIC_SNITCH_BADNESS_THRESHOLD }}"
+        - name: cassandra_endpoint_snitch
+          value: "{{ $.Values.CASSANDRA_ENDPOINT_SNITCH }}"
+        - name: cassandra_num_tokens
+          value: "{{ $.Values.CASSANDRA_NUM_TOKENS }}"
+        - name: cassandra_gc_warn_threshold_in_ms
+          value: "{{ $.Values.CASSANDRA_GC_WARN_THRESHOLD_IN_MS }}"
+        - name : cassandra_server_instance_num
+          value: "{{ $.Values.INSTANCE_NUM }}"
+        - name: cassandra_numactl_enable
+          value: "{{ $.Values.CASSANDRA_NUMACTL_ENABLE }}"
+        - name: numa_options
+          value: "{{ $.Values.NUMA_OPTIONS }}"
+        - name : cassandra_slow_query_log_timeout_in_ms
+          value: "{{ $.Values.CASSANDRA_SLOW_QUERY_TIMEOUT }}"
+        - name: CASSANDRA_JVM_HEAP_SIZE
+          value: "{{ $.Values.JVM_HEAP_SIZE }}"
+        - name: CASSANDRA_JVM_GC_TYPE
+          value: "{{ $.Values.JVM_GC_TYPE }}"
+        - name : HOST_NETWORK
+          value: "{{ $.Values.HOST_NETWORK_ENABLE }}"
+        - name: RPS_TUNE
+          value: "{{ $.Values.NETWORK_RPS_TUNE_ENABLE }}"
+        - name: KERNEL_TUNE
+          value: "{{ $.Values.KERNEL_TUNE_ENABLE }}"
+        - name: CLEAN_PORT
+          value: "{{ $.Values.CLEAN_PORT }}"
+      restartPolicy: Never  
+  {{- if $.Values.CASSANDRA_DISK_MOUNT }}
+      volumes:
+      - name: cassandra-disk
+        hostPath:
+          path: /mnt/disk1
+          type: Directory
+  {{- end }}
+  {{- if $.Values.CASSANDRA_DISK_MOUNT }}
+      nodeSelector:  
+        HAS-SETUP-DISK-MOUNT-1: "yes"
+  {{- end }}
+  {{- $args1 := dict "key" "deployPolicy" "value" "standalone" }}
+    {{- include "podAntiAffinity" $args1 }}
+  {{- $args2 := dict "nkey" "VM-GROUP" "nvalue" "worker" }}
+    {{- include "nodeAffinity" $args2 }}
+  {{- end }} #end for Values.SERVER_POD_NUM
+{{- end }} #end for Values.DEPLOY_MODE

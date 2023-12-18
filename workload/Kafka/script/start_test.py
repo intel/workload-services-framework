@@ -1,40 +1,61 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 import sys
 import os
 import subprocess
 import uuid
 from multiprocessing import Pool
 from time import strftime, localtime
-import random
+import secrets
 
 def get_task_cmd(params):
     if params['kafka_enable_encryption'] == "true":
         if params['id'] == "consumer":
-            cmd = "date; sh " + params['kafka_dir'] + "/bin/kafka-consumer-perf-test.sh" + " --messages " + params['messages'] + \
-                  " --topic " + params['topic'] + " --broker-list " + params['kafka_server'] + " --group " + params['kafka_consumer_group_id'] + \
-                  " --timeout " + params['consumer_timeout'] + " --fetch-size " + params['fetch_size'] + \
-                  " --consumer.config " + params['kafka_dir'] + "/config/client-ssl.properties"
+            cmd = [params['kafka_dir'] + "/bin/kafka-consumer-perf-test.sh",
+                   "--messages",params['messages'],
+                   "--topic",params['topic'],
+                   "--broker-list",params['kafka_server'],
+                   "--group",params['kafka_consumer_group_id'],
+                   "--timeout",params['consumer_timeout'],
+                   "--fetch-size",params['fetch_size'],
+                   "--consumer.config",params['kafka_dir'] + "/config/client-ssl.properties"]
         elif params['id'] == "producer":
             prepare_payload(params)
-            cmd = "date; sh " + params['kafka_dir'] + "/bin/kafka-producer-perf-test.sh" + " --topic " + params['topic'] + \
-                  " --num-records " + params['num_records'] + " --throughput " + params['throughput'] + " --payload-file " \
-                  + params['payload_file'] + " --producer-props bootstrap.servers=" + params['kafka_server'] + \
-                  " compression.type=" + params['compression_type'] + " buffer.memory=" + params['buffer_mem'] + \
-                  " batch.size=" + params['batch_size'] + " linger.ms=" + params['linger_ms'] + " acks=" + params['ack'] + \
-                  " --producer.config " + params['kafka_dir'] + "/config/client-ssl.properties"+" --print-metrics"
+            cmd = [params['kafka_dir'] + "/bin/kafka-producer-perf-test.sh",
+                   "--topic",params['topic'],
+                   "--num-records",params['num_records'],
+                   "--throughput",params['throughput'],
+                   "--payload-file",params['payload_file'],
+                   "--producer-props","bootstrap.servers=" + params['kafka_server'],
+                   "compression.type=" + params['compression_type'],
+                   "buffer.memory=" + params['buffer_mem'],"batch.size=" + params['batch_size'],
+                   "linger.ms=" + params['linger_ms'],"acks=" + params['ack'],
+                   "--producer.config",params['kafka_dir'] + "/config/client-ssl.properties","--print-metrics"]
         else:
             raise Exception("Unknown id [{}].".format(params['id']))
     else:
         if params['id'] == "consumer":
-            cmd = "date; sh " + params['kafka_dir'] + "/bin/kafka-consumer-perf-test.sh" + " --messages " + params['messages'] + \
-                  " --topic " + params['topic'] + " --broker-list " + params['kafka_server'] + " --group " + params['kafka_consumer_group_id'] + \
-                  " --timeout " + params['consumer_timeout'] + " --fetch-size " + params['fetch_size']
+            cmd = [params['kafka_dir'] + "/bin/kafka-consumer-perf-test.sh",
+                   "--messages",params['messages'],
+                   "--topic",params['topic'],
+                   "--broker-list",params['kafka_server'],
+                   "--group",params['kafka_consumer_group_id'],
+                   "--timeout",params['consumer_timeout'],
+                   "--fetch-size",params['fetch_size']]
         elif params['id'] == "producer":
             prepare_payload(params)
-            cmd = "date; sh " + params['kafka_dir'] + "/bin/kafka-producer-perf-test.sh" + " --topic " + params['topic'] + \
-                  " --num-records " + params['num_records'] + " --throughput " + params['throughput'] + " --payload-file " \
-                  + params['payload_file'] + " --producer-props bootstrap.servers=" + params['kafka_server'] + \
-                  " compression.type=" + params['compression_type'] + " buffer.memory=" + params['buffer_mem'] + \
-                  " batch.size=" + params['batch_size'] + " linger.ms=" + params['linger_ms'] + " acks=" + params['ack']+" --print-metrics"
+            cmd = [params['kafka_dir'] + "/bin/kafka-producer-perf-test.sh",
+                   "--topic",params['topic'],
+                   "--num-records",params['num_records'],
+                   "--throughput",params['throughput'],
+                   "--payload-file",params['payload_file'],
+                   "--producer-props","bootstrap.servers=" + params['kafka_server'],
+                   "compression.type=" + params['compression_type'],
+                   "buffer.memory=" + params['buffer_mem'],"batch.size=" + params['batch_size'],
+                   "linger.ms=" + params['linger_ms'],"acks=" + params['ack'],"--print-metrics"]
         else:
             raise Exception("Unknown id [{}].".format(params['id']))
     return cmd
@@ -79,7 +100,6 @@ def start_benchmark(cmd):
     print(cmd)
     print(strftime("process started at :  [%Y-%m-%d %H:%M:%S]", localtime()))
     popen = subprocess.Popen(cmd,
-                         shell = True,
                          stdout = subprocess.PIPE,
                          stderr = subprocess.PIPE,
                          universal_newlines = True,
@@ -101,7 +121,7 @@ def prepare_payload(params):
     fileName = params['payload_file']
     with open(fileName,'w',encoding='utf-8') as file:
         for _ in range(number):
-            file.write(''.join(random.choice(seed_str) for _ in range(record_size))+"\n")
+            file.write(''.join(secrets.choice(seed_str) for _ in range(record_size))+"\n")
     file.close()
 
 if __name__ == '__main__':

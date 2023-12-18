@@ -1,0 +1,7 @@
+spark.driver.host master-0
+spark.driver.port 12345
+spark.blockManager.port 12346
+spark.port.maxRetries 65535
+spark.executor.heartbeatInterval 120
+spark.network.timeout 300
+spark.yarn.queue default

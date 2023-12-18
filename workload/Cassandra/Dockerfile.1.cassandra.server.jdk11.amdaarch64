@@ -1,0 +1,27 @@
+# wl-cassandra-server-jdk11
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG IMAGESUFFIX=
+from cassandra-server-jdk11${IMAGESUFFIX}
+
+VOLUME /var/lib/cassandra
+COPY jvm11-server.options.new  /cassandra/conf/jvm11-server.options
+COPY script/docker-entrypoint.sh /usr/local/bin/
+COPY script/cluster.sh /usr/local/bin/
+COPY script/standalone.sh /usr/local/bin/
+COPY script/network_tune.sh /usr/local/bin/
+COPY script/clean_data_server.py /usr/local/bin/
+COPY script/kernel_tune.sh /usr/local/bin/
+RUN chown -R cassandra:cassandra /cassandra \
+  && chmod +x /usr/local/bin/docker-entrypoint.sh \
+  && chmod +x /usr/local/bin/network_tune.sh \
+  && chmod +x /usr/local/bin/clean_data_server.py \
+  && chmod +x /usr/local/bin/kernel_tune.sh \
+  && chown -R cassandra:cassandra /usr/local/bin/ 
+
+CMD /usr/local/bin/docker-entrypoint.sh && \
+sleep infinity

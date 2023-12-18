@@ -2,6 +2,11 @@ changecom(`@')
 # STACK-base
 changecom(`#')
 
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 ARG OS_VER=22.04
 ARG OS_IMAGE=ubuntu
 FROM ${OS_IMAGE}:${OS_VER}
