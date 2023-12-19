@@ -17,13 +17,6 @@ WORKLOAD="linpack_${ARCH}"
 DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
 . "$DIR/../../script/overwrite.sh"
 
-# Check whether parameters are valid.
-source "$DIR"/../../stack/ai_common/libs/parameter_precheck.sh
-check_positive_integer_or_string "auto" $N_SIZE
-check_positive_integer_or_string "auto" $P_SIZE
-check_positive_integer_or_string "auto" $Q_SIZE 
-check_positive_integer_or_string "auto" $NB_SIZE 
-
 function k8s_settings() {
     RET=""
     for i in "$@"; do
