@@ -69,14 +69,13 @@ if [[ "${TEST_OPERATION}" =~ "sequential" ]]; then
     }
 
     ' "{}" \; || true ))
-elif [[ "${TEST_OPERATION}" =~ "random" || "${TEST_OPERATION}" =~ "gated" ]]; then
+elif [[ "${TEST_OPERATION}" =~ "random" || "${TEST_OPERATION}" =~ "gated" || "${TEST_OPERATION}" =~ "live" ]]; then
     # Block IO sequential R/W, the primary kpi is the bandwidth.
     flag_iops="*"
-    res=($(find . -name *random*.log -exec awk '
+    res=($(find . -name *random*.log  -exec awk '
     BEGIN {
         test_round=0;
     }
-
     function kvformat(key, value) {
         unit=gensub(/^[0-9+-.]+ *(.*)/,"\\1",1, value);
         value=gensub(/^([0-9+-.]+).*/,"\\1",1, value);
@@ -84,7 +83,6 @@ elif [[ "${TEST_OPERATION}" =~ "random" || "${TEST_OPERATION}" =~ "gated" ]]; th
         if (unit!="") key=key" ("unit")";
         return key": "value;
     }
-
     #args:
     # key - kpi type, eg. IOPS/Throught
     # value - equation with unit, eg. avgbw=100MiB
@@ -101,27 +99,21 @@ elif [[ "${TEST_OPERATION}" =~ "random" || "${TEST_OPERATION}" =~ "gated" ]]; th
         if (unit!="") key=key" ("unit")";
         return key": "value;
     }
-
     /IOPS/ {
-
         #format equation
         kv=gensub(/(.*)=(.*)*,/,"\\1=\\2",1, $2);
         #print "format kv:"kv
         print equation_kvformat("IOPS", kv)
-
     }
-
     /BW=/ {
         pattern="BW="
         bw_value=gensub(/BW=(.*)/,"\\1",1, $3)
         #print bw_value
         print kvformat("Throughput", bw_value)
     }
-
     END {
         #print "test round:\t"test_round;
     }
-
     ' "{}" \; || true ))
 
 fi
@@ -149,9 +141,19 @@ BEGIN{
     res_len = length(res)
     if(res_len >= 1 && vm_num >= 1){
         for(i=0;i<vm_num;i++){
-            IOPS = IOPS + res[((6*i+3))]
-            BW = BW + res[((6*i+6))]
+            if(index(res[((6*i+2))], "k") != 0)
+                IOPS = IOPS + res[((6*i+3))] * 1000
+            else
+                IOPS = IOPS + res[((6*i+3))]
+            if(index(res[((6*i+5))], "M") != 0)
+                BW = BW + res[((6*i+6))] * 1024
+            else
+                BW = BW + res[((6*i+6))]
         }
+        if(index(res[2], "k") != 0)
+            IOPS = IOPS / 1000
+        if(index(res[5], "M") != 0)
+            BW = BW / 1024
         printf("%s%s %s %s\n",flag_iops,res[1],res[2],IOPS)
         printf("%s%s %s %s\n",flag_bw,res[4],res[5],BW)
     }

@@ -1,6 +1,3 @@
->
-> **Note: The Workload Services Framework is a benchmarking framework and is not intended to be used for the deployment of workloads in production environments. It is recommended that users consider any adjustments which may be necessary for the deployment of these workloads in a production environment including those necessary for implementing software best practices for workload scalability and security.**
->
 ### Introduction
 This is an Intel Deep Learning Streamer pipeline with a decoder, object detection, and object classification components. This pipeline takes video as input to identify vehicles. Object detection uses YOLO model. Object classification uses ResNet-50 model.
 

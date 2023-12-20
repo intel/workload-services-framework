@@ -30,5 +30,6 @@
 
   - name: wait for dlb-plugin to become fully available
     command: "kubectl wait --for=condition=Ready pod --all -n {{ dlbplugin_namespace }} --timeout 30s"
+    ignore_errors: true
 
   when: dlbplugin_ready.rc == 1

@@ -4,62 +4,80 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: Create the perf directory
-  file:
-    path: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-perf"
-    state: directory
-  delegate_to: localhost
-  become: false
-  ignore_errors: true
+- block:
 
-- name: Process perf records
-  shell:
-    cmd: |
-      {% if perf_action == 'record' %}
+  - name: Create the perf directory
+    file:
+      path: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-perf"
+      state: directory
+    delegate_to: localhost
+    become: false
+    ignore_errors: true
+
+  - name: Process perf records
+    shell:
+      cmd: |
         for record in perf-*.record; do
-          perf report {{ perf_report_options }} -i $record > ${record/.record/.report}
-          {% if perf_flamegraph %}
-            perf script {{ perf_script_options }} -i $record > $record.out
+          if [ -e "$record" ]; then
+          {% if not (perf_skip_report | bool) %}
+            perf report {{ perf_report_options }} -i $record > ${record/.record/.report}
           {% endif %}
+            perf script {{ perf_script_options }} -i $record > $record.out
+          fi
         done
-      {% endif %}
-    chdir: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf"
-    executable: /bin/bash
-  delegate_to: "{{ trace_node.1 }}"
-  ignore_errors: true
-  become: true
+      chdir: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf"
+      executable: /bin/bash
+    when: (perf_action == 'record')
+    ignore_errors: true
+    become: true
 
-- name: Get perf files
-  shell:
-    cmd:   ls -1
-    chdir: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf"
-    executable: /bin/bash
-  register: perf_files
-  delegate_to: "{{ trace_node.1 }}"
-  ignore_errors: true
-  become: false
+  - name: Get perf files
+    shell:
+      cmd:   ls -1
+      chdir: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf"
+      executable: /bin/bash
+    register: perf_files
+    ignore_errors: true
+    become: false
 
-- name: Fetch perf files
-  ansible.builtin.fetch:
-    src:  "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf/{{ item }}"
-    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-perf/"
-    flat: true
-  when: (perf_action == 'stat') or ('.record' not in item) or ('.out' in item)
-  loop: "{{ perf_files.stdout_lines | reject('==','perf.pid') }}"
-  delegate_to: "{{ trace_node.1 }}"
-  ignore_errors: true
-  become: false
+  - name: Fetch perf files
+    ansible.builtin.fetch:
+      src:  "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf/{{ item }}"
+      dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-perf/"
+      flat: true
+    when: (perf_action == 'stat') or ('.record' not in item) or ('.out' in item)
+    loop: "{{ perf_files.stdout_lines | reject('==','perf.pid') }}"
+    ignore_errors: true
+    become: false
 
-- name: Remove any collection files
-  file:
-    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf"
-    state: absent
-  delegate_to: "{{ trace_node.1 }}"
-  ignore_errors: true
-  become: true
+  - name: Remove any collection files
+    file:
+      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf"
+      state: absent
+    ignore_errors: true
+    become: true
 
-- name: Create flame graph
-  include_tasks:
-    file: flamegraph.yaml
-  when: perf_flamegraph and perf_action == "record"
+  - name: Create flamegraph SVG
+    template:
+      src: perf-charts.html.j2
+      dest: "{{ item | regex_replace('perf-([0-9]*).record.out','roi-\\1.html') }}"
+    when: perf_action == "record"
+    loop: "{{ lookup('pipe','ls -1 '+wl_logs_dir+'/'+trace_node.1+'-'+(itr|default(1)|string)+'-perf/perf-*.record.out', wantlist=True) }}"
+    delegate_to: localhost
+    ignore_errors: yes
+    become: false
+
+  - name: Remove .record.out
+    file:
+      path: "{{ item }}"
+      state: absent
+    when:
+    - perf_action == "record"
+    - not (perf_fetch_data | bool)
+    loop: "{{ lookup('pipe','ls -1 '+wl_logs_dir+'/'+trace_node.1+'-'+(itr|default(1)|string)+'-perf/perf-*.record.out', wantlist=True) }}"
+    delegate_to: localhost
+    ignore_errors: yes
+    become: false
+
+  delegate_to: "{{ trace_node.1 }}"
 

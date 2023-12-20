@@ -1,0 +1,63 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Install prerequisites
+    yum:
+      name: 
+        - "@Development Tools"
+        - pkgconfig
+        - bzip2
+      state: present
+      update_cache: true
+    register: yumrc
+    until: yumrc is success
+    retries: 10
+    delay: 10
+  
+  - name: Detect kernel version
+    shell:
+      cmd: uname -r
+      executable: /bin/bash
+    register: kernel_version
+  
+  - name: Check if kernel header is already installed
+    stat:
+      path: "/usr/src/kernels/{{ kernel_version.stdout }}"
+    register: kernel_header
+
+  - block:
+  
+    - name: Install prerequisites
+      yum:
+        name: 
+          - "kernel-devel-{{ kernel_version.stdout }}"
+        state: present
+      register: yumrc
+      until: yumrc is success
+      retries: 10
+      delay: 10
+  
+    rescue:
+  
+    - name: Install prerequisites
+      yum:
+        name: 
+          - "kernel-devel"
+        state: present
+      register: yumrc
+      until: yumrc is success
+      retries: 10
+      delay: 10
+  
+    when:
+    - os.stdout_lines | last | int >= 8
+    - not kernel_header.stat.exists
+  
+  delegate_to: "{{ trace_node.1 }}"
+  become: true
+

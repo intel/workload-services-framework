@@ -4,30 +4,88 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- hosts: cluster_hosts:off_cluster_hosts
-  become: "{{ sut_sudo | default(true) | bool }}"
-  gather_facts: no
-  tasks:
-
-    - name: Cleanup sequence
-      include_role:
-        name: cleanup
-      when: 
-      - ((csp | default('static')) == 'static')
-      - ansible_connection != 'winrm'
-      - sut_sudo | default(true) | bool
 
 - hosts: trace_hosts
   become: "{{ sut_sudo | default(true) | bool }}"
   gather_facts: no
   tasks:
 
-    - name: Cleanup trace scripts
-      include_role:
-        name: cleanup
-        tasks_from: trace
+    - block:
+
+      - name: Cleanup trace scripts on VM Linux instances
+        include_role:
+          name: trace
+          tasks_from: cleanup-script
+        when:
+        - ((ansible_connection|default('ssh')) == 'ssh')
+
+      - name: Cleanup trace scripts on VM Windows instances
+        include_role:
+          name: trace
+          tasks_from: cleanup-script-win
+        when:
+        - ((ansible_connection|default('ssh')) == 'winrm')
+        - (playbook_dir+'/roles/trace/tasks/cleanup-script-win.yaml') is exists
+
       when:
       - sut_sudo | default(true) | bool
+      - (wl_trace_modules | split(',') | reject('match','.*:host.*') | length) > 0
+      vars:
+        trace_host: "{{ inventory_hostname }}"
+
+    - block:
+
+      - name: Cleanup trace scripts on VM Linux hosts
+        include_role:
+          name: trace
+          tasks_from: cleanup-script
+        when:
+        - ((ansible_connection|default('ssh')) == 'ssh')
+
+      - name: Cleanup trace scripts on VM Windows hosts
+        include_role:
+          name: trace
+          tasks_from: cleanup-script-win
+        when:
+        - ((ansible_connection|default('ssh')) == 'winrm')
+        - (playbook_dir+'/roles/trace/tasks/cleanup-script-win.yaml') is exists
+
+      when:
+      - sut_sudo | default(true) | bool
+      - vmhost_host is defined
+      - vmhost_host in unique_vmhosts
+      - (wl_trace_modules | split(',') | select('match','.*:host.*') | length) > 0
+      vars:
+        trace_host: "{{ vmhost_host | default(inventory_hostname) }}"
+        unique_vmhosts: "{{ dict(groups.vmhost_hosts | map('extract', hostvars, ['ansible_host']) | zip(groups.vmhost_hosts | map('extract', hostvars, ['ansible_port'])) | map('join',':') | zip(groups.vmhost_hosts)).values() }}"
+
+- hosts: cluster_hosts:off_cluster_hosts
+  become: "{{ sut_sudo | default(true) | bool }}"
+  gather_facts: no
+  tasks:
+
+    - block:
+
+      - name: Cleanup sequence (Linux)
+        include_role:
+          name: cleanup
+          tasks_from: main
+        when: 
+        - ((ansible_connection|default('ssh')) == 'ssh')
+        - ((csp | default('static')) == 'static')
+        - sut_sudo | default(true) | bool
+
+      - name: Cleanup sequence (Windows)
+        include_role:
+          name: cleanup
+          tasks_from: main-win
+        when: 
+        - ((ansible_connection|default('ssh')) == 'winrm')
+        - ((csp | default('static')) == 'static')
+        - sut_sudo | default(true) | bool
+        - (playbook_dir+'/roles/cleanup/tasks/main-win.yaml') is exists
+
+      when: 
       - ((csp | default('static')) == 'static')
-      - ansible_connection != 'winrm'
+      - sut_sudo | default(true) | bool
 

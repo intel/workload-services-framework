@@ -106,6 +106,7 @@ if [ -z "$REGISTRY" ]; then
     fi
 fi
 
+print_workload_configurations 2>&1 | tee -a "$LOGSDIRH"/k8s.logs
 iterations="$(echo "x--run_stage_iterations=1 $KUBERNETES_OPTIONS $CTESTSH_OPTIONS" | sed 's/.*--run_stage_iterations=\([0-9]*\).*/\1/')"
 rebuild_config "$CLUSTER_CONFIG_M4" "$CLUSTER_CONFIG"
 rebuild_kubernetes_config
@@ -116,6 +117,6 @@ for itr in $(seq 1 $iterations); do
     mkdir -p "$LOGSDIRH/itr-$itr"
     cp -f "$LOGSDIRH/kpi.sh" "$LOGSDIRH/itr-$itr"
     kubernetes_run $itr
-done 2>&1 | tee "$LOGSDIRH/k8s.logs"
+done 2>&1 | tee -a "$LOGSDIRH/k8s.logs"
 sed -i '1acd itr-1' "$LOGSDIRH/kpi.sh"
 

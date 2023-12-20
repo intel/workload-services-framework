@@ -103,5 +103,5 @@ variable "instance_storage_interface" {
 
 variable "cpu_model_timeout" {
   type = string
-  default = "5m"
+  default = "10m"
 }

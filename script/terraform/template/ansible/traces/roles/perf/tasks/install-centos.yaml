@@ -10,6 +10,7 @@
       - perf
     state: present
   become: yes
+  delegate_to: "{{ trace_node.1 }}"
   register: yumrc
   until: yumrc is success
   retries: 10

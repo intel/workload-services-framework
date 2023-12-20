@@ -1,0 +1,162 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- hosts: controller-0
+  gather_facts: no
+  vars_files:
+    - "/opt/workspace/template/ansible/common/roles/image-to-registry/defaults/main.yaml"
+  tasks:
+    - name: Wait for controller-0 to be available
+      wait_for_connection:
+
+    - name: get k8s apiserver no_proxy value
+      shell: |
+        kubectl get pod -n kube-system $(kubectl get pod -n kube-system|grep kube-apiserver|awk '{print $1}') -o=jsonpath='{.spec.containers[0].env[?(@.name=="no_proxy")].value}'
+      register: apiserver_no_proxy_value
+
+    - name: get k8s apiserver no_proxy name
+      shell: |
+        kubectl get pod -n kube-system $(kubectl get pod -n kube-system|grep kube-apiserver|awk '{print $1}') -o=jsonpath='{.spec.containers[0].env[?(@.name=="no_proxy")].name}'
+      register: apiserver_no_proxy_name
+
+    - name: get k8s apiserver env
+      shell: |
+        kubectl get pod -n kube-system $(kubectl get pod -n kube-system|grep kube-apiserver|awk '{print $1}') -o=jsonpath='{.spec.containers[0].env}'
+      register: apiserver_env
+
+    - name: Patch apiserver for changing no_proxy flag - if got no_proxy name
+      become: true
+      replace:
+        path: /etc/kubernetes/manifests/kube-apiserver.yaml
+        regexp: '- name: no_proxy\n      value: .*\n'
+        replace: '- name: no_proxy\n      value: istiod.istio-system.svc{{ (apiserver_no_proxy_value.stdout |length > 0) | ternary("," + apiserver_no_proxy_value.stdout, "") }}\n'
+      when: 'apiserver_no_proxy_name.stdout == "no_proxy" and not "istiod.istio-system.svc" in apiserver_no_proxy_value.stdout'
+
+    - name: Patch apiserver for changing no_proxy flag - if got env but no no_proxy name
+      become: true
+      replace:
+        path: /etc/kubernetes/manifests/kube-apiserver.yaml
+        regexp: '    env:\n'
+        replace: '    env:\n    - name: no_proxy\n      value: istiod.istio-system.svc\n'
+      when: 'apiserver_no_proxy_name.stdout == "" and apiserver_env.stdout != ""'
+
+    - name: Patch apiserver for changing no_proxy flag - if no env value then
+      become: true
+      replace:
+        path: /etc/kubernetes/manifests/kube-apiserver.yaml
+        regexp: '(  - command:\n    - kube-apiserver\n[\w\W]*    - --.*\n)'
+        replace: '\1    env:\n    - name: no_proxy\n      value: istiod.istio-system.svc\n'
+      when: 'apiserver_env.stdout == ""'
+
+    - name: Delay 15s, so that waiting for modfication to take effect
+      shell: "sleep 15"
+      when: 'not "istiod.istio-system.svc" in apiserver_no_proxy_value.stdout'
+
+    - name: Wait for apiserver to be ready
+      shell: |
+        kubectl get cs
+      register: wait_apiserver_ready
+      retries: 200
+      delay: 6
+      until: wait_apiserver_ready.rc == 0
+      when: 'not "istiod.istio-system.svc" in apiserver_no_proxy_value.stdout'
+
+    - name: Check if k8s_remote_registry_url enabled
+      shell: "cat ../../../cluster.yaml | grep k8s_remote_registry_url:"
+      register: remote_registy_enabled
+      delegate_to: localhost
+      ignore_errors: true
+
+    - name: Prepare local registry string
+      set_fact:
+        registry_url: "{{ wl_registry_map.split('/')[0] | trim }}"
+      ignore_errors: true
+
+    - name: Remove the last slash from local registry url if exists
+      set_fact:
+        registry_url: "{{ registry_url[:-1] }}"
+      when: registry_url.endswith('/')
+      ignore_errors: true
+
+    - name: Set k8s_remote_registry_url same as local registry
+      set_fact:
+        k8s_remote_registry_url: "{{ registry_url }}"
+      when: remote_registy_enabled.stdout == ""
+
+    - name: Get real k8s_remote_registry_url
+      shell: |
+        kubectl get svc -n wsf-registry|tail -n 1|awk '{split($5,a,/\//);print $4":"a[1]}'
+      register: get_k8s_remote_registry_url
+      until: get_k8s_remote_registry_url.stdout_lines | length > 0
+      retries: 5
+      delay: 5
+      when: remote_registy_enabled.stdout != ""
+
+    - name: Set k8s_remote_registry_url
+      set_fact:
+        k8s_remote_registry_url: "{{ get_k8s_remote_registry_url.stdout }}"
+      when: remote_registy_enabled.stdout != ""
+
+    - name: Set wl_docker_images
+      set_fact:
+        images: "{{ images | default({}) | combine ({ item.key : item.value }) }}"
+      with_items:
+        - {
+            # "key": "10.67.127.127:5000/istio-envoy-forward-server:latest",
+            "key": "{{ registry_url }}/istio-envoy-forward-server{{ 'release' | extract(lookup('file', wl_logs_dir + '/workload-config.yaml') | from_yaml) }}",
+            "value": false,
+          }
+      when: remote_registy_enabled.stdout != ""
+
+    - name: Transfer custom image to k8s_remote_registry_url
+      import_tasks: /opt/workspace/template/ansible/common/roles/image-to-registry/tasks/main.yaml
+      vars:
+        wl_docker_images: "{{ images }}"
+        # k8s_remote_registry_url: 192.168.128.138:20668
+        k8s_remote_registry_url: "{{ k8s_remote_registry_url }}"
+      when: remote_registy_enabled.stdout != ""
+
+    - name: Start istio installation
+      include_role:
+        name: istio
+
+    - name: Start server deployement
+      include_role:
+        name: server
+      vars:
+        remote_registry_url: "{{ k8s_remote_registry_url }}"
+
+    - name: Wait for nighthawk-server ready
+      shell: |
+        kubectl wait --namespace=istio-workload-nighthawk-server pod --for=condition=Ready -l app=nighthawk-server --timeout=6s
+      register: wait_server_ready
+      retries: 200
+      delay: 3
+      until: wait_server_ready.rc == 0
+
+    - name: Modify config of terraform
+      import_tasks: /opt/workspace/template/ansible/custom/patch-terraform-config.yaml
+
+
+
+
+- hosts: worker-0
+  gather_facts: no
+  tasks:
+    - name: Get CPU policy file as log
+      become: true
+      fetch:
+        src: /var/lib/kubelet/cpu_manager_state
+        dest: "{{ wl_logs_dir }}/server/"
+        flat: yes
+      ignore_errors: true
+
+    - name: Get memory policy file as log
+      become: true
+      fetch:
+        src: /var/lib/kubelet/memory_manager_state
+        dest: "{{ wl_logs_dir }}/server/"
+        flat: yes
+      ignore_errors: true

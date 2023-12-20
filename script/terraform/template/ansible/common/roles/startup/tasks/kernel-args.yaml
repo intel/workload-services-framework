@@ -6,38 +6,61 @@
 
 - name: set kernel args
   set_fact:
-    kernel_args_list: "{{ (kernel_args_list + (sut_kernel_args | split(',') | map('trim') | select('match',item+':.*') | map('regex_replace','^[^:]*:','') | map('trim') | map('split',' '))) | flatten | reject('==','') }}"
+    kernel_args_list_min: "{{ (kernel_args_list_min + (sut_kernel_args | split(',') | map('trim') | select('match',item+':.*') | map('regex_replace','^[^:]*:','') | map('trim') | map('split',' '))) | flatten | reject('==','') }}"
+    kernel_args_list_all: "{{ (kernel_args_list_all + (sut_kernel_args | split(',') | map('trim') | select('match',item+':.*') | map('regex_replace','^[^:]*:','') | map('trim') | map('split',' '))) | flatten | reject('==','') }}"
   loop: "{{ group_names }}"
   vars:
-    kernel_args_list: "{{ wl_kernel_args.values() | list }}"
+    kernel_args_list_min: "{{ wl_kernel_args.values() | list }}"
+    kernel_args_list_all: "{{ (wl_kernel_args.values() | list) + (wl_kernel_args_optional.values() | list) }}"
+
+- name: get existing kernel args
+  command: cat /proc/cmdline
+  register: kernel_cmdline
+  when: kernel_args_list_all | length > 0
 
 - name: Detect OS
   shell: 
     cmd: ". /etc/os-release; echo $ID"
     executable: /bin/bash
   register: os
-  when: kernel_args_list | length > 0
+  when:
+  - kernel_args_list_all | length > 0
+  - kernel_args_list_all is not subset(kernel_cmdline.stdout | split(' '))
+
+- name: remove legacy marker
+  blockinfile:
+    path: "{{ startup_kernel_args_actions[os.stdout]['grub_path'] }}"
+    state: absent
+  ignore_errors: yes
+  when:
+  - kernel_args_list_all | length > 0
+  - kernel_args_list_all is not subset(kernel_cmdline.stdout | split(' '))
 
 - name: add kernel parameters
   blockinfile:
+    marker: "# {mark} WSF Setup"
     path: "{{ startup_kernel_args_actions[os.stdout]['grub_path'] }}"
     create: yes
     block: |
-      GRUB_CMDLINE_LINUX_DEFAULT="${GRUB_CMDLINE_LINUX_DEFAULT} {{ kernel_args_list | join(' ') }}"
+      GRUB_CMDLINE_LINUX_DEFAULT="${GRUB_CMDLINE_LINUX_DEFAULT} {{ kernel_args_list_all | join(' ') }}"
   register: kargs
   ignore_errors: yes
-  when: kernel_args_list | length > 0
+  when:
+  - kernel_args_list_all | length > 0
+  - kernel_args_list_all is not subset(kernel_cmdline.stdout | split(' '))
 
 - name: update grub
   shell: "{{ startup_kernel_args_actions[os.stdout]['update_grub_cmd'] }}"
   when:
-  - kernel_args_list | length > 0
+  - kernel_args_list_all | length > 0
+  - kernel_args_list_all is not subset(kernel_cmdline.stdout | split(' '))
   - (kargs.msg == 'Block inserted') or (kargs.msg == 'File created')
   ignore_errors: yes
 
 - name: request reboot
   set_fact:
     startup_reboot_required: "{{ startup_reboot_required or (kargs.msg == 'Block inserted') or (kargs.msg == 'File created') }}"
-  when: kernel_args_list | length > 0
-
+  when:
+  - kernel_args_list_min | length > 0
+  - kernel_args_list_min is not subset(kernel_cmdline.stdout | split(' '))
 

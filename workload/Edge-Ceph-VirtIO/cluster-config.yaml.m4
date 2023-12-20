@@ -6,8 +6,8 @@
 include(config.m4)
 
 # Define the cluster node requirement for cumulus test.
-# For typical ceph cluster benchamrk architecture, we need several nodes used for
-# benchmark clients, and select 3 nodes for ceph server clusters.
+# For typical ceph cluster benchamrk architecture, we need several nodes used for 
+# benchmark clients, and select 3 nodes for ceph server clusters. 
 # Currently, we combine the test client on ceph server clusters. only select 3-nodes
 # for current design.Later we need to seperate the clients(2-3nodes) and servers(3nodes).
 cluster:

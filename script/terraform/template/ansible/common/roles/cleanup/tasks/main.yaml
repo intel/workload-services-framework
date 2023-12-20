@@ -8,6 +8,14 @@
   set_fact:
     cleanup_reboot_required: false
 
+- name: Restore services
+  systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: "{{ sut_restore_services | split(',') | reject('==','') }}"
+  failed_when: false
+
 - name: Restore sysctls
   include_tasks:
     file: sysctl.yaml
@@ -21,7 +29,8 @@
     name: bios
     tasks_from: cleanup
   when:
-  - sut_reboot | default(true) | bool
+  - sut_reboot | bool
+  - sut_restore_bios | bool
   - not ansible_host in my_ip_list.split(',')
   - (playbook_dir+'/roles/bios') is exists
 
@@ -31,27 +40,18 @@
     state: absent
   failed_when: false
 
-- name: check label stat
-  stat:
-    path: "{{ playbook_dir }}/roles/{{ item.split('=')[0].split('-')[2] | lower }}/tasks/cleanup.yaml"
-  when:
-  - item.startswith("HAS-SETUP-")
-  register: label_check
-  loop: "{{ k8s_node_labels | default([]) }}"
-  delegate_to: localhost
-
-- name: provision "{{ label_result.item }}"
+- name: Restore label provisions
   include_role:
-    name: "{{ label_result.item.split('=')[0].split('-')[2]|lower }}"
+    name: "{{ label_roles | select('in',label_name|lower) | first }}"
     tasks_from: cleanup
-  vars:
-    label_name: "{{ label_result.item }}"
   when:
-    - sut_reboot | default(true) | bool
-    - label_result.stat.exists | default(false) | bool
-  loop: "{{ label_check.results }}"
+  - label_name.startswith('HAS-SETUP-')
+  - label_roles | select('in',label_name|lower) | length > 0
+  loop: "{{ k8s_node_labels }}"
   loop_control:
-    loop_var: label_result
+    loop_var: label_name
+  vars:
+    label_roles: "{{ lookup('pipe','ls -f '+playbook_dir+'/roles/*/tasks/cleanup.yaml') | split('\n') | map('regex_replace','^.*/roles/([a-z-]*)/.*$','\\1') | sort(reverse=true) }}"
 
 - name: Restore kernel modules
   include_tasks:
@@ -61,14 +61,27 @@
   include_tasks:
     file: kernel-args.yaml
   when: 
-  - sut_reboot | default(true) | bool
+  - sut_reboot | bool
   - not ansible_host in my_ip_list.split(',')
+
+- name: Restore /etc/environment
+  include_role:
+    name: no-proxy
+    tasks_from: cleanup
+  when: (groups.cluster_hosts+groups.off_cluster_hosts)|map('extract',hostvars,['private_ip'])|select('defined')|unique|length>1
+
+- name: Restore MSR
+  include_role:
+    name: msr
+    tasks_from: cleanup
+  when:
+  - (playbook_dir + '/roles/msr/tasks/cleanup.yaml') is exists
 
 - name: reboot
   command: "reboot"
-  async: 1
+  async: 10
   poll: 0
   ignore_errors: yes
   when:
   - cleanup_reboot_required
-  - sut_reboot | default(true) | bool
+  - sut_reboot | bool

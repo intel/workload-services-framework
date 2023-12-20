@@ -1,0 +1,23 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: read no_proxy
+  shell:
+    cmd: |
+      . <(sed '/# BEGIN WSF Setup/,/# END WSF Setup/{d}' /etc/environment)
+      echo $no_proxy
+    executable: /bin/bash
+  register: no_proxy
+
+- name: add cluster proxy list to no-proxy
+  blockinfile:
+    path: /etc/environment
+    marker: "# {mark} WSF Setup"
+    block: |
+      no_proxy="{{ (no_proxy.stdout.split(',') + [k8s_pod_cidr, k8s_service_cidr, k8s_apiserver_cluster_ip] + ((groups['cluster_hosts']+groups['off_cluster_hosts']) | map('extract', hostvars, ['ansible_host'])) + ((groups['cluster_hosts']+groups['off_cluster_hosts']) | map('extract', hostvars, ['private_ip']))) | select('defined') | unique | reject('==','') | join(',') }}"
+
+- name: reset ssh connection to make the setting effective
+  ansible.builtin.meta: reset_connection

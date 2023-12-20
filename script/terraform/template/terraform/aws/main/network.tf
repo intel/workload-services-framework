@@ -3,6 +3,14 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
+
+locals {
+  sg_whitelist_cidr_blocks = [
+    for p in var.sg_whitelist_cidr_blocks: p
+      if replace(p,"/[0-9.]+/[0-9]+/","") != p
+  ]
+}
+
 resource "aws_vpc" "default" {
   cidr_block           = var.vpc_cidr_block
   enable_dns_hostnames = true
@@ -52,15 +60,7 @@ resource "aws_default_security_group" "default" {
     from_port        = 22
     to_port          = 22
     protocol         = "tcp"
-    cidr_blocks      = var.sg_whitelist_cidr_blocks
-  }
-
-  ingress {
-    description      = "PING"
-    from_port        = 8
-    to_port          = 0
-    protocol         = "icmp"
-    cidr_blocks      = var.sg_whitelist_cidr_blocks
+    cidr_blocks      = local.sg_whitelist_cidr_blocks
   }
 
   ingress {

@@ -12,6 +12,7 @@
 
 - name: Remove any changes
   blockinfile:
+    marker: "# {mark} WSF Setup"
     path: "{{ cleanup_hugepage_actions[os.stdout]['grub_path'] }}"
     state: absent
   register: grubsts

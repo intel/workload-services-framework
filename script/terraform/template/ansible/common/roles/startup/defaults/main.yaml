@@ -7,6 +7,7 @@
 wl_sysctls: {}
 wl_sysfs: {}
 wl_kernel_args: {}
+wl_kernel_args_optional: {}
 wl_kernel_modules: []
 k8s_node_labels: []
 
@@ -22,3 +23,5 @@ sut_sysctl_options: ""
 # format: <group>:key=value,...
 sut_sysfs_options: "workload_hosts:/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor=performance,offcluster_hosts:/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor=performance"
 
+sut_incompatible_services: "tuned,ondemand,unattended-upgrades"
+sut_update_datetime: true

@@ -17,14 +17,13 @@
       name: kubeadm
       tasks_from: join
     when:
-    - hostvars['localhost']['ansible_facts']['install_k8s']
-    - ansible_host != hostvars['controller-0']['ansible_facts']['ip_address']
+    - install_k8s
+    - is_a_unique_worker_or_a_controller
 
-  ### Add retry policy to fix known issue:
-  ### If calicovpp as k8s_cni
-  ### And DSA enabled, DSA devices will be auto-bound by dpdk 
-  ### when vpp-node container creating which is very slow
   - name: wait for all nodes ready
-    shell: "kubectl wait --for=condition=Ready node $(kubectl get nodes -o='custom-columns=name:.metadata.name,ip:.status.addresses[?(@.type==\"InternalIP\")].address' --no-headers | grep -F \"{{ private_ip }}\" | cut -f1 -d' ') --timeout=600s"
+    shell:
+      cmd: |
+        timeout 600s bash -c "while ! kubectl wait --for=condition=Ready node \$(kubectl get nodes -o='custom-columns=name:.metadata.name,ip:.status.addresses[?(@.type==\"InternalIP\")].address' --no-headers | grep -F '{{ private_ip }}' | cut -f1 -d' ') --timeout 30s; do sleep 1s; done"
+      executable: /bin/bash
     delegate_to: "{{ ('controller' in groups) | ternary('controller-0','localhost') }}"
 

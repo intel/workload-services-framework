@@ -21,7 +21,7 @@ ENV CASSANDRA_HOME /cassandra
 ENV CASSANDRA_CONF /cassandra-etc
 ENV PATH $PATH:PATH=$PATH:/opt/${OPENJDK_VER}/bin:/opt/${OPENJDK_VER}/jre/bin:$CASSANDRA_HOME/bin
 
-WORKDIR /temurin-build
+WORKDIR ./temurin-build
 
 #Get pkg
 RUN apt-get update \

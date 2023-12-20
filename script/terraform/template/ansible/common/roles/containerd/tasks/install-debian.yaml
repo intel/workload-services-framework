@@ -13,7 +13,7 @@
     state: absent
   become: true
   ignore_errors: true
-  when: ((csp | default('static')) == 'static')
+  when: ((csp | default('static')) in ['static', 'kvm', 'hyperv'])
 
 - name: install prerequisite
   apt:
@@ -51,10 +51,8 @@
     update_cache: false
   become: true
 
-- name: install containerd.io
+- name: apt update
   apt:
-    name:
-    - "containerd.io={{ containerd_version | default(containerd_default_version.debian) }}"
     update_cache: true
   register: aptrc
   become: true
@@ -62,3 +60,13 @@
   retries: 10
   delay: 10
 
+- name: "install {{ containerd_package_name }}"
+  apt:
+    name:
+    - "{{ containerd_package_name }}={{ containerd_version | default(containerd_default_version.debian) }}*"
+    update_cache: false
+  register: aptrc
+  become: true
+  until: aptrc is success
+  retries: 10
+  delay: 10

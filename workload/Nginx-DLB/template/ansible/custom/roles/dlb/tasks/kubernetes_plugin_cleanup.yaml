@@ -1,0 +1,7 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: "Clean up kubernetes DLB device plugin"
+  shell: kubectl delete -k {{ dlb_kubernetes_plugin_package }}

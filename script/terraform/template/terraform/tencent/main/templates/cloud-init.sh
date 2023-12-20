@@ -5,6 +5,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+if [ -r /etc/apt/apt.conf.d/20auto-upgrades ]; then
+    sed -i -e '/APT::Periodic::Update-Package-Lists/{s/"1"/"0"/}' -e '/APT::Periodic::Unattended-Upgrade/{s/"1"/"0"/}' /etc/apt/apt.conf.d/20auto-upgrades
+fi
+
 %{ for disk in disks ~}
     while true; do
         if [ -n "${disk.serial}" ]; then

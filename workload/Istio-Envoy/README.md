@@ -16,25 +16,42 @@ Nighthawk is a L7 performance characterization tool.
 The Istio-Envoy workload organizes the following common test cases:
 
 ```
-  Test  #1: test_static_Istio-Envoy_RPS-MAX_http1_2n
-  Test  #2: test_static_Istio-Envoy_RPS-MAX_http2_2n
-  Test  #3: test_static_Istio-Envoy_RPS-MAX_https_2n
-  Test  #4: test_static_Istio-Envoy_RPS-SLA_http1_2n
-  Test  #5: test_static_Istio-Envoy_RPS-SLA_http2_2n
-  Test  #6: test_static_Istio-Envoy_RPS-SLA_https_2n
-  Test  #7: test_static_Istio-Envoy_RPS-MAX_http1_1n
-  Test  #8: test_static_Istio-Envoy_RPS-MAX_http2_2n_pkm
-  Test  #9: test_static_Istio-Envoy_RPS-MAX_http1_1n_gated
-  Test #10: test_static_Istio-Envoy_RPS-MAX_https_cryptomb_2n
-  Test #11: test_static_Istio-Envoy_RPS-MAX_https_qathw_2n
-  Test #12: test_static_Istio-Envoy_RPS-SLA_https_cryptomb_2n
-  Test #13: test_static_Istio-Envoy_RPS-SLA_https_qathw_2n
+Test  #1: test_static_istio_envoy_rps_max_http1_2n
+Test  #2: test_static_istio_envoy_rps_max_http2_2n
+Test  #3: test_static_istio_envoy_rps_max_https_2n
+Test  #4: test_static_istio_envoy_rps_sla_http1_2n
+Test  #5: test_static_istio_envoy_rps_sla_http2_2n
+Test  #6: test_static_istio_envoy_rps_sla_https_2n
+Test  #7: test_static_istio_envoy_rps_max_http1_1n
+Test  #8: test_static_istio_envoy_rps_max_http1_1n_ebpf
+Test  #9: test_static_istio_envoy_rps_max_http1_2n_ebpf
+Test #10: test_static_istio_envoy_rps_max_http2_1n_ebpf
+Test #11: test_static_istio_envoy_rps_max_http2_2n_ebpf
+Test #12: test_static_istio_envoy_rps_max_http1_2n_avx512
+Test #13: test_static_istio_envoy_rps_max_https_2n_avx512
+Test #14: test_static_istio_envoy_rps_sla_http1_2n_avx512
+Test #15: test_static_istio_envoy_rps_sla_https_2n_avx512
+Test #16: test_static_istio_envoy_rps_max_http2_2n_pkm
+Test #17: test_static_istio_envoy_rps_max_http1_1n_gated
+Test #18: test_static_istio_envoy_rps_max_https_2n_cryptomb
+Test #19: test_static_istio_envoy_rps_max_https_2n_qathw
+Test #20: test_static_istio_envoy_rps_max_http1_2n_dlb
+Test #21: test_static_istio_envoy_rps_max_http2_2n_dlb
+Test #22: test_static_istio_envoy_rps_max_https_2n_dlb
+Test #23: test_static_istio_envoy_rps_sla_https_2n_cryptomb
+Test #24: test_static_istio_envoy_rps_sla_https_2n_qathw
+Test #25: test_static_istio_envoy_rps_sla_http1_2n_dlb
+Test #26: test_static_istio_envoy_rps_sla_http2_2n_dlb
+Test #27: test_static_istio_envoy_rps_sla_https_2n_dlb
 ```
 
-- **`MAX RPS`**: Increases the requested RPS so as to obtain the highest possible achieved RPS without blocking.
-- **`RPS-SLA`**: Maximum number of achieved RPS with Latency P99 below RPS-SLA e.g. 50ms.
+- **`rps_max`**: Increases the requested RPS so as to obtain the highest possible achieved RPS without blocking.
+- **`rps_sla`**: Maximum number of achieved RPS with Latency P99 below rps_sla e.g. 50ms.
+- **`ebpf`**: Using eBPF to let the traffic bypass the TCP/IP stack.
+- **`avx512`**: Enable BoringSSL with AVX512 vAES+vPCLMULQDQ patch to accelerate symmetric encryption.
 - **`cryptomb`**: CryptoMB Extension to implemented the Envoy crypto provider for QATSW.
 - **`qathw`**: Intel QAT device plugin enabled and exposed QAT VF devices to the Envoy container.
+- **`dlb`**: It benefit the queue management performance for enqueue and dequeue by hardware queue manager.
 - **`_pkm`**: This test case will run the whole progress.
 - **`gated`**: Designed for basic function verification.
 
@@ -49,11 +66,17 @@ This workload provides the following docker images:
 
 The parameters are:
 
-- **`MODE`**: Specify `RPS-MAX` or `RPS-SLA`.
+- **`MODE`**: Specify `rps_max` or `rps_sla`.
 - **`PROTOCOL`**: Protocol (currently support HTTP1, HTTP2) in packet generator Nighthawk client.
-- **`NODES`**: The node number.
+- **`NODES`**: The node number. 1 node case only for eBPF performance benchmarking and tuning.
 - **`ISTIO_VERSION`**: The version of Istio.
 - **`CRYPTO_ACC`**: Choose crypto acceleration, default none.
+- **`QAT_RESOURCE_TYPE`**: QAT resource type, it will be display `kubectl describe node` available resource `Capacity` & `Allocatable` section after installing
+- **`DLB_ACC`**: Choose DLB acceleration, default none.
+- **`EBPF`**: Choose EBPF to let the traffic bypass the TCP/IP stack, default none.
+- **`AVX512_PATCH`**: Apply AVX512 Patch in BoringSSL, default none.
+- **`AUTO_EXTEND_INPUT`**: Automatically extend the input RPS range to try to get the best KPI. It may take more time when set true, default false.
+- **`MORE_EXT_SLA_SCAN`**: More Automatically extend the input RPS range for SLA cases. It may take more time when set true, default false.
 - **`SERVER_IP`**: The external IP of Istio ingress gateway.
 - **`SERVER_PORT`**: The port of the Istio ingress gateway for nighthawk server entrance, default 32222.
 - **`SERVER_REPLICA_NUM`**: Replica number for the nighthawk server pod, default 15.
@@ -104,6 +127,7 @@ The Istio-Envoy workload works with the `terraform` validation backend. For simp
 - AWS
 - GCP
 
+The eBPF case only support On-Premesis System.
 
 #### Network Configuration
 
@@ -146,6 +170,18 @@ systemctl restart containerd
 chmod a+wr /dev/vfio/*
 ```
 
+##### DLB Configuration
+
+Please refer below guide:
+[DLB Setup](../../doc/user-guide/preparing-infrastructure/setup-dlb.md)
+Latest DLB can be found here:
+[Intel DLB](https://www.intel.com/content/www/us/en/download/686372/intel-dynamic-load-balancer.html)
+
+Note:
+
+- "HAS-SETUP-DLB=yes" is not necessary for this workload
+- for the 5.19+ kernel, the v8+ version of dlb is required
+
 #### Kubernetes Configuration
 
 * In this sample, the NIC used by the cluster is on NUMA node 0, core number is 224.
@@ -162,9 +198,9 @@ chmod a+wr /dev/vfio/*
 
 #### AWS Configuration
 
-For ingress gateway core scaling on AWS, m6i.12xlarge was used to have 48 cores and cover the core numbers from ingress gateway, nighthawk servers and sidecars.
+On AWS cloud, instance type m6i/m7i.12xlarge was used as client node to have 40 cores for nighthawk client. Different instance types are configured for the ingress gateway CPU core number scaling. For the detail configurations, please refer to the performance report.
 
-For more configurations, please refer to performance report.
+
 
 ### See Also
 

@@ -1,0 +1,29 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Create FlameGraph
+  template:
+    src: gprofiler-charts.html.j2
+    dest: "{{ gprofiler_dir }}/roi-{{ roi_index }}.html"
+  delegate_to: localhost
+  become: false
+  ignore_errors: true
+  vars:
+    start_timestamp: "{{ lookup('pipe', 'date --utc -d' + (roi[0] | quote) + ' +%s') }}"
+    stop_timestamp: "{{ lookup('pipe', 'date --utc -d' + (roi[1] | quote) + ' +%s') }}"
+    svg_cmds: |
+      cd {{ gprofiler_dir }}
+      for col in profile_*.col; do
+        if [ -e "$col" ]; then
+          this="${col#profile_}"
+          this="$(date --utc -d "${this%.col}" +%s)"
+          if [ "$this" -ge "{{ start_timestamp }}" ] && [ "$this" -le "{{ stop_timestamp }}" ]; then
+            cat "$col"
+            echo ""
+          fi
+        fi
+      done | {{ role_path }}/scripts/merge-co.py | /usr/local/bin/flamegraph.pl --inverted --title "Icicle Graph: {{ trace_node.1 }}-{{ itr | default(1) }}/roi-{{ roi_index }}"
+

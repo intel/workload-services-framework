@@ -1,0 +1,15 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Set local time
+  shell:
+    cmd: |
+      timedatectl set-timezone '{{ timezone }}'
+      date -Ins -s '{{ datetime }}'
+    executable: /bin/bash
+  vars:
+    timezone: "{{ lookup('pipe', 'cat /etc/timezone') }}"
+    datetime: "{{ lookup('pipe', 'date -Ins') }}"

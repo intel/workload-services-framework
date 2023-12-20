@@ -1,7 +1,6 @@
 >
 > **Note: The Workload Services Framework is a benchmarking framework and is not intended to be used for the deployment of workloads in production environments. It is recommended that users consider any adjustments which may be necessary for the deployment of these workloads in a production environment including those necessary for implementing software best practices for workload scalability and security.**
 >
-
 ### Introduction
 
 Ceph is one of the storage backend in the Intel Edge platform, it provides the High performance IO caplibility for containerized application and VM based application. The Ceph is an open-source software (software-defined storage) storage platform, implements object storage on a single distributed computer cluster, and provides 3-in-1 interfaces for object-, block- and file-level storage.
@@ -12,7 +11,9 @@ For cloud native VM based, the kubevirt is basic framework to enable the VM base
 
 
 ### Test Case
+
 This Edge Ceph provides `Block` storage function which provides serveral test cases with the following configuration parameters:
+
 - **User Cases**: One of the major storage function for Edge Ceph, provide block device to client.
   - `virtIO`: Test IO performance with traditional virtio VM.
   - `vhost`: Test the Block IO in VM with vhost acclelerated.
@@ -23,12 +24,19 @@ This Edge Ceph provides `Block` storage function which provides serveral test ca
   - `random_read`: Test the randomly IO read operation performance.
   - `random_write`: Test the randomly IO write operation performance.
   - `random_mixedrw`: Test the IO random Mixed Read/Write performance with R:W ratio.
+- **VM Scaling Cases**: Test the throughput/IOPS with VM number scaling.
+  - `virtIO_random_read_scale-1vm`: Test the virtio randomly IO read operation performance with 1 VM in each node.
+  - `virtIO_random_read_scale-4vm`: Test the virtio randomly IO read operation performance with 4 VMs in each node.
+  - `vhost_random_read_scale-1vm`: Test the vhost randomly IO read operation performance with 1 VM in each node.
+  - `vhost_random_read_scale-4vm`: Test the vhost randomly IO read operation performance with 4 VMs in each node.
 - **MISC**: This is optional parameter, specify `gated` or `pkm`.
   - `gated` represents running the workload with simple and quick case.
   - `pkm` represents the typical test case with performance analysis.
 
 ##### More Parameters
+
 Each test case accepts configurable parameters like `TEST_BLOCK_SIZE`, `TEST_IO_DEPTH`, `TEST_DATASET_SIZE` ,`TEST_IO_THREADS`  in [validate.sh](validate.sh). More details as below.
+
 - **Workload**
   - `CLUSTER_NODES`: Node count will be used for building Ceph Storage Cluster, typical cluster size is 3 nodes.
   - `BENCHMARK_CLIENT_NODES`: The count of client benchmark pod to test the Ceph Storage, default is 1.
@@ -53,17 +61,33 @@ Each test case accepts configurable parameters like `TEST_BLOCK_SIZE`, `TEST_IO_
   - `TEST_RAMP_TIME`: The FIO run warm up time.
 
 ### System Requirements
- - Please setup K8S with Ceph enabled, and the preferred namespace for rook-ceph storage is `rook-ceph`. It is recommended to repare K8S Env with 100G NIC.
 
-- Need to allocate enough Hugepages in each node before running vhost-vm test cases.(Default: 64Gi, for 32G-Memory VM), then restart kubelet.
+ - Please setup K8S and rook-ceph, and the preferred namespace for rook-ceph storage is `rook-ceph`. It is recommended to repare K8S Env with 100G NIC.
+
+- Need to allocate enough Hugepages in each node before running vhost-vm test cases.(Default: 64Gi, for 32G-Memory VM), then restart kubelet.(Need to confirm the default hugepage size is 2M)
+
 ```
 echo 32768 | sudo tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
 ```
+
+- Add the configuration to enable the qemu-kvm privilege of the container.
+
+```
+vim /etc/apparmor.d/usr.sbin.libvirtd
+...
+/usr/libexec/qemu-kvm PUx,
+...
+apparmor_parser -r /etc/apparmor.d/usr.sbin.libvirtd # or systemctl reload apparmor.service
+```
+
 - Check hardware virtualization enabled for each node
+
 ```shell
 sudo apt install libvirt-daemon-system libvirt-clients
 ```
+
 - Run 'virt-host-validate qemu' in each node, you need to see hardware virtualization check passed like this :
+
 ```
   QEMU: Checking for hardware virtualization                                 : PASS
   QEMU: Checking if device /dev/kvm exists                                   : PASS
@@ -80,15 +104,17 @@ sudo apt install libvirt-daemon-system libvirt-clients
   QEMU: Checking if IOMMU is enabled by kernel                               : PASS
   QEMU: Checking for secure guest support                                    : WARN (Unknown if this platform has Secure Guest support)
 ```
+
 - Set static cpu (set once for each machine), modify this file `/var/lib/kubelet/kubeadm-flags.env` to like this,
+
 ```
 KUBELET_KUBEADM_ARGS="--network-plugin=cni --pod-infra-container-image=k8s.gcr.io/pause:3.6 --topology-manager-policy=single-numa-node --cpu-manager-policy=static --system-reserved=cpu=2"
-```
-```
 rm -rf /var/lib/kubelet/cpu_manager_state
 rm -rf /var/lib/kubelet/memory_manager_state
 ```
+
 - Restart the kubelet. Then in the process of running the test, it will become cpumanager=true.
+
 ```
 kubectl describe no | grep cpumanager
           cpumanager=true
@@ -96,43 +122,65 @@ kubectl describe no | grep cpumanager
           cpumanager=true
 ```
 
+- Add the no_proxy configuration of "virt-api.kubevirt.svc" and "kubevirt-operator-webhook.kubevirt.svc" in /etc/environment.
+
+```
+source /etc/environment
+```
+
 ### Deploy the Ceph toolbox and kubevirt operator CRD
+
 Assuming you have deploied Ceph, you also need
+
 - Deploy the Ceph toolbox.
+
 ```
    In the [workload directory](./template/ceph_toolbox.yaml):
    kubectl apply -f ceph_toolbox.yaml
 ```
+
 - Apply the kubevirt operator CRD previously before run test.
+
 ```
    In the [workload directory](./template/kubevirt/kubevirt-operator-crd.yaml):
    kubectl apply -f kubevirt-operator-crd.yaml # copy to master node and run
 ```
 
 ### Node Labels:
+
 Label each node with the following node labels:
+
 - `HAS-SETUP-CEPH-STORAGE=yes`
 - `HAS-SETUP-HUGEPAGE-2048kB-32768=yes`
 
 For example,
+
 ```
 kubectl label nodes <hostname> HAS-SETUP-CEPH-STORAGE=yes
 ```
+
 ### Docker Image
+
 Current workload don't support standalone docker run, it's cloud native workload.
 
 ### Kubernetes run manually
+
 User can run the workload manually, but it's more perfer to run in SF following the [SF-Guide](../../README.md#evaluate-workload). And please make sure the docker image is ready before kubernetes running. Alternatively, user also can utilize Internal docker registry
+
 ```
 RELEASE=":latest"
 REGISTRY="<IP>:<port>/"
 ```
+
 For example,
+
 ```
 /build# cmake -DREGISTRY="<IP>:<port>/" -DRELEASE=":latest" -DBENCHMARK="" -DBACKEND="kubernetes" ..
 /build/workload/Edge-Ceph-VirtIO# make
 ```
+
 #### Create kubernetes-config.yaml to test
+
 ```
 In the [`workload`](./) directory:
 namespace="rook-ceph"
@@ -140,7 +188,9 @@ m4 -Itemplate -I../../template -DNAMESPACE=$namespace -DREGISTRY=$REGISTRY -DREL
 kubectl create ns $namespace
 kubectl apply -f kubernetes-config.yaml
 ```
+
 #### Run the workload and retrieve logs
+
 ```
 kubectl --namespace=$namespace wait pod --all --for=condition=ready --selector=app=ceph-benchmark-operator --timeout=300s
 pod=$(kubectl get pod --namespace=$namespace --selector=app=ceph-benchmark-operator -o=jsonpath="{.items[0].metadata.name}")
@@ -148,12 +198,15 @@ timeout 300s kubectl exec --namespace=$namespace $pod -c ceph-benchmark-operator
 ```
 
 ### KPI
+
 Run the [`kpi.sh`](kpi.sh) script to generate KPIs out of the validation logs.
+
 ```
 /build/workload/Edge-Ceph-VirtIO# ./list-kpi.sh logs*
 ```
 
 ### Performance BKM
+
 - **ICX**
 
   | BIOS setting                     | Required setting |
@@ -169,6 +222,7 @@ Run the [`kpi.sh`](kpi.sh) script to generate KPIs out of the validation logs.
   | Intel VT for directed I/O        | Enable           |
 
   System:
+
   - 2M hugepages:32768
   - intel_iommu: ON
   - numa_balancing: enable
@@ -188,23 +242,18 @@ Run the [`kpi.sh`](kpi.sh) script to generate KPIs out of the validation logs.
   | Intel VT for directed I/O        | Enable           |
 
   System:
+
   - 2M hugepages:32768
   - intel_iommu: ON
   - numa_balancing: enable
 
  - **Drop cache for environment**
+
  ```
-   For each node of the cluster:
-   sync; echo 3 > /proc/sys/vm/drop_caches
-```
-
-### Index Info
-- Name: `Edge Ceph VirtIO`
-- Category: `DataServices`
-- Platform: `SPR`, `ICX`
-- Keywords: `IO`
-- Permission:
-
+  For each node of the cluster:
+  sync; echo 3 > /proc/sys/vm/drop_caches
+ ```
 
 ### See Also
+
 - [Ceph source code](https://github.com/ceph/ceph)

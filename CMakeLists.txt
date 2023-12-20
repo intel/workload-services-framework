@@ -123,6 +123,7 @@ if(BACKEND)
     include(${BACKEND} OPTIONAL)
 endif()
 set(IMAGEARCH "linux/amd64")
+set(IMAGESUFFIX "")
 include(multi-arch OPTIONAL)
 
 foreach(subdir image stack workload dist)

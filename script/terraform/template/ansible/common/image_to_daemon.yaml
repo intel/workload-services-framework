@@ -3,6 +3,7 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
+
 - hosts: workload_hosts
   any_errors_fatal: true
   gather_facts: no
@@ -16,13 +17,17 @@
         executable: /bin/bash
       delegate_to: localhost
       run_once: true
-      when: (wl_docker_images | length) > 0
+      when:
+      - ((ansible_connection|default('ssh')) == 'ssh')
+      - (wl_docker_images | length) > 0
+      async: 30
+      poll: 0
 
     - name: Transfer image(s) to docker daemon
       include_role:
         name: image-to-daemon
       when: 
-      - ansible_connection != 'winrm'
+      - ((ansible_connection|default('ssh')) == 'ssh')
       - (native | default(false) | bool) == false
       - (wl_docker_images | length) > 0
       - ((','+ansible_host+',') not in (','+my_ip_list+',')) or ((csp | default('static')) != 'static')
@@ -34,4 +39,8 @@
         executable: /bin/bash
       delegate_to: localhost
       run_once: true
-      when: (wl_docker_images | length) > 0
+      when:
+      - ((ansible_connection|default('ssh')) == 'ssh')
+      - (wl_docker_images | length) > 0
+      async: 30
+      poll: 0

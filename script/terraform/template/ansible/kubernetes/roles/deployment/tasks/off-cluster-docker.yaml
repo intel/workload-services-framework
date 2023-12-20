@@ -14,7 +14,7 @@
     - name: waitproc to wait for logs complete
       shell:
         cmd: |
-          nohup timeout {{ workload_config.timeout.split(',') | first }}s bash -c 'docker exec {{ off_cluster_container_id }} sh -c "cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-docker-logs.tar; tar tf /tmp/{{ wl_namespace }}-docker-logs.tar > /dev/null && cat /tmp/{{ wl_namespace }}-docker-logs.tar || tar cf - \$(cat /tmp/{{ wl_namespace }}-docker-logs.tar)" > /tmp/{{ wl_namespace }}-docker-logs.tar' > /dev/null 2>&1 &
+          nohup bash -c 'timeout {{ workload_config.timeout.split(',') | first }}s docker exec {{ off_cluster_container_id }} sh -c "cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-docker-logs.tar; tar tf /tmp/{{ wl_namespace }}-docker-logs.tar > /dev/null && cat /tmp/{{ wl_namespace }}-docker-logs.tar || tar cf - \$(cat /tmp/{{ wl_namespace }}-docker-logs.tar)" > /tmp/{{ wl_namespace }}-docker-logs.tar; echo $? > /tmp/{{ wl_namespace }}-{{ off_cluster_host }}-waitproc.status' > /dev/null 2>&1 &
           echo $!
           disown
         executable: /bin/bash
@@ -39,7 +39,7 @@
   include_role:
     name: trace
     tasks_from: collect
-  when: wl_trace_modules is defined
+  when: wl_trace_modules | default('') | split(',') | reject('==','') | length > 0
   ignore_errors: yes
 
 - name: print docker logs

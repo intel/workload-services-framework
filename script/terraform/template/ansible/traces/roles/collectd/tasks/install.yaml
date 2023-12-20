@@ -4,59 +4,72 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: Check if collectd is already installed
-  stat:
-    path: "{{ collectd_bin_path }}"
-  register: collectd
+- block:
 
-- name: Check OS
-  shell:
-    cmd: ". /etc/os-release; echo $ID"
-    executable: /bin/bash
-  register: os
+  - name: Check if collectd is already installed
+    stat:
+      path: "{{ collectd_bin_path }}"
+    register: collectd
 
-- name: Install collectd
-  include_tasks:
-    file: "install-{{ os.stdout }}.yaml"
+  - name: Check OS
+    shell:
+      cmd: ". /etc/os-release; echo $ID"
+      executable: /bin/bash
+    register: os
 
-- name: Detect collectd version
-  command: "{{ collectd_bin_path }} -h"
-  register: version
+  - name: Install collectd
+    include_tasks:
+      file: "install-{{ os.stdout }}.yaml"
 
-- name: Stop collectd
-  service:
-    name: collectd
-    enabled: no
-    state: stopped
-  become: yes
+  - name: Detect collectd version
+    command: "{{ collectd_bin_path }} -h"
+    register: version
 
-- name: Append the start script
-  blockinfile:
-    path: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-start-trace.sh"
-    marker: "# collectd {mark}"
-    insertbefore: "^wait"
-    block: |
-      (
-        mkdir -p /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-collectd/csv
-        mkdir -p /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-collectd/conf
-        cd /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-collectd/conf
-        date -Ins >> TRACE_START
-        echo '{{ collectd_conf }}' > collectd.conf
-        nohup {{ collectd_bin_path }} -C collectd.conf -f > collectd.logs 2>&1 &
-        echo $! > collectd.pid
-        disown
-      ) &
-  vars:
-    collectd_conf: "{{ lookup('ansible.builtin.template', role_path+'/templates/collectd.conf.j2') }}"
+  - name: Stop collectd
+    service:
+      name: collectd
+      enabled: no
+      state: stopped
+    become: yes
 
-- name: Append the stop script
-  blockinfile:
-    path: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-stop-trace.sh"
-    marker: "# collectd {mark}"
-    insertbefore: "^wait"
-    block: |
-      (
-          cd /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-collectd/conf
-          date -Ins >> TRACE_STOP
-          kill $(cat collectd.pid)
-      ) &
+  - name: Append the start script
+    blockinfile:
+      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-start-trace.sh"
+      marker: "# collectd {mark}"
+      insertbefore: "^wait"
+      block: |
+        (
+          mkdir -p /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd/csv
+          mkdir -p /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd/conf
+          cd /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd/conf
+          if is_roi "{{ trace_node.0 }}"; then
+            date -Ins >> TRACE_START
+            echo '{{ collectd_conf }}' > collectd.conf
+            nohup {{ collectd_bin_path }} -C collectd.conf -f > collectd.logs 2>&1 &
+            echo $! > collectd.pid
+            disown
+          else
+            echo "---" >> TRACE_START
+          fi
+        ) &
+    vars:
+      collectd_conf: "{{ lookup('ansible.builtin.template', role_path+'/templates/collectd.conf.j2') }}"
+
+  - name: Append the stop script
+    blockinfile:
+      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-stop-trace.sh"
+      marker: "# collectd {mark}"
+      insertbefore: "^wait"
+      block: |
+        (
+          cd /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd/conf
+          if is_roi "{{ trace_node.0 }}"; then
+            date -Ins >> TRACE_STOP
+            kill $(cat collectd.pid)
+          else
+            echo "---" >> TRACE_STOP
+          fi
+        ) &
+
+  delegate_to: "{{ trace_node.1 }}"
+

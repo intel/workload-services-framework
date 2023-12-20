@@ -10,7 +10,7 @@ REGISTRY=${REGISTRY:-""}
 STACK_DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
 
 KUBEVIRT_REPO="https://github.com/kubevirt/kubevirt.git"
-KUBEVIRT_VER="v0.52.0"
+KUBEVIRT_VER="v0.58.0"
 KUBEVIRT_OUTPUT_PATH="_out/manifests/release"
 KUBEVRIT_BUILDER="kubevirt-bazel-server"
 KUBEVIRT_PATCH_PATH="$STACK_DIR/patch"
@@ -39,7 +39,7 @@ if [[ "$@" != *"--bom"* ]]; then
 
             # Build the kubevirt
             git clone -b ${KUBEVIRT_VER} ${KUBEVIRT_REPO} kubevirt && \
-            cd kubevirt && EMAIL=builder@localhost git am --whitespace=fix ${KUBEVIRT_PATCH_PATH}/*.patch && \
+            cd kubevirt && EMAIL=builder@localhost git apply --whitespace=fix ${KUBEVIRT_PATCH_PATH}/0001-spdk-vhost-blk-058.patch && \
             make && make push && make manifests && \
             cd ..
 

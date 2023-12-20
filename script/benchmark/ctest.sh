@@ -121,7 +121,7 @@ if [ -n "$stop" ]; then
     if [ "$($cmd | wc -l)" -ne 2 ] && [ "$stop" != "--stop=all" ]; then
         echo "None or multiple ctest instances detected:"
         echo ""
-        $cmd --format '{{.Names}}\t\t{{.ID}}\t{{.Status}}'
+        $cmd --format '{{.Names}}\t{{.Status}}'
         echo ""
         echo "Please identify the instance with: ./ctest.sh --stop=<prefix> or ./ctest.sh --stop=all"
         exit 3
@@ -255,7 +255,7 @@ for var in "$@"; do
     --check-docker-image)
         export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --check-docker-image"
         ;;
-    --push-docker-image=)
+    --push-docker-image=*)
         export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --push-docker-image=${var#--push-docker-image=}"
         ;;
     --push-docker-image)

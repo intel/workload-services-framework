@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>System Activity Reporter (SAR)</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-4bw+/aepP/YC94hEpVNVgiZdgIC5+VKNBQNGCHeKRQN+PtmoHDEXuppvnDJzQIu9" crossorigin="anonymous">
+
+  <style>
+    body {
+      padding-top: 20px;
+      padding-bottom: 20px;
+    }
+
+    .header {
+      padding-bottom: 20px;
+      padding-right: 15px;
+      padding-left: 15px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .header h3 {
+      margin-top: 0;
+      margin-bottom: 0;
+      line-height: 40px;
+    }
+
+    .container {}
+
+    .wrapper {
+      display: flex;
+      box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
+      margin: 2rem;
+    }
+
+    .handle {
+      height: 70px;
+      width: 5px;
+      background-color: DodgerBlue;
+    }
+
+    .content {
+      flex-grow: 1;
+    }
+
+    .tab {
+      overflow: hidden;
+      border: 1px solid #ccc;
+      background-color: #f1f1f1;
+    }
+
+    /* Style the buttons that are used to open the tab content */
+    .tab button {
+      background-color: inherit;
+      float: left;
+      border: 1px solid lightgray;
+      outline: none;
+      cursor: pointer;
+      padding: 8px 10px;
+      transition: 0.3s;
+      font-weight: 600;
+      font-size: 0.8rem;
+    }
+
+    /* Change background color of buttons on hover */
+    .tab button:hover {
+      background-color: #ddd;
+    }
+
+    /* Create an active/current tablink class */
+    .tab button.active {
+      background-color: #00aeef;
+      font-size: bold !important;
+      color: white !important;
+    }
+
+    /* Style the tab content */
+    .tabcontent {
+      display: none;
+      padding: 6px 12px;
+      border: 1px solid #ccc;
+      border-top: none;
+    }
+
+    @media print {
+      .printable {
+        zoom: 50%;
+      }
+    }
+  </style>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/apexcharts/3.42.0/apexcharts.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-HwwvtgBNo3bZJJLYd8oVXjrBZt8cqVSpeBNS5n7C8IVInixGAoxmnlMuBnhbgrkm"
+    crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/apexcharts/3.42.0/apexcharts.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+</head>
+
+<body>
+
+  <div class="card shadow py-2 px-2">
+    <div class="tab">
+      <button class="tablinks active" onclick="openTabContent(event, 'AverageCPU')">Average CPU Usage Trend(across all
+        cores)</button>
+      <button class="tablinks" onclick="openTabContent(event, 'CPUFrequency')">CPU Frequency Trend</button>
+      <button class="tablinks" onclick="openTabContent(event, 'CPUUtil')">CPU Utilization Trend</button>
+      <button class="tablinks" onclick="openTabContent(event, 'Load')">Load Utilization Trend</button>
+      <button class="tablinks" onclick="openTabContent(event, 'MemoryUtil')">Memory Usage Trend</button>
+      <button class="tablinks" onclick="openTabContent(event, 'DiskUtil')">Disk Usage Trend</button>
+      <button class="tablinks" onclick="openTabContent(event, 'IOUtil')">IO Usage Trend</button>
+      <button class="tablinks" onclick="openTabContent(event, 'SocketsUtil')">Sockets Usage Trend</button>
+      <button class="tablinks" onclick="openTabContent(event, 'NetworkUtil')">Network Usage Trend</button>
+      <button class="tablinks" onclick="openTabContent(event, 'ProcessesUtil')">Processes Usage Trend</button>
+    </div>
+    <div id="AverageCPU" class="tabcontent active px-0 py-2" style="display: block">
+      <div class="card-header">
+        <span style="font-weight: 500;">Average CPU Usage Trend(across all cores)</span>
+        <button class="btn btn-success btn-sm" style="float:right;" onClick="window.print()"><i class="fa fa-print"
+            aria-hidden="true"></i>Save as PDF</button>
+        <div class="row d-flex"></div>
+      </div>
+      <div class="card-body overflow-auto row col-12">
+        <div class="col-11 printable" id="average-cpu-id" style="height: 400px;"></div>
+      </div>
+    </div>
+    <div id="CPUUtil" class="tabcontent px-0 py-2">
+      <div class="card-header">
+        <span style="font-weight: 500;">CPU Utilization Trend</span>
+        <button class="btn btn-success btn-sm" style="float:right;" onClick="window.print()"><i class="fa fa-print"
+            aria-hidden="true"></i>Save as PDF</button>
+        <div class="row d-flex"></div>
+      </div>
+      <div class="row" id="sortable_cpu">
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="cpu-user-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="cpu-system-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="cpu-idle-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="cpu-iowait-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="cpu-irq-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="cpu-soft-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="cpu-guest-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="cpu-nice-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="cpu-steal-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="cpu-gnice-id" style="height: 400px;"></div>
+        </div>
+      </div>
+
+    </div>
+    <div id="CPUFrequency" class="tabcontent px-0 py-2">
+      <div class="card-header">
+        <span style="font-weight: 500;">CPU Frequency Trend</span>
+        <button class="btn btn-success btn-sm" style="float:right;" onClick="window.print()"><i class="fa fa-print"
+            aria-hidden="true"></i>Save as PDF</button>
+        <div class="row d-flex"></div>
+      </div>
+      <div class="card-body overflow-auto row col-12">
+        <div class="col-11" id="cpu-freq-id" style="height: 400px;"></div>
+      </div>
+    </div>
+    <div id="Load" class="tabcontent px-0 py-2">
+      <div class="card-header">
+        <span style="font-weight: 500;">Load Utilization Trend</span>
+        <button class="btn btn-success btn-sm" style="float:right;" onClick="window.print()"><i class="fa fa-print"
+            aria-hidden="true"></i>Save as PDF</button>
+        <div class="row d-flex"></div>
+      </div>
+      <div class="row" id="sortable_load">
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="load-percent" style="height: 400px;"></div>
+
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="load-tasks" style="height: 400px;"></div>
+        </div>
+      </div>
+
+    </div>
+    <div id="MemoryUtil" class="tabcontent px-0 py-2">
+      <div class="card-header">
+        <span style="font-weight: 500;">Memory Usage Trend</span>
+        <button class="btn btn-success btn-sm" style="float:right;" onClick="window.print()"><i class="fa fa-print"
+            aria-hidden="true"></i>Save as PDF</button>
+        <div class="row d-flex"></div>
+      </div>
+      <div class="row" id="sortable_mem_util">
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="memory-gb-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="memory-percent-id" style="height: 400px;"></div>
+        </div>
+      </div>
+
+    </div>
+    <div id="DiskUtil" class="tabcontent px-0 py-2">
+      <div class="card-header">
+        <span style="font-weight: 500;">Disk Usage Trend</span>
+        <button class="btn btn-success btn-sm" style="float:right;" onClick="window.print()"><i class="fa fa-print"
+            aria-hidden="true"></i>Save as PDF</button>
+        <div class="row d-flex"></div>
+      </div>
+      <div class="card-body overflow-auto row col-12">
+        <div class="col-11" id="disk-id" style="height: 400px;"></div>
+      </div>
+    </div>
+    <div id="IOUtil" class="tabcontent px-0 py-2">
+      <div class="card-header">
+        <span style="font-weight: 500;">IO Usage Trend</span>
+        <button class="btn btn-success btn-sm" style="float:right;" onClick="window.print()"><i class="fa fa-print"
+            aria-hidden="true"></i>Save as PDF</button>
+        <div class="row d-flex"></div>
+      </div>
+      <div class="card-body overflow-auto row col-12">
+        <div class="col-11" id="io-id" style="height: 400px;"></div>
+      </div>
+    </div>
+    <div id="SocketsUtil" class="tabcontent px-0 py-2">
+      <div class="card-header">
+        <span style="font-weight: 500;">Sockets Usage Trend</span>
+        <button class="btn btn-success btn-sm" style="float:right;" onClick="window.print()"><i class="fa fa-print"
+            aria-hidden="true"></i>Save as PDF</button>
+        <div class="row d-flex"></div>
+      </div>
+      <div class="card-body overflow-auto row col-12">
+        <div class="col-11" id="sockets-id" style="height: 400px;"></div>
+      </div>
+    </div>
+    <div id="NetworkUtil" class="tabcontent px-0 py-2">
+      <div class="card-header">
+        <span style="font-weight: 500;">Network Usage Trend</span>
+        <button class="btn btn-success btn-sm" style="float:right;" onClick="window.print()"><i class="fa fa-print"
+            aria-hidden="true"></i>Save as PDF</button>
+        <div class="row d-flex"></div>
+      </div>
+      <div class="card-body overflow-auto row col-12">
+        <div class="col-12" id="network-id" style="height: 400px;"></div>
+      </div>
+    </div>
+    <div id="ProcessesUtil" class="tabcontent px-0 py-2">
+      <div class="card-header">
+        <span style="font-weight: 500;">Processes Usage Trend</span>
+        <button class="btn btn-success btn-sm" style="float:right;" onClick="window.print()"><i class="fa fa-print"
+            aria-hidden="true"></i>Save as PDF</button>
+        <div class="row d-flex"></div>
+      </div>
+
+      <div class="row" id="sortable_process_util">
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="processes-procps-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="processes-sizeps-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="processes-percent-id"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    {{ sar_data }}
+  </script>
+
+  <script type="text/javascript">
+    function hide_chart(id) {
+      const el = document.getElementById(id);
+      el.parentNode.style.display = 'none';
+    }
+
+    function create_line_chart(id, options) {
+      const el = document.getElementById(id);
+      const chart = new ApexCharts(el, _.merge(options, {
+        chart: {
+          id: id,
+          type: 'line',
+          height: '350px',
+          redrawOnParentResize: true,
+          redrawOnWindowResize: true,
+          group: 'synchronized',
+          zoom: {
+            enabled: true
+          },
+          toolbar: {
+            show: true,
+            offsetX: 0,
+            offsetY: 0,
+            tools: {
+              download: true,
+              selection: true,
+              zoom: true,
+              zoomin: true,
+              zoomout: true,
+              pan: true,
+              reset: true | '<img src="/static/icons/reset.png" width="20">',
+              customIcons: []
+            },
+            export: {
+              csv: {
+                filename: undefined,
+                columnDelimiter: ',',
+                headerCategory: 'category',
+                headerValue: 'value',
+                dateFormatter(timestamp) {
+                  return new Date(timestamp).toDateString()
+                }
+              },
+              svg: {
+                filename: undefined,
+              },
+              png: {
+                filename: undefined,
+              }
+            },
+            autoSelected: 'zoom'
+          },
+        },
+        stroke: {
+          width: 1.5,
+          opacity: 1
+        },
+        xaxis: {
+          type: 'datetime',
+          labels: {
+            datetimeUTC: false,
+          },
+          min: min_time,
+          max: max_time,
+        },
+        yaxis: {
+          labels: {
+            minWidth: 20,
+          },
+        },
+        tooltip: {
+          shared: false,
+          x: {
+            format: 'MMM dd HH:mm:ss',
+          },
+        },
+        legend: {
+          show: true,
+          position: 'bottom',
+          horizontalAlign: 'center',
+          onItemClick: {
+            toggleDataSeries: true
+          },
+          onItemHover: {
+            highlightDataSeries: true
+          },
+        },
+      }));
+      chart.render();
+    }
+
+    var usr_nice = {};
+    for (let k in data_usr) {
+      usr_nice[k] = []
+      for (let t in data_usr[k])
+        usr_nice[k].push([data_usr[k][t][0], data_usr[k][t][1] + data_nice[k][t][1]]);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      create_average_cpu_chart('average-cpu-id', 'Average CPU Usage (%)');
+      function create_average_cpu_chart(id, title) {
+        try {
+          create_line_chart(id, {
+            title: {
+              text: title,
+            },
+            yaxis: {
+              min: 0,
+              max: 100,
+              decimalsInFloat: 0,
+            },
+            series: [{
+              name: 'usr',
+              data: data_usr['all'],
+            }, {
+              name: 'nice',
+              data: data_nice['all'],
+            }, {
+              name: 'usr+nice',
+              data: usr_nice['all'],
+            }, {
+              name: 'sys',
+              data: data_sys['all'],
+            }, {
+              name: 'iowait',
+              data: data_iowait['all'],
+            }, {
+              name: 'steal',
+              data: data_steal['all'],
+            }, {
+              name: 'irq',
+              data: data_irq['all'],
+            }, {
+              name: 'soft',
+              data: data_soft['all'],
+            }, {
+              name: 'guest',
+              data: data_guest['all'],
+            }, {
+              name: 'gnice',
+              data: data_gnice['all'],
+            }, {
+              name: 'idle',
+              data: data_idle['all'],
+            }],
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+      }
+
+      create_cpu_freq_chart('cpu-freq-id', 'CPU-freq (GHz)')
+      function create_cpu_freq_chart(id, title) {
+        try {
+          var series = [];
+          for (let k in data_mhz) {
+            series.push({
+              name: "cpu-" + k,
+              data: data_mhz[k].map((x) => [x[0], x[1] / 1024]),
+            });
+          }
+          create_line_chart(id, {
+            chart: {
+              animations: {
+                enabled: false,
+              },
+            },
+            title: {
+              text: title,
+            },
+            yaxis: {
+              decimalsInFloat: 2,
+            },
+            series: series,
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+      }
+
+      function create_memory_percent_chart(id, title) {
+        try {
+          create_line_chart(id, {
+            title: {
+              text: title,
+            },
+            yaxis: {
+              min: 0,
+              max: 100,
+              decimalsInFloat: 0,
+            },
+            series: [{
+              name: 'memused',
+              data: data_memused,
+            }, {
+              name: 'commit',
+              data: data_commit,
+            }],
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+      }
+
+      function create_memory_gb_chart(id, title) {
+        try {
+          var totalmemfree = [];
+          for (let t in data_kbmemfree)
+            totalmemfree.push([data_kbmemfree[t][0], data_kbmemfree[t][1] + data_kbbuffers[t][1] + data_kbcached[t][1]]);
+
+          create_line_chart(id, {
+            title: {
+              text: title,
+            },
+            yaxis: {
+              min: 0,
+              decimalsInFloat: 0,
+            },
+            series: [{
+              name: 'kbmemused',
+              data: data_kbmemused.map((x) => [x[0], x[1] / 1024 / 1024]),
+            }, {
+              name: 'kbcommit',
+              data: data_kbcommit.map((x) => [x[0], x[1] / 1024 / 1024]),
+            }, {
+              name: 'kbmemfree+kbbuffers+kbcached',
+              data: totalmemfree.map((x) => [x[0], x[1] / 1024 / 1024]),
+            }, {
+              name: 'kbmemfree',
+              data: data_kbmemfree.map((x) => [x[0], x[1] / 1024 / 1024]),
+            }, {
+              name: 'kbbuffers',
+              data: data_kbbuffers.map((x) => [x[0], x[1] / 1024 / 1024]),
+            }, {
+              name: 'kbcached',
+              data: data_kbcached.map((x) => [x[0], x[1] / 1024 / 1024]),
+            }],
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+      }
+
+      function create_io_chart(id, title) {
+        try {
+          create_line_chart(id, {
+            title: {
+              text: title,
+            },
+            yaxis: {
+              decimalsInFloat: 2,
+            },
+            series: [{
+              name: 'tps',
+              data: data_tps.map((x) => [x[0], x[1] / 1000]),
+            }, {
+              name: 'bread/s',
+              data: data_breadps.map((x) => [x[0], x[1] / 1000]),
+            }, {
+              name: 'bwrtn/s',
+              data: data_bwrtnps.map((x) => [x[0], x[1] / 1000]),
+            }, {
+              name: 'rtps',
+              data: data_rtps.map((x) => [x[0], x[1] / 1000]),
+            }, {
+              name: 'wtps',
+              data: data_wtps.map((x) => [x[0], x[1] / 1000]),
+            }],
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+      }
+
+      function create_load_percent_chart(id, title) {
+        try {
+          create_line_chart(id, {
+            title: {
+              text: title,
+            },
+            yaxis: {
+              min: 0,
+              decimalsInFloat: 2,
+            },
+            series: [{
+              name: 'ldavg-1',
+              data: data_ldavg1,
+            }, {
+              name: 'ldavg-5',
+              data: data_ldavg5,
+            }, {
+              name: 'ldavg-15',
+              data: data_ldavg15,
+            }],
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+      }
+
+      function create_load_tasks_chart(id, title) {
+        try {
+          create_line_chart(id, {
+            title: {
+              text: title,
+            },
+            yaxis: {
+              decimalsInFloat: 2,
+            },
+            series: [{
+              name: 'runq-sz',
+              data: data_runqsz.map((x) => [x[0], x[1] / 1000]),
+            }, {
+              name: 'plist-sz',
+              data: data_plistsz.map((x) => [x[0], x[1] / 1000]),
+            }, {
+              name: 'blocked',
+              data: data_blocked.map((x) => [x[0], x[1] / 1000]),
+            }],
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+      }
+
+      function create_processes_procps_chart(id, title) {
+        try {
+          create_line_chart(id, {
+            title: {
+              text: title,
+            },
+            yaxis: {
+              decimalsInFloat: 0,
+            },
+            series: [{
+              name: 'proc/s',
+              data: data_procps,
+            }],
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+      }
+      function create_processes_sizeps_chart(id, title) {
+        try {
+          create_line_chart(id, {
+            title: {
+              text: title,
+            },
+            yaxis: {
+              decimalsInFloat: 2,
+            },
+            series: [{
+              name: 'cswch/s',
+              data: data_cswchps.map((x) => [x[0], x[1] / 1024]),
+            }, {
+              name: 'intr/s',
+              data: data_intrps.map((x) => [x[0], x[1] / 1024]),
+            }, {
+              name: 'pgpgin/s',
+              data: data_pgpginps.map((x) => [x[0], x[1] / 1024]),
+            }, {
+              name: 'pgpgout/s',
+              data: data_pgpgoutps.map((x) => [x[0], x[1] / 1024]),
+            }, {
+              name: 'fault/s',
+              data: data_faultps.map((x) => [x[0], x[1] / 1024]),
+            }, {
+              name: 'majflt/s',
+              data: data_majfltps.map((x) => [x[0], x[1] / 1024]),
+            }, {
+              name: 'pgfree/s',
+              data: data_pgfreeps.map((x) => [x[0], x[1] / 1024]),
+            }, {
+              name: 'pgscank/s',
+              data: data_pgscankps.map((x) => [x[0], x[1] / 1024]),
+            }, {
+              name: 'pgscand/s',
+              data: data_pgscandps.map((x) => [x[0], x[1] / 1024]),
+            }, {
+              name: 'pgsteal/s',
+              data: data_pgstealps.map((x) => [x[0], x[1] / 1024]),
+            }],
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+      }
+
+      function create_processes_percent_chart(id, title) {
+        try {
+          create_line_chart(id, {
+            title: {
+              text: title,
+            },
+            yaxis: {
+              min: 0,
+              max: 100,
+              decimalsInFloat: 2,
+            },
+            series: [{
+              name: 'vmeff',
+              data: data_vmeff,
+            }],
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+      }
+
+      function create_disk_chart(id, title) {
+        try {
+          var series = [];
+          for (let k in data_devtps) {
+            series.push({
+              name: "tps-" + k,
+              data: data_devtps[k],
+            });
+            series.push({
+              name: "rMB/s-" + k,
+              data: data_devrkbps[k].map((x) => [x[0], x[1] / 1024]),
+            });
+            series.push({
+              name: "wMB/s-" + k,
+              data: data_devwkbps[k].map((x) => [x[0], x[1] / 1024]),
+            });
+          }
+          create_line_chart(id, {
+            title: {
+              text: title,
+            },
+            yaxis: {
+              decimalsInFloat: 2,
+            },
+            series: series,
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+      }
+
+      function create_interfaces_chart(id, title) {
+        try {
+          var series = [];
+          for (let k in data_ifrxkbps) {
+            series.push({
+              name: "ifrxMbps-" + k,
+              data: data_ifrxkbps[k].map((x) => [x[0], x[1] / 1024]),
+            });
+            series.push({
+              name: "iftxMbps-" + k,
+              data: data_iftxkbps[k].map((x) => [x[0], x[1] / 1024]),
+            });
+          }
+          create_line_chart(id, {
+            title: {
+              text: title,
+            },
+            yaxis: {
+              decimalsInFloat: 2,
+            },
+            series: series,
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+      }
+
+      function create_sockets_chart(id, title) {
+        try {
+          create_line_chart(id, {
+            title: {
+              text: title,
+            },
+            yaxis: {
+              decimalsInFloat: 0,
+            },
+            series: [{
+              name: 'totsck',
+              data: data_totsck,
+            }, {
+              name: 'tcpsck',
+              data: data_tcpsck,
+            }, {
+              name: 'udpsck',
+              data: data_udpsck,
+            }, {
+              name: 'rawsck',
+              data: data_rawsck,
+            }],
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+
+      }
+      function create_per_cpu_chart(id, title, data) {
+        try {
+          var series = [];
+          for (let k in data) {
+            if (k != 'all') series.push({
+              name: "cpu-" + k,
+              data: data[k],
+            });
+          }
+          create_line_chart(id, {
+            chart: {
+              animations: {
+                enabled: false,
+              },
+            },
+            title: {
+              text: title,
+            },
+            yaxis: {
+              min: 0,
+              max: 100,
+              decimalsInFloat: 2,
+            },
+            series: series,
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+      }
+
+      create_memory_percent_chart('memory-percent-id', 'Memory (%)');
+      create_memory_gb_chart('memory-gb-id', 'Memory (GB)')
+      create_io_chart('io-id', 'I/O (K/s)');
+      create_load_percent_chart('load-percent', 'Load (%)');
+      create_load_tasks_chart('load-tasks', 'Load (#tasks in K/s)');
+
+      create_processes_procps_chart('processes-procps-id', 'Processes (proc/s)');
+      create_processes_sizeps_chart('processes-sizeps-id', 'Processes (MB/s)');
+      create_processes_percent_chart('processes-percent-id', 'Processes (%vmeff)');
+
+      create_disk_chart('disk-id', 'Disk');
+      create_interfaces_chart('network-id', 'Network (Mbps)');
+      create_sockets_chart('sockets-id', 'Sockets');
+
+      create_per_cpu_chart("cpu-user-id", "CPU-user (%)", data_usr);
+      create_per_cpu_chart("cpu-nice-id", "CPU-nice (%)", data_nice);
+      create_per_cpu_chart("cpu-system-id", "CPU-system (%)", data_sys);
+      create_per_cpu_chart("cpu-iowait-id", "CPU-iowait (%)", data_iowait);
+      create_per_cpu_chart("cpu-steal-id", "CPU-steal (%)", data_steal);
+      create_per_cpu_chart("cpu-irq-id", "CPU-irq (%)", data_irq);
+      create_per_cpu_chart("cpu-soft-id", "CPU-soft (%)", data_soft);
+      create_per_cpu_chart("cpu-guest-id", "CPU-guest (%)", data_guest);
+      create_per_cpu_chart("cpu-gnice-id", "CPU-gnice (%)", data_gnice);
+      create_per_cpu_chart("cpu-idle-id", "CPU-idle (%)", data_idle);
+
+      function createSortable(div_id) {
+        Sortable.create(document.getElementById(div_id), {
+          group: {
+            name: 'shared',
+            pull: 'clone' // To clone: set pull to 'clone'
+          },
+          ghostClass: 'blue-background-class',
+          animation: 150
+        });
+      }
+
+      createSortable('sortable_cpu');
+      createSortable('sortable_load');
+      createSortable('sortable_mem_util');
+      createSortable('sortable_process_util');
+
+    });
+  </script>
+  <script type="text/javascript">
+    function openTabContent(evt, tabContentName) {
+      // Declare all variables
+      var i, tabcontent, tablinks;
+
+      // Get all elements with class="tabcontent" and hide them
+      tabcontent = document.getElementsByClassName("tabcontent");
+      for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+      }
+
+      // Get all elements with class="tablinks" and remove the class "active"
+      tablinks = document.getElementsByClassName("tablinks");
+      for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+      }
+
+      // Show the current tab, and add an "active" class to the button that opened the tab
+      document.getElementById(tabContentName).style.display = "block";
+      evt.currentTarget.className += " active";
+    }
+  </script>
+</body>
+
+</html>

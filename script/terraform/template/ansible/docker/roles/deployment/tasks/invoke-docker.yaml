@@ -10,6 +10,8 @@
       echo "workload_itr{{ itr }}_start: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
     executable: /bin/bash
   delegate_to: localhost
+  async: 30
+  poll: 0
 
 - name: invoke docker run
   shell: 
@@ -28,7 +30,7 @@
 - name: waitproc to wait for logs complete
   shell:
     cmd: |
-      nohup timeout {{ workload_config.timeout | split(',') | first }}s bash -c 'docker exec {{ container.stdout_lines | first }} sh -c "cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-docker-logs.tar; tar tf /tmp/{{ wl_namespace }}-docker-logs.tar > /dev/null && cat /tmp/{{ wl_namespace }}-docker-logs.tar || tar cf - \$(cat /tmp/{{ wl_namespace }}-docker-logs.tar)" > /tmp/{{ wl_namespace }}-docker-logs.tar' > /dev/null 2>&1 &
+      nohup bash -c 'timeout {{ workload_config.timeout | split(',') | first }}s docker exec {{ container.stdout_lines | first }} sh -c "cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-docker-logs.tar; tar tf /tmp/{{ wl_namespace }}-docker-logs.tar > /dev/null && cat /tmp/{{ wl_namespace }}-docker-logs.tar || tar cf - \$(cat /tmp/{{ wl_namespace }}-docker-logs.tar)" > /tmp/{{ wl_namespace }}-docker-logs.tar; echo $? > /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-waitproc.status' > /dev/null 2>&1 &
       echo $!
       disown
     executable: /bin/bash
@@ -47,6 +49,8 @@
       echo "workload_itr{{ itr }}_end: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
     executable: /bin/bash
   delegate_to: localhost
+  async: 30
+  poll: 0
 
 - name: print docker info
   command: "docker version"
@@ -55,7 +59,7 @@
   include_role:
     name: trace
     tasks_from: collect
-  when: wl_trace_modules is defined
+  when: wl_trace_modules | default('') | split(',') | reject('==','') | length > 0
 
 - block:
 
@@ -66,6 +70,7 @@
   - name: stop the docker container
     command: "docker rm -v -f {{ container.stdout_lines | first }}"
     when: ((itr |int) < (run_stage_iterations | default(1) | int)) or ('cleanup' not in (stage | default('cleanup')))
+    ignore_errors: true
 
   - name: create the iteration direcctory
     file:

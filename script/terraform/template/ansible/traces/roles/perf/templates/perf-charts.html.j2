@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Icicle Graph: {{ item | regex_replace('.*/([^/]*)-perf/perf-([0-9]*).record.out','\\1/roi-\\2') }} </title>
+
+  <style>
+    body {
+      padding-top: 20px;
+      padding-bottom: 20px;
+    }
+
+    .header {
+      padding-bottom: 20px;
+      padding-right: 15px;
+      padding-left: 15px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .header h3 {
+      margin-top: 0;
+      margin-bottom: 0;
+      line-height: 40px;
+    }
+  </style>
+</head>
+
+<body>
+
+  {{ lookup('pipe', '/usr/local/bin/stackcollapse-perf.pl '+item+' | /usr/local/bin/flamegraph.pl --inverted --title "Icicle Graph: '+(item | regex_replace('.*/([^/]*)-perf/perf-([0-9]*).record.out','\\1/roi-\\2'))+'"') }}
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const c=document.getElementsByTagName("svg");
+      for (let i=0;i<c.length;i++) {
+        c[i].style.width="100%";
+        c[i].style.height="100%";
+      }
+    });
+  </script>
+
+</body>
+
+</html>

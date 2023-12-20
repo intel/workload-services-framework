@@ -1,2 +1,3 @@
 cluster-info.json
 timing.yaml
+*.logs

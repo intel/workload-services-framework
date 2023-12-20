@@ -42,7 +42,7 @@
   - sysctl_options_dict.keys() | length > 0
 
 - name: Apply sysctls
-  command: "sysctl -p -q"
+  command: "sysctl -p/etc/sysctl.d/99-wsf-sysctls.conf -q"
   failed_when: false
   when:
   - sysctl_options_dict.keys() | length > 0

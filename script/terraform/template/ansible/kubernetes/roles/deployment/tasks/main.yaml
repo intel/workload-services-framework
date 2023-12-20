@@ -27,7 +27,7 @@
 - block:
   
     - name: wait for scheduling
-      shell: "timeout {{ timeout[1] | default(timeout[0]) }}s bash -c 'until kubectl --namespace={{ wl_namespace }} wait pod --all --for=condition=Ready --field-selector=status.phase!=Succeeded --timeout=1s 1>/dev/null 2>&1; do if kubectl --namespace={{ wl_namespace }} get pod -o json | grep -q Unschedulable; then exit 1; fi; done; exit 0'"
+      shell: "timeout {{ timeout[1] | default(timeout[0]) }}s bash -c 'until kubectl --namespace={{ wl_namespace }} wait pod --all --for=condition=Ready --field-selector=status.phase!=Succeeded --timeout=5s 1>/dev/null 2>&1; do if kubectl --namespace={{ wl_namespace }} get pod -o json | grep -q Unschedulable; then exit 1; fi; done; exit 0'"
       vars:
         timeout: "{{ 'timeout' | extract(lookup('file', wl_logs_dir+'/workload-config.yaml')|from_yaml) | split(',') }}"
 
@@ -47,6 +47,8 @@
       echo "workload_itr{{ itr }}_start: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
     executable: /bin/bash
   delegate_to: localhost
+  async: 30
+  poll: 0
 
 - name: workload-execution
   include_tasks:
@@ -58,12 +60,14 @@
       echo "workload_itr{{ itr }}_end: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
     executable: /bin/bash
   delegate_to: localhost
+  async: 30
+  poll: 0
 
 - name: collect trace data
   include_role:
     name: trace
     tasks_from: collect
-  when: wl_trace_modules is defined
+  when: wl_trace_modules | default('') | split(',') | reject('==','') | length > 0
   ignore_errors: yes
 
 - name: print debug info 

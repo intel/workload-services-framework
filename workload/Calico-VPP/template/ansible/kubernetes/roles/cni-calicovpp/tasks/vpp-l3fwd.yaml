@@ -1,0 +1,25 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Generate vpp-l3fwd.yaml
+  become: true
+  template:
+    src: vpp-l3fwd.yaml.j2
+    dest: /tmp/{{ wl_namespace }}-vpp-l3fwd.yaml
+    lstrip_blocks: true
+
+- name: Install vpp-l3fwd
+  shell: "kubectl apply -f /tmp/{{ wl_namespace }}-vpp-l3fwd.yaml -n calico-system"
+
+- name: Wait for vpp-l3fwd ready
+  shell: |
+    kubectl wait --namespace=calico-system pod --for=condition=Ready -l app=vpp-l3fwd --timeout=60s
+
+- name: Remove temp files
+  file:
+    path: "/tmp/{{ wl_namespace }}-vpp-l3fwd.yaml"
+    state: absent
+  ignore_errors: true

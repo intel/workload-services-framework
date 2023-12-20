@@ -92,7 +92,7 @@ Besides upper 11 test cases basic description, there are two very important envi
   >
   > **e.g** For server: NUMA node0 CPU(s): 0-55,112-167, to run 4c8t, you need to set `NGINX_WORKERS=8` and `NGINX_CPU_LISTS=0-3,112-115`
 - **`GETFILE`**: Specify the file size requested by the client to nginx. This is optional. The default is index.html, which is a 0KB file. Other optional files are: random_content_1KB, random_content_2KB, random_content_4KB, random_content_512KB, random_content_1MB, random_content_4MB. You can override it before testing. eg. export GETFILE=random_content_512KB; ./ctest.sh -V;
-- **`QAT_RESOURCE_TYPE`**: QAT resource type, it will be display `kubectl describe node` available resource `Capacity` & `Allocatable` section after installing qat-plugin. For kerner version >= 5.11: `qat.intel.com/generic`; for kernel version >= 5.17 `qat.intel.com/cy`: Default is `qat.intel.com/generic`
+- **`QAT_INSTANCE_TYPE`**: QAT resource type, it will be display `kubectl describe node` available resource `Capacity` & `Allocatable` section after installing qat-plugin. For kerner version >= 5.11: `qat.intel.com/generic`; for kernel version >= 5.17 `qat.intel.com/cy`: Default is `qat.intel.com/generic`
 - **`QAT_RESOURCE_NUM`**: The number of QAT resouce to request. Default is all qat resource on the host(32).
 
 ### Docker Image

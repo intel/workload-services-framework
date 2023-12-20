@@ -105,5 +105,5 @@ variable "spot_price" {
 
 variable "cpu_model_timeout" {
   type = string
-  default = "5m"
+  default = "10m"
 }

@@ -14,14 +14,12 @@ clouds="$(
 )"
 
 FIND_OPTIONS="-name Dockerfile.*.terraform"
-[[ "$clouds" = *aws* ]] && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.aws"
-[[ "$clouds" = *gcp* ]] && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.gcp"
-[[ "$clouds" = *azure* ]] && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.azure"
-[[ "$clouds" = *tencent* ]] && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.tencent"
-[[ "$clouds" = *alicloud* ]] && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.alicloud"
-[[ "$clouds" = *vsphere* ]] && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.vsphere"
-[[ "$clouds" = *oracle* ]] && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.oracle"
-[[ "$clouds" = *kvm* ]] && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.kvm"
+
+for c in "$DIR"/Dockerfile.1.*; do
+    c="${c#"$DIR/Dockerfile.1."}"
+    [[ "$clouds" = *$c* ]] && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.1.$c"
+done
+
 [ -r "$DIR"/Dockerfile.*.static-int ] && FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.static-int" || FIND_OPTIONS="$FIND_OPTIONS -o -name Dockerfile.*.static-ext"
 FIND_OPTIONS="( $FIND_OPTIONS )"
 . "$DIR"/../build.sh

@@ -1,0 +1,15 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+dpdk_version: "21.11"
+dpdk_repo: "http://fast.dpdk.org/rel/dpdk-{{ dpdk_version }}.tar.xz"
+dpdk_install_dir: "/usr/local/dpdk-{{ dpdk_version }}"
+dpdk_devbind: "/usr/local/dpdk-{{ dpdk_version }}/usertools/dpdk-devbind.py"
+
+network_kernel_driver: "ice"
+network_dpdk_driver: "vfio-pci"
+
+dsa_dpdk_driver: "vfio-pci"

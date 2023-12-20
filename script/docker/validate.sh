@@ -112,6 +112,7 @@ docker_compose_run () {
     (set -x; docker compose down --volumes)
 }
 
+print_workload_configurations 2>&1 | tee -a "$LOGSDIRH"/docker.logs
 . "$PROJECTROOT/script/docker/trace.sh"
 iterations="$(echo "x--run_stage_iterations=1 $DOCKER_CMAKE_OPTIONS $CTESTSH_OPTIONS" | sed 's/.*--run_stage_iterations=\([0-9]*\).*/\1/')"
 if [[ "$DOCKER_CMAKE_OPTIONS $CTESTSH_OPTIONS " = *"--native "* ]]; then
@@ -121,11 +122,11 @@ elif [[ "$DOCKER_CMAKE_OPTIONS $CTESTSH_OPTIONS " = *"--compose "* ]]; then
     rebuild_compose_config
     for itr in $(seq 1 $iterations); do
         docker_compose_run $itr
-    done 2>&1 | tee "$LOGSDIRH/docker.logs"
+    done 2>&1 | tee -a "$LOGSDIRH/docker.logs"
 else
     IMAGE=$(image_name "$DOCKER_IMAGE")
     for itr in $(seq 1 $iterations); do
         docker_run $IMAGE $itr
-    done 2>&1 | tee "$LOGSDIRH/docker.logs"
+    done 2>&1 | tee -a "$LOGSDIRH/docker.logs"
 fi
 sed -i '1acd itr-1' "$LOGSDIRH/kpi.sh"

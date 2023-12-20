@@ -1,0 +1,46 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Install emon prerequisites
+    apt:
+      name: 
+        - build-essential
+        - pkg-config
+        - bzip2
+      update_cache: true
+      state: present
+    register: aptrc
+    until: aptrc is success
+    retries: 10
+    delay: 10
+  
+  - name: Detect kernel version
+    shell:
+      cmd: uname -r
+      executable: /bin/bash
+    register: kernel_version
+  
+  - name: Check if kernel header is already installed
+    stat:
+      path: "/usr/src/kernels/{{ kernel_version.stdout }}"
+    register: kernel_header
+  
+  - name: Install kernel header
+    apt:
+      name: 
+        - "linux-headers-{{ kernel_version.stdout }}"
+      state: present
+    register: aptrc
+    until: aptrc is success
+    retries: 10
+    delay: 10
+    when: not kernel_header.stat.exists
+  
+  delegate_to: "{{ trace_node.1 }}"
+  become: true
+  

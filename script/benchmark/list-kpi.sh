@@ -25,6 +25,19 @@ print_help () {
     exit 0
 }
 
+get_status_code () {
+  local status_ret=1
+  local status_value=0
+  for status_path in "$1"/*/status; do
+      if [ -e "$status_path" ]; then
+          status_value="$(< "$status_path")"
+          [ "$status_value" -eq 0 ] || return 1
+          status_ret=0
+      fi
+  done
+  return $status_ret
+}
+
 prefixes=()
 primary=1
 outlier=0
@@ -134,7 +147,7 @@ for var in "$@"; do
             tags="$var"
             ;;
         *)
-            prefixes+=("$var")
+            prefixes+=("${var%/}")
             ;;
         esac
     esac
@@ -176,7 +189,7 @@ if [ $intel_publish = 1 ]; then
                 BACKEND_OPTIONS="$BACKEND_OPTIONS --tags=$tags"
             fi
 
-            TERRAFORM_OPTIONS="$BACKEND_OPTIONS" RELEASE="$RELEASE" REGISTRY="$REGISTRY" "$DIR"/../terraform/shell.sh static -v "$(readlink -f "$logsdir1"):/opt/workspace" -- bash -c "/opt/terraform/script/publish-intel.py $BACKEND_OPTIONS < <(cat tfplan.json 2> /dev/null || echo)"
+            TERRAFORM_OPTIONS="$BACKEND_OPTIONS" RELEASE="$RELEASE" REGISTRY="$REGISTRY" "$DIR"/../terraform/shell.sh static -v "$(readlink -f "$logsdir1"):/opt/workspace" -- bash -c "/opt/terraform/script/publish-intel.py $BACKEND_OPTIONS < <(cat tfplan.json 2> /dev/null || cat .tfplan.json 2> /dev/null || echo)"
         fi
     done
 fi
@@ -204,26 +217,27 @@ for logsdir1 in ${prefixes[@]}; do
         if [ -d "$logsdir1/itr-1" ]; then
             for itrdir1 in "$logsdir1"/itr-*; do
                 echo "$itrdir1:"
+                if get_status_code "$itrdir1"; then
+                    echo "# status: passed"
+                else
+                    echo "# status: failed"
+                fi
                 if [ $params -eq 1 ]; then
                     sed -n '/^tunables:/,/^[^ ]/{/^ /{s/^ */# /;p}}' "$logsdir1/workload-config.yaml"
                 fi
                 if [ -n "$primary" ]; then
-                    ( cd "$itrdir1" && bash ./kpi.sh $script_args 2> /dev/null | grep -E "^\*" ) || true
+                    ( cd "$itrdir1" && bash ./kpi.sh $script_args 2> /dev/null | sed -n '/^[*]/{s/#.*//;p}') || true
                 else
-                    ( cd "$itrdir1" && bash ./kpi.sh $script_args 2> /dev/null ) || true
+                    ( cd "$itrdir1" && bash ./kpi.sh $script_args 2> /dev/null) || true
                 fi
             done
         else
             echo "$logsdir1:"
-            if [ $params -eq 1 ]; then
-                sed -n '/^tunables:/,/^[^ ]/{/^ /{s/^ */# /;p}}' "$logsdir1/workload-config.yaml"
-            fi
-            if [ -n "$primary" ]; then
-                ( cd "$logsdir1" && bash ./kpi.sh $script_args 2> /dev/null | grep -E "^\*" ) || true
-            else
-                ( cd "$logsdir1" && bash ./kpi.sh $script_args 2> /dev/null ) || true
-            fi
+            echo "# status: failed"
         fi
+    else
+        echo "$logsdir1:"
+        echo "# status: failed"
     fi
     if [ -r "$logsdir1/publish.logs" ] && [ "$uri" -eq 1 ]; then
         sed -n '/WSF Portal URL:/{s/^[^:]*:/# portal:/;p;q}' "$logsdir1/publish.logs"

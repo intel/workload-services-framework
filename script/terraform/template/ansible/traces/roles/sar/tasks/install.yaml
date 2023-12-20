@@ -4,39 +4,51 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: Detect OS
-  shell:
-    cmd: ". /etc/os-release; echo $ID"
-    executable: /bin/bash
-  register: os
+- block:
 
-- name: Install sysstat
-  include_tasks:
-    file: "install-{{ (os.stdout == 'rhel' or os.stdout =='anolis') | ternary('centos', os.stdout) }}.yaml"
+  - name: Detect OS
+    shell:
+      cmd: ". /etc/os-release; echo $ID"
+      executable: /bin/bash
+    register: os
 
-- name: Append the start script
-  blockinfile:
-    path: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-start-trace.sh"
-    marker: "# sar {mark}"
-    insertbefore: "^wait"
-    block: |
-      (
-        mkdir -p /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-sar
-        cd /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-sar
-        date -Ins >> TRACE_START
-        nohup sar {{ sar_options }} -o sar-$1.logs > /dev/null 2>&1 &
-        echo $! > sar.pid
-        disown
-      ) &
+  - name: Install sysstat
+    include_tasks:
+      file: "install-{{ (os.stdout == 'rhel' or os.stdout =='anolis') | ternary('centos', os.stdout) }}.yaml"
 
-- name: Append the stop script
-  blockinfile:
-    path: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-stop-trace.sh"
-    marker: "# sar {mark}"
-    insertbefore: "^wait"
-    block: |
-      (
-        cd /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-sar
-        date -Ins >> TRACE_STOP
-        kill $(cat sar.pid)
-      ) &
+  - name: Append the start script
+    blockinfile:
+      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-start-trace.sh"
+      marker: "# sar {mark}"
+      insertbefore: "^wait"
+      block: |
+        (
+          mkdir -p /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar
+          cd /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar
+          if is_roi "{{ trace_node.0 }}"; then
+            date -Ins >> TRACE_START
+            nohup sar {{ sar_options }} -o sar-$roi.logs > /dev/null 2>&1 &
+            echo $! > sar.pid
+            disown
+          else
+            echo "---" >> TRACE_START
+          fi
+        ) &
+
+  - name: Append the stop script
+    blockinfile:
+      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-stop-trace.sh"
+      marker: "# sar {mark}"
+      insertbefore: "^wait"
+      block: |
+        (
+          cd /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar
+          if is_roi "{{ trace_node.0 }}"; then
+            date -Ins >> TRACE_STOP
+            kill $(cat sar.pid)
+          else
+            echo "---" >> TRACE_STOP
+          fi
+        ) &
+
+  delegate_to: "{{ trace_node.1 }}"

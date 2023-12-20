@@ -103,9 +103,14 @@ variable "winrm_port" {
   default = 5986
 }
 
+variable "winrm_timeout" {
+  type = number
+  default = 60
+}
+
 variable "cpu_model_timeout" {
   type = string
-  default = "5m"
+  default = "10m"
 }
 
 variable "allocate_public_ip" {

@@ -8,7 +8,7 @@
 # default settings
 LOGSDIRH="${LOGSDIRH:-$(pwd)}"
 KUBERNETES_CONFIG_M4="${KUBERNETES_CONFIG_M4:-$SOURCEROOT/kubernetes-config.yaml.m4}"
-KUBERNETES_CONFIG_J2="${KUBERNETES_CONFIG_M4:-$SOURCEROOT/kubernetes-config.yaml.j2}"
+KUBERNETES_CONFIG_J2="${KUBERNETES_CONFIG_J2:-$SOURCEROOT/kubernetes-config.yaml.j2}"
 KUBERNETES_CONFIG="${KUBERNETES_CONFIG:-$LOGSDIRH/kubernetes-config.yaml}"
 HELM_CONFIG="${HELM_CONFIG:-$SOURCEROOT/helm}"
 CLUSTER_CONFIG_M4="${CLUSTER_CONFIG_M4:-$SOURCEROOT/cluster-config.yaml.m4}"
@@ -38,43 +38,50 @@ NAMESPACE="${NAMESPACE:-$(echo $OWNER | sed 's|^\(.\{12\}\).*$|\1|')-$(cut -f5 -
 
 # args: image or Dockerfile
 image_name () {
-    if [ "$IMAGEARCH" = "linux/amd64" ]; then
-        arch=""
-    else
-        arch="-${IMAGEARCH/*\//}"
-    fi
     (
         cd "$SOURCEROOT"
         if [ -e "$1" ]; then
-            echo "$REGISTRY$(head -n2 "$1" | grep '^# ' | tail -n1 | cut -d' ' -f2)$arch$RELEASE"
+            echo "$REGISTRY$(head -n2 "$1" | grep '^# ' | tail -n1 | cut -d' ' -f2)$IMAGESUFFIX$RELEASE"
+        elif [[ "$1" = "$REGISTRY"*"$IMAGESUFFIX$RELEASE" ]]; then
+            echo "$1"
         else
-            echo "$REGISTRY$1$arch$RELEASE"
+            echo "$REGISTRY$1$IMAGESUFFIX$RELEASE"
         fi
     )
 }
 
+image_pull_policy () {
+    if [ -z "$REGISTRY" ]; then
+        echo "IfNotPresent"
+    else
+        echo "Always"
+    fi
+}
+
 # args: yaml
 rebuild_config () {
-    (
+    (   
         cd "$SOURCEROOT" && \
         m4 -Itemplate -I"$PROJECTROOT/template" \
             -DNAMESPACE=$NAMESPACE \
             -DTESTCASE=$TESTCASE \
             -DPLATFORM=$PLATFORM \
             -DIMAGEARCH=$IMAGEARCH \
+            -DIMAGESUFFIX=$IMAGESUFFIX \
+            -DIMAGEPULLPOLICY=$(image_pull_policy) \
             -DWORKLOAD=$WORKLOAD \
             -DBACKEND=$BACKEND \
             -DREGISTRY=$REGISTRY \
             -DRELEASE=$RELEASE \
             -DEXPORT_LOGS=$EXPORT_LOGS \
             $RECONFIG_OPTIONS \
-            "$1" > "$2"
+            "$1" > "$2" 
     )
 }
 
 # args: yaml
 rebuild_config_j2 () {
-    (
+    (   
         cd "$SOURCEROOT" && \
         ansible all -i "localhost," -c local -m template \
             -a "src=\"$1\" dest=\"$2\"" \
@@ -82,6 +89,8 @@ rebuild_config_j2 () {
             -e TESTCASE=$TESTCASE \
             -e PLATFORM=$PLATFORM \
             -e IMAGEARCH=$IMAGEARCH \
+            -e IMAGESUFFIX=$IMAGESUFFIX \
+            -e IMAGEPULLPOLICY=$(image_pull_policy) \
             -e WORKLOAD=$WORKLOAD \
             -e BACKEND=$BACKEND \
             -e REGISTRY=$REGISTRY \
@@ -93,18 +102,30 @@ rebuild_config_j2 () {
 
 # args: none
 test_pass_fail () {
-  local ret=0
-  for status_path in "$LOGSDIRH"/*/*/status "$LOGSDIRH"/*/status "$LOGSDIRH"/status
-  do
-    [ ! -e $status_path ] && continue
-    
-    local value=$(< $status_path)
-    if [ "$value" != "0" ]; then
-      echo "Failure reported in: $status_path"
-      ret=1
-    fi
+  eval "bk_opts=\"\$${BACKEND^^}$([ "$BACKEND" != "docker" ] || echo _CMAKE)_OPTIONS\""
+  [[ "$bk_opts $CTESTSH_OPTIONS " != *"--dry-run "* ]] && [[ "$bk_opts $CTESTSH_OPTIONS " != *"--skip-app-status-check "* ]] || return 0
+
+  local status_ret=1
+  for itr in "$LOGSDIRH"/itr-*; do
+      status_ret=1
+      local status_value=0
+      for status_path in "$itr"/*/status; do
+          if [ -e "$status_path" ]; then
+              status_value="$(< "$status_path")"
+              if [ "$status_value" -ne 0 ]; then
+                  echo -e "\033[31m${itr/"$LOGSDIRH"\//} app status: $status_value\033[0m"
+                  return 1
+              fi
+              status_ret=0
+          fi
+      done
+      if [ $status_ret -ne 0 ]; then
+          echo -e "\033[31mMissing ${itr/"$LOGSDIRH"\//} app status\033[0m"
+          return 1
+      fi
   done
-  return $ret
+  [ $status_ret -eq 0 ] || echo -e "\033[31mMissing app status\033[0m"
+  return $status_ret
 }
 
 rebuild_compose_config () {
@@ -120,7 +141,7 @@ rebuild_compose_config () {
     fi
     return 1
 }
-
+ 
 rebuild_kubernetes_config () {
     if [ -r "${KUBERNETES_CONFIG_M4%.m4}" ]; then
         cp -f "${KUBERNETES_CONFIG_M4%.m4}" "$KUBERENTES_CONFIG"
@@ -137,12 +158,14 @@ rebuild_kubernetes_config () {
             --set TESTCASE=$TESTCASE \
             --set PLATFORM=$PLATFORM \
             --set IMAGEARCH=$IMAGEARCH \
+            --set IMAGESUFFIX=$IMAGESUFFIX \
+            --set IMAGEPULLPOLICY=$(image_pull_policy) \
             --set WORKLOAD=$WORKLOAD \
             --set BACKEND=$BACKEND \
             --set REGISTRY=$REGISTRY \
             --set RELEASE=$RELEASE \
             --set EXPORT_LOGS=$EXPORT_LOGS \
-            $HELM_OPTIONS"
+            ${HELM_OPTIONS//,/\\,}"
         local chart_list=$(find "$HELM_CONFIG" -name "Chart.yaml")
         if helm version &>/dev/null; then
             while read chart_path; do
@@ -182,6 +205,7 @@ save_workload_params () {
     echo "platform: \"$PLATFORM\""
     echo "registry: \"$REGISTRY\""
     echo "release: \"$RELEASE\""
+    echo "image_suffix: \"$IMAGESUFFIX\""
     echo "timeout: \"$TIMEOUT\""
     echo "benchmark: \"$BENCHMARK\""
     echo "backend: \"$BACKEND\""
@@ -216,10 +240,12 @@ save_workload_params () {
         echo "docker_options: \"${DOCKER_OPTIONS//\"/\\\"}\""
     fi
 
-    echo "bom:"
-    for line in $("$SOURCEROOT"/build.sh --bom | grep -E '^ARG ' | sed 's/^ARG //'); do
-        echo "  ${line/=*/}: \"${line/*=/}\""
-    done
+    if [[ "$CTESTSH_OPTIONS " != *"--nobomlist "* ]]; then
+        echo "bom:"
+        for line in $("$SOURCEROOT"/build.sh --bom | grep -E '^ARG ' | sed 's/^ARG //'); do
+            echo "  ${line/=*/}: \"${line/*=/}\""
+        done
+    fi 
 
     if git --version > /dev/null 2>&1; then
         commit_id="$(GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo git log -1 2> /dev/null | head -n1 | cut -f2 -d' ' || echo -n "")"
@@ -284,7 +310,6 @@ if [ -r "$PROJECTROOT/script/${BACKEND}/validate.sh" ]; then
     elif [ -r "$CLUSTER_CONFIG_J2" ]; then
         rebuild_config_j2 "$CLUSTER_CONFIG_J2" "$CLUSTER_CONFIG"
     fi
-    print_workload_configurations
     . "$PROJECTROOT/script/${BACKEND}/validate.sh"
     test_pass_fail
 else

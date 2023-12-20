@@ -26,6 +26,11 @@ function get_value() {
 /\/itr-[0-9]*:$/{
     name=gensub(/^.*logs-([^/]*)[/].*$/,"\\1",1)
     itr=gensub(/^.*[/]itr-([0-9]+):$/,"\\1",1)
+    status="failed"
+}
+
+/^# status: (passed|failed)/ {
+    status=$3
 }
 
 index($0,var1)==1 || ($1=="#" && index($2,var1)==1) {
@@ -36,14 +41,14 @@ index($0,var2)==1 || ($1=="#" && index($2,var2)==1) {
     var2v=gensub(/.*"(.*)".*/,"\\1",1,$NF)
 }
 
-index($0,var3)==1 {
+index($0,var3)==1 && status=="passed" {
     var3v[name][product][var1v][var2v][++var3vct[name][product][var1v][var2v]]=get_value()
     n=length(var3v[name][product][var1v][var2v])
     if (n>var34n[name][product][var1v][var2v])
         var34n[name][product][var1v][var2v]=n
 }
 
-index($0,var4)==1 {
+index($0,var4)==1 && status=="passed" {
     idx=gensub(/ *([0-9]+).*$/,"\\1",1,substr($0,length(var4)+1))
     var4v[name][product][var1v][var2v][idx][++var4vct[name][product][var1v][var2v][idx]]=get_value()
     n=length(var4v[name][product][var1v][var2v][idx])

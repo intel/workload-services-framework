@@ -102,7 +102,7 @@ subjects:
 ---
 
 
-# Bind the cluster role and role for kubevirt
+# Bind the cluster role and role for kubevirt 
 # if SUPPORT_KUBEVIRT TRUE; then
 #
 apiVersion: rbac.authorization.k8s.io/v1
@@ -192,6 +192,10 @@ ifelse("defn(`DEBUG_MODE')","1",`dnl
               value: "IMAGENAME(Dockerfile.1.guestOS)"
             - name: `DOCKER_IMAGE_VHOST'
               value: "IMAGENAME(Dockerfile.1.rook_ceph_spdk_vhost)"
+            - name: `DOCKER_IMAGE_CEPH_QAT'
+              value: "IMAGENAME(Dockerfile.3.ceph_qat)"
+            - name: `DOCKER_IMAGE_ROOK_CEPH_QAT'
+              value: "IMAGENAME(Dockerfile.2.rook_ceph_qat)"
             - name: `KUBEVIRT_OPERATOR_DOCKER_IMAGE'
               value: "defn(`REGISTRY')`virt-operator'defn(`RELEASE')"
             - name: `ROOK_CEPH_STORAGE_NS'
@@ -223,3 +227,4 @@ ifelse("defn(`DEBUG_MODE')","1",`dnl
           #operator: Exists
           effect: NoSchedule
 # END ROOK-CEPH OPERATOR DEPLOYMENT
+

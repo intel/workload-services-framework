@@ -15,3 +15,6 @@ dev_registry_certs_path:
   debian: /usr/local/share/ca-certificates
   centos: /etc/pki/ca-trust/source/anchors
   rhel: /etc/pki/ca-trust/source/anchors
+
+containerd_proxy_conf: "/etc/systemd/system/containerd.service.d/99-wsf-proxies.conf"
+docker_proxy_conf: "/etc/systemd/system/docker.service.d/99-wsf-proxies.conf"

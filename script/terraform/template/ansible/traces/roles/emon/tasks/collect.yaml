@@ -4,43 +4,52 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: Create the emon directory
-  file:
-    path: "{{ wl_logs_dir}}/{{ trace_node.1 }}-{{ itr | default(1) }}-emon"
-    state: directory
-  delegate_to: localhost
-  become: no
-  ignore_errors: yes
+- block:
 
-- name: Get emon files
-  shell:
-    cmd: ls -1
-    chdir: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon"
-    executable: /bin/bash
+  - name: Create the emon directory
+    file:
+      path: "{{ wl_logs_dir}}/{{ trace_node.1 }}-{{ itr | default(1) }}-emon"
+      state: directory
+    delegate_to: localhost
+    become: false
+    ignore_errors: true
+
+  - name: Get emon files
+    shell:
+      cmd: ls -1
+      chdir: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon"
+      executable: /bin/bash
+    register: emon_files
+    become: false
+    ignore_errors: true
+
+  - name: Fetch emon files
+    fetch:
+      src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon/{{ item }}"
+      dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-emon/"
+      flat: true
+    become: false
+    loop: "{{ emon_files.stdout_lines }}"
+    ignore_errors: true
+    register: fetchrc
+    until: fetchrc is success
+    retries: 10
+    delay: 10
+
+  - name: Remove any collection files
+    file:
+      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon"
+      state: absent
+    become: true
+    ignore_errors: true
+
+  - name: Post Processing
+    include_tasks:
+      file: edp.yaml
+    when:
+    - not (emon_skip_edp | bool)
+    - emon_files.stdout_lines | select('match','.*.dat') | length > 0
+    ignore_errors: true
+
   delegate_to: "{{ trace_node.1 }}"
-  register: emon_files
-  become: no
-  ignore_errors: yes
 
-- name: Fetch emon files
-  fetch:
-    src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon/{{ item }}"
-    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-emon/"
-    flat: yes
-  become: no
-  delegate_to: "{{ trace_node.1 }}"
-  loop: "{{ emon_files.stdout_lines | reject('==', 'emon.pid') }}"
-  ignore_errors: yes
-
-- name: Remove any collection files
-  file:
-    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon"
-    state: absent
-  become: yes
-  delegate_to: "{{ trace_node.1 }}"
-  ignore_errors: yes
-
-- name: Post Processing
-  include_tasks:
-    file: edp-post-processing.yaml
-  when: emon_post_processing

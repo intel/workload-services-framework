@@ -33,30 +33,55 @@
   gather_facts: no
   tasks:
 
-    - name: Probe host features
+    - name: Probe host features (Linux)
       include_role:
         name: startup
         tasks_from: probe
-      when: ansible_connection != 'winrm'
+      when:
+      - ((ansible_connection|default('ssh')) == 'ssh')
 
-    - name: Startup sequence
+    - name: Probe host features (Windows)
       include_role:
         name: startup
+        tasks_from: probe-win
       when:
-      - ansible_connection != 'winrm'
+      - ((ansible_connection|default('ssh')) == 'winrm')
+      - (playbook_dir+'/roles/startup/tasks/probe-win.yaml') is exists
+
+    - block:
+
+      - name: Startup sequence (Linux)
+        include_role:
+          name: startup
+          tasks_from: main
+        when:
+        - ((ansible_connection|default('ssh')) == 'ssh')
+
+      - name: Startup sequence (Windows)
+        include_role:
+          name: startup
+          tasks_from: main-win
+        when:
+        - ((ansible_connection|default('ssh')) == 'winrm')
+        - (playbook_dir+'/roles/startup/tasks/main-win.yaml') is exists
+
+      when:
       - sut_sudo | default(true) | bool
 
     - name: Prepare Docker Auth
       include_role:
         name: docker_auth
+        tasks_from: main
       when:
-      - ansible_connection != 'winrm'
+      - ((ansible_connection|default('ssh')) == 'ssh')
       - docker_auth_reuse | default(False) | bool
 
     - name: Install instance watch
       include_role:
         name: instance-watch
+        tasks_from: main
       when:
-      - ansible_connection != 'winrm'
+      - ((ansible_connection|default('ssh')) == 'ssh')
       - sut_sudo | default(true) | bool
+      - inventory_hostname in (groups['workload_hosts'] + groups['off_cluster_hosts'])
 

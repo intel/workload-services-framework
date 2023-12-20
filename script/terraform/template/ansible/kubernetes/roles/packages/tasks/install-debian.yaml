@@ -51,13 +51,22 @@
     update_cache: false
   become: true
 
+- name: apt update
+  apt:
+    update_cache: true
+  become: true
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+
 - name: install kubeadm, kubelet, and kubectl
   apt:
     name:
-    - "kubeadm={{ k8s_version }}-*"
-    - "kubelet={{ k8s_version }}-*"
-    - "kubectl={{ k8s_version }}-*"
-    update_cache: true
+    - "kubeadm={{ k8s_version }}*"
+    - "kubelet={{ k8s_version }}*"
+    - "kubectl={{ k8s_version }}*"
+    update_cache: false
   become: true
   register: aptrc
   until: aptrc is success

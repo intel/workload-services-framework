@@ -8,6 +8,16 @@
   include_tasks:
     file: service.yaml
 
+- name: set no_proxy
+  include_role:
+    name: no-proxy
+  when: (groups.cluster_hosts+groups.off_cluster_hosts)|map('extract',hostvars,['private_ip'])|select('defined')|unique|length>1
+
+- name: set timezone and datetime
+  include_role:
+    name: datetime
+  when: sut_update_datetime | bool
+
 - name: Create a local sav folder
   file:
     path: "{{ startup_restore_path }}"
@@ -21,14 +31,16 @@
 
 - name: apply label kernel-args
   include_role:
-    name: "{{ label_name.split('=')[0].split('-')[2]|lower }}"
+    name: "{{ label_roles | select('in',label_name|lower) | first }}"
     tasks_from: kernel-args
   when:
     - label_name.startswith('HAS-SETUP-')
-    - (playbook_dir + '/roles/' + (label_name.split('=')[0].split('-')[2] | lower) + '/tasks/kernel-args.yaml') is exists
+    - label_roles | select('in',label_name|lower) | length > 0
   loop: "{{ k8s_node_labels }}"
   loop_control:
     loop_var: label_name
+  vars:
+    label_roles: "{{ lookup('pipe','ls -f '+playbook_dir+'/roles/*/tasks/kernel-args.yaml') | split('\n') | map('regex_replace','^.*/roles/([a-z-]*)/.*$','\\1') | sort(reverse=true) }}"
 
 - name: apply kernel args
   include_tasks:
@@ -54,15 +66,17 @@
 
 - name: auto-provision labels
   include_role:
-    name: "{{ label_name.split('=')[0].split('-')[2]|lower }}"
+    name: "{{ label_roles | select('in',label_name|lower) | first }}"
     tasks_from: install
   when:
     - label_name.startswith('HAS-SETUP-')
     - sut_reboot | default('true') | bool
-    - ( playbook_dir + '/roles/' + (label_name.split('=')[0].split('-')[2] | lower) + '/tasks/install.yaml' ) is exists
+    - label_roles | select('in',label_name|lower) | length > 0
   loop: "{{ k8s_node_labels }}"
   loop_control:
     loop_var: label_name
+  vars:
+    label_roles: "{{ lookup('pipe','ls -f '+playbook_dir+'/roles/*/tasks/install.yaml') | split('\n') | map('regex_replace','^.*/roles/([a-z-]*)/.*$','\\1') | sort(reverse=true) }}"
 
 - name: process kernel modules
   include_tasks:
@@ -75,3 +89,19 @@
 - name: process sysfs
   include_tasks:
     file: sysfs.yaml
+
+- name: install burncpu package
+  include_role:
+    name: burn-cpu
+    tasks_from: install
+  when:
+  - sut_sudo | default(true) | bool
+  - burn_cpu_seconds is defined
+
+- name: apply MSR settings
+  include_role:
+    name: msr
+  when:
+  - ((ansible_connection|default('ssh')) == 'ssh')
+  - sut_update_msr | default(false) | bool
+  - (playbook_dir + '/roles/msr/tasks/main.yaml') is exists

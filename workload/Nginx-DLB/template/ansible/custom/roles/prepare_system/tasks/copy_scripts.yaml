@@ -1,0 +1,10 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Generate set_irq_affinity script
+  template:
+    src: "set_irq_affinity.j2"
+    dest: "/tmp/{{ wl_namespace }}-set_irq_affinity.sh"
+    mode: +rx

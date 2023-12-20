@@ -1,0 +1,125 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: benchmark
+spec:
+  template:
+    metadata:
+      labels:
+        app: benchmark
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: benchmark
+        image: calicovpp_trex{{ .Values.RELEASE }}
+        imagePullPolicy: {{ include "imagepolicy" .Values }}
+        # command: ["/bin/sh","-c","sleep infinity"] # uncomment this line can be used to debug container
+        securityContext:
+          privileged: true
+        env:
+        - name: L3FWD_POD_IP
+          value: "L3FWD_POD_IP_PLACEHOLDER"
+        - name: TREX_PACKET_SIZE
+          value: '{{ .Values.TREX_PACKET_SIZE }}'
+        - name: TREX_DURATION 
+          value: '{{ .Values.TREX_DURATION }}'
+        - name: TREX_SOURCE_IP 
+          value: "{{ .Values.TREX_SOURCE_IP }}"
+        - name: ENABLE_DSA
+          value: '{{ .Values.ENABLE_DSA }}'
+        - name: MTU
+          value: '{{ .Values.MTU }}' 
+        - name: TREX_STREAM_NUM
+          value: '{{ .Values.TREX_STREAM_NUM }}'
+        - name: TREX_CORE_NUM
+          value: '{{ .Values.TREX_CORE_NUM }}'
+        - name: MASTER_THREAD_ID
+          value: '{{ .Values.MASTER_THREAD_ID }}'
+        - name: LATENCY_THREAD_ID
+          value: '{{ .Values.LATENCY_THREAD_ID }}'
+        - name: TREX_THREADS
+          value: '{{ .Values.TREX_THREADS | replace "." "," }}'
+        resources:
+          limits:
+{{- if eq (int64 .Values.PER_HUGEPAGE_SIZE) 2048 }}
+            hugepages-2Mi: {{ .Values.TREX_HUGEPAGES |mul 2 }}Mi
+{{- else if eq (int64 .Values.PER_HUGEPAGE_SIZE) 1048576 }}
+            hugepages-1Gi: {{ .Values.TREX_HUGEPAGES }}Gi
+{{- end }}
+          requests:
+            cpu: {{ .Values.TREX_CPU_REQUESTS }}
+            memory: {{ if eq (int64 .Values.PER_HUGEPAGE_SIZE) 2048 }}{{ .Values.TREX_HUGEPAGES |mul 2 }}Mi{{ else }}{{ .Values.TREX_HUGEPAGES }}Gi{{ end }}
+{{- if eq (int64 .Values.PER_HUGEPAGE_SIZE) 2048 }}
+            hugepages-2Mi: {{ .Values.TREX_HUGEPAGES |mul 2 }}Mi
+{{- else if eq (int64 .Values.PER_HUGEPAGE_SIZE) 1048576 }}
+            hugepages-1Gi: {{ .Values.TREX_HUGEPAGES }}Gi
+{{- end }}        
+        volumeMounts:
+        - name: network-env
+          mountPath: /etc/network_env.conf
+          readOnly: true
+        # - name: mnt-huge
+        #   mountPath: /mnt/huge/
+        - name: lib-firmware
+          mountPath: /lib/firmware/
+        - name: dev-hugepages
+          mountPath: /dev/hugepages
+        - name: lib-modules
+          mountPath: /lib/modules
+          readOnly: true
+        - name: sys-pci-devices
+          mountPath: /sys/bus/pci/devices 
+        - name: sys-pci-drivers
+          mountPath: /sys/bus/pci/drivers
+        - name: sys-devices
+          mountPath: /sys/devices/system/node
+        - name: dev
+          mountPath: /dev
+      volumes:
+      - name: network-env
+        hostPath:
+          path: /etc/network_env.conf
+          type: File
+      # - name: mnt-huge
+      #   hostPath:
+      #     path: /mnt/huge/
+      #     type: Directory
+      - name: lib-firmware
+        hostPath:
+          path: /lib/firmware/
+          type: Directory
+      - name: dev-hugepages
+        hostPath:
+          path: /dev/hugepages
+          type: Directory
+      - name: lib-modules
+        hostPath:
+          path: /lib/modules
+          type: Directory
+      - name: sys-pci-devices
+        hostPath:
+          path: /sys/bus/pci/devices
+          type: Directory
+      - name: sys-pci-drivers
+        hostPath:
+          path: /sys/bus/pci/drivers
+          type: Directory
+      - name: sys-devices
+        hostPath:
+          path:  /sys/devices/system/node
+          type: Directory
+      - name: dev
+        hostPath:
+          path: /dev
+          type: Directory
+      nodeSelector:
+        HAS-SETUP-HUGEPAGE-{{ .Values.PER_HUGEPAGE_SIZE }}kB-{{ .Values.HUGEPAGES }}: "yes"
+        HAS-SETUP-NIC-100G: "yes"
+      {{- $args := dict "key" "app" "values" "vpp-l3fwd" }}
+      {{- include "podAntiAffinity" $args | nindent 6 }}

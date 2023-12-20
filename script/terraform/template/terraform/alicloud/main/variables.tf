@@ -10,6 +10,11 @@ variable "common_tags" {
   nullable    = false
 }
 
+variable "config_file" {
+  type = string
+  default = "/home/.aliyun/config.json"
+}
+
 variable "profile" {
   type = string
   default = "default"
@@ -97,5 +102,5 @@ variable "resource_group_id" {
 
 variable "cpu_model_timeout" {
   type = string
-  default = "5m"
+  default = "10m"
 }

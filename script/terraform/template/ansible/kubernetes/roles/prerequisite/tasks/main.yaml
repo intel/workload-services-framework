@@ -12,6 +12,14 @@
     ignore_errors: yes
     become: yes
 
+  - name: Install systemd-resolved
+    become: true
+    package:
+      name: systemd-resolved
+      state: present
+    ignore_errors: yes
+    when: ((csp | default('static')) == 'alicloud')
+
   - name: Restart systemd-resolved.service
     become: true
     systemd:
@@ -25,21 +33,6 @@
   - name: Disable SWAP
     command: swapoff -a
     become: yes
-
-  - name: Get local time
-    shell: |
-      cat /etc/timezone
-      date -Ins
-    register: datetime
-    delegate_to: localhost
-    when: k8s_sync_time | default('true') | bool
-
-  - name: Syncronize date time
-    shell:  |
-      timedatectl set-timezone '{{ datetime.stdout_lines | first }}'
-      date -Ins -s '{{ datetime.stdout_lines | last }}'
-    become: yes
-    when: k8s_sync_time | default('true') | bool
 
   - name: Disable SWAP in fstab
     replace:
@@ -81,7 +74,7 @@
     become: yes
 
   - name: Apply new settings
-    command: sysctl --system
+    command: sysctl -p/etc/sysctl.d/99-kubernetes-cri.conf
     become: yes
 
   - name: Work on CNI prerequisite

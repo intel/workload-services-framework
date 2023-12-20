@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 #
 # Apache v2 license
 # Copyright (C) 2023 Intel Corporation
@@ -12,6 +12,8 @@ if [ ${#@} -lt 2 ]; then
   echo "--reset        Reset Kubernetes."
   echo "--purge        Reset Kubernetes and remove k8s packages."
   echo "--nointelcert  Do not install Intel certificates."
+  echo "--cni          Specify the CNI option."
+  echo "--plugins      Specify a list of k8s plugins to install, separated with comma."
   echo ""
   exit 3
 fi
@@ -28,6 +30,8 @@ last=""
 reset=false
 purge=false
 intelcert=true
+cni=flannel
+plugins=""
 for v in $@; do
   case "$v" in
   --port=*)
@@ -45,9 +49,23 @@ for v in $@; do
   --nointelcert)
     intelcert=false
     ;;
+  --cni=*)
+    cni="${v#--cni=}"
+    ;;
+  --cni)
+    ;;
+  --plugins=*)
+    plugins="${v#--plugins=}"
+    ;;
+  --plugins)
+    ;;
   *)
     if [ "$last" = "--port" ]; then
       ssh_port="$v"
+    elif [ "$last" = "--cni" ]; then
+      cni="$v"
+    elif [ "$last" = "--plugins" ]; then
+      plugins="$v"
     elif [[ "$v" = *"@"* ]]; then
       hosts+=("$v")
     else
@@ -59,10 +77,12 @@ for v in $@; do
   last="$v"
 done
 
+set -o pipefail
 DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
 cd "$DIR"
-./setup-ansible.sh || exit 3
-./setup-sut-native.sh --port $ssh_port $(echo ${hosts[@]} | sed 's|:[^ ]*||g') || exit 3
+
+./setup-ansible.sh 2>&1 | tee "$DIR"/setup-sut-k8s.logs
+./setup-sut-native.sh --port $ssh_port $(echo ${hosts[@]} | sed 's|:[^ ]*||g') 2>&1 | tee -a "$DIR"/setup-sut-k8s.logs
 
 controller=${hosts[0]}
 controller_hh="${controller/*@/}"
@@ -95,7 +115,7 @@ workers_ref="$(i=0;for h in ${hosts[@]:1}; do cat <<EOF
 EOF
 i=$((i+1));done)"
 
-ANSIBLE_ROLES_PATH=../terraform/template/ansible/kubernetes/roles:../terraform/template/ansible/common/roles:../terraform/template/ansible/traces/roles ANSIBLE_INVENTORY_ENABLED=yaml ansible-playbook --flush-cache -vv -e install_intelca=$intelcert -e wl_logs_dir="$DIR" -e my_ip_list=1.1.1.1 -e k8s_taint=$k8s_taint -e k8s_reset=$reset -e k8s_purge=$purge --inventory <(cat <<EOF
+ANSIBLE_ROLES_PATH=../terraform/template/ansible/kubernetes/roles:../terraform/template/ansible/common/roles:../terraform/template/ansible/traces/roles ANSIBLE_INVENTORY_ENABLED=yaml ansible-playbook --flush-cache -vv -e install_intelca=$intelcert -e wl_logs_dir="$DIR" -e my_ip_list=1.1.1.1 -e k8s_plugins=$plugins -e k8s_cni=$cni -e k8s_taint=$k8s_taint -e k8s_reset=$reset -e containerd_reset=$reset -e k8s_purge=$purge --inventory <(cat <<EOF
 all:
   children:
     cluster_hosts:
@@ -114,5 +134,5 @@ $workers
 $workers_ref
     trace_hosts:
 EOF
-) ./setup-sut-k8s.yaml
+) ./setup-sut-k8s.yaml 2>&1 | tee -a "$DIR"/setup-sut-k8s.logs
 rm -f cluster-info.json

@@ -41,11 +41,11 @@ spec:
             value: "--concurrency={{ wl_tunables['SERVER_INGRESS_GW_CONCURRENCY'] }}"
         resources:
           requests:
-            qat.intel.com/generic: "{{ wl_tunables['CY_NUM'] }}"
+            "{{ wl_tunables['QAT_RESOURCE_TYPE'] }}": "{{ wl_tunables['CY_NUM'] }}"
             cpu: "{{ wl_tunables['SERVER_INGRESS_GW_CPU'] }}"
             memory: "{{ wl_tunables['SERVER_INGRESS_GW_MEM'] }}"
           limits:
-            qat.intel.com/generic: "{{ wl_tunables['CY_NUM'] }}"
+            "{{ wl_tunables['QAT_RESOURCE_TYPE'] }}": "{{ wl_tunables['CY_NUM'] }}"
             cpu: "{{ wl_tunables['SERVER_INGRESS_GW_CPU'] }}"
             memory: "{{ wl_tunables['SERVER_INGRESS_GW_MEM'] }}"
         podAnnotations: # this controls the SDS service which configures ingress gateway

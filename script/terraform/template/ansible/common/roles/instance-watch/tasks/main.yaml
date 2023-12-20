@@ -22,4 +22,4 @@
   ignore_errors: true
   when:
   - instance_watch | bool
-  - not ((csp | default('static')) in [ 'static', 'kvm' ])
+  - not ((csp | default('static')) in [ 'static', 'kvm', 'hyperv' ])
