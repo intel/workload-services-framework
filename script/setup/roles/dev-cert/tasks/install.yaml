@@ -21,21 +21,39 @@
     include_tasks:
       file: "install-{{ (os.stdout == 'rhel') | ternary('centos', os.stdout) }}.yaml"
 
+  - name: proxy
+    shell:
+      cmd: |
+        echo "$http_proxy"
+        echo "$https_proxy"
+        echo "$no_proxy"
+      executable: /bin/bash
+    register: proxies
+
+  - name: "add {{ dev_cert_host }} to containerd/docker proxies"
+    shell: |
+      mkdir -p {{ containerd_proxy_conf | dirname }} {{ docker_proxy_conf | dirname }}
+      printf "[Service]\nEnvironment=\"HTTP_PROXY={{ proxies.stdout_lines[0] }}\" \"HTTPS_PROXY={{ proxies.stdout_lines[1] }}\" \"NO_PROXY={{ proxies.stdout_lines[2] | split(',') | union([ dev_cert_host ]) | unique | join(',') }}\"\n" | tee {{ containerd_proxy_conf }} {{ docker_proxy_conf }}
+
   - name: restart containerd
     systemd:
       name: containerd
       state: restarted
-    ignore_errors: yes
+      daemon_reload: true
+    ignore_errors: true
+
+  - name: sleep a while
+    command: sleep 20s
 
   - name: restart docker
     systemd:
       name: docker
       state: restarted
-    ignore_errors: yes
+    ignore_errors: true
 
   - name: restart kubelet
     systemd:
       name: kubelet
       state: restarted
-    ignore_errors: yes
+    ignore_errors: true
 

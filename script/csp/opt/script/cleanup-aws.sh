@@ -208,7 +208,7 @@ scan_tag () {
 scan_images () {
     echo
     echo "Scan images..."
-    for im in $(aws --region $region ec2 describe-images --output=json --filters Name=tag:owner,Values="$OWNER" | awk '/"ImageId":/{print$NF}' | tr -d '",'); do
+    for im in $(aws --region $region ec2 describe-images --output=json --owners self | awk '/"ImageId":/{print$NF}' | tr -d '",'); do
         echo "Image: $im"
         if [[ "$@" = *"--images"* ]]; then
             (set -x; aws ec2 --region $region deregister-image --image-id $im)

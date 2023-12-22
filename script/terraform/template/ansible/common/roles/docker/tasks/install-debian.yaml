@@ -17,7 +17,7 @@
     - docker-ce-rootless-extras
     - docker-scan-plugin
     state: absent
-  when: ((csp | default('static')) == 'static')
+  when: ((csp | default('static')) in ['static', 'kvm', 'hyperv'])
   ignore_errors: yes
 
 - name: install prerequisite
@@ -53,13 +53,21 @@
     state: present
     update_cache: false
 
+- name: apt update
+  apt:
+    update_cache: true
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+
 - name: install docker
   apt:
     name:
-    - "docker-ce={{ docker_version | default(docker_default_version.debian) }}"
-    - "docker-ce-cli={{ docker_cli_version | default(docker_cli_default_version.debian) }}"
-    - "docker-compose-plugin={{ docker_compose_plugin_version | default(docker_compose_plugin_default_version.debian) }}"
-    update_cache: true
+    - "docker-ce={{ docker_version | default(docker_default_version.debian) }}*"
+    - "docker-ce-cli={{ docker_cli_version | default(docker_cli_default_version.debian) }}*"
+    - "docker-compose-plugin={{ docker_compose_plugin_version | default(docker_compose_plugin_default_version.debian) }}*"
+    update_cache: false
   register: aptrc
   until: aptrc is success
   retries: 10

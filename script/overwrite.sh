@@ -42,9 +42,9 @@ if [ -r "$CTESTSH_CONFIG" ]; then
                 elif [ "$_overwrite" = "_customized" ]; then
                     TESTCASE_OVERWRITE_CUSTOMIZED+=($_k)
                 fi
-                eval "export $_k=\"$_v\""
                 echo "OVERWRITE: $_k=$_v"
             fi
+            eval "export $_k=\"$_v\""
             if [ -r "$PROJECTROOT/script/$BACKEND/vars.sh" ]; then
                 . "$PROJECTROOT/script/$BACKEND/vars.sh" "$_k" "$_v"
             fi

@@ -4,6 +4,19 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+- hosts: workload_hosts:off_cluster_hosts
+  gather_facts: no
+  become: false
+  tasks:
+
+    - name: burn cpu
+      include_role:
+        name: burn-cpu
+      when:
+      - sut_sudo | default(true) | bool
+      - burn_cpu_seconds is defined
+      - (ansible_connection|default('ssh')) == 'ssh'
+
 - hosts: "{{ ('controller' in groups) | ternary('controller','localhost') }}"
   gather_facts: no
   become: false
@@ -14,12 +27,12 @@
         src: "{{ wl_logs_dir }}/{{ wl_kubernetes_yaml }}"
         dest: "/tmp/{{ wl_namespace }}-k8s-script.yaml"
         owner: "{{ ansible_user | default('tfu') }}"
-      when: ansible_connection != 'winrm'
+      when: (ansible_connection|default('ssh')) == 'ssh'
 
     - name: perform k8s validation over iterations
       include_role:
         name: deployment
-      when: ansible_connection != 'winrm'
+      when: (ansible_connection|default('ssh')) == 'ssh'
       loop: "{{ range(1, run_stage_iterations | default(1) |int+1, 1) | list }}"
       loop_control:
         loop_var: itr

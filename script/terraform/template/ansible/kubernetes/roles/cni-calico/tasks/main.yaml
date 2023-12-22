@@ -18,37 +18,47 @@
   delegate_to: localhost
   get_url:
     url: "{{ k8s_calico_vxlan_repo if ( k8s_calico_encapsulation | lower == 'vxlan' ) else k8s_calico_ipinip_repo }}"
-    dest: "{{ inventory_dir }}/calico.yaml"
+    dest: "/tmp/{{ wl_namespace }}-calico.yaml"
     mode: +rx
   register: getrc
   until: getrc is success
   retries: 10
   delay: 5
 
-- name: Set fact for custom cidr
-  set_fact:
-    insert_cidr_lines: "- name: CALICO_IPV4POOL_CIDR\n  value: {{ k8s_pod_cidr }}"
-
 - name: Replace calico.yaml with custom cidr
   delegate_to: localhost
   blockinfile:
-    path: "{{ inventory_dir }}/calico.yaml"
+    path: "/tmp/{{ wl_namespace }}-calico.yaml"
     marker: "# {mark} ANSIBLE MANAGED BLOCK cidr"
     state: present
     insertbefore: '# - name: CALICO_IPV4POOL_CIDR'
     block: "{{ insert_cidr_lines | indent(width=12, first=True) }}"
+  vars:
+    insert_cidr_lines: "- name: CALICO_IPV4POOL_CIDR\n  value: {{ k8s_pod_cidr }}"
+
+- name: Replace calico.yaml with IP detection
+  delegate_to: localhost
+  blockinfile:
+    path: "/tmp/{{ wl_namespace }}-calico.yaml"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK ip detection"
+    state: present
+    insertbefore: '# - name: CALICO_IPV4POOL_CIDR'
+    block: "{{ ip_detection_lines | indent(width=12, first=True) }}"
+  when: k8s_calico_iface != ''
+  vars:
+    ip_detection_lines: "- name: IP_AUTODETECTION_METHOD\n  value: 'interface={{ k8s_calico_iface }}'"
 
 - name: Replace calico.yaml CrossSubnet with Always if vxlan enabled
   delegate_to: localhost
   replace:
-    path: "{{ inventory_dir }}/calico.yaml"
+    path: "/tmp/{{ wl_namespace }}-calico.yaml"
     regexp: '(\s+)value: "CrossSubnet"(\s+.*)?$'
     replace: '\1value: "Always"\2'
   when: (k8s_calico_encapsulation | lower) == 'vxlan'
 
 - name: Copy replaced calico.yaml to remote
   ansible.builtin.copy:
-    src: "{{ inventory_dir }}/calico.yaml"
+    src: "/tmp/{{ wl_namespace }}-calico.yaml"
     dest: /tmp/{{ wl_namespace }}-calico.yaml
 
 - name: Install calico.yaml
@@ -59,11 +69,9 @@
     path: "/tmp/{{ wl_namespace }}-calico.yaml"
     state: absent
   ignore_errors: true
+  async: 30
+  poll: 0
 
 - name: Wait for calico ready
   shell: |
-    kubectl wait --namespace=kube-system pod --for=condition=Ready -l k8s-app=calico-node --timeout=300s
-  register: wait_ready
-  retries: 50
-  delay: 3
-  until: wait_ready.rc == 0
+    timeout 300s bash -c "while ! kubectl wait --namespace=kube-system pod --for=condition=Ready -l k8s-app=calico-node --timeout=30s; do sleep 1s; done"

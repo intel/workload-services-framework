@@ -120,6 +120,7 @@
     - istio_precheck.rc == 0
     - wl_tunables['CRYPTO_ACC'] != "cryptomb"
     - wl_tunables['CRYPTO_ACC'] != "qathw"
+    - wl_tunables['DLB_ACC'] != "dlb"
 
 - name: Generate istio cryptomb plugin file
   template:
@@ -158,3 +159,28 @@
   when:
     - wl_tunables['CRYPTO_ACC'] == "qathw"
 
+- name: Generate eBPF yaml file
+  template:
+    src: /opt/workload/template/ansible/custom/pods_template/bypass-tcpip-daemonset.yaml.j2
+    dest: /tmp/istio-wl/bypass-tcpip-daemonset.yaml
+  when:
+    - wl_tunables['EBPF'] == "ebpf"
+
+- name: Enable eBPF
+  shell: "kubectl apply -f /tmp/istio-wl/bypass-tcpip-daemonset.yaml"
+  when:
+    - wl_tunables['EBPF'] == "ebpf"
+
+- name: Generate istio DLB file
+  template:
+    src: /opt/workload/template/ansible/custom/pods_template/istio-intel-dlb.yaml.j2
+    dest: /tmp/istio-wl/istio-intel-dlb.yaml
+
+- name: Install Intel istio DLB
+  become: true
+  become_user: "{{ ansible_user }}"
+  shell:
+    cmd: "istioctl install -f /tmp/istio-wl/istio-intel-dlb.yaml --set values.gateways.istio-ingressgateway.runAsRoot=true -y"
+  register: istio_install_dlb_res
+  when:
+    - wl_tunables['DLB_ACC'] == "dlb"

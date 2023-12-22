@@ -9,7 +9,7 @@ ARG RELEASE
 FROM terraform-static${RELEASE}
 
 # Install TCCLI 
-ARG TENCENT_CLI_VER=3.0.938.1
+ARG TENCENT_CLI_VER=3.0.996.1
 ARG TENCENT_CLI_REPO=conda
 RUN /opt/conda/bin/python3 -m pip install --no-cache-dir tccli==${TENCENT_CLI_VER}
 

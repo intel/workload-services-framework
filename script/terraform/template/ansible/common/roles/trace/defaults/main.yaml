@@ -1,0 +1,12 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+trace_waitproc_precision: "0.5"
+trace_start_timeout: "100"
+trace_stop_timeout: "100"
+sut_unreachable_retries: 1
+sut_unreachable_delay: 1m
+win_tmp_path: "C:"

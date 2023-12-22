@@ -38,7 +38,7 @@
   file:
     path: "{{ home.stdout }}/.kube"
     state: directory
-    mode: 0755
+    mode: "0700"
 
 - name: copy admin.conf
   copy:
@@ -46,6 +46,7 @@
     dest: "{{ home.stdout }}/.kube/config"
     remote_src: yes
     owner: "{{ ansible_user }}"
+    mode: "0600"
   become: yes
 
 - name: Remove the kubeadm config file
@@ -72,5 +73,5 @@
     - kube-scheduler
 
 - name: Wait for control-plane pods become ready
-  shell: "kubectl wait --namespace=kube-system --for=condition=Ready pods --selector tier=control-plane --timeout=600s"
+  shell: "timeout 600s kubectl wait --namespace=kube-system --for=condition=Ready pods --selector tier=control-plane"
 

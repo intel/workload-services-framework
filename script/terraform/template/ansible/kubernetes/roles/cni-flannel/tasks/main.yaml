@@ -4,20 +4,46 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+- name: Download the script
+  get_url:
+    url: "{{ k8s_flannel_repo }}"
+    dest: "/tmp/{{ wl_namespace }}-flannel.yaml"
 
-# retry to fix known issue: the server could not find the requested resource
+- name: Change Backend Type
+  lineinfile:
+    path: "/tmp/{{ wl_namespace }}-flannel.yaml"
+    regex: '^(\s*"Type":\s*)"vxlan"\s*$'
+    line: '\1"{{ k8s_flannel_backend_type }}"'
+    backrefs: true
+  when: k8s_flannel_backend_type != 'vxlan'
+
+- name: Change Backend MTU
+  lineinfile:
+    path: "/tmp/{{ wl_namespace }}-flannel.yaml"
+    insertafter: '^\s*"Backend":'
+    line: '      "MTU": {{ k8s_flannel_backend_mtu }},'
+  when: k8s_flannel_backend_mtu | int > 0
+
+- name: Change Backend IFACE
+  lineinfile:
+    path: "/tmp/{{ wl_namespace }}-flannel.yaml"
+    insertafter: '--kube-subnet-mgr'
+    line: "        - --iface={{ k8s_flannel_backend_iface }}"
+  when: k8s_flannel_backend_iface != ''
+
 - name: install flannel
-  command: "kubectl apply -f {{ k8s_flannel_repo }}"
+  command: "kubectl apply -f /tmp/{{ wl_namespace }}-flannel.yaml"
 
-### fix known issue: flannel namespace changed from kube-system to kube-flannel since v0.19.0 
-- name: Set fact for flannel namespace by version
-  set_fact:
-    flannel_namespace: "{{ 'kube-flannel' if (k8s_flannel_version is version('v0.19.0', '>=') ) else 'kube-system' }}"
+- name: Remove temporary file
+  file:
+    path: /tmp/{{ wl_namespace }}-flannel.yaml
+    state: absent
+  async: 10
+  poll: 0
 
+### fix known issue: flannel namespace changed from kube-system to kube-flannel since v0.19.0
 - name: Wait for flannel pod ready
-  shell: "kubectl wait --namespace={{ flannel_namespace }} pod --for=condition=Ready -l app=flannel --timeout=600s"
-  register: wait_ready
-  retries: 50
-  delay: 3
-  until: wait_ready.rc == 0
+  shell:
+    cmd: |
+      timeout 600s bash -c "while ! kubectl wait --namespace={{ 'kube-flannel' if (k8s_flannel_version is version('v0.19.0', '>=') ) else 'kube-system' }} pod --for=condition=Ready -l app=flannel --timeout 30s; do sleep 1s; done"
 

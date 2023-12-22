@@ -11,6 +11,7 @@
     update_cache: true
     state: present
   become: yes
+  delegate_to: "{{ trace_node.1 }}"
   register: aptrc
   until: aptrc is success
   retries: 10

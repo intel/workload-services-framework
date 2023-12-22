@@ -1,0 +1,15 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Install macchanger
+  ansible.builtin.dnf:
+    name: macchanger
+    state: latest
+  become: true
+  register: result
+  until: result is success
+  retries: 10
+  delay: 10

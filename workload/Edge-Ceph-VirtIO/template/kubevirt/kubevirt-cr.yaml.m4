@@ -13,8 +13,9 @@ spec:
   certificateRotateStrategy: {}
   configuration:
     developerConfiguration:
-      featureGates:
+      featureGates: 
         - CPUManager
+        - LiveMigration
   customizeComponents: {}
   imagePullPolicy: IfNotPresent
   infra:

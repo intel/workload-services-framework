@@ -8,8 +8,10 @@
       include_role:
         name: containerd
       
-    - name: check if docker already installed
-      command: "docker {{ compose | default(false) | bool | ternary('compose version','ps') }}"
+    - name: get docker status
+      shell:
+        cmd: "docker ps {{ compose | default(false) | bool | ternary('&& docker compose version','') }}"
+        executable: /bin/bash
       register: docker
       ignore_errors: yes
 

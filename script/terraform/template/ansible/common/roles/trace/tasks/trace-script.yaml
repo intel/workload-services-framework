@@ -4,11 +4,24 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: Create start/stop-trace.sh
-  template:
-    src: "{{ item }}.j2"
-    dest: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-{{ item }}"
-    mode: "a+rx"
-  loop:
-  - start-trace.sh
-  - stop-trace.sh
+- block:
+
+  - name: "Create start-trace.sh on {{ trace_host }}"
+    template:
+      src: "start-trace.sh.j2"
+      dest: "/tmp/{{ wl_namespace }}-{{ trace_host }}-start-trace.sh"
+      mode: "a+rx"
+
+  - name: "Create stop-trace.sh on {{ trace_host }}"
+    template:
+      src: "stop-trace.sh.j2"
+      dest: "/tmp/{{ wl_namespace }}-{{ trace_host }}-stop-trace.sh"
+      mode: "a+rx"
+
+  - name: set flag to prevent multiple installations
+    set_fact:
+      trace_script_installed: true
+    delegate_facts: true
+
+  when: not (hostvars[trace_host].trace_script_installed | default(false))
+  delegate_to: "{{ trace_host }}"

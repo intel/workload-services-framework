@@ -8,7 +8,7 @@
   block:
 
   - name: delete deployment
-    command: "kubectl --namespace={{ wl_namespace }} delete -f /tmp/{{ wl_namespace }}-k8s-script.yaml --ignore-not-found=true --grace-period=150 --timeout=5m"
+    command: "timeout 5m kubectl --namespace={{ wl_namespace }} delete -f /tmp/{{ wl_namespace }}-k8s-script.yaml --ignore-not-found=true --grace-period=150"
     ignore_errors: yes
 
   - name: get resource types
@@ -17,12 +17,12 @@
 
   - name: delete resources
     shell:
-      cmd: "kubectl --namespace={{ wl_namespace }} delete {{ resources.stdout_lines | join(',') }} --all --ignore-not-found=true --grace-period=150 --timeout=5m"
+      cmd: "timeout 5m kubectl --namespace={{ wl_namespace }} delete {{ resources.stdout_lines | join(',') }} --all --ignore-not-found=true --grace-period=150"
       executable: /bin/bash
     ignore_errors: yes
 
   - name: delete namespace
-    command: "timeout 10m kubectl delete namespace {{ wl_namespace }} --grace-period=300 --timeout=10m --wait --ignore-not-found=true"
+    command: "timeout 10m kubectl delete namespace {{ wl_namespace }} --grace-period=300 --wait --ignore-not-found=true"
     register: delns
     until: delns.rc == 0
     retries: 10

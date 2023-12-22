@@ -5,11 +5,11 @@
 #
 include(cmake/common.cmake)
 
-foreach(MODE "RPS-MAX" "RPS-SLA")
+foreach(MODE "rps_max" "rps_sla")
     foreach(PROTOCOL "https")
         foreach(NODES "2n")
             foreach(CRYPTO_ACC "cryptomb")
-                add_testcase(${workload}_${MODE}_${PROTOCOL}_${CRYPTO_ACC}_${NODES} ${MODE} ${PROTOCOL} ${CRYPTO_ACC} ${NODES})
+                add_testcase(${workload}_${MODE}_${PROTOCOL}_${NODES}_${CRYPTO_ACC} ${MODE} ${PROTOCOL} ${NODES} ${CRYPTO_ACC})
             endforeach()
         endforeach()        
     endforeach()        

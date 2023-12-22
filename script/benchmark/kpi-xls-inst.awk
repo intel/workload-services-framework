@@ -12,9 +12,14 @@
 
 /\/itr-[0-9]*:$/ {
     name=gensub(/^.*logs-([^/]*)[/].*$/,"\\1",1)
+    status="failed"
 }
 
-/^[^#].*: *[0-9.-][0-9.e+-]* *#?.*$/ {
+/^# status: (passed|failed)/ {
+    status=$3
+}
+
+/^[^#].*: *[0-9.-][0-9.e+-]* *#?.*$/ && status=="passed" {
     k=gensub(/^(.*): *[0-9.-]+.*$/, "\\1", 1)
     v=gensub(/^.*: *([0-9.-]+).*/, "\\1", 1)
     kpis[name][product][k][++kpisct[name][product][k]]=v
@@ -90,12 +95,14 @@ END {
             print "</Row>"
         }
 
-        add_svrinfo_ex(ws, psp, ith)
+        if (length(svrinfo_values[ws])>0)
+            add_svrinfo_ex(ws, psp, ith)
 
         print "</Table>"
         print "</Worksheet>"
 
-        add_svrinfo(ws)
+        if (length(svrinfo_values[ws])>0)
+            add_svrinfo(ws)
     }
     print "</Workbook>"
 }

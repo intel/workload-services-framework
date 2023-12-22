@@ -8,7 +8,7 @@
     include_role:
       name: kubeadm
       tasks_from: init
-    when: hostvars['localhost']['ansible_facts']['install_k8s']
+    when: install_k8s
 
   - name: Untaint k8s
     shell: "kubectl taint node $(kubectl get nodes -o='custom-columns=name:.metadata.name,ip:.status.addresses[?(@.address==\"{{ private_ip }}\")].address' --no-headers | cut -f1 -d' ') --overwrite {{ item }}"
@@ -17,13 +17,13 @@
       - "node-role.kubernetes.io/control-plane-"
     ignore_errors: true
     when:
-    - hostvars['localhost']['ansible_facts']['install_k8s']
+    - install_k8s
     - ansible_host in (groups['workload_hosts'] | map('extract', hostvars, ['ansible_host']))
 
   - name: Install k8s CNI
     include_role:
       name: "cni-{{ k8s_cni }}"
-    when: hostvars['localhost']['ansible_facts']['install_k8s']
+    when: install_k8s
 
   - name: Abort if registry must be created
     fail:
@@ -31,7 +31,7 @@
     when:
     - k8s_enable_registry | bool
     - not (k8s_enable_csp_registry | bool)
-    - hostvars['localhost']['ansible_facts']['install_k8s']
+    - install_k8s
     - ansible_host in my_ip_list.split(',')
 
   - name: Create registry
@@ -54,7 +54,7 @@
   - name: Create Join Command
     command: kubeadm token create --print-join-command
     register: join_cmd
-    when: hostvars['localhost']['ansible_facts']['install_k8s']
+    when: install_k8s
 
   - name: Set fact
     set_fact:

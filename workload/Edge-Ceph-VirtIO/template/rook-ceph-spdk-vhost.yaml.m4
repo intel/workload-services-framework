@@ -8,7 +8,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: ceph-spdk-vhost-daemon
-  namespace: defn(`ROOK_CEPH_STORAGE_NS')
+  namespace: defn(`ROOK_CEPH_STORAGE_NS') 
   labels:
     app: ceph-spdk-vhost-daemon
 spec:
@@ -36,7 +36,7 @@ ifelse("defn(`DEBUG_MODE')","3",`dnl
             - name: `VHOST_CPU_NUM'
               value: "defn(`VHOST_CPU_NUM')"
             - name: `CHECK_CEPH_STATUS'
-              value: "defn(`CHECK_CEPH_STATUS')"
+              value: "defn(`CHECK_CEPH_STATUS')"              
             - name: MY_POD_NAME
               valueFrom:
                 fieldRef:
@@ -90,6 +90,7 @@ ifelse("defn(`DEBUG_MODE')","3",`dnl
       #restartPolicy: Never
       # if hostNetwork: false, the "rbd map" command hangs, see https://github.com/rook/rook/issues/2021
       hostNetwork: true
+      terminationGracePeriodSeconds: 120
       volumes:
         - name: tmp
           hostPath:

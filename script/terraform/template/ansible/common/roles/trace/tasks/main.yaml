@@ -10,8 +10,7 @@
     - name: start trace
       include_tasks:
         file: trace-proc.yaml
-      when:
-      - wl_trace_modules is defined
+      when: wl_trace_modules | default('') | split(',') | reject('==','') | length > 0
       loop: "{{ workload_config.trace_mode | split(',') | slice([((workload_config.trace_mode | split(',') | length)/3)|int,1] | max) }}"
       loop_control:
         loop_var: roi_region
@@ -19,14 +18,59 @@
 
   always:
 
-    - name: wait until execution compete
-      command: "tail --pid={{ trace_waitproc_pid }} -f /dev/null"
-      ignore_errors: yes
-      delegate_to: "{{ trace_logs_host | default(inventory_hostname) }}"
+    - block:
+
+        - name: wait until execution complete
+          include_tasks:
+            file: "trace-complete{{ win_suffix }}.yaml"
+
+      rescue:
+
+        - block:
+
+            - name: wait until execution complete (unreachable host 2nd attempt)
+              include_tasks:
+                file: "trace-complete{{ win_suffix }}.yaml"
+
+          rescue:
+
+            - block:
+
+                - name: wait until execution complete (unreachable host 3rd attempt)
+                  include_tasks:
+                    file: "trace-complete{{ win_suffix }}.yaml"
+
+              rescue:
+
+                - block:
+
+                    - name: wait until execution complete (unreachable host 4th attempt)
+                      include_tasks:
+                        file: "trace-complete{{ win_suffix }}.yaml"
+
+                  rescue:
+
+                    - name: wait until execution complete (unreachable host 5th attempt)
+                      include_tasks:
+                        file: "trace-complete{{ win_suffix }}.yaml"
+
+                      when: (sut_unreachable_retries|int) >= 4
+                  when: (sut_unreachable_retries|int) >= 3
+              when: (sut_unreachable_retries|int) >= 2
+          when: (sut_unreachable_retries|int) >= 1
 
     - name: revoke trace
       include_tasks:
         file: stop.yaml
-      when: wl_trace_modules is defined
+      when: wl_trace_modules | default('') | split(',') | reject('==','') | length > 0
       vars:
         roi_index: "{{ [(((workload_config.trace_mode | split(',') | length) / 3) | int) - 1, 0] | max }}"
+
+    - name: retrieve waitproc status
+      include_tasks:
+        file: "trace-status{{ win_suffix }}.yaml"
+
+  vars:
+
+    workload_config: "{{ lookup('file',wl_logs_dir+'/workload-config.yaml') | from_yaml }}"
+    win_suffix: "{{ ((hostvars[trace_logs_host|default(inventory_hostname)].ansible_connection|default('ssh'))=='winrm')|ternary('-win','') }}"

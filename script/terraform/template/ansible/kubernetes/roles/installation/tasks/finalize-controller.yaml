@@ -8,7 +8,7 @@
     include_role:
       name: "{{ plugin_name }}"
     when: ((playbook_dir+'/roles/'+plugin_name+'/tasks/main.yaml') is exists)
-    loop: "{{ ['nfd'] + k8s_plugins }}"
+    loop: "{{ ['nfd'] + ([k8s_plugins] | flatten | join(',') | split(',')) | unique }}"
     loop_control:
       loop_var: plugin_name
 

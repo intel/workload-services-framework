@@ -15,10 +15,11 @@ destroy () {
     set +e
     trap - ERR EXIT
     trap " " SIGTERM
-    kill -- -$BASHPID
+    kill -- -$BASHPID 2> /dev/null
     wait
 
     cd /opt/workspace
+
     if [[ "$stages" = *"--stage=cleanup"* ]]; then
         if [ -r cleanup.yaml ]; then
             echo "Restore SUT settings..." | tee -a tfplan.logs
@@ -39,7 +40,8 @@ destroy () {
             # create KPI and publish KPI
             if [[ "$stages" = *"--${publisher}_publish"* ]]; then
                 echo "Publish to datalake..." | tee -a tfplan.logs
-                (cat tfplan.json 2> /dev/null || echo "{}") | $DIR/publish-$publisher.py $stages 2>&1 | tee publish.logs
+                sed -e 's/_password":"[^"]*/_password":"string/g' -e 's/_password\\": *\\"[^"]*/_password\\":\\"XYZXYZ\\/g' .tfplan.json > tfplan.json
+                "$DIR"/publish-$publisher.py $stages < tfplan.json 2>&1 | tee publish.logs
             fi
         done
     fi
@@ -49,16 +51,19 @@ destroy () {
 
 locate_trace_modules () {
     trace_modules=()
+    trace_modules_options=()
     for tp in /opt/workload/template/ansible/traces/roles/* /opt/terraform/template/ansible/traces/roles/*; do
-        tn="${tp/*\//}"
-        if [ -d "$tp" ] && [[ " $@ " = *" --$tn "* ]]; then
-            trace_modules+=("$tp")
-        fi
+      tn="${tp/*\//}"
+      if [ -d "$tp" ]; then
+        for argv in $@; do
+          if [ "$argv" = "--$tn" ] || [[ "$argv" =~ ^--$tn:[0-9a-z:_-]*$ ]]; then
+            [[ "/$(IFS=/;echo "${trace_modules[*]}")/" = *"/$tn/"* ]] || trace_modules+=("$tp")
+            [[ "|$(IFS=\|;echo "${trace_modules_options[*]}")|" = *"|${argv#--}|"* ]] || trace_modules_options+=("${argv#--}")
+          fi
+        done
+      fi
     done
-    trace_modules_options="$(echo ${trace_modules[@]/*\//} | tr ' ' ',')"
-    if [ -n "$trace_modules_options" ]; then
-        trace_modules_options="--wl_trace_modules=$trace_modules_options"
-    fi
+    trace_modules_options="--wl_trace_modules=$(IFS=,;echo "${trace_modules_options[*]}")"
 }
 
 run_playbook () {
@@ -81,7 +86,7 @@ run_playbook () {
     done
     [ "$playbook" = "cluster.yaml" ] && [[ "$stages" != *"--stage=provision"* ]] && return
     cp -f /opt/terraform/template/ansible/ansible.cfg .
-    (set -ex; ANSIBLE_FORKS=$(nproc) ANSIBLE_ROLES_PATH="$ANSIBLE_ROLES_PATH:template/ansible/common/roles:template/ansible/traces/roles" ansible-playbook --flush-cache $options -i inventory.yaml --private-key "$keyfile" $playbook)
+    (set -ex; ANSIBLE_FORKS=$(nproc) ANSIBLE_ROLES_PATH="$ANSIBLE_ROLES_PATH:template/ansible/common/roles:template/ansible/traces/roles:/opt/collections/ansible_collections/cek/share/roles" ansible-playbook --flush-cache $options -i "$DIR"/create-inventory.py --private-key "$keyfile" $playbook)
 }
 
 check_docker_image () {
@@ -163,6 +168,7 @@ if [[ "$stages" = *"--stage=provision"* ]]; then
     trap destroy SIGTERM SIGINT SIGKILL ERR EXIT
 
     # provision VMs
+    cp -f /opt/terraform/template/ansible/ansible.cfg .
     (set -xeo pipefail; terraform init -input=false -no-color 2>&1 | tee -a tfplan.logs) &
     wait -n %1
 
@@ -190,8 +196,8 @@ if [[ "$stages" = *"--stage=provision"* ]]; then
         done
 
         [ $sts -eq 0 ] || break
-        terraform show -json > tfplan.json
-        terraform_replace=($(sed -n '/"terraform_replace":/{s/.*"terraform_replace":{"sensitive":false,"value":{"command":"\([^"]*\)".*/\1/;p}' tfplan.json | sed 's/[[]\([^]]*\)[]]/["\1"]/g' | tr ' ' '\n'))
+        terraform show -json > .tfplan.json
+        terraform_replace=($(sed -n '/"terraform_replace":/{s/.*"terraform_replace":{"sensitive":false,"value":{"command":"\([^"]*\)".*/\1/;p}' .tfplan.json | sed 's/[[]\([^]]*\)[]]/["\1"]/g' | tr ' ' '\n'))
         sts=${#terraform_replace[@]}
         [ $sts -gt 0 ] || break
         sleep ${terraform_delay%,*}
@@ -205,7 +211,7 @@ fi
 # for validation only, we still want to prepare cluster.yaml but not execute it.
 echo "host_setup_start: \"$(date -Ins)\"" >> timing.yaml
 locate_trace_modules $@
-cat tfplan.json | $DIR/create-cluster.py $@ $trace_modules_options
+cat .tfplan.json | $DIR/create-cluster.py $@ $trace_modules_options
 (set -eo pipefail; run_playbook -vv cluster.yaml $@ 2>&1 | tee -a tfplan.logs) &
 wait -n %1
 echo "host_setup_end: \"$(date -Ins)\"" >> timing.yaml
@@ -218,7 +224,7 @@ if [[ "$stages" = *"--stage=validation"* ]]; then
     trap destroy SIGTERM SIGINT SIGKILL ERR EXIT
 
     locate_trace_modules $@
-    cat tfplan.json | $DIR/create-deployment.py $@ $trace_modules_options
+    cat .tfplan.json | $DIR/create-deployment.py $@ $trace_modules_options
     (set -eo pipefail; run_playbook -vv deployment.yaml $@ 2>&1 | tee -a tfplan.logs) &
     wait -n %1
     echo "deployment_end: \"$(date -Ins)\"" >> timing.yaml

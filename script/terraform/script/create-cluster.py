@@ -27,11 +27,11 @@ for argv in sys.argv:
     argv = argv[2:]
     if "=" in argv:
       k, _, v = argv.partition("=")
-      options[k.replace('-', '_')] = v.strip().replace('%20', ' ')
+      options[k.replace('-', '_').split(':')[0]] = v.strip().replace('%20', ' ')
     elif argv.startswith("no"):
-      options[argv[2:].replace('-', '_')] = False
+      options[argv[2:].replace('-', '_').split(':')[0]] = False
     else:
-      options[argv.replace('-', '_')] = True
+      options[argv.replace('-', '_').split(':')[0]] = True
 instances = tfoutput["values"]["outputs"]["instances"]["value"]
 kubeadm_options = [ "--pod-network-cidr=10.244.0.0/16" ]
 options["wl_logs_dir"] = "/opt/workspace"
@@ -54,6 +54,9 @@ inventories = {
   "trace_hosts": {
     "hosts": {},
   },
+  "vmhost_hosts": {
+    "hosts": {},
+  },
 }
 bastion_hosts = {}
 for host in instances:
@@ -66,9 +69,9 @@ for host in instances:
     }
   inventories[vm_group]["hosts"][host]=dict(instances[host])
   inventories[vm_group]["hosts"][host].update({
-    "ansible_host": instances[host].get("public_ip", instances[host]["private_ip"]),
-    "ansible_user": instances[host]["user_name"],
-    "ansible_port": instances[host].get("ssh_port", 22),
+    "ansible_host": instances[host].get("ansible_host", instances[host].get("public_ip", instances[host].get("private_ip","127.0.0.1"))),
+    "ansible_user": instances[host].get("ansible_user", instances[host].get("user_name","")),
+    "ansible_port": instances[host].get("ansible_port", instances[host].get("ssh_port", 22)),
     "wl_kernel_args": options.get("wl_kernel_args", {}),
   })
   if vm_group == "controller":
@@ -77,15 +80,6 @@ for host in instances:
     if instances[host]["bastion_host"] not in bastion_hosts:
       bastion_hosts[instances[host]["bastion_host"]] = []
     bastion_hosts[instances[host]["bastion_host"]].append(host)
-  if "winrm_password" in instances[host]:
-    inventories[vm_group]["hosts"][host].update({
-      "ansible_connection": "winrm",
-      "ansible_password": instances[host]["winrm_password"],
-      "ansible_port": instances[host].get("winrm_port", "5986"),
-      "ansible_winrm_server_cert_validation": "ignore",
-      "ansible_winrm_transport": "basic",
-      "ansible_winrm_scheme": "https",
-    })
 
 workload_config={}
 with open(WORKLOAD_CONFIG) as fd:
@@ -205,11 +199,12 @@ nidx = {}
 sysctls = {}
 sysfs = {}
 bios = {}
+msr = {}
 with open(CLUSTER_CONFIG) as fd:
   for doc in yaml.safe_load_all(fd):
     if doc and "cluster" in doc:
       for i,c in enumerate(doc["cluster"]):
-        vm_group = c["vm_group"] if "vm_group" in c else "worker"
+        vm_group = c.get("vm_group", "worker")
         if vm_group not in inventories:
           raise Exception(f"Unknown vm_group {vm_group} in {inventories}")
         if vm_group not in nidx:
@@ -255,6 +250,11 @@ with open(CLUSTER_CONFIG) as fd:
             bios[vm_group] = {}
           bios[vm_group].update(c["bios"])
 
+        if "msr" in c:
+          if vm_group not in msr:
+            msr[vm_group] = {}
+          msr[vm_group].update(c["msr"])
+
     if doc and "terraform" in doc:
       for option1 in doc["terraform"]:
         if option1 not in options:
@@ -268,6 +268,7 @@ with open(CLUSTER_CONFIG) as fd:
 _CreatePerHostCtls("wl_sysctls", sysctls)
 _CreatePerHostCtls("wl_sysfs", sysfs)
 _CreatePerHostCtls("wl_bios", bios)
+_CreatePerHostCtls("wl_msr", msr)
 
 playbooks = [{
   "name": "startup sequence",
@@ -296,7 +297,7 @@ if ((options.get("docker", False) or options.get("native", False)) and ("docker_
   })
 
 elif os.path.exists(KUBERNETES_CONFIG) or options.get("k8s_install", False):
-  k8s_registry_port = options.get("k8s_registry_port", "20668")
+  k8s_registry_port = options.get("k8s_registry_port", "30668")
   k8s_registry_ip = inventories["controller"]["hosts"]["controller-0"]["private_ip"] if "controller" in inventories else "127.0.0.1"
 
   playbooks.append({
@@ -343,14 +344,6 @@ if options.get("svrinfo", True):
   playbooks.append({
     "name": "Invoke svrinfo",
     "import_playbook": "./template/ansible/common/svrinfo.yaml",
-    "vars": _ExtendOptions({
-    })
-  })
-  
-if options.get("msrinfo", False):
-  playbooks.append({
-    "name": "Invoke msrinfo",
-    "import_playbook": "./template/ansible/common/msrinfo.yaml",
     "vars": _ExtendOptions({
     })
   })

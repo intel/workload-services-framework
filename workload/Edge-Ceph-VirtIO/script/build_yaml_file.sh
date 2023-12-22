@@ -1,6 +1,6 @@
 #!/bin/bash -e
 # build_yaml_file used to compile m4 file, transform the yaml.m4 file to yaml file.
-#args:
+#args: 
 # $1 -- path contains the m4 files.
 #
 #
@@ -32,6 +32,7 @@ generate_kubernetes_yaml () {
       -DDOCKER_IMAGE_GUESTOS=$DOCKER_IMAGE_GUESTOS \
       -DDOCKER_IMAGE_VHOST=$DOCKER_IMAGE_VHOST \
       -DDOCKER_IMAGE_CEPH_BM_TEST=$DOCKER_IMAGE_CEPH_BM_TEST \
+      -DDOCKER_IMAGE_ROOK_CEPH_QAT=$DOCKER_IMAGE_ROOK_CEPH_QAT \
       -DKUBEVIRT_OPERATOR_DOCKER_IMAGE=$KUBEVIRT_OPERATOR_DOCKER_IMAGE \
       -DTEST_CASE=$TEST_CASE \
       -DBENCHMARK_OPTIONS=$BENCHMARK_OPTIONS \
@@ -43,15 +44,13 @@ generate_kubernetes_yaml () {
     )
 }
 
-#generate VM yaml file
+# Generate VM yaml file
 generate_vm_yaml () {
     i=1
     while [ "$i" -le "$1" ];do
-        zone_num=$(echo "$i % ${CLUSTERNODES}" |bc)
         m4 -I${CONFIG_PATH} \
         -DTEST_CASE=$TEST_CASE \
         -DVM_NAME=$VM_NAME$i \
-        -DVM_ZONE="$zone_num" \
         -DPVC_NAME=$PVC_NAME$i \
         -DVM_SCALING=$VM_SCALING \
         -DVM_CPU_NUM=$VM_CPU_NUM \
@@ -68,13 +67,28 @@ generate_vm_yaml () {
     done
 }
 
+# Generate live-migration yaml file
+generate_migration_yaml () {
+    i=1
+    while [ "$i" -le "$1" ];do
+        m4 -I${CONFIG_PATH} \
+        -DVM_NAME=$VM_NAME$i \
+        "${CONFIG_PATH}/live-migration.yaml.m4" > "${CONFIG_PATH}/live-migration$i.yaml"
+        i=$(($i+1))
+    done
+}
+
 echo "== Start to Build kubernetes config file from m4, at $CONFIG_PATH"
 echo "- Attach to namespace to [$NAMESPACE]."
 # Build all m4 file to yaml.
 for m4file in `find $CONFIG_PATH/ -name "*.yaml.m4"`
-do
+do 
   #echo "transfer $m4file"  # m4file is the file name with path.
   generate_kubernetes_yaml "$m4file" > "${m4file%.m4}"
 done
 
 generate_vm_yaml ${BENCHMARK_CLIENT_NODES}
+echo $TEST_OPERATION_MODE
+if [ "${TEST_OPERATION_MODE}" == "live-migration" ]; then
+  generate_migration_yaml ${BENCHMARK_CLIENT_NODES}
+fi

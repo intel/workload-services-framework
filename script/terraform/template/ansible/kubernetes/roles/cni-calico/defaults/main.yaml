@@ -11,6 +11,7 @@ k8s_calico_version: "v3.25"
 k8s_calico_encapsulation: "VXLAN"
 k8s_calico_ipinip_repo: "https://projectcalico.docs.tigera.io/archive/{{ k8s_calico_version }}/manifests/calico.yaml"
 k8s_calico_vxlan_repo: "https://projectcalico.docs.tigera.io/archive/{{ k8s_calico_version }}/manifests/calico-vxlan.yaml"
+k8s_calico_iface: ""
 
 # calicoctl is helpful tool to diagnose calico network
 k8s_calicoctl_rep: "https://projectcalico.docs.tigera.io/archive/{{ k8s_calico_version }}/manifests/calicoctl.yaml"

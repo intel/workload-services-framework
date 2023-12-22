@@ -6,12 +6,23 @@
 
 - block:
 
-    - name: collect trace data
+    - name: collect Linux trace data
       include_role:
-        name: "{{ trace_node.0 }}"
+        name: "{{ trace_module_name }}"
         tasks_from: collect
-      vars:
-        trace_from: kubernetes
+      when:
+      - ((ansible_connection | default('.ssh')) == 'ssh')
+      - (playbook_dir+'/../traces/roles/'+trace_module_name+'/tasks/collect.yaml') is exists
 
+    - name: collect Windows trace data
+      include_role:
+        name: "{{ trace_module_name }}"
+        tasks_from: collect-win
+      when:
+      - ((ansible_connection | default('.ssh')) == 'winrm')
+      - (playbook_dir+'/../traces/roles/'+trace_module_name+'/tasks/collect-win.yaml') is exists
+
+  vars:
+    trace_module_name: "{{ trace_node.0 | split(':') | first }}"
   ignore_errors: yes
 

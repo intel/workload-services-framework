@@ -6,6 +6,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 ARG RELEASE
+
 FROM ceph-base${RELEASE}
 
 ARG  BASE_PATH=/opt/rook
@@ -16,9 +17,9 @@ RUN yum group install -y "Development Tools" && \
     dnf module -y install python39 && \
     dnf clean all && \
     alternatives --set python3 /usr/bin/python3.9 && \
-    yum -y install git make which gcc m4 libaio-devel bc zlib-devel wget unzip curl \
+    yum -y install git make which gcc m4 libaio-devel bc zlib-devel wget unzip curl \ 
     nmap-ncat net-tools procps sysstat librbd1-devel mpich mpich-devel \
-    numactl numactl-devel numatop && \
+    numactl numactl-devel numatop yum-utils && \
     yum clean all
 
 RUN dnf -y install librados2-devel librbd-devel glib2 glib2-devel pixman-devel && \
@@ -26,8 +27,8 @@ RUN dnf -y install librados2-devel librbd-devel glib2 glib2-devel pixman-devel &
 
 WORKDIR   ${WORK_PATH}
 
-ARG SPDK_VER=v22.09
-ARG SPDK_REPO=https://github.com/spdk/spdk
+ARG SPDK_VER=v23.09
+ARG SPDK_REPO=https://github.com/spdk/spdk.git
 RUN cd ${WORK_PATH}/ && git clone -b ${SPDK_VER} ${SPDK_REPO} && \
     cd spdk && \
     git submodule update --init && \
@@ -36,7 +37,5 @@ RUN cd ${WORK_PATH}/ && git clone -b ${SPDK_VER} ${SPDK_REPO} && \
     make -j
 
 COPY script/* ./
-
-#RUN mkfifo /export-test-logs
 
 CMD ["./ceph_spdk_vhost_entrypoint.sh"]

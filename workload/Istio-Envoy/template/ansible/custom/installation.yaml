@@ -169,7 +169,7 @@
   tasks:
     - name: Get nighthawk-server node name
       shell: |
-        kubectl get node "`kubectl get pod -n istio-workloads-{{ wl_namespace }} -o wide |tail -n 1|awk '{print $7}'`" -owide --no-headers|awk '{print $6}'
+        kubectl get node "`kubectl get pod -o=custom-columns=NODE:.spec.nodeName -n istio-workloads-{{ wl_namespace }} | tail -n 1`" -owide --no-headers|awk '{print $6}'
       register: nighthawk_server_node_ip
       until: nighthawk_server_node_ip.stdout_lines | length > 0
       retries: 10

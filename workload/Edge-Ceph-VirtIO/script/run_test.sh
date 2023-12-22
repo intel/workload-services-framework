@@ -47,4 +47,3 @@ date +"%m-%d-%y-%H-%M-%S" > /logs/benchmark_end.log
 
 cd /logs && tar cf /export-test-logs status *.log
 echo "=== Finish the test and data collection==="
-#sleep infinity

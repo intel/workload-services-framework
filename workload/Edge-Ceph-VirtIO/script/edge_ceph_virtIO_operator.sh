@@ -19,6 +19,7 @@ BENCHMARK_NS="${CLUSTER_NS:-"ABCDEFG"}"
 CEPH_CLUSTER_NS="${ROOK_CEPH_STORAGE_NS:-"rook-ceph"}"
 KUBEVIRT_NS="${KUBEVIRT_NS:-"kubevirt"}"
 TEST_CASE="${TEST_CASE:-"virtIO"}"
+TEST_OPERATION_MODE="${TEST_OPERATION_MODE:-"random"}"
 TIMEOUT="7200,3600"  # Wait for log collection | WAIT POD ready timeout, seconds
 CEPH_CLUSTER=${CEPH_CLUSTER:-"my-cluster"}
 CEPH_STORAGE_CLASS=${CEPH_STORAGE_CLASS:-"rook-ceph-block"}
@@ -26,6 +27,7 @@ CEPH_CONFIG_ENABLED=${CEPH_CONFIG_ENABLED:-"0"}
 OSD_MEMORY_TARGET=${OSD_MEMORY_TARGET:-"8589934592"}
 CLUSTERNODES=${CLUSTERNODES:-1}
 BENCHMARK_CLIENT_NODES=${BENCHMARK_CLIENT_NODES:-3}
+TEST_CASE_COMP=${TEST_CASE_COMP:-0}
 
 WAIT_VM=${WAIT_VM:-1800}
 HUGEPAGE_REQ=${HUGEPAGE_REQ:-32768}  #Hugepage required for workload test, default: 32768Mi
@@ -37,14 +39,14 @@ BENCHMARK_SELECTOR="${BENCHMARK_SELECTOR:-"app=rook-ceph-benchmark"}"
 BENCHMARK_CONTAINER="${BENCHMARK_SELECTOR/*=/}"
 BENCHMARK_LOGS="${WORK_PATH}/${TEST_CASE}-logs"
 
-# For VM settings
-#VM_NAME="${VM_NAME:-"ubuntu"}"
-#VM_CPU_NUM="${VM_CPU_NUM:-"32"}"
-#VM_MEMORY="${VM_MEMORY:-"2Gi"}"
-
 # For operation args:
 OPERATOR_ARG="ALL"
 DEBUG_MODE="${DEBUG_MODE:-0}" # disable debug mode by default
+
+ROOK_CEPH_CONFIG_PATH="${ROOK_CEPH_CONFIG_PATH:-"/opt/rook/benchmark/rook/deploy/examples"}"
+CRD_CEPHCLUSTER="${CRD_CEPHCLUSTER:-"CephCluster"}"
+CRD_CEPHBLOCK="${CRD_CEPHBLOCK:-"CephBlockPool"}"
+
 
 # logs directory
 mkdir -p "$BENCHMARK_LOGS"
@@ -64,10 +66,10 @@ function check_args() {
     if [[ $# == 0 || $* =~ ^"--help"$ ]]; then
       help_usage;
       exit 0;
-    fi
+    fi 
 
     if [[ $* =~ "--all" ]]; then
-      export OPERATOR_ARG="ALL";    #
+      export OPERATOR_ARG="ALL";    # 
     elif [[ $* =~ "--deploy" ]];then
       export OPERATOR_ARG="DEPLOY";
     elif [[ $* =~ "--benchmark" ]];then
@@ -116,10 +118,10 @@ calculate_rbd_img_size() {
     elif [ "$VM_SCALING" = "1" ];then
         RBD_IMG_SIZE=$(echo "$CEPH_CAPACITY / $REPLICATED_SIZE / $MAX_VM_COUNT / $RBD_IMAGE_NUM / 5 * 3" | bc)"G"
     fi
-    PVC_BLOCK_SIZE=$RBD_IMG_SIZE
     TEST_DATASET_SIZE=$RBD_IMG_SIZE
     BENCHMARK_OPTIONS=${BENCHMARK_OPTIONS}";-DTEST_DATASET_SIZE=${TEST_DATASET_SIZE}"
     CONFIGURATION_OPTIONS=${CONFIGURATION_OPTIONS}";-DRBD_IMG_SIZE=${RBD_IMG_SIZE};-DPVC_BLOCK_SIZE=${PVC_BLOCK_SIZE}"
+    PVC_BLOCK_SIZE=$RBD_IMG_SIZE
 }
 
 # args: None
@@ -129,16 +131,16 @@ trap_kubernetes () {
     sleep infinity  # TODO: maybe should remove this.
 }
 
-# args:
+# args: 
 #   $1 - benchmark container name
-#   $2 ~~ - pods run the benchmark.
+#   $2 ~~ - pods run the benchmark. 
 extract_logs () {
 
     container=$1; shift
     for pod1 in $@; do
         echo "get benchmark pod $pod1"
         # mkdir -p "$pod1"
-        # kubectl exec --namespace=$CEPH_CLUSTER_NS $pod1 -c $container -- bash -c 'cat /export-test-logs' | tar -xf - -C "$pod1"
+        # kubectl exec --namespace=$CEPH_CLUSTER_NS $pod1 -c $container -- bash -c 'cat /export-test-logs' | tar -xf - -C "$pod1"        
         kubectl exec --namespace=$CEPH_CLUSTER_NS $pod1 -c $container -- bash -c 'cat /export-test-logs' | tar -xf - -C "$BENCHMARK_LOGS"
     done
 }
@@ -149,6 +151,23 @@ data_collection_and_exit () {
     cd "$BENCHMARK_LOGS" && echo ${exit_code} > status && tar cf /export-logs status $(find . -name "*.log")
 
     sleep infinity
+}
+
+# -- cleanup VMs
+delete_vms () {
+    # -- benchmark cleanup
+    kubectl -n ${BENCHMARK_NS} get vmi
+    echo "End of log collection, delete the VM..."
+    # need to delete one by one
+    i=1
+    while [ "$i" -le "${BENCHMARK_CLIENT_NODES}" ]; do
+        if [ -n "$(kubectl -n ${BENCHMARK_NS} get vmi)" ]; then
+            kubectl -n ${BENCHMARK_NS} delete -f ${CONFIG_FILE_PATH}/VM$i.yaml
+        fi
+        sleep 20s
+        i=$(($i+1))
+    done
+    sleep 15s
 }
 
 # Collect VM related pod's logs and exit, args: exit_code
@@ -168,11 +187,13 @@ vmlogs_collection_and_exit () {
         fi
     done
     echo " - Finish VM pod logs collection..."
+    # Cleanup_environment and exit
+    cleanup_environment
     data_collection_and_exit $1;
 }
 
 check_ceph_cluster_namespace () {
-    if [ -z "$(kubectl get namespace | grep "${CEPH_CLUSTER_NS}" )" ]; then
+    if [ -z "$(kubectl get namespace | grep "${CEPH_CLUSTER_NS}" )" ]; then 
         echo " *** ERROR: NAMESPACE [$CEPH_CLUSTER_NS] for rook-ceph is not exist! Please set the correct namespace for ceph cluster and check the ceph status firstly."
         data_collection_and_exit 1;
     fi
@@ -218,7 +239,7 @@ check_hugepage () {
     done
 }
 
-# args:
+# args: 
 env_precheck_hook () {
     echo "Health check for the validation environment."
     # 1. Ceph healthy status
@@ -238,12 +259,23 @@ env_precheck_hook () {
     # check if hugepage is enough
     if [ "$TEST_CASE" = "vhost" ];then
         check_hugepage
+    fi    
+
+    if [ -z "$(kubectl api-resources | grep -i "${CRD_CEPHCLUSTER}" )" ]; then
+        echo " *** ERROR: CRD $CRD_CEPHCLUSTER for rook-ceph is not exist!, please pre-set the CRD firstly."
+        data_collection_and_exit 1;
+    fi
+
+    # - For Block device prerequisites.
+    if [ -z "$(kubectl api-resources | grep -i "${CRD_CEPHBLOCK}" )" ]; then
+        echo " *** ERROR: CRD $CRD_CEPHBLOCK for rook-ceph is not exist!, please pre-set the CRD firstly."
+        data_collection_and_exit 1;
     fi
 
     # Currently, single node cluster is jsut for development, not used for production.
     # If user want to run on single node cluster with multi-nodes cofig, it should break here.
     # 'CLUSTERNODES' should be >= Nodes count in k8s cluster (K8S_CLUSTER_NODES).
-    # User need to change 'CLUSTERNODES' to 1 in validate.sh on sinle node k8s cluster
+    # User need to change 'CLUSTERNODES' to 1 in validate.sh on sinle node k8s cluster 
     K8S_CLUSTER_NODES=$(kubectl get nodes -A -o wide | grep Ready | wc -l)
     if [ ${CLUSTERNODES} -gt ${K8S_CLUSTER_NODES} ]; then
         echo " *** ERROR: No sufficient nodes[${K8S_CLUSTER_NODES}-Nodes] for the ceph cluster configuration[Need ${CLUSTERNODES} nodes]."
@@ -281,39 +313,26 @@ deploy_kubevirt () {
     done
 
     echo "- Apply the kubevirt successfully  "
-    # Check all of kubevirt resource
+    # Check all of kubevirt resource 
     #kubectl -n ${KUBEVIRT_NS} get all
 }
 
 # args:
 cleanup_kubevirt () {
     # Check the kubevirt environment firstly before cleanup.
-    #TODO:
-
-    echo " == Start to clean up the kubevirt environment, please ensure all of VMs are destoryed == "
-
-    #kubectl -n ${KUBEVIRT_NS} delete kubevirts.kubevirt.io kubevirt --wait=true
-    #sleep 3s
-
-    #kubectl -n ${KUBEVIRT_NS} get all
-
-    #kubectl get apiservices.apiregistration.k8s.io | grep virt
-
-    #kubectl delete apiservices.apiregistration.k8s.io v1.kubevirt.io
-    #kubectl delete apiservices.apiregistration.k8s.io v1alpha3.kubevirt.io
-
-    #kubectl get mutatingwebhookconfigurations 2>/dev/null
-    #kubectl delete mutatingwebhookconfigurations virt-api-mutator 2>/dev/null
-    #sleep 15s
-
-    #kubectl get validatingwebhookconfigurations.admissionregistration.k8s.io 2>/dev/null
-    #kubectl delete validatingwebhookconfigurations virt-api-validator 2>/dev/null
-    kubectl delete -f ${KUBEVIRT_CONFIG_PATH}/kubevirt-cr.yaml
-    sleep 3s
-    echo "- Delete the kubevirt operation resource "
-    kubectl delete -f ${KUBEVIRT_CONFIG_PATH}/kubevirt-operator.yaml
-    sleep 5s
+    if [ -n "$(kubectl -n ${KUBEVIRT_NS} get kubevirt.kubevirt.io/kubevirt \
+            -o=jsonpath="{.status.phase}" | grep -i Deployed)" ]; then
+        echo " == Start to clean up the kubevirt environment, please ensure all of VMs are destoryed == "
+        kubectl delete -f ${KUBEVIRT_CONFIG_PATH}/kubevirt-cr.yaml
+        sleep 3s
+        echo "- Delete the kubevirt operation resource "
+        kubectl delete -f ${KUBEVIRT_CONFIG_PATH}/kubevirt-operator.yaml
+        sleep 5s
+    else
+        echo "- No kubevirt operation resource found"
+    fi
 }
+
 # args:
 deploy_spdk_daemonset () {
     echo "Start to deploy spdk-vhost daemonset"
@@ -325,6 +344,7 @@ deploy_spdk_daemonset () {
         if [ "$check_time" -gt ${TIMEOUT/*,/} ]; then
             echo "*** WARNING: Checking daemonset status timeout, please check if the nodes are labeled correctly, status is:"
             kubectl -n $CEPH_CLUSTER_NS get daemonset
+            cleanup_environment
             data_collection_and_exit 1
         fi
         sleep 5s
@@ -337,30 +357,35 @@ deploy_spdk_daemonset () {
 cleanup_spdkvhost () {
     echo "Cleanup the spdk-vhost resources"
     # check the vhost resources status and cleanup.
-    #TODD:
-
-    echo " == Start to clean up the spdk-vhost environment == "
-    echo " == Comfirming whether spdk bdevs are cleaned =="
+    if [ -n "$(kubectl -n $CEPH_CLUSTER_NS get daemonset | grep ceph-spdk-vhost-daemon)" ]; then
+        echo " == Start to clean up the spdk-vhost environment == "
+        kubectl delete -f ${CONFIG_FILE_PATH}/rook-ceph-spdk-vhost.yaml
+    else
+        echo "- No spdkvhost daemonset resource found"
+    fi
     TOOLBOX_PODNAME=`kubectl get po -A|grep rook-ceph-tools|awk '{print$2}'`
     check_time=0
     time_out_spdk=36
+    sleep 5s
     while [ -n "$(kubectl exec -it $TOOLBOX_PODNAME -n $CEPH_CLUSTER_NS -- rbd ls replicapool)" ];do
         if [ "$check_time" -gt "$time_out_spdk" ]; then
-            echo "*** WARNING: SPDK BDEVs are not completely deleted, will delete the spdk-daemon anyway!"
+            echo "*** WARNING: SPDK BDEVs are not completely deleted, will continue environment cleanup anyway!"
             break;
         fi
         sleep 5s
         check_time=$(($check_time + 1))
     done
-    kubectl delete -f ${CONFIG_FILE_PATH}/rook-ceph-spdk-vhost.yaml
-    sleep 5s
+    # Check if kubevirt-vhost communication files are cleaned up
+    if [ -f "/var/tmp/vhost.message" ]; then
+        rm -rf /var/tmp/vhost.message
+    fi
 }
 
-# args:
+# args: 
 block_IO_function_bench () {
 
     echo " == To bench edge ceph block interface == "
-
+    
     # - Start the benchmark.
     echo "- Start the ${TEST_CASE} benchmark POD "
     kubectl create -f ${ROOK_CEPH_CONFIG_PATH}/rook-ceph-rbd-benchmark.yaml
@@ -375,12 +400,12 @@ block_IO_function_bench () {
     export -pf extract_logs
 
     echo "- Waiting for the ${BENCHMARK_CLIENT_NODES} benchmark implementation... "
-    if [ "${BENCHMARK_CLIENT_NODES}" == "1" ]; then
+    if [ "${BENCHMARK_CLIENT_NODES}" == "1" ]; then 
         timeout ${TIMEOUT/,*/}s bash -c "extract_logs ${BENCHMARK_CONTAINER} $(kubectl get pod --namespace=$CEPH_CLUSTER_NS --selector="$BENCHMARK_SELECTOR" -o=jsonpath="{.items[*].metadata.name}")"
     else
         # Multi-client for benchmark pod to test ceph cluster.
 
-        # Prepare stage for benchmark PODs
+        # Prepare stage for benchmark PODs 
         for benchmark_pod in $(kubectl -n "${CEPH_CLUSTER_NS}" get pod --selector="$BENCHMARK_SELECTOR" -o jsonpath='{.items[*].metadata.name}'); do
 
             mkdir -p ${BENCHMARK_LOGS}/${benchmark_pod}
@@ -395,14 +420,14 @@ block_IO_function_bench () {
 
         done
 
-        # Trigger to start benchmark, and collect data
+        # Trigger to start benchmark, and collect data 
         echo " - Trigger the Benchmark POD to start the test..."
         touch start_test
         for benchmark_pod in $(kubectl -n "${CEPH_CLUSTER_NS}" get pod --selector="$BENCHMARK_SELECTOR" -o jsonpath='{.items[*].metadata.name}'); do
             timeout ${TIMEOUT/*,/}s kubectl -n ${CEPH_CLUSTER_NS} cp ./start_test ${benchmark_pod}:/
         done
 
-        # Collecting data
+        # Collecting data 
         for benchmark_pod in $(kubectl -n "${CEPH_CLUSTER_NS}" get pod --selector="$BENCHMARK_SELECTOR" -o jsonpath='{.items[*].metadata.name}'); do
             echo " - Collecting data from Benchmark POD ${benchmark_pod}..."
             timeout ${TIMEOUT/,*/}s kubectl -n ${CEPH_CLUSTER_NS} exec ${benchmark_pod} -- bash -c 'cat /export-test-logs' | tar -xf - -C "${BENCHMARK_LOGS}/${benchmark_pod}"
@@ -436,11 +461,11 @@ run_gated_benchmark () {
         -output=${BENCHMARK_LOGS}/gated_random_read_$(date +"%m-%d-%y-%H-%M-%S").log
 
         echo $? > ${BENCHMARK_LOGS}/status
-    echo "- End of the edge ceph ${TEST_CASE} benchmark"
+    echo "- End of the edge ceph ${TEST_CASE} benchmark"    
 }
 
 
-# args:
+# args: 
 #   $1 - vm_number
 #   $2 - vm_ip_address
 compare_vm_ip () {
@@ -448,27 +473,27 @@ compare_vm_ip () {
     # If VM IP changed,then collect logs and exit ,exit code 2 means VM IP changed error
     if [ "$CURRENT_VM_IP" != "$2" ]; then
         echo " - VM's IP has changed,start to collect logs and exit..."
-        vmlogs_collection_and_exit 2
-    fi
+        vmlogs_collection_and_exit 2        
+    fi       
 }
 
-deploy_vms_benchmark () {
-    echo " == start to deploy the VMs and test the virtIO =="
+# Save original IP of VMs to array
+declare -a VM_IP_ADDR
 
-    #Generate ssh-key
+deploy_vms () {
+    echo " == start to deploy the VMs =="
+    # Generate ssh-key
     echo "- Genereate the RSA key for no-password access "
-    if test -f "~/.ssh/id_rsa";then
+    if test -f "~/.ssh/id_rsa"; then
         rm ~/.ssh/id_rsa
     fi
     ssh-keygen -f ~/.ssh/id_rsa -N ""
     PUBKEY=`cat ~/.ssh/id_rsa.pub`
     echo "- Create VM "
-    i=1
-    while [ "$i" -le "${BENCHMARK_CLIENT_NODES}" ];do
+    for i in $(seq 1 $BENCHMARK_CLIENT_NODES); do
         sed -i "s%ssh-rsa.*%$PUBKEY%" ${CONFIG_FILE_PATH}/VM$i.yaml
         kubectl -n ${BENCHMARK_NS} apply -f ${CONFIG_FILE_PATH}/VM$i.yaml
         sleep 10s
-        i=$(($i+1))
     done
 
     # Check VM status and collect logs
@@ -477,17 +502,41 @@ deploy_vms_benchmark () {
     kubectl wait --for=condition=ready vmi --all --timeout=300s
     sleep 15s
     kubectl -n ${BENCHMARK_NS} get vmi
-    # Prepare for benchmark,waiting all vms to be ready for benchmark
-    echo " - waiting all vms to be ready for benchmark..."
-    # Sleep to wait VM being ready
+}
+
+# export VM logs by FIFO
+# args:
+#   $1 - vm_ip_address
+#   $2 - vm name
+#   $3 - vm sequence number
+export_vm_logs () {
+    check_time=0
+    while (! ssh -o StrictHostKeyChecking=no -l root $1 'cat /export-test-logs' | tar -xf - -C "${BENCHMARK_LOGS}/$2" 2>/dev/null); do
+        sleep 5s
+        if [ "$check_time" -gt ${TIMEOUT/*,/} ]; then
+            echo "*** ERROR: vm connection status timeout, please have a check"
+            # Cleanup_environment and exit
+            cleanup_environment
+            data_collection_and_exit 1
+        fi
+        check_time=$(($check_time + 1))
+        # Compare current vm ip with the original ip,if VM IP changed,then collect logs and exit
+        compare_vm_ip $3 ${VM_IP_ADDR[$3]}
+    done
+}
+
+# shake hand with VM ,wait until VMs being ready for benchmarking
+prepare_vm_benchmark () {
+    echo " == start to prepare benchmarking in the VMs =="
+    # Sleep to wait VM prefill finished
     sleep $WAIT_VM
     # Record VMs IP addresses
     num_line=2
     for benchmark_vmi in $(kubectl get vmi -o jsonpath='{.items[*].metadata.name}'); do
         VM_IP_ADDR[$num_line]=$(kubectl get vmi | awk 'NR=="'"$num_line"'"{print $4}')
         num_line=$(($num_line + 1))
-    done
-    echo " - Finish VM IP record, start to wait for VM's ready message..."
+    done    
+    echo " - Finish VM IP record, start to wait for VM's ready message..." 
     # Start to wait for VM's ready message
     num_line=2
     for benchmark_vmi in $(kubectl get vmi -o jsonpath='{.items[*].metadata.name}'); do
@@ -496,41 +545,38 @@ deploy_vms_benchmark () {
         check_time=0
         mkdir -p ${BENCHMARK_LOGS}/${benchmark_vmi}
         while(! ssh -o StrictHostKeyChecking=no -l root $CURRENT_VM_IP "echo 'ssh to VM succeed...'" 2>/dev/null); do
-            sleep 5s
+            sleep 5s 
             if [ "$check_time" -gt ${TIMEOUT/*,/} ]; then
-                echo "*** WARNING: vm connection status timeout, please have a check"
-                exit -1
-            fi
+                echo "*** ERROR: vm connection status timeout, please have a check"
+                # Cleanup_environment and exit
+                cleanup_environment
+                data_collection_and_exit 1
+            fi 
             # If VM IP changed,then collect logs and exit
-            compare_vm_ip $num_line ${VM_IP_ADDR[$num_line]}
+            compare_vm_ip $num_line ${VM_IP_ADDR[$num_line]}   
             check_time=$(($check_time + 1))
         done
         echo " - ssh connection to VM ${benchmark_vmi} succeed..."
-        check_time=0
-        while (! ssh -o StrictHostKeyChecking=no -l root $CURRENT_VM_IP 'cat /export-test-logs' | tar -xf - -C "${BENCHMARK_LOGS}/${benchmark_vmi}" 2>/dev/null); do
-            sleep 5s
-            if [ "$check_time" -gt ${TIMEOUT/*,/} ]; then
-                echo "*** WARNING: vm connection status timeout, please have a check"
-                exit -1
-            fi
-            # Compare current vm ip with the original ip,if VM IP changed,then collect logs and exit
-            compare_vm_ip $num_line ${VM_IP_ADDR[$num_line]}
-            check_time=$(($check_time + 1))
-        done
+        # Collect VM-ready logs
+        export_vm_logs $CURRENT_VM_IP $benchmark_vmi $num_line
         num_line=$(($num_line + 1))
         echo " - VM${num_line} ${benchmark_vmi} is ready"
     done
-    echo "All VM is ready ,start to send start_test signal to VM..."
-    # Start to do benchmark:
+    echo "All VM is ready ,start to send start_test signal to VM..." 
+    # Start to send benchmark launch signal
     num_line=2
     for benchmark_vmi in $(kubectl get vmi -o jsonpath='{.items[*].metadata.name}'); do
         # Compare current vm ip with the original ip,if VM IP changed,then collect logs and exit
-        compare_vm_ip $num_line ${VM_IP_ADDR[$num_line]}
+        compare_vm_ip $num_line ${VM_IP_ADDR[$num_line]}     
         (ssh -o StrictHostKeyChecking=no -l root $CURRENT_VM_IP 'touch /home/start_test') &
         num_line=$(($num_line + 1))
         echo " - VM${num_line} ${benchmark_vmi} create start_test successfully..."
     done
     echo " - Finished start_test file creation in VM..."
+}
+
+# Start to do benchmarking
+benchmark_vms () {
     # Benchmark start flag for emon test
     echo "Start benchmark"
     num_line=2
@@ -539,72 +585,145 @@ deploy_vms_benchmark () {
         compare_vm_ip $num_line ${VM_IP_ADDR[$num_line]}
         mkdir -p ${BENCHMARK_LOGS}/${benchmark_vmi}
         # Collect logs
-        check_time=0
-        while (! ssh -o StrictHostKeyChecking=no -l root $CURRENT_VM_IP 'cat /export-test-logs' | tar -xf - -C "${BENCHMARK_LOGS}/${benchmark_vmi}" 2>/dev/null); do
-            sleep 5s
-            if [ "$check_time" -gt ${TIMEOUT/*,/} ]; then
-                echo "*** WARNING: vm connection status timeout, please have a check"
-                exit -1
-            fi
-            check_time=$(($check_time + 1))
-            # Compare current vm ip with the original ip,if VM IP changed,then collect logs and exit
-            compare_vm_ip $num_line ${VM_IP_ADDR[$num_line]}
-        done
+        export_vm_logs $CURRENT_VM_IP $benchmark_vmi $num_line
         num_line=$(($num_line + 1))
-        cat ${BENCHMARK_LOGS}/${benchmark_vmi}/status
+        cat ${BENCHMARK_LOGS}/${benchmark_vmi}/status 
         cp ${BENCHMARK_LOGS}/${benchmark_vmi}/status ${BENCHMARK_LOGS}/
         echo "Finished one VM's benchmark..."
     done
     # Benchmark end flag for emon test
     echo "Finish benchmark"
-    # -- benchmark cleanup
-    kubectl -n ${BENCHMARK_NS} get vmi
-    echo "End of log collection, delete the VM..."
+    # -- cleanup VMs after benchmark finished
+    delete_vms
+}
 
-    # need to delete one by one
-    i=1
-    while [ "$i" -le "${BENCHMARK_CLIENT_NODES}" ];do
-        kubectl -n ${BENCHMARK_NS} delete -f ${CONFIG_FILE_PATH}/VM$i.yaml
-        sleep 20s
-        i=$(($i+1))
+run_migration_benchmark () {
+    # Deploy the VMs
+    deploy_vms
+    # Start benchmarking in VM
+    prepare_vm_benchmark
+    # Wait FIO benchmarking 30s before doing live migration
+    sleep 30s
+    
+    for i in $(seq 1 $BENCHMARK_CLIENT_NODES); do
+        kubectl -n ${BENCHMARK_NS} apply -f ${CONFIG_FILE_PATH}/live-migration$i.yaml
+        sleep 5s
+        vm_name=${VM_NAME}$i
+        check_migration_time=0
+        while [ -z "$(kubectl -n ${BENCHMARK_NS} get pod | grep ${vm_name} |grep "Completed")" ]; do
+             if [ "$check_migration_time" -gt $MIGRATION_TIMEOUT ]; then
+                echo "vm live migration time out, migration failed."
+                # Live-migration failed , the KPI(IOPS & BW) should be 0
+                echo -e "read: IOPS=0, BW=0MiB/s" > ${BENCHMARK_LOGS}/${benchmark_vmi}/${TEST_CASE}_random_read_${TEST_OPERATION_MODE}_$(date +"%m-%d-%y-%H-%M-%S").log
+                # Cleanup_environment and exit
+                cleanup_environment
+                data_collection_and_exit 1
+            fi
+            sleep 1s
+            check_migration_time=$(($check_migration_time + 1))
+        done
+
     done
-    sleep 15s
+    # VM IP will change after live-migration,refresh IP here
+    num_line=2
+    for benchmark_vmi in $(kubectl get vmi -o jsonpath='{.items[*].metadata.name}'); do
+        VM_IP_ADDR[$num_line]=$(kubectl get vmi | awk 'NR=="'"$num_line"'"{print $4}')
+        num_line=$(($num_line + 1))
+    done
+    # Start to benchmark fio in new VMs after migration
+    benchmark_vms
+}
+
+run_recovery_benchmark () {
+    # Deploy the VMs
+    deploy_vms
+    # Start benchmarking in VM
+    prepare_vm_benchmark
+    # after FIO running on VMs, sleep 30s before kill SPDK
+    wait_to_kill_spdk=30
+    sleep $wait_to_kill_spdk
+    # kill SPDK application
+    for vhost_daemon in $(kubectl -n ${CEPH_CLUSTER_NS} get po | grep ceph-spdk-vhost-daemon |awk '{print$1}');do
+        kubectl exec -n ${CEPH_CLUSTER_NS} -i $vhost_daemon -- ./spdk/scripts/rpc.py spdk_kill_instance SIGKILL 2>/dev/null
+        if [ "$?" -eq 0 ];then
+            echo "killed SPDK process succefully, wait for live recovery!"
+        else
+            echo "*** WARNING: unable to kill spdk, please check SPDK app status"
+        fi
+    done
+    echo "benchmark live recovery"
+    num_line=2
+    # live-recovery tolerate time = fio benchmark time + wait recovery time + wait to kill spdk time + 30s
+    RECOVERY_TIMEOUT=$(($TEST_DURATION + $WAIT_RECOVERY_TIME + $wait_to_kill_spdk + 300))
+    check_recovery_time=0
+    for benchmark_vmi in $(kubectl get vmi -o jsonpath='{.items[*].metadata.name}'); do
+        # compare current vm ip with the original ip,if VM IP changed,then collect logs and exit
+        compare_vm_ip $num_line ${VM_IP_ADDR[$num_line]}
+        mkdir -p ${BENCHMARK_LOGS}/${benchmark_vmi}
+        # check live-recovery status
+        while (! ssh -o StrictHostKeyChecking=no -l root $CURRENT_VM_IP 'cat /logs/status' 2>/dev/null); do
+            sleep 1s
+             if [ "$check_recovery_time" -gt $RECOVERY_TIMEOUT ]; then
+                echo "vm live recovery time out, recovery failed..."
+                echo 1 > ${BENCHMARK_LOGS}/${benchmark_vmi}/status
+                # live-recovery failed , the KPI(IOPS & BW) should be 0
+                echo -e "read: IOPS=0, BW=0MiB/s" > ${BENCHMARK_LOGS}/${benchmark_vmi}/${TEST_CASE}_random_read_${TEST_OPERATION_MODE}_$(date +"%m-%d-%y-%H-%M-%S").log
+                # Cleanup_environment and exit
+                cleanup_environment
+                data_collection_and_exit 1
+            fi
+            check_recovery_time=$(($check_recovery_time + 1))
+            # compare current vm ip with the original ip, if VM IP changed,then collect logs and exit
+            compare_vm_ip $num_line ${VM_IP_ADDR[$num_line]}
+        done
+        # export vm logs only when live-recovery succeed
+        export_vm_logs $CURRENT_VM_IP $benchmark_vmi $num_line
+        cat ${BENCHMARK_LOGS}/${benchmark_vmi}/status
+        cp ${BENCHMARK_LOGS}/${benchmark_vmi}/status ${BENCHMARK_LOGS}/
+        num_line=$(($num_line + 1))
+        echo "Finished one VM's benchmark..."
+    done
 }
 
 deploy_and_benchmark () {
     if kubectl>/dev/null 2>/dev/null; then
         trap 'trap_kubernetes ${LINENO}' ERR SIGINT
 
-        # enable toolbox if needed
-        #deploy_ceph_toolbox
-
         if [[ "${TEST_CASE}" == "virtIO" || "${TEST_CASE}" == "vhost" ]]; then
-            # deploy kubevirt
+            # deploy kubevirt 
             deploy_kubevirt
 
             if [ "${TEST_CASE}" == "vhost" ]; then
                 # deploy the vhost deamonset for vhost cases
                 echo "Deploy the spdk-vhost daemonset for acceleration"
-                ## TODO:
                 deploy_spdk_daemonset
-
             elif [ "${TEST_CASE}" == "virtIO" ]; then
                 STORAGE_CLASS=$(kubectl get sc | awk 'NR==2{print $1}')
                 if [ "$STORAGE_CLASS" != "rook-ceph-block" ]; then
                     echo "***WARNING: Storageclass rook-ceph-block not found, please have a check!"
+                    cleanup_environment
                     data_collection_and_exit 1
                 fi
+            fi                
+            if [ "${TEST_OPERATION_MODE}" == "live-recovery" ]; then
+                # Benchmark for live-recovery case
+                run_recovery_benchmark
+            elif [ "${TEST_OPERATION_MODE}" == "live-migration" ]; then
+                # Benchmark for live-migration case
+                run_migration_benchmark
+            else
+                # Benchmark for sequitial/random write/read case
+                deploy_vms
+                prepare_vm_benchmark
+                benchmark_vms
             fi
-
-            # deploy VMs
-            deploy_vms_benchmark
 
         elif [ "${TEST_CASE}" == "gated" ]; then
             # test bm cases.
             run_gated_benchmark
         fi
 
-        trap - ERR SIGINT
+        trap - ERR SIGINT 
     else
         echo "Deploy failed, kubenetes not supported!"
     fi
@@ -614,23 +733,25 @@ cleanup_environment () {
     if [ "${TEST_CASE}" == "gated" ]; then
         echo "${TEST_CASE} case, don't need cleanup."
         return 0
-    fi
+    fi 
 
-    #bash ${WORK_PATH}/rook_ceph_cleanup.sh
     if kubectl>/dev/null 2>/dev/null; then
 
         # set trap for cleanup
-        trap 'trap_kubernetes ${LINENO}' ERR SIGINT
+        trap 'trap_kubernetes ${LINENO}' ERR SIGINT 
+
+        # Cleanup VM resoruces.
+        delete_vms
 
         # Cleanup the kubevirt resoruces.
         cleanup_kubevirt
 
         if [ "${TEST_CASE}" == "vhost" ]; then
-                # cleanup the vhost deamonset for vhost cases
-                cleanup_spdkvhost
+            # cleanup the vhost deamonset for vhost cases
+            cleanup_spdkvhost
         fi
         # Finish the cleanup process, clean trap.
-        trap - ERR SIGINT
+        trap - ERR SIGINT 
 
     else
         echo "Failed for cleanup, kubenetes not supported!"
@@ -647,8 +768,8 @@ wait_ceph_cluster_ready () {
         | grep -v STATUS | grep -E 'rook-ceph-mgr|rook-ceph-osd|rook-ceph-mon' | awk '{print $3}'); do
             if [[ "$pod_name" != "Running" && "$pod_name" != "Completed" ]]; then
                 ceph_cluster_ready="False"
-            fi
-        done
+            fi      
+        done 
         if [ "$ceph_cluster_ready" == "True" ]; then
             echo " - ceph cluster is ready..."
             return 0
@@ -664,9 +785,11 @@ wait_ceph_cluster_ready () {
 }
 
 # Deploy ceph override configuration
+# $1: override configuration yaml file
 ceph_config_override () {
     # Deploy ceph override configuration yaml file
-    kubectl -n ${CEPH_CLUSTER_NS} apply -f ${CONFIG_FILE_PATH}/ceph_configmap.yaml
+    #kubectl -n ${CEPH_CLUSTER_NS} apply -f ${CONFIG_FILE_PATH}/ceph_configmap.yaml
+    kubectl -n ${CEPH_CLUSTER_NS} apply -f ${CONFIG_FILE_PATH}/"$1"
     OSD=$(kubectl get po -n ${CEPH_CLUSTER_NS} |grep rook-ceph-osd |grep -v rook-ceph-osd-prepare-|awk '{print $1}')
     # Re-deploy osd to let ceph configuration take effect
     for osds in $OSD; do
@@ -694,22 +817,41 @@ ceph_config_override () {
     echo " - Restart MONs succeed..."
 }
 
+# Check ceph version for qat cases, since only ceph version 17+ supports qat acceleration.
+# If ceph version matches, no need to redeploy ceph,but need to reconfig ceph.
+check_ceph_version_for_qatcase () {
+
+    if [ -n "$(kubectl get po -n $CEPH_CLUSTER_NS |grep rook-ceph-tools)" ];then
+        TOOLBOX_PODNAME=`kubectl -n $CEPH_CLUSTER_NS get pods -A|grep rook-ceph-tools|awk '{print$2}'`
+        CEPH_VERSION=`kubectl -n $CEPH_CLUSTER_NS exec -it $TOOLBOX_PODNAME -- ceph -v`
+        if [[ ! "$CEPH_VERSION" =~ "ceph version 17.2.5" ]];then
+            echo "Ceph version too old, please deploy specific version for Ceph-QAT"
+            sleep 10s
+            data_collection_and_exit 1
+        fi
+    else
+        echo "Ceph-tools pod does not exist, please have a check and run benchmark again"
+        data_collection_and_exit 1
+    fi
+
+}
+
 # Parse the arguments for bench operator.
 check_args $*
 
-if [ "$OPERATOR_ARG" == "CLEANUP" ]; then
+if [ "$OPERATOR_ARG" == "CLEANUP" ]; then 
     echo "Clean up the environment."
     exit 0
 fi
 
 # Retrieve the informantion about the list of worker node IP address.
-# In Service framework, it is critical to restrict any newly launched pods
-# to be within the cluster workers that the workload is assigned to run, but not
+# In Service framework, it is critical to restrict any newly launched pods 
+# to be within the cluster workers that the workload is assigned to run, but not 
 # all of the nodes in k8s cluster.
 #  - name: CLUSTER_WORKERS
 #      value: 10.67.121.66,10.67.121.67,10.67.121.68
 if [ -n "$CLUSTER_WORKERS" ]; then
-    node_array=(${CLUSTER_WORKERS//,/ })
+    node_array=(${CLUSTER_WORKERS//,/ })  
     # Check how many nodes we have been authorized and assigned.
     #ASSIGNED_WORKER_COUNT=$(echo $CLUSTER_WORKERS | tr -t ',' '\n' | wc -l)
     ASSIGNED_WORKER_COUNT=${#node_array[*]}
@@ -718,7 +860,7 @@ if [ -n "$CLUSTER_WORKERS" ]; then
         echo " *** Assigned node list :["$CLUSTER_WORKERS"]"
         data_collection_and_exit 1;
     fi
-    echo "Try to deploy ceph storage on these "$CLUSTERNODES"-node:[$CLUSTER_WORKERS]";
+    echo "Try to deploy ceph storage on these "$CLUSTERNODES"-node:[$CLUSTER_WORKERS]"; 
     # Currently, the largest cluster is 3-nodes.
     # DEPLOY_NODE1 / DEPLOY_NODE2 / DEPLOY_NODE3
     if [ $ASSIGNED_WORKER_COUNT -gt $CLUSTERNODES ]; then
@@ -726,7 +868,7 @@ if [ -n "$CLUSTER_WORKERS" ]; then
     fi
     i=1
     for node_i in ${node_array[@]}
-    do
+    do 
         echo "Set DEPLOY_NODE$i with $node_i"
         export DEPLOY_NODE$i="$node_i"
         i=$(($i + 1))
@@ -736,18 +878,23 @@ if [ -n "$CLUSTER_WORKERS" ]; then
     NODE_SELECT="PARTIAL"
     BENCHMARK_OPTIONS=${BENCHMARK_OPTIONS}";-DNODE_SELECT=${NODE_SELECT}"
 
-else
+else 
     echo "WARN: No restrict node list:["$CLUSTER_WORKERS"], please ensure the nodes selection for ceph is under control"
+fi
+
+if [ "$TEST_CASE_COMP" == "1" ]; then
+    check_ceph_version_for_qatcase
 fi
 
 env_precheck_hook
 sleep 5s # for system stability after purge
 
-# Auto calculate rbd image size according to different
+# Auto calculate rbd image size according to different 
 calculate_rbd_img_size
 
 # Convert the m4 file to k8s yaml
-bash build_yaml_file.sh template  #
+bash ./build_yaml_file.sh template
+
 # Health check before run validation
 # Also need to check CRD setting.
 
@@ -756,7 +903,7 @@ if [ "${CEPH_CONFIG_ENABLED}" == "1" ]; then
     # print current ceph config
     kubectl get -n ${CEPH_CLUSTER_NS} configmap rook-config-override -o yaml
     # Deploy configuration override for ceph
-    ceph_config_override
+    ceph_config_override ceph_configmap.yaml
     # Print current ceph config
     kubectl get -n ${CEPH_CLUSTER_NS} configmap rook-config-override -o yaml
     # Need to check ceph cluster status after deploy ceph configuration
@@ -770,7 +917,7 @@ fi
 echo "Start to Deploy and benchmark"
 deploy_and_benchmark | tee "$BENCHMARK_LOGS"/deploy_bench_$(date +"%m-%d-%y-%H-%M-%S").log
 
-if [[ "$OPERATOR_ARG" == "DEPLOY" || "$OPERATOR_ARG" == "BENCH" ]]; then
+if [[ "$OPERATOR_ARG" == "DEPLOY" || "$OPERATOR_ARG" == "BENCH" ]]; then 
     echo "Benchmark is done, cluster is still alive, need to cleanup manually!"
     exit 0
 fi
@@ -786,7 +933,7 @@ if [ "${DEBUG_MODE}" == "4" ]; then
 fi
 
 echo "Clean up the environment"
-sleep 15s #
+sleep 15s # 
 cleanup_environment | tee "$BENCHMARK_LOGS"/cleanup_$(date +"%m-%d-%y-%H-%M-%S").log
 sleep 15s
 
@@ -799,12 +946,8 @@ sleep 15s
 # echo "End of the initialization!"
 
 # # Benchmark the ceph after the stack ready.
-# echo "Start to test ceph cluster..."
-# (./run_ceph_test.sh; echo $? > status ) 2>&1 | tee ceph_bench_$(date +"%m-%d-%y-%H-%M-%S").log && \
-# sync && \
-# tar cf /export-logs status $(find . -name "*.log")
 echo "Collect benchmark logs"
 sync && cd "$BENCHMARK_LOGS" && tar cf /export-logs status $(find . -name "*.log")  && \
-# sync && tar cf /export-logs $BENCHMARK_LOGS/* && \
+
 echo "Test finished" && \
 sleep infinity

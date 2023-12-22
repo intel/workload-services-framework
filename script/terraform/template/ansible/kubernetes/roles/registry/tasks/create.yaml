@@ -58,13 +58,20 @@
   when: not cert.stat.exists
   become: yes
 
-- name: delete the wsf-registry namespace
-  command: kubectl delete ns wsf-registry
-  when: not cert.stat.exists
-  ignore_errors: yes
+- name: check if registry already in place
+  command: "kubectl get service {{ k8s_registry_service }} --namespace {{ k8s_registry_namespace }} -o yaml"
+  register: regsvc
+  ignore_errors: true
 
-- name: create wsf-registry namespace
-  command: kubectl create namespace wsf-registry
+- name: delete the registry namespace
+  command: "kubectl delete ns {{ k8s_registry_namespace }}"
+  when: (not cert.stat.exists) or (not nodeport_inplace)
+  ignore_errors: yes
+  vars:
+    nodeport_inplace: "{{ ('nodePort: '+k8s_registry_port) in regsvc.stdout }}"
+
+- name: create the registry namespace
+  command: "kubectl create namespace {{ k8s_registry_namespace }}"
   register: regns 
   ignore_errors: yes
  
@@ -72,7 +79,7 @@
   include_role:
     name: docker_auth
   vars:
-    namespace: wsf-registry
+    namespace: "{{ k8s_registry_namespace }}"
 
 - name: get home
   shell:
@@ -81,7 +88,7 @@
   register: home
 
 - name: create cert secret
-  shell: "kubectl create --kubeconfig={{ home.stdout }}/.kube/config --namespace=wsf-registry secret tls wsf-registry-cert --cert {{ k8s_registry_conf_dir }}/{{ k8s_registry_ip }}:{{ k8s_registry_port }}.crt --key {{ k8s_registry_conf_dir }}/{{ k8s_registry_ip }}:{{ k8s_registry_port }}.key"
+  shell: "kubectl create --kubeconfig={{ home.stdout }}/.kube/config --namespace={{ k8s_registry_namespace }} secret tls {{ k8s_registry_cert }} --cert {{ k8s_registry_conf_dir }}/{{ k8s_registry_ip }}:{{ k8s_registry_port }}.crt --key {{ k8s_registry_conf_dir }}/{{ k8s_registry_ip }}:{{ k8s_registry_port }}.key"
   when: regns.rc == 0
   become: yes
 
@@ -100,7 +107,7 @@
   when: regns.rc == 0
 
 - name: kubectl create registry.yaml
-  command: kubectl create --namespace=wsf-registry -f "/tmp/{{ wl_namespace }}-registry.yaml"
+  command: "kubectl create --namespace={{ k8s_registry_namespace }} -f /tmp/{{ wl_namespace }}-registry.yaml"
   when: regns.rc == 0
 
 - name: remove registry.yaml
@@ -111,7 +118,7 @@
   when: regns.rc == 0
 
 - name: wait for registry to be deployed
-  command: kubectl wait --namespace=wsf-registry pod --for=condition=ready -l app=registry
+  command: "kubectl wait --namespace={{ k8s_registry_namespace }} pod --for=condition=ready -l app=registry"
   retries: 50
   delay: 10
   register: result

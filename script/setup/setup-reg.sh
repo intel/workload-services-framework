@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 #
 # Apache v2 license
 # Copyright (C) 2023 Intel Corporation
@@ -54,7 +54,7 @@ for v in $@; do
     elif [ -z "$host" ]; then
       host="${v/:*/}"
       host="${host/*@/}"
-      [[ "$v" = *":"* ]] && reg_port="${v/*:/}"
+      [[ "$v" != *":"* ]] || reg_port="${v/*:/}"
     elif [[ "$v" = *"@"* ]]; then
       hosts+=("$v")
     else
@@ -66,17 +66,18 @@ for v in $@; do
   last="$v"
 done
 
+set -o pipefail
 DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
 cd "$DIR"
 
-./setup-ansible.sh || exit 3
-./setup-sut-native.sh --port $ssh_port ${hosts[@]} || exit 3
+./setup-ansible.sh 2>&1 | tee "$DIR"/setup-reg.logs
+./setup-sut-native.sh --port $ssh_port ${hosts[@]} 2>&1 | tee -a "$DIR"/setup-reg.logs
 if [ -z "$mirror_url" ]; then
-  [[ -z "$reg_port" ]] && reg_port=20666
+  [[ -n "$reg_port" ]] || reg_port=20666
   options=""
 else
-  [[ "$mirror_url" != "http"* ]] && mirror_url="https://$mirror_url"
-  [[ -z "$reg_port" ]] && reg_port=20690
+  [[ "$mirror_url" = "http"* ]] || mirror_url="https://$mirror_url"
+  [[ -n "$reg_port" ]] || reg_port=20690
   options="-e dev_registry_name=dev-cache -e dev_registry_mirror=$mirror_url"
 fi
 
@@ -96,4 +97,5 @@ all:
       hosts:
 $workers
 EOF
-) ./setup-reg.yaml
+) ./setup-reg.yaml 2>&1 | tee -a "$DIR"/setup-reg.logs
+

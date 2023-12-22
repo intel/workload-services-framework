@@ -4,24 +4,24 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+- block:
 
-- name: uname -r
-  command: uname -r
-  register: unamer
+  - name: uname -r
+    command: uname -r
+    register: unamer
 
-- name: Install perf
-  apt:
-    name:
-      - linux-tools-common
-      - linux-tools-generic
-      - "linux-tools-{{ unamer.stdout }}"
-    update_cache: true
-    state: present
-  become: yes
-  register: aptrc
-  until: aptrc is success
-  retries: 10
-  delay: 10
+  - name: Install perf
+    apt:
+      name:
+        - linux-tools-common
+        - linux-tools-generic
+        - "linux-tools-{{ unamer.stdout }}"
+      update_cache: true
+      state: present
+    become: yes
+    register: aptrc
+    until: aptrc is success
+    retries: 10
+    delay: 10
 
-
-
+  delegate_to: "{{ trace_node.1 }}"

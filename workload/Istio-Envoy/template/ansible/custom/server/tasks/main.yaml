@@ -11,6 +11,10 @@
   shell: "kubectl get node -owide|grep {{ worker_host_ip }}|awk '{print $1}'"
   register: worker_host_name
 
+- name: Get docker image of istio-proxy
+  shell: "echo {{ registry_url }}/istio-envoy-istio-proxyv2-1.16.0{{ 'release' | extract(lookup('file', wl_logs_dir + '/workload-config.yaml') | from_yaml) }}"
+  register: istio_proxy_with_avx512patch
+
 - name: Generate nighthawk-server yaml file
   template:
     src: /opt/workload/template/ansible/custom/pods_template/nighthawk-server.yaml.j2
@@ -66,6 +70,7 @@
   when:
     - wl_tunables['CRYPTO_ACC'] != "qathw"
     - wl_tunables['CRYPTO_ACC'] != "cryptomb"
+    - wl_tunables['DLB_ACC'] != "dlb"
 
 - name: Dump istio-gateway service yaml file
   shell: "kubectl get svc -n istio-system   istio-ingressgateway -o yaml > /tmp/istio-wl/istio-ingressgateway-svc.yaml"
@@ -147,3 +152,72 @@
   register: nhs_https_gateway_rst
   when:
     - wl_tunables['PROTOCOL'] == "https"
+
+- name: Generate istio DLB filter file
+  template:
+    src: /opt/workload/template/ansible/custom/pods_template/envoy-filter-dlb.yaml.j2
+    dest: /tmp/istio-wl/envoy-filter-dlb.yaml
+
+- name: Apply dlb filter for ingress gateway
+  become: true
+  become_user: "{{ ansible_user }}"
+  shell:
+    cmd: "kubectl apply -f /tmp/istio-wl/envoy-filter-dlb.yaml"
+  register: istio_apply_dlb_filter_res
+  when:
+    - wl_tunables['DLB_ACC'] == "dlb"
+
+- name: Generate istio EB filter file
+  template:
+    src: /opt/workload/template/ansible/custom/pods_template/envoy-filter-eb.yaml.j2
+    dest: /tmp/istio-wl/envoy-filter-eb.yaml
+
+- name: Apply eb filter for ingress gateway
+  become: true
+  become_user: "{{ ansible_user }}"
+  shell:
+    cmd: "kubectl apply -f /tmp/istio-wl/envoy-filter-eb.yaml"
+  register: istio_apply_eb_filter_res
+  when:
+    - wl_tunables['DLB_ACC'] == "eb"
+
+- name: Enable vAES + vPCLMULQDQ in ingressGW
+  shell: "kubectl set image -n istio-system deployment/istio-ingressgateway istio-proxy={{ istio_proxy_with_avx512patch.stdout }}"
+  when:
+    - wl_tunables['AVX512_PATCH'] == 'avx512'
+
+- name: Wait for nighthawk-server ready
+  shell: "kubectl wait --namespace=istio-workloads-{{ wl_namespace }} pod --for=condition=Ready -l app=sm-nighthawk-server --timeout=6s"
+  register: wait_server_ready
+  retries: 200
+  delay: 3
+  until: wait_server_ready.rc == 0
+  when:
+    - wl_tunables['AVX512_PATCH'] == 'avx512'
+
+- name: Check the number of PODs
+  shell: "kubectl get deployment sm-nighthawk-server --namespace=istio-workloads-{{ wl_namespace }} -o jsonpath='{.status.readyReplicas}'"
+  register: check_pod_number
+  retries: 200
+  delay: 3
+  until: check_pod_number.stdout == wl_tunables['SERVER_REPLICA_NUM']
+  when:
+    - wl_tunables['AVX512_PATCH'] == 'avx512'
+
+- name: Get pods of nighthawk-server
+  shell: kubectl get pods -n istio-workloads-{{ wl_namespace }} -o jsonpath='{.items[*].metadata.name}'
+  register: pod_list
+  when:
+    - wl_tunables['AVX512_PATCH'] == 'avx512'
+
+- name: Store pod names of nighthawk-server in an array
+  set_fact:
+    pod_names: "{{ pod_list.stdout.split() }}"
+  when:
+    - wl_tunables['AVX512_PATCH'] == 'avx512'
+
+- name: Enable vAES + vPCLMULQDQ in nighthawk-server
+  shell: kubectl set image -n istio-workloads-{{ wl_namespace }} pod/{{ item }} istio-proxy={{ istio_proxy_with_avx512patch.stdout }}
+  loop: "{{ pod_names }}"
+  when:
+    - wl_tunables['AVX512_PATCH'] == 'avx512'

@@ -9,10 +9,11 @@ ARG OS_VER="stream8"
 ARG OS_IMAGE="quay.io/centos/centos"
 
 FROM ${OS_IMAGE}:${OS_VER}
-# This ceph docker file refer to the git repo(https://github.com/ceph/ceph-container.git),
+# This ceph docker file refer to the git repo(https://github.com/ceph/ceph-container.git), 
 
 ENV I_AM_IN_A_CONTAINER=1
 ARG CENTOS_VER=8
+# ceph-16.2.13 pacific
 ENV CEPH_VERSION=pacific
 
 RUN export CEPH_POINT_RELEASE="-"`curl --insecure -s https://docs.ceph.com/en/latest/releases/index.html |grep pacific|grep latest |awk -F ")" '{print$1}' |awk '{print$NF}'`
@@ -52,7 +53,7 @@ RUN yum install -y jq && \
     elif [[ "${CEPH_VERSION}" == octopus ]]; then  \
         echo "baseurl=https://download.ceph.com/nfs-ganesha/rpm-V3.3-stable/$CEPH_VERSION/el\$releasever/\$basearch/" >> /etc/yum.repos.d/ganesha.repo ; \
         echo "gpgcheck=1" >> /etc/yum.repos.d/ganesha.repo ; \
-        echo "enabled=1" >> /etc/yum.repos.d/ganesha.repo  ; \
+        echo "enabled=1" >> /etc/yum.repos.d/ganesha.repo  ; \ 
         echo "[ganesha-noarch]" >> /etc/yum.repos.d/ganesha.repo ;  \
         echo "name=ganesha-noarch" >> /etc/yum.repos.d/ganesha.repo ; \
         echo "baseurl=https://download.ceph.com/nfs-ganesha/rpm-V3.3-stable/$CEPH_VERSION/el\$releasever/noarch/" >> /etc/yum.repos.d/ganesha.repo ; \
@@ -184,8 +185,8 @@ RUN yum install -y jq && \
     ceph-common$CEPH_POINT_RELEASE \
     ceph-mon$CEPH_POINT_RELEASE  \
     ceph-osd$CEPH_POINT_RELEASE \
-    ceph-mds$CEPH_POINT_RELEASE cephfs-mirror$CEPH_POINT_RELEASE  \
-    rbd-mirror$CEPH_POINT_RELEASE \
+    ceph-mds$CEPH_POINT_RELEASE cephfs-mirror$CEPH_POINT_RELEASE  \ 
+    rbd-mirror$CEPH_POINT_RELEASE \ 
     ceph-mgr$CEPH_POINT_RELEASE \
     ceph-mgr-cephadm$CEPH_POINT_RELEASE \
     ceph-mgr-dashboard$CEPH_POINT_RELEASE \

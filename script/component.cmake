@@ -93,10 +93,10 @@ function(add_component_build type name)
     string(REPLACE "\n" "\\n" license_reqs "${license_reqs}")
 
     string(TOUPPER ${type} typeu)
-    add_custom_target(bom_${name} COMMAND bash -c "echo BOM of ${PLATFORM}/${name}:" COMMAND bash -c "PLATFORM=${PLATFORM} IMAGEARCH=${IMAGEARCH} ${typeu}=${name} BACKEND=${BACKEND} RELEASE=${RELEASE} REGISTRY=${REGISTRY} PROJECTROOT='${PROJECT_SOURCE_DIR}' ${sut_var}='${sut_r}' SOURCEROOT='${CMAKE_CURRENT_SOURCE_DIR}' BUILDROOT='${CMAKE_BINARY_DIR}' '${CMAKE_CURRENT_SOURCE_DIR}/build.sh' --bom" VERBATIM)
+    add_custom_target(bom_${name} COMMAND bash -c "echo BOM of ${PLATFORM}/${name}:" COMMAND bash -c "PLATFORM=${PLATFORM} IMAGEARCH=${IMAGEARCH} IMAGESUFFIX=${IMAGESUFFIX} ${typeu}=${name} BACKEND=${BACKEND} RELEASE=${RELEASE} REGISTRY=${REGISTRY} PROJECTROOT='${PROJECT_SOURCE_DIR}' ${sut_var}='${sut_r}' SOURCEROOT='${CMAKE_CURRENT_SOURCE_DIR}' BUILDROOT='${CMAKE_BINARY_DIR}' '${CMAKE_CURRENT_SOURCE_DIR}/build.sh' --bom" VERBATIM)
     add_dependencies(bom bom_${name})
 
-    add_custom_target(build_${name} ALL COMMAND bash -c "'${PROJECT_SOURCE_DIR}/script/check-license.sh' '${CMAKE_CURRENT_BINARY_DIR}/.check-license' ${license_reqs} && '${PROJECT_SOURCE_DIR}/script/check-git-repo.sh' '${CMAKE_CURRENT_BINARY_DIR}/.check-git' ${git_repo_list} && ${BACKEND_ENVS} PLATFORM=${PLATFORM} IMAGEARCH=${IMAGEARCH} ${typeu}=${name} BACKEND=${BACKEND} RELEASE=${RELEASE} REGISTRY=${REGISTRY} PROJECTROOT='${PROJECT_SOURCE_DIR}' BUILDROOT='${CMAKE_BINARY_DIR}' ${sut_var}='${sut_r}' SOURCEROOT='${CMAKE_CURRENT_SOURCE_DIR}' '${CMAKE_CURRENT_SOURCE_DIR}/build.sh' ${BUILDSH_OPTIONS} && ('${CMAKE_SOURCE_DIR}/script/code-check.sh' '${CMAKE_CURRENT_SOURCE_DIR}' 2> /dev/null || true)" VERBATIM)
+    add_custom_target(build_${name} ALL COMMAND bash -c "'${PROJECT_SOURCE_DIR}/script/check-license.sh' '${CMAKE_CURRENT_BINARY_DIR}/.check-license' ${license_reqs} && '${PROJECT_SOURCE_DIR}/script/check-git-repo.sh' '${CMAKE_CURRENT_BINARY_DIR}/.check-git' ${git_repo_list} && ${BACKEND_ENVS} PLATFORM=${PLATFORM} IMAGEARCH=${IMAGEARCH} IMAGESUFFIX=${IMAGESUFFIX} ${typeu}=${name} BACKEND=${BACKEND} RELEASE=${RELEASE} REGISTRY=${REGISTRY} PROJECTROOT='${PROJECT_SOURCE_DIR}' BUILDROOT='${CMAKE_BINARY_DIR}' ${sut_var}='${sut_r}' SOURCEROOT='${CMAKE_CURRENT_SOURCE_DIR}' '${CMAKE_CURRENT_SOURCE_DIR}/build.sh' ${BUILDSH_OPTIONS} && ('${CMAKE_SOURCE_DIR}/script/code-check.sh' '${CMAKE_CURRENT_SOURCE_DIR}' 2> /dev/null || true)" VERBATIM)
     set_property(DIRECTORY APPEND PROPERTY ADDITIONAL_MAKE_CLEAN_FILES "${CMAKE_CURRENT_BINARY_DIR}/.check-license" "${CMAKE_CURRENT_BINARY_DIR}/.check-git")
     if(COMMAND add_backend_dependencies)
         add_backend_dependencies(${type} ${name})
@@ -121,7 +121,7 @@ function(add_component_testcase type component name)
         string(REPLACE ";" " " argstr "${ARGN}")
 
         string(TOUPPER ${type} typeu)
-      	add_test(NAME test_${name} COMMAND bash -c "rm -rf $CTESTSH_PREFIX''logs-${name} && mkdir -p $CTESTSH_PREFIX''logs-${name} && cd $CTESTSH_PREFIX''logs-${name} && ${BACKEND_ENVS} TESTCASE=test_${name} PLATFORM=${PLATFORM} IMAGEARCH=${IMAGEARCH} ${typeu}=${component} RELEASE=${RELEASE} REGISTRY=${REGISTRY} BENCHMARK='${BENCHMARK}' TIMEOUT=${TIMEOUT} ${backend} PROJECTROOT='${PROJECT_SOURCE_DIR}' SOURCEROOT='${CMAKE_CURRENT_SOURCE_DIR}' BUILDROOT='${CMAKE_BINARY_DIR}' REGISTRY_AUTH=${REGISTRY_AUTH} '${CMAKE_CURRENT_SOURCE_DIR}/validate.sh' ${argstr}" WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+	add_test(NAME test_${name} COMMAND bash -c "rm -rf $CTESTSH_PREFIX''logs-${name} && mkdir -p $CTESTSH_PREFIX''logs-${name} && cd $CTESTSH_PREFIX''logs-${name} && ${BACKEND_ENVS} TESTCASE=test_${name} PLATFORM=${PLATFORM} IMAGEARCH=${IMAGEARCH} IMAGESUFFIX=${IMAGESUFFIX} ${typeu}=${component} RELEASE=${RELEASE} REGISTRY=${REGISTRY} BENCHMARK='${BENCHMARK}' TIMEOUT=${TIMEOUT} ${backend} PROJECTROOT='${PROJECT_SOURCE_DIR}' SOURCEROOT='${CMAKE_CURRENT_SOURCE_DIR}' BUILDROOT='${CMAKE_BINARY_DIR}' REGISTRY_AUTH=${REGISTRY_AUTH} '${CMAKE_CURRENT_SOURCE_DIR}/validate.sh' ${argstr}" WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
         set_tests_properties(test_${name} PROPERTIES TIMEOUT 0)
 
         set_property(DIRECTORY APPEND PROPERTY ADDITIONAL_MAKE_CLEAN_FILES "${CMAKE_CURRENT_BINARY_DIR}/logs-${name}")

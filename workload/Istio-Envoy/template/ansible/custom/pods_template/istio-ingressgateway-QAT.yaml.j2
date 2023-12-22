@@ -191,11 +191,11 @@ spec:
           limits:
             cpu: "{{ wl_tunables['SERVER_INGRESS_GW_CPU'] }}"
             memory: "{{ wl_tunables['SERVER_INGRESS_GW_MEM'] }}"
-            qat.intel.com/cy: "{{ wl_tunables['CY_NUM'] }}"
+            "{{ wl_tunables['QAT_RESOURCE_TYPE'] }}": "{{ wl_tunables['CY_NUM'] }}"
           requests:
             cpu: "{{ wl_tunables['SERVER_INGRESS_GW_CPU'] }}"
             memory: "{{ wl_tunables['SERVER_INGRESS_GW_MEM'] }}"
-            qat.intel.com/cy: "{{ wl_tunables['CY_NUM'] }}"
+            "{{ wl_tunables['QAT_RESOURCE_TYPE'] }}": "{{ wl_tunables['CY_NUM'] }}"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

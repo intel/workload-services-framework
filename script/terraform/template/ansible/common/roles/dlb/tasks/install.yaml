@@ -55,6 +55,8 @@
         ignore_errors: true
         delegate_to: localhost
         run_once: true
+        environment:
+          no_proxy: "{{ lookup('env','no_proxy') | split(',') | reject('match','.?intel.com') | join(',') }}"
 
       - name: unzip dlb_zip
         unarchive:

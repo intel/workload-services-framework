@@ -1,0 +1,41 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# - name: Debug variables
+#   debug: 
+#     msg: |
+#       Module Variables ("vars"):
+#       --------------------------------
+#       {{ vars }} 
+#       Host Variables ("hostvars"):
+#       --------------------------------
+#       {{ hostvars }}
+
+- name: Get node name by ip
+  shell: |
+    kubectl get nodes -o wide --no-headers=true |awk -v IP="{{ private_ip }}" '$6 ~ IP {print $1}'
+  register: get_node_name
+
+- name: Set fact
+  set_fact:
+    k8s_node_name: "{{ get_node_name.stdout }}"
+  when:
+    - get_node_name.rc == 0
+    - get_node_name.stdout != ""
+
+- name: Get Ethernet interface
+  shell: |
+    {{ k8s_calivppctl_install_dest }} vppctl {{ k8s_node_name }} "show interface address" |grep 'Ethernet' |awk '{print $1}'
+  register: get_eth_name
+
+- name: Add ip route
+  shell: |
+    {{ k8s_calivppctl_install_dest }} vppctl {{ k8s_node_name }} set ip neighbor {{ item }} {{ k8s_calicovpp_l3fwd_neighbor_ip }} {{ k8s_calicovpp_l3fwd_mac }}
+    {{ k8s_calivppctl_install_dest }} vppctl {{ k8s_node_name }} ip route add {{ k8s_calicovpp_l3fwd_packet_subnet_ip }} via {{ k8s_calicovpp_l3fwd_neighbor_ip }} {{ item }}
+  with_items: "{{ get_eth_name.stdout_lines }}"
+  when: 
+    - get_eth_name.rc == 0
+    - get_eth_name.stdout_lines | length > 0

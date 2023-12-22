@@ -8,15 +8,15 @@
 ARG RELEASE
 
 FROM ceph-base${RELEASE}
+
 ARG  BASE_PATH=/opt/rook
 ARG  WORK_PATH=${BASE_PATH}/benchmark
 ARG  KUBEVIRT_PATH=${WORK_PATH}/kubevirt
 
-USER root
 RUN yum group install -y "Development Tools" && \
     yum -y install git make which gcc m4 libaio-devel bc zlib-devel && \
     yum clean all
-    
+
 WORKDIR   ${WORK_PATH}
 
 ARG KUBECTL_VER="v1.23.1"
@@ -33,10 +33,17 @@ RUN git clone -b fio-${FIO_VER} ${FIO_REPO} fio && \
     ./configure && \
     make
 
+# Used for rook-ceph re-deploy
+ARG ROOK_VER="v1.10.10"
+ARG ROOK_REPO="https://github.com/rook/rook.git"
+RUN git clone -b ${ROOK_VER} ${ROOK_REPO} rook
+#ENV ROOK_CEPH_CONFIG_PATH=${WORK_PATH}/rook/cluster/examples/kubernetes/ceph
+ENV ROOK_CEPH_CONFIG_PATH=${WORK_PATH}/rook/deploy/examples
+
 COPY script ./
 COPY template ./template
 
 # Create a pipefile for SF benchmark logs collection.
-RUN mkfifo /export-logs
+RUN mkfifo /export-logs  
 
 CMD ["./edge_ceph_virtIO_operator.sh", "--all"]

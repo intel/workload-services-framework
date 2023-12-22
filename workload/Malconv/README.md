@@ -108,14 +108,6 @@ The recommended system setup on SPR platform
 - Turbo Boost: Enabled
 
 
-### Index Info
-
-- Name: `Malconv`
-- Category: `ML/DL/AI`
-- Platform: `SPR`, `ICX`
-- Keywords: `Malware_detection`, `CNN`
-- Permission: 
-
 ### Setup Workload with RA
 - If you use the Reference Architecture to set up your system, use the basic profile for best performance.
 

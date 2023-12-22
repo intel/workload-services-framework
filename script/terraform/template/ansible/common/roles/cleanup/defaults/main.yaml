@@ -1,0 +1,13 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+sut_restore_services: "unattended-upgrades"
+k8s_node_labels: []
+win_tmp_path: "C:"
+sut_reboot: true
+sut_restore_bios: true
+sut_restore_msr: true
+

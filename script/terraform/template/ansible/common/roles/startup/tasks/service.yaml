@@ -7,10 +7,10 @@
 - name: Turn off incompatible services
   systemd:
     name: "{{ item }}"
-    enabled: no
+    enabled: false
     state: stopped
-  loop:
-  - tuned
-  - ondemand
+  loop: "{{ sut_incompatible_services | split(',') | reject('==', '') }}"
   failed_when: false
+  async: 100
+  poll: 1
 

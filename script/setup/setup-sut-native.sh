@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 #
 # Apache v2 license
 # Copyright (C) 2023 Intel Corporation
@@ -49,23 +49,34 @@ if [ "$(ls -lnd "$HOME" | cut -f3-4 -d' ')" != "$(id -u) $(id -g)" ]; then
   exit 3
 fi
 
-if [ ! -r ~/.ssh/id_rsa ]; then
-  echo "Generating self-signed key file..."
-  yes y | ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa
-fi
+set -o pipefail
+DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
+
+(
+    if [ ! -r ~/.ssh/id_rsa ]; then
+        echo "Generating self-signed key file..."
+        yes y | ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa
+    fi
+) 2>&1 | tee "$DIR"/setup-sut-native.logs
+
+ssh_options=(
+  -o ConnectTimeout=20
+  -o ServerAliveInterval=30
+  -o ServerAliveCountMax=10
+)
 
 for host in ${hosts[@]}; do
     echo "Setting up passwordless ssh to $host..."
-    ssh-copy-id -p $ssh_port "$host"
+    ssh-copy-id ${ssh_options[@]} -p $ssh_port "$host"
 
     echo "Setting up passwordless sudo...(sudo password might be required)"
-    username="$(ssh -p $ssh_port "$host" id -un)"
+    username="$(ssh ${ssh_options[@]} -p $ssh_port "$host" id -un)"
     if [[ "$username" = *" "* ]]; then
         echo "Unsupported: username contains whitespace!"
         exit 3
     fi
 
     sudoerline="$username ALL=(ALL:ALL) NOPASSWD: ALL"
-    ssh -p $ssh_port -t "$host" sudo bash -c "'grep -q -F \"$sudoerline\" /etc/sudoers || echo \"$sudoerline\" | EDITOR=\"tee -a\" visudo'"
-done
+    ssh ${ssh_options[@]} -p $ssh_port -t "$host" sudo bash -c "'grep -q -F \"$sudoerline\" /etc/sudoers || echo \"$sudoerline\" | EDITOR=\"tee -a\" visudo'"
+done 2>&1 | tee -a "$DIR"/setup-sut-native.logs
 

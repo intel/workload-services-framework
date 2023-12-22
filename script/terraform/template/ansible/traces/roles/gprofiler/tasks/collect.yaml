@@ -4,39 +4,72 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: Create the gprofiler directory
-  file:
-    path: "{{ wl_logs_dir}}/{{ trace_node.1 }}-{{ itr | default(1) }}-gprofiler"
-    state: directory
-  delegate_to: localhost
-  become: no
-  ignore_errors: true
+- block:
 
-- name: Get gprofiler files
-  shell:
-    cmd: ls -1
-    chdir: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler"
-    executable: /bin/bash
-  become: no
-  delegate_to: "{{ trace_node.1 }}"
-  register: gprofiler_files
-  ignore_errors: true
+  - name: Create the gprofiler directory
+    file:
+      path: "{{ wl_logs_dir}}/{{ trace_node.1 }}-{{ itr | default(1) }}-gprofiler"
+      state: directory
+    delegate_to: localhost
+    become: no
+    ignore_errors: true
 
-- name: Fetch gprofiler files
-  fetch:
-    src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler/{{ item }}"
-    dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-gprofiler/"
-    flat: yes
-  become: no
-  delegate_to: "{{ trace_node.1 }}"
-  loop: "{{ gprofiler_files.stdout_lines | reject('==', 'gprofiler.pid') }}"
-  ignore_errors: true
+  - name: Create a tar file for gprofiler results
+    community.general.archive:
+      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler"
+      dest: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler.tgz"
+      exclusion_patterns: "*.pid"
+      force_archive: true
+    become: false
+    ignore_errors: true
 
-- name: Remove any collection files
-  file:
-    path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler"
-    state: absent
-  become: true
+  - name: Fetch the tar file back to local
+    fetch:
+      src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler.tgz"
+      dest: "{{ wl_logs_dir}}/{{ trace_node.1 }}-{{ itr | default(1) }}-gprofiler/"
+      flat: true
+    become: false
+    ignore_errors: true
+
+  - name: Unarchive the gprofiler results locally
+    unarchive:
+      src: "{{ wl_logs_dir}}/{{ trace_node.1 }}-{{ itr | default(1) }}-gprofiler/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler.tgz"
+      dest: "{{ wl_logs_dir}}/{{ trace_node.1 }}-{{ itr | default(1) }}-gprofiler/"
+      remote_src: true
+      extra_opts:
+      - --warning=no-timestamp
+      - --strip-components=1
+    delegate_to: localhost
+    become: false
+    ignore_errors: true
+
+  - name: Remove any collection files
+    file:
+      path: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-gprofiler/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler.tgz"
+      state: absent
+    become: false
+    delegate_to: localhost
+    ignore_errors: true
+
+  - name: Remove any collection files
+    file:
+      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler"
+      state: absent
+    become: true
+    ignore_errors: true
+
+  - name: Generate HTML
+    include_tasks:
+      file: gprofiler-html.yaml
+    when: (roi.0 != '---') and (roi.1 != '---')
+    loop: "{{ start | zip(stop) }}"
+    loop_control:
+      loop_var: roi
+      index_var: roi_index
+    vars:
+      gprofiler_dir: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-gprofiler"
+      start: "{{ lookup('file', gprofiler_dir + '/TRACE_START') | split('\n') }}"
+      stop: "{{ lookup('file', gprofiler_dir + '/TRACE_STOP') | split('\n') }}"
+
   delegate_to: "{{ trace_node.1 }}"
-  ignore_errors: true
 

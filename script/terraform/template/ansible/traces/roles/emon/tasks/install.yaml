@@ -4,111 +4,123 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: Check if emon is already installed
-  stat:
-    path: "{{ emon_bin_path }}/sep/sep_vars.sh"
-  register: emon
+- block:
 
-- name: Copy the emon installation package
-  copy:
-    src: "{{ emon_src_path }}"
-    dest: "{{ emon_src_path | dirname }}/"
-    mode: preserve
-  become: yes
-  when: not emon.stat.exists
+  - name: Check if emon is already installed
+    stat:
+      path: "{{ emon_bin_path }}/sep/sep_vars.sh"
+    register: emon
+  
+  - block:
 
-- name: "Create an {{ emon_group }} group"
-  group:
-    name: "{{ emon_group }}"
-    state: present
-    system: yes
-  become: yes
-  when: not emon.stat.exists
+    - name: Detect OS
+      shell:
+        cmd: . /etc/os-release; echo $ID_LIKE; echo $VERSION_ID
+        executable: /bin/bash
+      register: os
+  
+    - name: Install prerequisites
+      include_tasks:
+        file: "install-{{ os.stdout_lines | first | split(' ') | first }}.yaml"
+  
+    - name: "Create an {{ emon_group }} group"
+      group:
+        name: "{{ emon_group }}"
+        state: present
+        system: true
+  
+    - name: "Add user to the {{ emon_group }} group"
+      user:
+        name: "{{ ansible_user }}"
+        append: true
+        groups: 
+          - "{{ emon_group }}"
 
-- name: Detect OS
-  shell:
-    cmd: . /etc/os-release; echo $ID
-    executable: /bin/bash
-  register: os
-  when: not emon.stat.exists
+    - name: reset ssh connection
+      meta: reset_connection
+  
+    - name: "Create {{ emon_bin_path }}"
+      file:
+        path: "{{ emon_bin_path }}"
+        state: directory
+  
+    - name: Create the emon directory
+      file:
+        path: "{{ emon_src_path }}"
+        state: directory
+    
+    - name: Get CPU vendor_id
+      shell:
+        cmd: "sed -n '/^vendor_id/{s/.*: //;p;q}' /proc/cpuinfo"
+        executable: /bin/bash
+      register: vendor_id
+  
+    - name: Unpackage sep
+      unarchive:
+        src: "/usr/local/src/{{ emon_sep_package[vendor_id.stdout] }}"
+        dest: "{{ emon_src_path }}"
+        extra_opts: --strip-components=1
+      when: not emon.stat.exists
+  
+    - name: Install emon
+      shell:
+        cmd: |
+          ./sep-installer.sh -u -C {{ emon_bin_path }} --accept-license -ni -i -g {{ emon_group }} --install-boot-script
+        chdir: "{{ emon_src_path }}"
+        executable: /bin/bash
 
-- name: "Create {{ emon_bin_path }}"
-  file:
-    path: "{{ emon_bin_path }}"
-    state: directory
-  when: not emon.stat.exists
-  become: yes
+    - name: Remove any installation files
+      file:
+        path: "{{ emon_src_path }}"
+        state: absent
+  
+    when: not emon.stat.exists
+    become: true
 
-- name: Install emon on centos/rhel
-  include_tasks:
-    "install-centos.yaml"
-  when: 
-    - not emon.stat.exists
-    - os.stdout == "centos" or os.stdout == "rhel"
+  - name: stop any pending emon session
+    shell: 
+      cmd: ". ./sep_vars.sh; emon -stop"
+      executable: /bin/bash
+      chdir: "{{ emon_bin_path }}/sep"
+    failed_when: false
+    become: true
+  
+  - name: Append the start script
+    blockinfile:
+      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-start-trace.sh"
+      marker: "# emon {mark}"
+      insertbefore: "^wait"
+      block: |
+        (
+          mkdir -p /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon
+          cd /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon
+          if is_roi "{{ trace_node.0 }}"; then
+            date -Ins >> TRACE_START
+            . {{ emon_bin_path }}/sep/sep_vars.sh
+            nohup emon -collect-edp {{ emon_options }} -f emon-$roi.dat > emon-$roi.logs 2>&1 &
+            disown
+          else
+            echo "---" >> TRACE_START
+          fi
+        ) &
+  
+  - name: Append the stop script
+    blockinfile:
+      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-stop-trace.sh"
+      marker: "# emon {mark}"
+      insertbefore: "^wait"
+      block: |
+        (
+          cd /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon
+          if is_roi "{{ trace_node.0 }}"; then
+            date -Ins >> TRACE_STOP
+            . {{ emon_bin_path }}/sep/sep_vars.sh
+            emon -stop
+            chmod a+r emon-*.dat
+          else
+            echo "---" >> TRACE_STOP
+          fi
+        ) &
 
-- name: Install emon on ubuntu/debian
-  include_tasks:
-    "install-ubuntu.yaml"
-  when:
-    - not emon.stat.exists
-    - os.stdout == "ubuntu" or os.stdout == "debian"
+  delegate_to: "{{ trace_node.1 }}"
 
-- name: Remove any installation files
-  file:
-    path: "{{ emon_src_path }}"
-    state: absent
-  become: yes
-  when: not emon.stat.exists
-
-- name: "Add user to the {{ emon_group }} group"
-  user:
-    name: "{{ ansible_user }}"
-    append: yes
-    groups: 
-      - "{{ emon_group }}"
-  become: yes
-  when: not emon.stat.exists
-
-- name: reset ssh connection
-  meta: reset_connection
-
-- name: stop any pending emon session
-  shell: 
-    cmd: ". ./sep_vars.sh; emon -stop"
-    executable: /bin/bash
-    chdir: "{{ emon_bin_path }}/sep"
-  ignore_errors: yes
-  become: yes
-  when: emon.stat.exists
-
-- name: Append the start script
-  blockinfile:
-    path: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-start-trace.sh"
-    marker: "# emon {mark}"
-    insertbefore: "^wait"
-    block: |
-      (
-        mkdir -p /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-emon
-        cd /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-emon
-        date -Ins >> TRACE_START
-        . {{ emon_bin_path }}/sep/sep_vars.sh
-        nohup emon -collect-edp {{ emon_options }} -f emon-$1.dat > emon-$1.logs 2>&1 &
-        echo $! > emon.pid
-        disown
-      ) &
-
-- name: Append the stop script
-  blockinfile:
-    path: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-stop-trace.sh"
-    marker: "# emon {mark}"
-    insertbefore: "^wait"
-    block: |
-      (
-        cd /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-emon
-        date -Ins >> TRACE_STOP
-        chmod a+r *
-        . {{ emon_bin_path }}/sep/sep_vars.sh
-        emon -stop
-        sleep 5
-        kill -9 $(cat emon.pid)
-      ) &

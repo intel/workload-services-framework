@@ -10,11 +10,19 @@
   become: false
   tasks:
 
+    - name: burn cpu
+      include_role:
+        name: burn-cpu
+      when:
+      - (ansible_connection|default('ssh')) == 'ssh'
+      - sut_sudo | default(true) | bool
+      - burn_cpu_seconds is defined
+
     - name: run docker validation over iterations
       include_role:
         name: deployment
         tasks_from: "invoke-{{ native | default(false) | bool | ternary('native', docker | default(false) | bool | ternary('docker', 'compose')) }}"
-      when: ansible_connection != 'winrm'
+      when: (ansible_connection|default('ssh')) == 'ssh'
       loop: "{{ range(1, run_stage_iterations | default(1) |int+1, 1) | list }}"
       loop_control:
         loop_var: itr

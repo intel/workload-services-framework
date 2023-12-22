@@ -1,0 +1,20 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+  - name: Get vpp-l3fwd pod ip
+    shell: |
+      kubectl get pod -n calico-system -l app=vpp-l3fwd -o wide --no-headers=true |awk '{print $6}'
+    register: get_l3fwd_pod_ip
+
+  - name: Replace l3fwd pod ip
+    lineinfile:
+      dest: "/tmp/{{ wl_namespace }}-k8s-script.yaml"
+      regexp: '^.*value: L3FWD_POD_IP_PLACEHOLDER$'
+      line: "          value: {{ get_l3fwd_pod_ip.stdout }}"
+    when:
+      - get_l3fwd_pod_ip.rc == 0
+      - get_l3fwd_pod_ip.stdout != ""

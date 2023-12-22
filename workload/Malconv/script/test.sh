@@ -6,7 +6,7 @@
 #
 
 # parse framework and precision requirements and decide with model to use
-model='emberMalconv'
+model='IntelOptMalconv'
 
 if [ "${FRAMEWORK}" != "onnx" ] && [ "${FRAMEWORK}" != "tf" ]; then
     echo "Usage: only onnx and tensorflow are supported"
@@ -46,7 +46,7 @@ fi
 
 # start single core / multicore benchmark
 if [ ${MODE} == "single" ]; then
-    OMP_NUM_THREADS=1 TF_CPP_MIN_LOG_LEVEL=2 DNNL_VERBOSE=0 ONEDNN_VERBOSE=0 TF_ENABLE_ONEDNN_OPTS=1 ONEDNN_MAX_CPU_ISA=${ISAFlag} numactl -C 5 -m 0 python3 malconv_test.py -m ${file} -t ${TAG} -i ./fakeData
+    OMP_NUM_THREADS=1 TF_CPP_MIN_LOG_LEVEL=3 DNNL_VERBOSE=0 ONEDNN_VERBOSE=0 TF_ENABLE_ONEDNN_OPTS=1 ONEDNN_MAX_CPU_ISA=${ISAFlag} numactl -C 1 -m 0 python3 malconv_test.py -m ${file} -t ${TAG} -i ./fakeData
     echo "total instance 1"
 
 elif [ ${MODE} != "multi" ]; then

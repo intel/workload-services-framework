@@ -19,7 +19,7 @@ output "terraform_replace" {
     command = join(" ",[
       for k,v in local.instances :
         "-replace=alicloud_instance.default[${k}]"
-        if v.cpu_model_regex!=null?(replace(data.external.cpu_model[k].result.cpu_model,startswith(v.cpu_model_regex,"/")?v.cpu_model_regex:"/^.*${v.cpu_model_regex}.*$/", "")!=""):false
+        if (v.cpu_model_regex!=null&&v.cpu_model_regex!="")?replace(data.external.cpu_model[k].result.cpu_model,v.cpu_model_regex,"")==data.external.cpu_model[k].result.cpu_model:false
     ])
     cpu_model = {
       for k,v in local.instances :

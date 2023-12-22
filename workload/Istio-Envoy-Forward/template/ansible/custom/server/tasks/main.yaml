@@ -1,0 +1,114 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Get host ip of worker-0
+  set_fact:
+    worker_host_ip: '{{ hostvars["worker-0"]["private_ip"] }}'
+
+- name: Get hostname of worker
+  shell: "kubectl get node -owide|grep {{ worker_host_ip }}|awk '{print $1}'"
+  register: worker_host_name
+
+- name: Get host ip of controller-0
+  set_fact:
+    controller_host_ip: '{{ hostvars["controller-0"]["private_ip"] }}'
+
+- name: Get hostname of worker
+  shell: "kubectl get node -owide|grep {{ controller_host_ip }}|awk '{print $1}'"
+  register: controller_host_name
+
+
+
+- name: Generate istio egress gateway yaml file to specify resource
+  template:
+    src: /opt/workload/template/ansible/custom/pods_template/istio-egressgateway.yaml.j2
+    dest: /tmp/istio-egressgateway.yaml
+
+- name: Debug Info - Print istio egress gateway yaml file
+  shell: "cat /tmp/istio-egressgateway.yaml"
+
+- name: Configure istio egress gateway
+  shell: "kubectl apply -f /tmp/istio-egressgateway.yaml"
+
+- name: Wait for istio egress gateway ready
+  shell: |
+    kubectl wait --namespace=istio-system pod --for=condition=Ready -l istio=egressgateway --timeout=6s
+  register: wait_gw_ready
+  retries: 200
+  delay: 3
+  until: wait_gw_ready.rc == 0
+  
+
+- name: Generate nighthawk-server yaml file
+  template:
+    src: /opt/workload/template/ansible/custom/pods_template/nighthawk-server.yaml.j2
+    dest: /tmp/nighthawk-server.yaml
+
+- name: Debug Info - Print nh nighthawk-server yaml file
+  shell: "cat /tmp/nighthawk-server.yaml"
+
+- name: Make sure the workload namespace is created.
+  shell: "kubectl create namespace istio-workload-nighthawk-server --dry-run=client -o yaml | kubectl apply -f -"
+  ignore_errors: yes
+
+- name: Deploy nighthawk-server
+  shell: "kubectl apply -f /tmp/nighthawk-server.yaml"
+
+
+
+
+- name: Generate nighthawk-server-gateway-virtualservice yaml file
+  template:
+    src: /opt/workload/template/ansible/custom/pods_template/nighthawk-server-gateway-virtualservice.yaml.j2
+    dest: /tmp/nighthawk-server-gateway-virtualservice.yaml
+
+- name: Debug Info - Print nh server yaml gateway-virtual-service file
+  shell: "cat /tmp/nighthawk-server-gateway-virtualservice.yaml"
+
+- name: Deploy nighthawk-server-gateway
+  shell: "kubectl apply -f /tmp/nighthawk-server-gateway-virtualservice.yaml"
+
+
+
+
+
+- name: Dump istio-sidecar-injector yaml file
+  shell: "kubectl get cm -n istio-system istio-sidecar-injector -o yaml > /tmp/istio-sidecar-injector.yaml"
+
+- name: Set the cpu_value variable
+  set_fact:
+    cpu_value: "{{ wl_tunables['CLIENT_SIDECAR_CPU'] }}"
+
+- name: Set the memory_value variable
+  set_fact:
+    memory_value: "{{ wl_tunables['CLIENT_SIDECAR_MEM'] }}"
+
+- name: Replace the value of cpu in istio-sidecar-injector yaml file
+  replace:
+    path: /tmp/istio-sidecar-injector.yaml
+    regexp: '("cpu": "2000m")|("cpu": "100m")'
+    replace: '"cpu": "{{ cpu_value }}"'
+    before: '"proxy_init": {'
+
+- name: Replace the value of memory in istio-sidecar-injector yaml file
+  replace:
+    path: /tmp/istio-sidecar-injector.yaml
+    regexp: '("memory": "1024Mi")|("memory": "128Mi")'
+    replace: '"memory": "{{ memory_value }}"'
+    before: '"proxy_init": {'
+
+# - name: Debug Info - Print istio-sidecar-injector yaml file
+#   shell: "cat /tmp/istio-sidecar-injector.yaml"
+
+- name: Deploy istio-sidecar-injector
+  shell: "kubectl apply -f /tmp/istio-sidecar-injector.yaml"
+
+
+- name: Create wl_log directory if not exist
+  become: true
+  file:
+    path: "{{ wl_logs_dir }}/server"
+    state: directory
+    mode: "0755"

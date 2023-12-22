@@ -1,0 +1,48 @@
+# calicovpp_dsa_vpp
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+ARG OS_IMAGE=ubuntu
+ARG OS_VER=20.04
+FROM calicovpp_dsa_build_base${RELEASE} as builder
+FROM ${OS_IMAGE}:${OS_VER}
+
+RUN apt-get update && apt-get install -y \
+            openssl \
+            libapr1 \
+            libnuma1 \
+            libmbedcrypto3 \
+            libmbedtls12 \
+            libmbedx509-0 \
+            libsubunit0 \
+            iproute2 \
+            ifupdown \
+            ethtool \
+            libnl-3-dev \
+            libnl-route-3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /root/
+
+RUN mkdir /tmp/vpp
+
+ARG CALICOVPP_DIR=/vpp-dataplane
+ARG CALICOVPP_MANAGER_DIR=${CALICOVPP_DIR}/vpp-manager
+
+COPY --from=builder ${CALICOVPP_MANAGER_DIR}/vpp_build/build-root/*.deb /tmp/vpp/
+COPY --from=builder ${CALICOVPP_MANAGER_DIR}/images/ubuntu/vpp-manager /usr/bin/
+COPY --from=builder ${CALICOVPP_DIR}/test/scripts/vppdev.sh /usr/bin/calivppctl
+
+RUN export VPP_INSTALL_SKIP_SYSCTL=1 && \
+    dpkg -i /tmp/vpp/libvppinfra_*.deb \
+    /tmp/vpp/vpp_*.deb \
+    /tmp/vpp/vpp-plugin-core_*.deb \
+    /tmp/vpp/vpp-plugin-dpdk_*.deb \
+    /tmp/vpp/vpp-dbg_*.deb \
+    && rm -rf /tmp/vpp
+
+ENTRYPOINT ["/usr/bin/vpp-manager"]

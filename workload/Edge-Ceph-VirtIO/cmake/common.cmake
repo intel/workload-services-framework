@@ -19,6 +19,18 @@ if(NOT BACKEND STREQUAL "docker")
 			endforeach()
 		endforeach()
 
+		# live-recovery - VM live recovery ability of vhost solution
+		add_testcase(${workload}_block_vhost_live-recovery "vhost_live-recovery")
+
+		# live-migration - VM live migration ability of vhost solution
+		add_testcase(${workload}_block_vhost_live-migration "vhost_live-migration")
+
+		# VM-scaling - VM number scale for virtIO and vhost solution
+		foreach (schema "virtIO" "vhost")
+			add_testcase(${workload}_block_${schema}_random_read_scale-1vm "${schema}_random_read_scale-1vm")
+			add_testcase(${workload}_block_${schema}_random_read_scale-4vm "${schema}_random_read_scale-4vm")
+		endforeach()
+
 		# Set two PKM use case. For each workload, the we need to define at least 1 pkm case, and no more than 2.
 		add_testcase(${workload}_block_virtIO_random_read_pkm "virtIO_random_read_pkm")
 

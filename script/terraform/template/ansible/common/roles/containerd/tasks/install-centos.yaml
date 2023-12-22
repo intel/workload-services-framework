@@ -14,7 +14,7 @@
       state: absent
     become: true
     ignore_errors: true
-    when: ((csp | default('static')) == 'static' or (csp | default('static')) == 'alicloud')
+    when: ((csp | default('static')) in ['static', 'kvm', 'hyperv'] or (csp | default('static')) == 'alicloud')
 
   - name: Detect OS version
     shell:
@@ -33,10 +33,10 @@
     retries: 10
     delay: 5
 
-  - name: install containerd
+  - name: "install {{ containerd_package_name }}"
     yum:
       name:
-      - "containerd.io-{{ containerd_version | default(containerd_default_version.centos) }}"
+      - "{{ containerd_package_name }}-{{ containerd_version | default(containerd_default_version.centos) }}*"
       update_cache: true
     become: true
     register: yumrc

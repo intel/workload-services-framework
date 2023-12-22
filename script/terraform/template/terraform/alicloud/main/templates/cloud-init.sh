@@ -16,6 +16,10 @@ chown -R ${user_name}:${user_name} /home/${user_name}/.ssh
 chmod 700 /home/${user_name}/.ssh
 chmod 400 /home/${user_name}/.ssh/authorized_keys
 
+if [ -r /etc/apt/apt.conf.d/20auto-upgrades ]; then
+    sed -i -e '/APT::Periodic::Update-Package-Lists/{s/"1"/"0"/}' -e '/APT::Periodic::Unattended-Upgrade/{s/"1"/"0"/}' /etc/apt/apt.conf.d/20auto-upgrades
+fi
+
 %{ for disk in disks ~}
     while true; do
         if [ -n "${disk.serial}" ]; then

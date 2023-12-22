@@ -5,6 +5,9 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+BEGIN {
+    status="failed"
+}
 /^#svrinfo[:-] / {
     if (!svrinfo) next
 }
@@ -14,7 +17,10 @@
 {   
     print $0
 }
-/^[*].*: *([0-9.-][0-9.e+-]*) *#*.*$/ {
+/^# status: (passed|failed)/ {
+    status=$3
+}
+/^[*].*: *([0-9.-][0-9.e+-]*) *#*.*$/ && status=="passed" {
     k=gensub(/^(.*): *[0-9.-][0-9.-]*.*$/,"\\1",1,$0)
     v=gensub(/^.*: *([0-9.-][0-9.-]*).*$/,"\\1",1,$0)
     n[k]=n[k]+1

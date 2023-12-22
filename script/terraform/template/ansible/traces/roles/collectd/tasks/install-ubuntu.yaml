@@ -9,8 +9,11 @@
     name: collectd
     update_cache: true
     install_recommends: false
+  environment:
+    DEBIAN_FRONTEND: noninteractive
   when: not collectd.stat.exists
   become: yes
+  delegate_to: "{{ trace_node.1 }}"
   register: aptrc
   until: aptrc is success
   retries: 10

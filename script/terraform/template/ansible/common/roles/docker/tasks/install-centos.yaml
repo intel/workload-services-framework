@@ -22,7 +22,7 @@
     - docker-ce-rootless-extras
     - docker-scan-plugin
     state: absent
-  when: ((csp | default('static')) == 'static')
+  when: ((csp | default('static')) in ['static', 'kvm', 'hyperv'])
   ignore_errors: yes
 
 - name: Install docker repo
@@ -37,9 +37,9 @@
 - name: install docker
   yum:
     name:
-      - "docker-ce-{{ docker_version | default(docker_default_version.centos) }}"
-      - "docker-ce-cli-{{ docker_cli_version | default(docker_cli_default_version.centos) }}"
-      - "docker-compose-plugin-{{ docker_compose_plugin_version | default(docker_compose_plugin_default_version.centos) }}"
+      - "docker-ce-{{ docker_version | default(docker_default_version.centos) }}*"
+      - "docker-ce-cli-{{ docker_cli_version | default(docker_cli_default_version.centos) }}*"
+      - "docker-compose-plugin-{{ docker_compose_plugin_version | default(docker_compose_plugin_default_version.centos) }}*"
     update_cache: true
   register: yumrc
   until: yumrc is success
