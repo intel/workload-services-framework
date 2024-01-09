@@ -6,7 +6,7 @@
 
 - name: reboot
   command: reboot
-  async: 5
+  async: 10
   poll: 0
   become: true
 
@@ -14,5 +14,5 @@
   wait_for_connection:
     connect_timeout: 20
     sleep: 1
-    delay: 1
+    delay: 15
     timeout: 1800

@@ -1,5 +1,10 @@
 # stream-repo
 
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 ARG OS_VER=22.04
 ARG OS_IMAGE=ubuntu
 
@@ -26,4 +31,3 @@ ARG STREAM_INSTALL_DIR=/opt/stream_repo
 WORKDIR ${STREAM_INSTALL_DIR}
 
 COPY --from=clone /opt/stream_repo ${STREAM_INSTALL_DIR}/
-COPY run_stream.sh ${STREAM_INSTALL_DIR}/run_stream.sh

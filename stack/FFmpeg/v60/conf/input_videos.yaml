@@ -1,0 +1,69 @@
+#
+# Specify the details of the videos files that are available for download and can be used in FFMPEG tests
+#
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+input_videos:
+- url: 'https://media.xiph.org/video/derf/ElFuente/Netflix_Tango_4096x2160_60fps_10bit_420.y4m'
+  archive: 'Netflix_Tango_4096x2160_60fps_10bit_420.7z'
+  filename: 'Netflix_Tango_4096x2160_60fps_10bit_420'
+  w: 4096
+  h: 2160
+  fps: 60
+  bitrate: '20M'
+  seconds: 5
+  frames: 600
+  bitdepth: 10
+- url: 'https://media.xiph.org/video/derf/y4m/crowd_run_1080p50.y4m'
+  archive: 'crowd_run_1080p50.7z'
+  filename: 'crowd_run_1080p50'
+  w: 1920
+  h: 1080
+  fps: 50
+  bitrate: '6M'
+  seconds: 5
+  frames: 600
+  bitdepth: 8
+- url: 'https://media.xiph.org/video/derf/twitch/y4m/CSGO.y4m'
+  archive: 'CSGO.7z'
+  filename: 'CSGO'
+  w: 1980
+  h: 1080
+  fps: 60
+  bitrate: '6M'
+  seconds: 5
+  frames: 600
+  bitdepth: 8
+- url: 'https://media.xiph.org/video/derf/y4m/crowd_run_2160p50.y4m'
+  archive: 'crowd_run_2160p50.7z'
+  filename: 'crowd_run_2160p50'
+  w: 4096
+  h: 2160
+  bitrate: '20M'
+  fps: 50
+  seconds: 5
+  frames: 600
+  bitdepth: 8
+- url: 'https://media.xiph.org/video/derf/y4m/dinner_1080p30.y4m'
+  archive: 'Dinnerscene_1080p.7z'
+  filename: 'dinner_1080p30'
+  w: 1920
+  h: 1080
+  bitrate: '6M'
+  fps: 30
+  seconds: 5
+  frames: 600
+  bitdepth: 8
+- url: 'https://media.xiph.org/video/derf/twitch/y4m/GTAV.y4m'
+  archive: ' GTAV_1080p.7z'
+  filename: 'GTAV'
+  w: 1920
+  h: 1080
+  bitrate: '6M'
+  fps: 60
+  seconds: 5
+  frames: 600
+  bitdepth: 8

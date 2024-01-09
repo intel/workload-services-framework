@@ -1,8 +1,16 @@
 #!/bin/bash -e
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
-default_kafka_p95_latency=${kafka_p95_latency:-5}
+# p95 & p99 Latency SLA will be overrided kpi args in validate.sh when run wsf
+p95_latency_sla=${1:-20}
+p99_latency_sla=${2:-40}
 
-awk -v kafka_p95_latency=$default_kafka_p95_latency '
+awk -v p95_latency_sla=$p95_latency_sla \
+    -v p99_latency_sla=$p99_latency_sla '
 BEGIN {
     producer_records_sent[FILENAME] = 0
     producer_records_per_sec[FILENAME] = 0
@@ -14,8 +22,8 @@ BEGIN {
     producer_99th[FILENAME] = 0
     producer_999th[FILENAME] = 0
     maximum_throughput=0
-    maximum_throughput_sla=0
-    max_p95_tx_latency=0
+    maximum_throughput_p95_sla=0
+    maximum_throughput_p99_sla=0
     number_of_producer=0
     max_p95_latency=0
     min_p95_latency=9999999
@@ -25,6 +33,7 @@ BEGIN {
     min_p99_latency=9999999
     avg_p99_latency=0
     total_p99_latency=0
+    sum_compression_rate=0
 }
 
 #parse producer results
@@ -46,13 +55,13 @@ BEGIN {
     number_of_producer += 1
 
     # only add if throughputs 95th is less than FLAG
-    if ( producer_95th[FILENAME] < kafka_p95_latency ) {
-        maximum_throughput_sla += producer_MB_per_sec[FILENAME]
+    if ( producer_95th[FILENAME] < p95_latency_sla ) {
+        maximum_throughput_p95_sla += producer_MB_per_sec[FILENAME]
     }
 
-    # if producer_95th is bigger, assign to variable
-    if ( producer_95th[FILENAME] > max_p95_tx_latency) {
-        max_p95_tx_latency = producer_95th[FILENAME]
+    # only add if throughputs 99th is less than FLAG
+    if ( producer_99th[FILENAME] < p99_latency_sla ) {
+        maximum_throughput_p99_sla += producer_MB_per_sec[FILENAME]
     }
 
     if ( producer_95th[FILENAME] > max_p95_latency) {
@@ -85,21 +94,30 @@ BEGIN {
     consumer_fetch_nMsg_sec[FILENAME] = b[10]
 }
 
+/compression-rate-avg/ {
+    split($0, c, ": ");
+    sum_compression_rate += c[2]
+}
+
 END {
     primary="*"
     avg_p95_latency = total_p95_latency/number_of_producer
     avg_p99_latency = total_p99_latency/number_of_producer
-    print "kafka_p95_latency (ms): " kafka_p95_latency
+    avg_compression_rate = sum_compression_rate/number_of_producer
+
     print "number_of_producer: " number_of_producer
     print primary "Maximum Throughput (MB/s): "  maximum_throughput
-    print "Maximum Throughput for Latency SLA (MB/s): " maximum_throughput_sla
-    print "max_p95_tx_latency (ms): " max_p95_tx_latency
+    print "avg_p95_latency (ms): " avg_p95_latency
+    print "avg_p99_latency (ms): " avg_p99_latency
+    print "p95 Latency SLA (ms): " p95_latency_sla
+    print "p99 Latency SLA (ms): " p99_latency_sla
+    print "Maximum Throughput for p95 Latency SLA (MB/s): " maximum_throughput_p95_sla
+    print "Maximum Throughput for p99 Latency SLA (MB/s): " maximum_throughput_p99_sla
     print "max_p95_latency (ms): " max_p95_latency
     print "min_p95_latency (ms): " min_p95_latency
-    print "avg_p95_latency (ms): " avg_p95_latency
     print "max_p99_latency (ms): " max_p99_latency
     print "min_p99_latency (ms): " min_p99_latency
-    print "avg_p99_latency (ms): " avg_p99_latency
+    print "avg_compression_rate of producer: " avg_compression_rate
 }
 
 

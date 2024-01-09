@@ -10,7 +10,7 @@ NODE_IP=${SERVER_IP:-sm-nighthawk-server.istio-workloads.svc.cluster.local}
 PORT=${SERVER_PORT:-10000}
 
 # Common setting for both http1 & http2
-MODE=${MODE:-RPS-MAX}
+MODE=${MODE:-rps_max}
 PROTOCOL=${PROTOCOL:-http1}
 NODES=${NODES:-2n}
 
@@ -28,6 +28,7 @@ CLIENT_MAR=${CLIENT_MAR:-500}
 CLIENT_MCS=${CLIENT_MCS:-100}
 
 CRYPTO_ACC=${CRYPTO_ACC:-none}
+DLB_ACC=${DLB_ACC:-none}
 
 CLIENT_MRPC=${CLIENT_MRPC:-7}
 CLIENT_MPR=${CLIENT_MPR:-100}
@@ -39,6 +40,7 @@ KILL_DELAY=${KILL_DELAY:-30}
 CLIENT_CPU=${CLIENT_CPU//"!"/","}
 
 AUTO_EXTEND_INPUT=${AUTO_EXTEND_INPUT:-false}
+MORE_EXT_SLA_SCAN=${MORE_EXT_SLA_SCAN:-false}
 
 auto_extend_rps_range() {
     # check the min input rps will blocking or not
@@ -191,7 +193,10 @@ nighthawk_test() {
 	echo "	- Port: $PORT"
 	echo "	- RPS: $CLIENT_RPS"
 	echo "	- Duration: $1 sec"
-
+    #echo " Sleeppppppppppppp for debug"
+	#while 1; do
+	#	sleep 10
+	#done
 	if [[ "$PROTOCOL" == "http1" ]]; then
 		echo "	- Protocol: HTTP/1.1"
 		echo
@@ -277,7 +282,7 @@ get_max_rps() {
 	cp $COMPARE_RPS_LOC.log performance.log
 }
 
-get_RPS-SLA() {
+get_RPS_SLA() {
 	CLIENT_RPS=$TEMP
 	COMPARE_P99_MAX=0
 	COMPARE_P99_LOC=0
@@ -315,13 +320,15 @@ fi
 sleep 10s
 
 if [[ $AUTO_EXTEND_INPUT == "true" ]]; then
-	if [[ $MODE == "RPS-MAX" ]]; then
+	if [[ $MODE == "rps_max" ]]; then
 		auto_extend_rps_range
-	elif [[ $MODE == "RPS-SLA" ]]; then
-		auto_extend_rps_range
+	elif [[ $MODE == "rps_sla" ]]; then
+		if [[ $MORE_EXT_SLA_SCAN == true ]]; then
+			auto_extend_rps_range
+		fi
 		auto_extend_sla_range
 	else
-		echo "Something has gone wrong. Please choose mode as RPS-MAX or RPS-SLA."
+		echo "Something has gone wrong. Please choose mode as rps_max or rps_sla."
 	fi
 fi
 
@@ -335,7 +342,7 @@ fi
 sleep 10s
 blocking=$(cat $CLIENT_RPS.log | grep Blocking)
 
-if [[ "$blocking" != "" && $MODE == "RPS-MAX" && $AUTO_EXTEND_INPUT == "true" ]];then
+if [[ "$blocking" != "" && $MODE == "rps_max" && $AUTO_EXTEND_INPUT == "true" ]];then
 	while [[ "$blocking" != "" ]]; do
 		CLIENT_RPS=$(( $CLIENT_RPS-$CLIENT_RPS_STEP ))
 		if [[ $CLIENT_RPS -lt 1 ]];then
@@ -360,7 +367,7 @@ else
 		fi
 		sleep 10s
 	done
-	if [[ $MODE == "RPS-MAX" && $AUTO_EXTEND_INPUT == "true" ]]; then
+	if [[ $MODE == "rps_max" && $AUTO_EXTEND_INPUT == "true" ]]; then
 		blocking=$(cat $CLIENT_RPS.log | grep Blocking)
 		if [[ "$blocking" == "" ]];then
 			while [[ "$blocking" == "" ]]; do
@@ -392,12 +399,12 @@ fi
 echo "end of region"
 
 TEMP=$CLIENT_RPS_MIN
-if [[ $MODE == "RPS-MAX" ]]; then
+if [[ $MODE == "rps_max" ]]; then
 	get_max_rps
-elif [[ $MODE == "RPS-SLA" ]]; then
-	get_RPS-SLA
+elif [[ $MODE == "rps_sla" ]]; then
+	get_RPS_SLA
 else
-	echo "Something has gone wrong. Please choose mode as RPS-MAX or RPS-SLA."
+	echo "Something has gone wrong. Please choose mode as rps_max or rps_sla."
 fi
 
 echo "All done! Measurements completed :)"

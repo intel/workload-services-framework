@@ -35,7 +35,7 @@ LoadPlugin "aggregation"
     IgnoreSelected true
 </Plugin>
 <Plugin csv>
-    DataDir "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-collectd/csv"
+    DataDir "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd/csv"
     StoreRates true
 </Plugin>
 <Plugin disk>

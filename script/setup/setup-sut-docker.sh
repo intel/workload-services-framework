@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 #
 # Apache v2 license
 # Copyright (C) 2023 Intel Corporation
@@ -48,10 +48,12 @@ for v in $@; do
   last="$v"
 done
 
+set -o pipefail
 DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
 cd "$DIR"
-./setup-ansible.sh || exit 3
-./setup-sut-native.sh --port $ssh_port ${hosts[@]} || exit 3
+
+./setup-ansible.sh 2>&1 | tee "$DIR"/setup-sut-docker.logs
+./setup-sut-native.sh --port $ssh_port ${hosts[@]} 2>&1 | tee -a "$DIR"/setup-sut-docker.logs
 
 ANSIBLE_ROLES_PATH=../terraform/template/ansible/docker/roles:../terraform/template/ansible/common/roles:../terraform/template/ansible/traces/roles ANSIBLE_INVENTORY_ENABLED=yaml ansible-playbook -vv -e install_intelca=$intelcert -e wl_logs_dir="$DIR" -e compose=true -e my_ip_list=1.1.1.1 --inventory <(cat <<EOF
 all:
@@ -65,5 +67,5 @@ all:
           ansible_port: "$ssh_port"
     trace_hosts:
 EOF
-) ./setup-sut-docker.yaml
+) ./setup-sut-docker.yaml 2>&1 | tee -a "$DIR"/setup-sut-docker.logs
 

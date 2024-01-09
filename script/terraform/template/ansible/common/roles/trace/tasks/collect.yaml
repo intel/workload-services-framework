@@ -7,9 +7,12 @@
 - name: collect trace data
   include_tasks:
     file: collect-block.yaml
-  loop: "{{ wl_trace_modules | default('') | split(',') | reject('==', '') | product(groups['trace_hosts']) | list }}"
+  loop: "{{ ((trace_module_list | select('match','.*:host.*') | product(groups.trace_hosts | map('extract',hostvars,['vmhost_host']) | map('default','') | reject('==','') | select('in', unique_vmhosts))) + (trace_module_list | reject('match','.*:host.*') | product(groups.trace_hosts))) | unique }}"
   loop_control:
     loop_var: trace_node
   ignore_errors: yes
   when: sut_sudo | default(true) | bool
+  vars:
+    trace_module_list: "{{ wl_trace_modules | default('') | split(',') | reject('==','') }}"
+    unique_vmhosts: "{{ dict(groups.vmhost_hosts | map('extract', hostvars, ['ansible_host']) | zip(groups.vmhost_hosts | map('extract', hostvars, ['ansible_port'])) | map('join',':') | zip(groups.vmhost_hosts)).values() }}"
 

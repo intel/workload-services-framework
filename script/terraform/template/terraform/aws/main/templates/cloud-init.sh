@@ -5,6 +5,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+if [ -r /etc/apt/apt.conf.d/20auto-upgrades ]; then
+    sed -i -e '/APT::Periodic::Update-Package-Lists/{s/"1"/"0"/}' -e '/APT::Periodic::Unattended-Upgrade/{s/"1"/"0"/}' /etc/apt/apt.conf.d/20auto-upgrades
+fi
+
 premounted="$(mount | grep -F ' /mnt ' | cut -f1 -d' ')"
 if [ -n "$premounted" ]; then
     sed -i 's|^\([A-Za-z0-9=_/]\+\s\+/mnt\s\+.*\)$|#\1|' /etc/fstab

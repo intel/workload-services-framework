@@ -9,6 +9,7 @@ locals {
     "ubuntu2004": "Canonical",
     "ubuntu2204": "Canonical",
     "debian11"  : "Debian",
+    "debian12"  : "Debian",
     "rhel9"     : "RedHat",
     "windows2022" : "MicrosoftWindowsServer",
   }
@@ -16,6 +17,7 @@ locals {
     "ubuntu2004": "0001-com-ubuntu-server-focal",
     "ubuntu2204": "0001-com-ubuntu-server-jammy",
     "debian11"  : "debian-11",
+    "debian12"  : "debian-12",
     "rhel9"     : "RHEL",
     "windows2022" : "WindowsServer",
   }
@@ -23,6 +25,7 @@ locals {
     "ubuntu2004": "20_04-lts",
     "ubuntu2204": "22_04-lts",
     "debian11"  : "11",
+    "debian12"  : "12",
     "rhel9"     : "9-lvm",
     "windows2022" : "2022-Datacenter",
   }
@@ -30,6 +33,7 @@ locals {
     "ubuntu2004": "tfu",
     "ubuntu2204": "tfu",
     "debian11"  : "tfu",
+    "debian12"  : "tfu",
     "rhel9"     : "tfu",
     "windows2022" : "tfu",
   }

@@ -21,7 +21,7 @@ terraform {
 }
 
 locals {
-  credentials = jsondecode(file("~/.tccli/default.credential"))
+  credentials = sensitive(jsondecode(file("~/.tccli/default.credential")))
 }
 
 provider "tencentcloud" {

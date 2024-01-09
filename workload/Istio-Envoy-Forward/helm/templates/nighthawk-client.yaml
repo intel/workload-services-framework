@@ -1,0 +1,70 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nighthawk-client
+  labels:
+    application: nighthawk-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nighthawk-client
+  template:
+    metadata:
+      labels:
+        app: nighthawk-client
+    spec:
+      containers:
+      - name: nighthawk-client
+        image: {{ .Values.REGISTRY }}istio-envoy-forward-client{{ .Values.RELEASE }}
+        imagePullPolicy: {{ include "imagepolicy" .Values }}
+        resources:
+          limits:
+            cpu: {{ .Values.CLIENT_CORE_NUM }}
+            memory: {{ .Values.CLIENT_MEM }}
+          requests:
+            cpu: {{ .Values.CLIENT_CORE_NUM }}
+            memory: {{ .Values.CLIENT_MEM }}
+        env:
+        - name: CLIENT_REQUEST_BODY_SIZE
+          value: "{{ .Values.CLIENT_REQUEST_BODY_SIZE }}"
+        - name: SERVER_RESPONSE_BODY_SIZE
+          value: "{{ .Values.SERVER_RESPONSE_BODY_SIZE}}"
+        - name: CLIENT_CORE_NUM
+          value: "{{ .Values.CLIENT_CORE_NUM }}"
+        - name: CLIENT_CONCURRENCY
+          value: "{{ .Values.CLIENT_CONCURRENCY }}"
+        - name: CLIENT_CONNECTIONS
+          value: "{{ .Values.CLIENT_CONNECTIONS }}"
+        - name: MODE
+          value: "{{ .Values.MODE }}"
+        - name: PROTOCOL
+          value: "{{ .Values.PROTOCOL }}"
+        - name: CLIENT_RPS
+          value: "{{ .Values.CLIENT_RPS }}"
+        - name: CLIENT_RPS_MAX
+          value: "{{ .Values.CLIENT_RPS_MAX }}"
+        - name: CLIENT_RPS_STEP
+          value: "{{ .Values.CLIENT_RPS_STEP }}"
+        - name: SERVER_DOMAIN_NAME
+          value: "{{ .Values.SERVER_DOMAIN_NAME }}"
+        - name: SERVER_PORT
+          value: "{{ .Values.SERVER_PORT }}"
+        - name: CLIENT_LATENCY_BASE
+          value: "{{ .Values.CLIENT_LATENCY_BASE }}"
+        - name: KILL_DELAY
+          value: "{{ .Values.KILL_DELAY }}"
+        - name: DURATION
+          value: "{{ .Values.DURATION }}"
+        - name: AUTO_EXTEND_INPUT
+          value: "{{ .Values.AUTO_EXTEND_INPUT }}"
+        securityContext:
+          privileged: true
+      restartPolicy: Always
+      nodeSelector:
+        kubernetes.io/hostname: ${ISTIO_ENVOY_CLIENT_HOSTNAME}

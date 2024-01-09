@@ -64,9 +64,11 @@ for regionres in "${REGIONS[@]}"; do
             echo
             echo "Scanning KeyPair..."
             for kp in $(aliyun ecs DescribeKeyPairs --RegionId $region $rg | jq ".KeyPairs.KeyPair[] | select(.Tags.Tag[].TagValue | test(\"$OWNER\")) | .KeyPairId" 2>/dev/null | tr -d '"'); do
-                echo "KeyPair: $kp"
-                resources+=($kp)
-                (set -x; aliyun ecs DeleteKeyPairs --RegionId $region --KeyPairId $kp)
+                if [ "$kp" != "null" ]; then
+                    echo "KeyPair: $kp"
+                    resources+=($kp)
+                    (set -x; aliyun ecs DeleteKeyPairs --RegionId $region --KeyPairId $kp)
+                fi
             done
 
             echo

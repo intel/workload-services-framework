@@ -1,0 +1,13 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Install dpdk
+  include_role:
+    name: dpdk-calico
+    tasks_from: install.yaml
+
+- name: Install macchanger
+  include_tasks:
+    file: macchanger.yaml

@@ -1,0 +1,11 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Uninstall Istio if installed
+  include_role:
+    name: istio
+    tasks_from: cleanup
+

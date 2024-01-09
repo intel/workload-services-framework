@@ -1,0 +1,25 @@
+# calicovpp_trex
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# from trex-base stack
+ARG RELEASE
+FROM trex-base${RELEASE}
+
+ENV TREX_HOME=/opt/trex
+ENV TREX_STL_DIR=$TREX_HOME/trex_client/interactive/trex/examples/stl
+
+WORKDIR /
+
+COPY --chmod=755 script/trex-l3fwd.py $TREX_STL_DIR/trex-l3fwd.py
+COPY --chmod=755 script/run_test.sh /run_test.sh
+COPY trex_cfg.yaml /etc/trex_cfg.yaml
+
+RUN mkfifo /export-logs
+
+CMD (/run_test.sh;echo $? > status) | tee output.log && \
+    tar cf /export-logs status output.log && \
+    sleep infinity

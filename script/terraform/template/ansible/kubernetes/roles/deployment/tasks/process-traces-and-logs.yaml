@@ -15,11 +15,15 @@
 - name: waitproc to wait for logs complete
   shell:
     cmd: |
-      nohup timeout {{ workload_config.timeout.split(',') | first }}s bash -c 'for pod in {{ pods.stdout_lines | join(" ") }}; do kubectl exec --namespace={{ wl_namespace }} $pod -c {{ workload_config.job_filter.split(',')[0].split('=')[1] | default(workload_config.job_filter.split(',')[0].split('=')[0]) }} -- sh -c "cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar; tar tf /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar || tar cf /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar \$(cat /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar)"; done' > /dev/null 2>&1 &
+      nohup bash -c "timeout {{ timeout }}s bash -c \"{% for pod in pods.stdout_lines %}kubectl exec --namespace={{ wl_namespace }} {{ pod }} -c {{ pod_container }} -- sh -c 'cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-{{ pod }}-{{ itr }}-logs.tar; tar tf /tmp/{{ wl_namespace }}-{{ pod }}-{{ itr }}-logs.tar || tar cf /tmp/{{ wl_namespace }}-{{ pod }}-{{ itr }}-logs.tar \\\$(cat /tmp/{{ wl_namespace }}-{{ pod }}-{{ itr }}-logs.tar)'; {% endfor %}\"; echo \$? > /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-waitproc.status" > /dev/null 2>&1 &
       echo $!
       disown
     executable: /bin/bash
   register: waitproc
+  vars:
+    pods_str: "{{ pods.stdout_lines | join(' ') }}"
+    pod_container: "{{ workload_config.job_filter.split(',')[0].split('=')[1] | default(workload_config.job_filter.split(',')[0].split('=')[0]) }}"
+    timeout: "{{ workload_config.timeout.split(',') | first }}"
 
 - name: invoke the trace procedure
   include_role:

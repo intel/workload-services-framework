@@ -5,20 +5,20 @@
 #
 
 docker_default_version:
-  ubuntu: "5:20.10.23~*"
-  debian: "5:20.10.23~*"
-  centos: "3:20.10.23-*"
+  ubuntu: "5:24.0.6"
+  debian: "5:24.0.6"
+  centos: "3:24.0.6"
 docker_cli_default_version:
-  ubuntu: "5:20.10.23~*"
-  debian: "5:20.10.23~*"
-  centos: "1:20.10.23-*"
+  ubuntu: "5:24.0.6"
+  debian: "5:24.0.6"
+  centos: "1:24.0.6"
 docker_compose_plugin_default_version:
-  ubuntu: "2.18.1-*"
-  debian: "2.18.1-*"
-  centos: "2.18.1-*"
+  ubuntu: "2.21.0"
+  debian: "2.21.0"
+  centos: "2.21.0"
 docker_dist_repo: "https://download.docker.com"
 docker_registry_mirrors: []
 docker_data_root: "/var/lib/docker"
 docker_daemon_json: "/etc/docker/daemon.json"
-docker_proxy_conf: "/etc/systemd/system/docker.service.d/proxy.conf"
+docker_proxy_conf: "/etc/systemd/system/docker.service.d/99-wsf-proxies.conf"
 

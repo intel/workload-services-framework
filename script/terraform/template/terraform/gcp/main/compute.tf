@@ -3,6 +3,15 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
+
+data "external" "local_ssd" {
+  for_each = toset([
+    for k,v in local.vms : v.instance_type
+      if v.data_disk_spec!=null?(v.data_disk_spec.disk_type=="local"):false
+  ])
+  program = [ "${path.module}/templates/get-local-ssd.sh", each.value, var.zone ]
+}
+
 resource "google_compute_instance" "default" {
   for_each = local.vms
 
@@ -58,6 +67,7 @@ resource "google_compute_instance" "default" {
     automatic_restart = false
     provisioning_model = var.spot_instance?"SPOT":"STANDARD"
     instance_termination_action = var.spot_instance?"DELETE":null
+    on_host_maintenance = startswith(each.value.instance_type,"e2-")?null:"TERMINATE"
   }
 
   advanced_machine_features {
@@ -67,7 +77,7 @@ resource "google_compute_instance" "default" {
   }
 
   dynamic "scratch_disk" {
-    for_each = range(each.value.data_disk_spec!=null?(each.value.data_disk_spec.disk_type=="local"?each.value.data_disk_spec.disk_count:0):0)
+    for_each = range(each.value.data_disk_spec!=null?(each.value.data_disk_spec.disk_type=="local"?max(each.value.data_disk_spec.disk_count,data.external.local_ssd[each.value.instance_type].result.local_ssds):0):0)
     content {
       interface = var.instance_storage_interface
     }

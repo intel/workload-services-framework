@@ -1,0 +1,74 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nighthawk-client
+  labels:
+    application: nighthawk-client
+  namespace:  istio-workload-nighthawk-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nighthawk-client
+  template:
+    metadata:
+      labels:
+        app: nighthawk-client
+    spec:
+      containers:
+      # TODO: Init container of client: Wait for server initiation and sync the deployment.
+      - name: nighthawk-client
+        image: {{ remote_registry_url.stdout }}/istio-envoy-forward-client{{ 'release' | extract(lookup('file', wl_logs_dir + '/workload-config.yaml') | from_yaml) }}
+        imagePullPolicy: Always
+        resources:
+          limits:
+            cpu: {{ wl_tunables['CLIENT_CORE_NUM'] }}
+            memory: {{ wl_tunables['CLIENT_SIDECAR_MEM'] }}
+          requests:
+            cpu: {{ wl_tunables['CLIENT_CORE_NUM'] }}
+            memory: {{ wl_tunables['CLIENT_SIDECAR_MEM'] }}
+        env:
+        - name: CLIENT_REQUEST_BODY_SIZE
+          value: "{{ wl_tunables['CLIENT_REQUEST_BODY_SIZE'] }}"
+        - name: SERVER_RESPONSE_BODY_SIZE
+          value: "{{ wl_tunables['SERVER_RESPONSE_BODY_SIZE'] }}"
+        - name: CLIENT_CORE_NUM
+          value: "{{ wl_tunables['CLIENT_CORE_NUM'] }}"
+        - name: CLIENT_CONCURRENCY
+          value: "{{ wl_tunables['CLIENT_CONCURRENCY'] }}"
+        - name: CLIENT_CONNECTIONS
+          value: "{{ wl_tunables['CLIENT_CONNECTIONS'] }}"
+        - name: MODE
+          value: "{{ wl_tunables['MODE'] }}"
+        - name: PROTOCOL
+          value: "{{ wl_tunables['PROTOCOL'] }}"
+        - name: CLIENT_RPS
+          value: "{{ wl_tunables['CLIENT_RPS'] }}"
+        - name: CLIENT_RPS_MAX
+          value: "{{ wl_tunables['CLIENT_RPS_MAX'] }}"
+        - name: CLIENT_RPS_STEP
+          value: "{{ wl_tunables['CLIENT_RPS_STEP'] }}"
+        - name: SERVER_DOMAIN_NAME
+          value: "{{ wl_tunables['SERVER_DOMAIN_NAME'] }}"
+        - name: SERVER_PORT
+          value: "{{ wl_tunables['SERVER_PORT'] }}"
+        - name: CLIENT_LATENCY_BASE
+          value: "{{ wl_tunables['CLIENT_LATENCY_BASE'] }}"
+        - name: KILL_DELAY
+          value: "{{ wl_tunables['KILL_DELAY'] }}"
+        - name: DURATION
+          value: "{{ wl_tunables['DURATION'] }}"
+        - name: AUTO_EXTEND_INPUT
+          value: "{{ wl_tunables['AUTO_EXTEND_INPUT'] }}"
+        - name: NODES
+          value: "{{ wl_tunables['NODES'] }}"
+        securityContext:
+          privileged: true
+      restartPolicy: Always
+      nodeSelector:
+        kubernetes.io/hostname: {{ controller_host_name.stdout }}

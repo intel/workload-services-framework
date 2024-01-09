@@ -22,10 +22,15 @@ terraform {
 
 locals {
   region = var.region!=null?var.region:(var.zone=="cn-hangzhou"?var.zone:length(regexall("^cn-",var.zone))>0?replace(var.zone,"/-[a-z0-9]*$/",""):replace(var.zone,"/.$/",""))
+  profiles = sensitive([
+    for p in jsondecode(file(var.config_file))["profiles"] : p
+      if p["name"] == var.profile
+  ])
 }
 
 provider "alicloud" {
   region = local.region
-  profile = var.profile
+  access_key = local.profiles.0.access_key_id
+  secret_key = local.profiles.0.access_key_secret
 }
 

@@ -1,0 +1,18 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: wait until execution complete
+  command: "tail --pid={{ trace_waitproc_pid }} -f /dev/null"
+  delegate_to: "{{ trace_logs_host | default(inventory_hostname) }}"
+  register: waitrc
+  ignore_unreachable: true
+  ignore_errors: true
+
+- name: fail if host is unreachable
+  command: "sleep {{ sut_unreachable_delay }}"
+  delegate_to: localhost
+  failed_when: true
+  when: waitrc is unreachable

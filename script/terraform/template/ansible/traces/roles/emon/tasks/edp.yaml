@@ -1,0 +1,112 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Get CPU vendor_id locally
+    shell:
+      cmd: "sed -n '/^vendor_id/{s/.*: //;p;q}' /proc/cpuinfo"
+      executable: /bin/bash
+    register: vendor_id
+    run_once: true
+    ignore_errors: yes
+
+  - name: Create the emon directory locally
+    file:
+      path: "{{ item }}"
+      state: directory
+    become: true
+    run_once: true
+    ignore_errors: yes
+    loop:
+    - "{{ emon_src_path }}"
+    - "{{ emon_bin_path }}"
+
+  - name: Unpackage sep locally
+    unarchive:
+      src: "/usr/local/src/{{ emon_sep_package[vendor_id.stdout] }}"
+      dest: "{{ emon_src_path }}"
+      extra_opts: --strip-components=1
+    become: true
+    run_once: true
+    ignore_errors: true
+  
+  - name: Install gcc locally
+    apt:
+      name: gcc
+      update_cache: true
+    register: aptrc
+    until: aptrc is success
+    retries: 10
+    delay: 10
+    become: true
+    run_once: true
+    ignore_errors: true
+    environment:
+      http_proxy: "{{ lookup('env','http_proxy') }}"
+      no_proxy: "{{ lookup('env','no_proxy') }}"
+
+  - name: Install emon locally
+    shell:
+      cmd: |
+        which () {
+          echo "x"
+        }
+        export PATH=/opt/conda/bin:$PATH
+        . ./sep-installer.sh -i -u -C {{ emon_bin_path }} --accept-license -ni -i --no-load-driver
+      chdir: "{{ emon_src_path }}"
+      executable: /bin/bash
+    become: true
+    ignore_errors: yes
+    run_once: true
+
+  - name: Install pip packages
+    pip:
+      name:
+      - .
+      - tdigest
+      - natsort
+      chdir: "{{ emon_bin_path }}/sep/{{ emon_pyedp_path }}"
+      executable: /opt/conda/bin/pip3
+    become: true
+    run_once: true
+    ignore_errors: true
+    environment:
+      http_proxy: "{{ lookup('env','http_proxy') }}"
+      https_proxy: "{{ lookup('env','https_proxy') }}"
+      no_proxy: "{{ lookup('env','no_proxy') }}"
+
+  - name: Replace edp config file
+    replace:
+      path: "{{ emon_bin_path }}/sep/{{ emon_pyedp_config }}"
+      regexp: '^(VIEW=).*$'
+      replace: '\1{{ emon_pyedp_options }}'
+    become: true
+    ignore_errors: yes
+    run_once: true
+
+  - name: Run emon post-processing
+    shell:
+      cmd: |
+        export PATH=/opt/conda/bin:$PATH
+        . {{ emon_bin_path }}/sep/sep_vars.sh
+        for dat in emon-*.dat; do (
+          if [ -r "$dat" ]; then
+            mkdir -p ${dat/.*/}-edp
+            cd ${dat/.*/}-edp
+            cp ../$dat emon.dat
+            emon -process-pyedp {{ emon_bin_path }}/sep/{{ emon_pyedp_config }}
+            rm -f emon.dat
+          fi
+        ) &
+        done
+        wait
+      chdir: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-emon"
+      executable: /bin/bash
+    ignore_errors: yes
+    become: false
+
+  delegate_to: localhost

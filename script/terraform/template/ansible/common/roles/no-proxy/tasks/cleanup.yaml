@@ -1,0 +1,12 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: restore /etc/environment
+  blockinfile:
+    path: /etc/environment
+    marker: "# {mark} WSF Setup"
+    state: absent
+  ignore_errors: yes

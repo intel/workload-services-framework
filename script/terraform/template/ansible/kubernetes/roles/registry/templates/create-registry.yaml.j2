@@ -23,7 +23,7 @@ spec:
       volumes:
       - name: cert
         secret:
-          secretName: wsf-registry-cert
+          secretName: {{ k8s_registry_cert }}
       - name: config
         secret:
           secretName: wsf-registry-config
@@ -49,15 +49,15 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: wsf-registry-service
+  name: {{ k8s_registry_service }}
   labels:
-    app: wsf-registry-service
+    app: {{ k8s_registry_service }}
 spec:
   ports:
-    - port: {{ k8s_registry_port | int }}
+    - nodePort: {{ k8s_registry_port | int }}
+      port: 5000
       targetPort: 5000
-  externalIPs:
-    - "{{ k8s_registry_ip }}"
+  type: NodePort
   selector:
     app: registry
 

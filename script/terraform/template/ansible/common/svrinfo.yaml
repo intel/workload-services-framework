@@ -4,14 +4,22 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- hosts: all
+- hosts: cluster_hosts:off_cluster_hosts:vmhost_hosts
   any_errors_fatal: true
   gather_facts: no
   become: false
   tasks:
 
-    - name: Invoke svrinfo
+    - name: Invoke svrinfo (Linux)
       include_role:
         name: svrinfo
-      when: ansible_connection != 'winrm'
+      when:
+      - ((ansible_connection|default('ssh')) == 'ssh')
 
+    - name: Invoke svrinfo (Windows)
+      include_role:
+        name: svrinfo
+        tasks_from: main-win
+      when:
+      - ((ansible_connection|default('ssh')) == 'winrm')
+      - (playbook_dir+'/roles/svrinfo/tasks/main-win.yaml') is exists

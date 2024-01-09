@@ -11,6 +11,7 @@ This workload provides several tests  cases with the following configuration par
 
 - **instruction_set**: Specify the instruction set: `sse`, `avx2` or `avx3`, default is `sse`.
 - **ntimes**: Specify the number of iterations of each kernel (Default:100, Min=2).
+- **CLOUDFLAG**: Specify true if you are running on Cloud.(Default:false).
 
 Use the following commands to show the list of test cases:
 
@@ -92,4 +93,5 @@ Triad Max time (s): 0.148240
     - HT: ON
     - Turbo: ON
     - NUMA: 2
-    - LLC Prefetch: ON    
+    - LLC Prefetch: ON
+

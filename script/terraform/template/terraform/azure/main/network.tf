@@ -3,6 +3,14 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
+
+locals {
+  sg_whitelist_cidr_blocks = [
+    for p in var.sg_whitelist_cidr_blocks: p
+      if replace(p,"/[0-9.]+/[0-9]+/","") != p
+  ]
+}
+
 resource "azurerm_virtual_network" "default" {
   count = var.virtual_network_name!=null?0:1
 
@@ -29,19 +37,6 @@ resource "azurerm_network_security_group" "default" {
   resource_group_name = local.resource_group_name
   
   security_rule {
-    name                       = "PING"
-    description                = "PING"
-    priority                   = 160
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Icmp"
-    source_port_range          = "*"
-    destination_port_range     = "*"
-    source_address_prefixes    = var.sg_whitelist_cidr_blocks
-    destination_address_prefix = local.subnet_cidr_block
-  }
-
-  security_rule {
     name                       = "SSH"
     description                = "SSH"
     priority                   = 150
@@ -50,7 +45,7 @@ resource "azurerm_network_security_group" "default" {
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "22"
-    source_address_prefixes    = var.sg_whitelist_cidr_blocks
+    source_address_prefixes    = local.sg_whitelist_cidr_blocks
     destination_address_prefix = local.subnet_cidr_block
   }
 
@@ -63,7 +58,7 @@ resource "azurerm_network_security_group" "default" {
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "${var.winrm_port}"
-    source_address_prefixes    = var.sg_whitelist_cidr_blocks
+    source_address_prefixes    = local.sg_whitelist_cidr_blocks
     destination_address_prefix = local.subnet_cidr_block
   }
 

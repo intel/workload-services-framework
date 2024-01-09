@@ -1,0 +1,68 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+    - name: "wait for the starting phrase: {{ start_phrase }}"
+      shell:
+        cmd: |
+          pids=()
+          {% for script1 in trace_logs_scripts %}
+            while kill -0 {{ trace_waitproc_pid }}; do
+              {% if start_phrase.startswith('/') and start_phrase.endswith('/') %}
+                ({{ script1 }}) | tr '\n' '~' | grep -q -E '{{ start_phrase.split('/')[1:-1] | join('/') }}' && break
+              {% else %}
+                ({{ script1 }}) | grep -q -F '{{ start_phrase }}' && break
+              {% endif %}
+              sleep {{ trace_waitproc_precision }}
+            done > /dev/null 2>&1 &
+            pids+=($!)
+          {% endfor %}
+          wait -n ${pids[@]}
+          kill ${pids[@]} > /dev/null 2>&1 || true
+        executable: /bin/bash
+      delegate_to: "{{ trace_logs_host | default(inventory_hostname) }}"
+      register: waitrc
+      ignore_unreachable: true
+      ignore_errors: true
+
+    - name: fail if host is unreachable
+      command: "sleep {{ sut_unreachable_delay }}"
+      failed_when: true
+      delegate_to: localhost
+      when: waitrc is unreachable
+
+  when:
+  - ((roi_region | first) == 'roi')
+  - (start_phrase != '')
+  vars:
+    start_phrase: "{{ 1 | extract(roi_region) | default('START_TRACE') | replace('%44',',') | regex_replace('[+][0-9]*[smh]$','') }}"
+
+- block:
+
+    - name: "wait for the starting delay: {{ start_delay }}"
+      shell:
+        cmd: |
+          timeout {{ start_delay }} tail --pid={{ trace_waitproc_pid }} -f /dev/null > /dev/null 2>&1 || true
+        executable: /bin/bash
+      delegate_to: "{{ trace_logs_host | default(inventory_hostname) }}"
+      register: waitrc
+      ignore_unreachable: true
+      ignore_errors: true
+
+    - name: fail if host is unreachable
+      command: "sleep {{ sut_unreachable_delay }}"
+      failed_when: true
+      delegate_to: localhost
+      when: waitrc is unreachable
+
+  when:
+  - ((roi_region | first) == 'time') or ((roi_region | first) == 'roi')
+  - start_delay is match('^[0-9]*[smh]$')
+  - (start_delay | regex_replace('[smh]$','') | int) != 0
+  vars:
+    start_delay: "{{ ((roi_region | first) == 'time') | ternary(1 | extract(roi_region) | default(0) | regex_replace('^([0-9]*)$','\\1s'), 1 | extract(roi_region) | default('+0s') | regex_replace('^.*[+]([0-9]*[smh])$','\\1')) }}"
+

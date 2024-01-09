@@ -27,9 +27,9 @@
 - name: install kubeadm, kubelet, and kubectl
   yum:
     name: 
-    - "kubeadm-{{ k8s_version }}-*"
-    - "kubelet-{{ k8s_version }}-*"
-    - "kubectl-{{ k8s_version }}-*"
+    - "kubeadm-{{ k8s_version }}*"
+    - "kubelet-{{ k8s_version }}*"
+    - "kubectl-{{ k8s_version }}*"
     update_cache: true
   become: true
   register: yumrc

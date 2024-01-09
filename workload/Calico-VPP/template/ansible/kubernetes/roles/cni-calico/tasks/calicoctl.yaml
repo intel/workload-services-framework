@@ -1,0 +1,38 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Check if calicoctl installed
+  become: true
+  ansible.builtin.stat:
+    path: "{{ k8s_calicoctl_install_dest }}"
+  register: check_file
+
+- block:
+  - name: Download calicoctl locally
+    delegate_to: localhost
+    get_url:
+      url: "{{ k8s_calicoctl_repository }}"
+      dest: "/tmp/{{ wl_namespace }}-calicoctl"
+      mode: +rx
+    register: getrc
+    until: getrc is success
+    retries: 10
+    delay: 5
+
+  - name: Install calicoctl
+    ansible.builtin.copy:
+      src: "/tmp/{{ wl_namespace }}-calicoctl"
+      dest: "{{ k8s_calicoctl_install_dest }}"
+      mode: +rx
+    become: true
+
+  - name: Remove local temp files
+    delegate_to: localhost
+    file:
+      path: "/tmp/{{ wl_namespace }}-calicoctl"
+      state: absent
+    ignore_errors: true
+  when: not check_file.stat.exists

@@ -70,6 +70,8 @@
           echo "image_transfer_itr{{ itr }}_start: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
         executable: /bin/bash
       delegate_to: localhost
+      async: 30
+      poll: 0
 
     - name: copy the workload file system
       shell:
@@ -84,6 +86,8 @@
           echo "image_transfer_itr{{ itr }}_end: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
         executable: /bin/bash
       delegate_to: localhost
+      async: 30
+      poll: 0
 
   always:
 
@@ -123,15 +127,8 @@
           echo "workload_itr{{ itr }}_start: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
         executable: /bin/bash
       delegate_to: localhost
-
-    - name: waitproc to wait for logs complete
-      shell:
-        cmd: |
-          nohup timeout {{ workload_config.timeout | split(',') | first }}s sh -c 'cat {{ workspace }}{{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-logs.tar;tar tf /tmp/{{ wl_namespace }}-logs.tar || tar cf /tmp/{{ wl_namespace }}-logs.tar -C {{ workspace }} $(cat /tmp/{{ wl_namespace }}-logs.tar | tr " " "\n")' > /dev/null 2>&1 &
-          echo $!
-          disown
-        executable: /bin/bash
-      register: waitproc
+      async: 30
+      poll: 0
 
     - name: create startup script
       copy:
@@ -157,6 +154,15 @@
       register: pid
       become: true
 
+    - name: waitproc to wait for logs complete
+      shell:
+        cmd: |
+          nohup bash -c 'timeout {{ workload_config.timeout | split(',') | first }}s cat {{ workspace }}{{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-logs.tar;echo $? > /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-waitproc.status; tar tf /tmp/{{ wl_namespace }}-logs.tar || tar cf /tmp/{{ wl_namespace }}-logs.tar -C {{ workspace }} $(cat /tmp/{{ wl_namespace }}-logs.tar | tr " " "\n")' > /dev/null 2>&1 &
+          echo $!
+          disown
+        executable: /bin/bash
+      register: waitproc
+
     - name: invoke the trace procedure
       include_role:
         name: trace
@@ -172,17 +178,21 @@
           echo "workload_itr{{ itr }}_end: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
         executable: /bin/bash
       delegate_to: localhost
+      async: 30
+      poll: 0
 
     - name: kill the worker process
-      command: "kill -9 {{ pid.stdout }}"
+      command: "kill {{ pid.stdout }}"
       become: true
       ignore_errors: true
+      async: 30
+      poll: 0
 
 - name: collect trace data
   include_role:
     name: trace
     tasks_from: collect
-  when: wl_trace_modules is defined
+  when: wl_trace_modules | default('') | split(',') | reject('==','') | length > 0
 
 - name: print logs
   command: "cat /tmp/{{ wl_namespace }}-logs"
@@ -216,6 +226,21 @@
       state: absent
     delegate_to: localhost
     ignore_errors: true
+
+  ignore_errors: true
+
+- name: append build_commit_id and build_branch to workload-config.yaml
+  blockinfile:
+    path: "{{ wl_logs_dir }}/workload-config.yaml"
+    marker: "# {mark} BUILD CONFIG"
+    content: |
+      build_commit_id: "{{ image_labels | selectattr('key', '==', 'BUILD_COMMIT_ID') | map(attribute='value') | unique | join(',') }}"
+      build_branch: "{{ image_labels | selectattr('key', '==', 'BUILD_BRANCH') | map(attribute='value') | unique | join(',') }}"
+  delegate_to: localhost
+  become: false
+  vars:
+    image_labels: "{{ 'Labels' | extract('Config' | extract(container_info) | default([],true)) | default({},true) | dict2items }}"
+  ignore_errors: true
 
 - name: cleanup workspace
   include_role:

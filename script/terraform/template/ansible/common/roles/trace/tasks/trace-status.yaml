@@ -1,0 +1,35 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+    - name: retrieve waitproc status
+      shell:
+        cmd: |
+          rc="$(cat /tmp/{{ wl_namespace }}-{{ trace_logs_host | default(inventory_hostname) }}-waitproc.status)"
+          rm -f /tmp/{{ wl_namespace }}-{{ trace_logs_host | default(inventory_hostname) }}-waitproc.status
+          exit ${rc:-0}
+        executable: /bin/bash
+      register: waitproc_status
+      delegate_to: "{{ trace_logs_host | default(inventory_hostname) }}"
+      ignore_errors: true
+
+    - name: create the itr/waitproc logs directory
+      file:
+        path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ trace_logs_host | default(inventory_hostname) }}-waitproc"
+        state: directory
+        recurse: true
+      when: waitproc_status.rc != 0
+      delegate_to: localhost
+      ignore_errors: true
+      become: false
+
+    - name: "write down waitproc status: {{ waitproc_status.rc }}"
+      copy:
+        content: "{{ waitproc_status.rc }}"
+        dest: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ trace_logs_host | default(inventory_hostname) }}-waitproc/status"
+      delegate_to: localhost
+      when: waitproc_status.rc != 0
+      ignore_errors: true
+      become: false

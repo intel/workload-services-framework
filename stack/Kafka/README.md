@@ -29,3 +29,7 @@ make
 ./ctest.sh -R test_static_kafka-jdk8_version_check -VV
 ```
 
+### Contact
+
+- Stage1 Contact: `Xiangling Yu`;`Kailiu Wang`;`Xiaofang Chen`
+- Stage2 Contact: `Madhanagopal Murali` 

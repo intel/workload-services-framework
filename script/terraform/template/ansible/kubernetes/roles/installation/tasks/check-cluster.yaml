@@ -8,14 +8,14 @@
     command: kubectl get pod
     register: k8scheck
     delegate_to: "{{ ('controller' in groups) | ternary('controller-0','localhost') }}"
+    run_once: true
     ignore_errors: true
+    run_once: true
 
   - name: Set fact
     set_fact:
       install_k8s: "{{ ((k8scheck.rc != 0) or (k8s_reset | default('no') | bool)) and ('controller' in groups) }}"
-      cacheable: yes
-      delegate_to: localhost
-      delegate_facts: true
+      is_a_unique_worker_or_a_controller: "{{ (((ansible_host | default('127.0.0.1'))+':'+(ansible_port | default(22) | string)) not in (groups.controller | default([]) | map('extract',hostvars,['ansible_host']) | map('default','127.0.0.1') | zip(groups.controller | default([]) | map('extract',hostvars,['ansible_port']) | map('default',22) | map('string')) | map('join',':'))) or (inventory_hostname in (groups.controller | default([]))) }}"
 
   - name: Abort if k8s is not ready and does not reset
     fail:

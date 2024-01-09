@@ -1,3 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 {{- $brokerServerList := include "brokerServerList" .Values -}}
 {{- $zkServerList := include "zkServerList" .Values -}}
 {{- $IMAGESUFFIX := include "IMAGESUFFIX" .Values -}}
@@ -46,11 +51,47 @@ spec:
             value: "{{ .Values.ENCRYPTION }}"
           - name: K_NUM_NETWORK_THREADS
             value: "{{ .Values.NUM_NETWORK_THREADS }}"
+          - name: K_NUM_REPLICA_FETCHERS
+            value: "{{ .Values.NUM_REPLICA_FETCHERS }}"
+          - name: K_REPLICA_FETCH_MAX_BYTES
+            value: "{{ .Values.REPLICA_FETCH_MAX_BYTES }}"
+          - name: K_REPLICA_SOCKET_RECEIVE_BUFFER_BYTES
+            value: "{{ .Values.REPLICA_SOCKET_RECEIVE_BUFFER_BYTES }}"
           - name: K_SERVER_NUMACTL_OPTIONS
-            value: "{{ .Values.SERVER_NUMACTL_OPTIONS }}"      
+            value: "{{ .Values.SERVER_NUMACTL_OPTIONS }}"
+          - name: K_KAFKA_HEAP_OPTS
+            value: "{{ .Values.KAFKA_HEAP_OPTS }}"
+          - name: K_ENABLE_MUL_DISK
+            value: "{{ .Values.ENABLE_MUL_DISK }}"
+          - name: K_MOUNT_DISK_COUNT
+            value: "{{ .Values.MOUNT_DISK_COUNT }}"
+        {{- if $.Values.ENABLE_MUL_DISK }}
+        volumeMounts:
+          {{- $disk_num := (int $.Values.MOUNT_DISK_COUNT) -}}
+          {{- range $i, $e := until $disk_num }}
+          - name: kafka{{ $i }}-mountdisk
+            mountPath: /data/kafka{{ $i }}
+          {{- end }}
+        {{- end }}
 {{- if contains "_3n" .Values.TESTCASE }}
         {{- $args := dict "key" "zoo-producer-consumer" "value" "anti" }}
         {{- include "podAntiAffinity" $args }}
+        {{- $args2 := dict "nkey" "VM-GROUP" "nvalue" "worker" }}
+        {{- include "nodeAffinity" $args2 }}
+      {{- if $.Values.ENABLE_MUL_DISK }}
+      volumes:
+        {{- $disk_num := (int $.Values.MOUNT_DISK_COUNT) -}}
+        {{- range $i, $e := until $disk_num }}
+        - name: kafka{{ $i }}-mountdisk
+          hostPath:
+            path: /mnt/disk{{ add $i 1 }}/kafka_data
+            type: DirectoryOrCreate
+        {{- end }}
+      {{- end }}
+      {{- if $.Values.ENABLE_MUL_DISK }}
+      nodeSelector:
+        HAS-SETUP-DISK-SPEC-1: "yes"
+      {{- end }}
 {{- end }}
 
 ---

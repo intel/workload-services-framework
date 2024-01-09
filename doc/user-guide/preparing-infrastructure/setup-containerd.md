@@ -45,6 +45,18 @@ EOF
 sudo systemctl restart containerd
 ```
 
+On-Premises workload validation based on RKE2 requires to use a docker registry. If you need to setup any insecure registries with `containerd`, modify the `rke2` configuration as follows, assuming your private registry is `foo.com:5000`:   
+
+```shell
+cat | sudo tee /etc/rancher/rke2/registries.yaml <<EOF
+mirrors:
+  "foo.com:5000":
+    endpoint:
+      - "http://foo.com:5000"
+EOF 
+sudo systemctl restart rke2-server
+```
+
 ## Setup Data Storage
 
 Optionally, if you need to move the containerd storage location to, for example, `/mnt/storage/containerd`:

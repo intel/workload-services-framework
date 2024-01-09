@@ -1,0 +1,37 @@
+# istio-envoy-istio-proxyv2-1.16.0
+ARG TOOL_VER=release-1.16-latest-amd64
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG TOOL_IMAGE=gcr.io/istio-testing/build-tools-proxy
+ARG ISTIO_PROXY_VER="1.16.0"
+ARG ISTIO_PROXY_IMAGE="istio/proxyv2"
+
+FROM ${TOOL_IMAGE}:${TOOL_VER} AS build
+
+# Istio-Proxy
+ARG ISTIO_PROXY_REPO="https://github.com/istio/proxy"
+ARG ISTIO_PROXY_VER="1.16.0"
+RUN git clone -b ${ISTIO_PROXY_VER} ${ISTIO_PROXY_REPO}
+
+# Bazel
+ARG BAZEL_REPO="https://releases.bazel.build/6.0.0/rolling"
+ENV BAZELISK_BASE_URL=$BAZEL_REPO
+
+# BoringSSL
+ARG BORINGSSL_REPO="https://github.com/google/boringssl"
+ARG BORINGSSL_VER="098695591f3a2665fccef83a3732ecfc99acdcdd"
+RUN wget ${BORINGSSL_REPO}/archive/${BORINGSSL_VER}.tar.gz && tar -zxvf ${BORINGSSL_VER}.tar.gz && mv boringssl-${BORINGSSL_VER} boringssl && rm ${BORINGSSL_VER}.tar.gz
+
+# Patch
+COPY patch/avx512.patch /
+RUN cd boringssl && patch -p1 < ../avx512.patch
+
+# Build Envoy binary
+RUN cd proxy && export PATH=/usr/lib/llvm-10/bin:/usr/lib/llvm-10/bin:/usr/lib/llvm/bin:/usr/local/go/bin:/gobin:/usr/local/google-cloud-sdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin CC=clang CXX=clang++ && bazel  build --override_repository=boringssl=`pwd`/../boringssl --config=release --config=libc++ //...
+
+# Main Image
+FROM ${ISTIO_PROXY_IMAGE}:${ISTIO_PROXY_VER}
+COPY --from=build /proxy/bazel-out/k8-opt/bin/src/envoy/envoy /usr/local/bin/envoy

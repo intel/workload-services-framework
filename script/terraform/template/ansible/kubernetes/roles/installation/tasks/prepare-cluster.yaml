@@ -4,53 +4,33 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-  - name: Mark IP addresses
-    set_fact:
-      ip_address: "{{ ansible_host | default('127.0.0.1') }}"
-      cacheable: yes
+- block:
 
   - name: Install prerequisite
     include_role:
       name: prerequisite
-    when:
-    - hostvars['localhost']['ansible_facts']['install_k8s']
-    - ((ansible_host != hostvars['controller-0']['ansible_facts']['ip_address'] and inventory_hostname != "controller-0") or inventory_hostname == "controller-0")
 
   - name: Install containerd
     include_role:
       name: containerd
-    when:
-    - hostvars['localhost']['ansible_facts']['install_k8s']
-    - ((ansible_host != hostvars['controller-0']['ansible_facts']['ip_address'] and inventory_hostname != "controller-0") or inventory_hostname == "controller-0")
 
   - name: Check containerd cgroup setting
     include_role:
       name: containerd
       tasks_from: check
-    when:
-    - hostvars['localhost']['ansible_facts']['install_k8s']
-    - ((ansible_host != hostvars['controller-0']['ansible_facts']['ip_address'] and inventory_hostname != "controller-0") or inventory_hostname == "controller-0")
 
   - name: Reset k8s
     include_role:
       name: kubeadm
       tasks_from: reset.yaml
     when:
-    - hostvars['localhost']['ansible_facts']['install_k8s']
-    - ((ansible_host != hostvars['controller-0']['ansible_facts']['ip_address'] and inventory_hostname != "controller-0") or inventory_hostname == "controller-0")
     - ((csp | default('static')) == 'static')
 
   - name: Install k8s packages
     include_role:
       name: packages
-    when:
-    - hostvars['localhost']['ansible_facts']['install_k8s']
-    - ((ansible_host != hostvars['controller-0']['ansible_facts']['ip_address'] and inventory_hostname != "controller-0") or inventory_hostname == "controller-0")
 
-  - name: Add no-proxy
-    include_role:
-      name: no-proxy
-    when:
-    - hostvars['localhost']['ansible_facts']['install_k8s']
-    - ((ansible_host != hostvars['controller-0']['ansible_facts']['ip_address'] and inventory_hostname != "controller-0") or inventory_hostname == "controller-0")
+  when:
+    - install_k8s
+    - is_a_unique_worker_or_a_controller
 

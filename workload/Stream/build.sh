@@ -1,4 +1,9 @@
 #!/bin/bash -e
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 
 DIR="$(cd "$(dirname "$0")" &>/dev/null && pwd)"
 WORKLOAD=${WORKLOAD:-stream}
@@ -8,7 +13,7 @@ ARMv8 | ARMv9)
   echo "Build containers for ARM platforms"
   DOCKER_CONTEXT=("." "arm")
   ;;
-MILAN | ROME | GENOA)
+MILAN | ROME)
   echo "Build containers for AMD platforms"
   DOCKER_CONTEXT=("." "amd")
   if [[ "$WORKLOAD" =~ "aocc" ]]; then
@@ -18,6 +23,10 @@ MILAN | ROME | GENOA)
     echo "Build containers for AMD platforms and aocc version 3 compiler"
     FIND_OPTIONS="-not -name Dockerfile.1.amd-aocc-4"
   fi
+  ;;
+GENOA)
+  echo "Build containers for AMD GENOA platform"
+  DOCKER_CONTEXT=("." "amd-zen4")
   ;;
 *)
   echo "Build containers for Intel platforms"

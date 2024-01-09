@@ -1,0 +1,27 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: "Remove start-trace.sh on {{ trace_host }}"
+    file:
+      path: "/tmp/{{ wl_namespace }}-{{ trace_host }}-start-trace.sh"
+      state: absent
+    ignore_errors: true
+
+  - name: "Remove stop-trace.sh on {{ trace_host }}"
+    file:
+      path: "/tmp/{{ wl_namespace }}-{{ trace_host }}-stop-trace.sh"
+      state: absent
+    ignore_errors: true
+
+  - name: Set flag to prevent multiple cleanups
+    set_fact:
+      trace_script_removed: true
+    delegate_facts: true
+
+  delegate_to: "{{ trace_host }}"
+  when: not (hostvars[trace_host].trace_script_removed | default(false))

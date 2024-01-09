@@ -1,0 +1,40 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- hosts: controller-0
+  gather_facts: no
+  tasks:
+    - name: "Cleanup kubernetes DLB device plugin"
+      ansible.builtin.include_role:
+        name: dlb
+        tasks_from: kubernetes_plugin_cleanup.yaml
+      when: 
+        - wl_tunables['DLB_ACC'] == "enable"
+
+- hosts: worker-0
+  become: yes
+  gather_facts: no
+  tasks:
+    - name: "Check if uninstallation script exists"
+      stat:
+        path: /opt/workspace/template/ansible/custom/roles/dlb/tasks/driver_uninstall.yaml
+      register: check_uninstall_script
+      delegate_to: localhost
+
+    - name: "Check if dlb driver already installed"
+      shell: |
+        ls -la /dev/dlb*
+      ignore_errors: true
+      register: dlb_driver_exist
+
+    - name: "Uninstall dlb driver"
+      ansible.builtin.include_role:
+        name: dlb
+        tasks_from: driver_uninstall.yaml
+      when: 
+        - wl_tunables['DLB_ACC'] == "enable"
+        - dlb_driver_exist.rc == 0
+        - check_uninstall_script.stat.exists

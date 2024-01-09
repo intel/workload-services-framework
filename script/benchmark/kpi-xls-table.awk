@@ -21,6 +21,11 @@ BEGIN {
 
 /[/]itr-[0-9]*:$/ {
     name=gensub("^.*logs-([^/]*)[/].*$","\\1",1)
+    status="failed"
+}
+
+/^# status: (passed|failed)/ {
+    status=$3
 }
 
 index($0,var1)==1 || ($1=="#" && index($2,var1)==1) {
@@ -39,7 +44,7 @@ index($0,var2)==1 || ($1=="#" && index($2,var2)==1) {
     var4v=var4": "gensub(/"/,"","g",$NF)
 }
 
-/^[*].*: *([0-9.-][0-9.e+-]*) *#*.*$/ {
+/^[*].*: *([0-9.-][0-9.e+-]*) *#*.*$/ && status=="passed" {
     primary_kpi[name]=gensub(/^.*: *([0-9.-][0-9.-]*).*$/,"\\1",1,$0)
     var34v=""
     if (length(var3)>0) var34v=var3v

@@ -4,51 +4,63 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: Check if gprofiler is already installed
-  stat:
-    path: /usr/local/bin/gprofiler
-  register: gprofiler
+- block:
 
-- name: Get uname -m
-  command: uname -m
-  register: uname
-  when: not gprofiler.stat.exists
+  - name: Check if gprofiler is already installed
+    stat:
+      path: /usr/local/bin/gprofiler
+    register: gprofiler
 
-- name: Fetch gprofiler
-  get_url:
-    url: "{{ gprofiler_package }}/gprofiler_{{ uname.stdout }}"
-    dest: /usr/local/bin/gprofiler
-    mode: "a+rx"
-  become: true
-  when: not gprofiler.stat.exists
+  - name: Get uname -m
+    command: uname -m
+    register: uname
+    when: not gprofiler.stat.exists
 
-- name: Append the start script
-  blockinfile:
-    path: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-start-trace.sh"
-    marker: "# gprofiler {mark}"
-    insertbefore: "^wait"
-    block: |
-      (
-        mkdir -p /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-gprofiler
-        cd /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-gprofiler
-        date -Ins >> TRACE_START
-        killall -9 gprofiler || true
-        rm -rf /tmp/gprofiler_tmp
-        nohup /usr/local/bin/gprofiler {{ gprofiler_options }} --continuous --output /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-gprofiler > gprofiler-$1.logs 2>&1 &
-        echo $! > gprofiler.pid
-        disown
-      ) &
+  - name: Fetch gprofiler
+    get_url:
+      url: "{{ gprofiler_package }}/gprofiler_{{ uname.stdout }}"
+      dest: /usr/local/bin/gprofiler
+      mode: "a+rx"
+    become: true
+    when: not gprofiler.stat.exists
 
-- name: Append the stop script
-  blockinfile:
-    path: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-stop-trace.sh"
-    marker: "# gprofiler {mark}"
-    insertbefore: "^wait"
-    block: |
-      (
-        cd /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-gprofiler
-        date -Ins >> TRACE_STOP
-        kill $(cat gprofiler.pid)
-        pkill -TERM gprofiler
-        rm -rf /tmp/gprofiler_tmp
-      ) &
+  - name: Append the start script
+    blockinfile:
+      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-start-trace.sh"
+      marker: "# gprofiler {mark}"
+      insertbefore: "^wait"
+      block: |
+        (
+          mkdir -p /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler
+          cd /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler
+          if is_roi "{{ trace_node.0 }}"; then
+            date -Ins >> TRACE_START
+            killall -9 gprofiler || true
+            rm -rf /tmp/gprofiler_tmp
+            nohup /usr/local/bin/gprofiler {{ gprofiler_options }} --continuous --output /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler > gprofiler-$roi.logs 2>&1 &
+            echo $! > gprofiler.pid
+            disown
+          else
+            echo "---" >> TRACE_START
+          fi
+        ) &
+
+  - name: Append the stop script
+    blockinfile:
+      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-stop-trace.sh"
+      marker: "# gprofiler {mark}"
+      insertbefore: "^wait"
+      block: |
+        (
+          cd /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-gprofiler
+          if is_roi "{{ trace_node.0 }}"; then
+            date -Ins >> TRACE_STOP
+            kill $(cat gprofiler.pid)
+            pkill -TERM gprofiler
+            rm -rf /tmp/gprofiler_tmp
+          else
+            echo "---" >> TRACE_STOP
+          fi
+        ) &
+
+  delegate_to: "{{ trace_node.1 }}"

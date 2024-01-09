@@ -1,0 +1,236 @@
+{% raw %}
+
+#!/bin/bash -e
+
+##############################################
+# filename: set_irq_affinity.sh
+# function: bind soft irqs to different cores.
+#           support specify cores, by default
+#           irqs will be binded to all cores.
+# input: ip or dev name of that need to be set
+# output: status before and after setting
+##############################################
+
+if [ "$#" -eq 0 ]; then
+    echo "Usage: [options]"
+    echo "--ip <str>              IP address that need to be optimized."
+    echo "--devname <str>         Device name of NIC that need to be optimized."
+    echo "--cpu <str>             Bind irqs to these CPUs, by default is all core."
+    echo "--checkirq              With this flag, will show current core bindings of input device."
+    exit 3
+fi
+
+input_ip=""
+input_dev_name=""
+input_cpu=""
+check_irq=0
+
+# get the input parameters
+for var in "$@"; do
+    case "$var" in
+    --ip=*)
+        input_ip="${var/--ip=/}"
+        ;;
+    --ip)
+        input_ip="-1"
+        ;;
+    --devname=*)
+        input_dev_name="${var/--devname=/}"
+        ;;
+    --devname)
+        input_dev_name="-1"
+        ;;
+    --cpu=*)
+        input_cpu="${var/--cpu=/}"
+        ;;
+    --cpu)
+        input_cpu="-1"
+        ;;
+    --checkirq)
+        check_irq=1
+        ;;
+    *)
+        if [ "$input_ip" = "-1" ]; then
+            input_ip="$var"
+        elif [ "$input_dev_name" = "-1" ]; then
+            input_dev_name="$var"
+        elif [ "$input_cpu" = "-1" ]; then
+            input_cpu="$var"
+        else
+            args+=("$var")
+        fi
+        ;;
+    esac
+done
+
+function parse_input_cpu() {
+    input_cpu=${1// /}
+    IFS_BAK="$IFS"
+    IFS=","
+    input_cpu=($input_cpu)
+    input_cpu_len=${#input_cpu[@]}
+
+    parsed_cpu=""
+    parsed_cpu_idx=0
+    for(( i = 0; i < input_cpu_len; i ++ ))
+    do
+        IFS="-"
+        current_group=(${input_cpu[$i]})
+        if [[ ${#current_group[@]} == 1 ]]; then
+            parsed_cpu[$parsed_cpu_idx]=$current_group
+            parsed_cpu_idx=$(( $parsed_cpu_idx + 1 ))
+        elif [[ ${#current_group[@]} == 2 ]]; then
+            current_group_start=${current_group[0]}
+            current_group_end=${current_group[1]}
+            current_group_cpu_num=$(( $current_group_end-$current_group_start+1 ))
+            for (( j = 0; j < current_group_cpu_num; j ++ ))
+            do
+                parsed_cpu[$parsed_cpu_idx]=$(( $current_group_start+$j ))
+                parsed_cpu_idx=$(( $parsed_cpu_idx + 1 ))
+            done
+        fi
+    done
+
+    IFS="$IFS_BAK"
+    echo ${parsed_cpu[@]}
+}
+
+function get_dev_name_with_ip() {
+    dev_list=($(ls /sys/class/net))
+    for dev in "${dev_list[@]}"
+    do
+        if [[ "$(ifconfig $dev)" =~ "$1" ]]; then
+            dev_name_via_ip=$dev
+            break
+        fi
+    done
+    echo "$dev_name_via_ip"
+}
+
+function check_if_dev_name_exist() {
+    dev_list=($(ls /sys/class/net))
+    for dev in "${dev_list[@]}"
+    do
+        if [[ "$dev" == "$1" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+function get_local_cores() {
+    dev_name=$1
+    local_core_list=$(cat /sys/class/net/$dev_name/device/local_cpulist)
+    local_node=$(lscpu |grep "$local_core_list"|awk '/NUMA node/{print $2}'|awk -F 'node' '{print $2}')
+    local_cores=$(lscpu -p=CPU,NODE | grep ",$local_node" | awk -F ',' '{print $1}')
+    echo ${local_cores[@]}
+}
+
+function check_current_irqs() {
+    dev_name=$1
+    irq_list=($(cat /proc/interrupts | grep "$dev_name" | awk -F: '{print $1}'))
+    irq_list_len=${#irq_list[@]}
+
+    local_cores=$(get_local_cores $dev_name)
+    echo "Local cores of network device $dev_name: $local_cores"
+
+    echo "Below are interrupts and binded cores of Network device $dev_name:"
+    echo "IRQ : Core"
+
+    for (( i = 0; i < $irq_list_len; i ++ ))
+    do
+        echo "${irq_list[$i]} : $(cat /proc/irq/${irq_list[$i]}/smp_affinity_list)"
+    done
+}
+
+function bind_irqs_to_cores() {
+    dev_name=$1
+    core_list=$2
+
+    IFS_BAK="$IFS"
+    IFS=" "
+    core_list=($core_list)
+    IFS="$IFS_BAK"
+
+    core_list_len=${#core_list[@]}
+    irq_list=($(cat /proc/interrupts | grep "$dev_name" | awk -F: '{print $1}'))
+    irq_list_len=${#irq_list[@]}
+    echo "Interrupts on Network device $dev_name : ${irq_list[@]}"
+
+    echo "IRQ : Core"
+    for(( i = 0; i < $irq_list_len; i ++ ))
+    do
+        core_idx=$((i % $core_list_len))
+        core=${core_list[$core_idx]}
+        echo "${irq_list[$i]} : $(cat /proc/irq/${irq_list[$i]}/smp_affinity_list) , before setting"
+        echo "$core" > /proc/irq/${irq_list[$i]}/smp_affinity_list
+        echo "${irq_list[$i]} : $core , after setting"
+    done
+}
+
+if [[ -z "$input_dev_name" ]] && [[ -z "$input_ip" ]]; then
+    echo "Please input ip or device name."
+    exit 3
+fi
+
+# check if input ip or device name is valid.
+if [[ -n "$input_ip" ]]; then
+    dev_name_via_ip=$(get_dev_name_with_ip $input_ip)
+    if [[ -z "$dev_name_via_ip" ]]; then
+        echo "Can not find any net device via input ip address."
+        if [[ -z "$input_dev_name" ]]; then
+            echo "Please input at least one ip or device name."
+            exit 3
+        else
+            check_if_dev_name_exist $input_dev_name
+            retval=$?
+            if [[ $retval == 0 ]]; then
+                dev_name=$input_dev_name
+            else
+                echo "Input device name $input_dev_name not found."
+                exit 3
+            fi
+        fi
+    else
+        echo "Found the net device $dev_name_via_ip binded to ip $input_ip."
+        if [[ -n "$input_dev_name" ]]; then
+            if [[ "$dev_name_via_ip" != "$input_dev_name" ]]; then
+                echo "Input ip address and device name not match."
+                exit 3
+            else
+                dev_name=$dev_name_via_ip
+            fi
+        else
+            dev_name=$dev_name_via_ip
+        fi
+    fi
+else
+    echo "No input ip address, will check if input device name exist."
+    check_if_dev_name_exist $input_dev_name
+    retval=$?
+    if [[ $retval == 0 ]]; then
+        dev_name=$input_dev_name
+    else
+        echo "Input device name $input_dev_name not found."
+        exit 3
+    fi
+fi
+
+if [ $check_irq = 1 ]; then
+    # check local cores for device
+    check_current_irqs $input_dev_name
+elif [[ -z "$input_cpu" ]]; then
+    # irqs will be bind to all cores by default
+    echo "Not specify cpu cores, will bind irqs of device $dev_name to all cores."
+    local_cores=$(get_local_cores $dev_name)
+    echo "Network device $dev_name local cpu list: ${local_cores[@]}"
+    bind_irqs_to_cores $dev_name "${local_cores[*]}"
+else
+    # irqs will be bind to specific cores
+    echo "Specified cpu cores, Will bind irqs of device $dev_name to cpu cores $input_cpu."
+    input_cpu=$(parse_input_cpu "${input_cpu[@]}")
+    ########## Need to check if input cpu is valid ############
+    bind_irqs_to_cores $dev_name "${input_cpu[@]}"
+fi
+
+{% endraw %}

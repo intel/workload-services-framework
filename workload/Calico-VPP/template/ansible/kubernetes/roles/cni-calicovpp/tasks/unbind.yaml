@@ -1,0 +1,17 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+### Unbind DSA devices with dpdk driver
+- name: Unbind DSA devices
+  include_role:
+    name: dpdk-calico
+    tasks_from: unbind-dsa.yaml
+  when: k8s_calicovpp_dsa_enable | default(true)
+
+- name: Unbind Network devices
+  include_role:
+    name: dpdk-calico
+    tasks_from: unbind-network.yaml

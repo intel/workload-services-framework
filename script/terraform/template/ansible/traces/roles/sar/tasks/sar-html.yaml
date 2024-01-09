@@ -1,0 +1,16 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: generate sar html page
+  template:
+    src: sar-charts.html.j2
+    dest: "{{ sar_dir }}/roi-{{ roi_index }}.html"
+  vars:
+    time_spec: "{{ lookup('pipe', 'date -d ' + (roi[0] | quote) + ' +' + ('%Y %m %d' | quote)) }}"
+    sar_data: "{{ lookup('pipe', 'gawk -v time_spec=' + (time_spec | quote) + ' -f ' + ((role_path + '/scripts/parse-sartxt.awk') | quote) + ' ' + ((sar_dir + '/sar-' + (roi_index | string) + '.logs.txt') | quote)) }}"
+  delegate_to: localhost
+  become: false
+  ignore_errors: true

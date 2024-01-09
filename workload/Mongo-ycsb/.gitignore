@@ -1,3 +1,2 @@
-Dockerfile
-Dockerfile.1.mongodb
-Dockerfile.2.ycsb
+**/*.tmpm4.*
+**/*.tmpj2.*

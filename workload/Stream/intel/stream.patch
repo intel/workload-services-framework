@@ -1,0 +1,15 @@
+--- stream_orig.c       2023-05-25 07:37:23.215642457 +0000
++++ stream.c    2023-05-25 06:46:19.102415019 +0000
+@@ -46,6 +46,7 @@
+ # include <float.h>
+ # include <limits.h>
+ # include <sys/time.h>
++# include <omp.h>
+
+ /*-----------------------------------------------------------------------
+  * INSTRUCTIONS:
+@@ -583,3 +584,4 @@
+ }
+ /* end of stubs for the "tuned" versions of the kernels */
+ #endif
++

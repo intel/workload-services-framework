@@ -72,17 +72,20 @@ spec:
           - disk:
               bus: virtio
             name: block-disk1
-ifelse("eval(defn(`RBD_IMAGE_NUM') > 1)","1",`dnl
+ifelse("eval(defn(`RBD_IMAGE_NUM') > 1)","1",`dnl            
           - disk:
               bus: virtio
             name: block-disk2
 ',)dnl
-ifelse("eval(defn(`RBD_IMAGE_NUM') > 2)","1",`dnl
+ifelse("eval(defn(`RBD_IMAGE_NUM') > 2)","1",`dnl            
           - disk:
               bus: virtio
             name: block-disk3
 ',)dnl
-        cpu:
+          interfaces:
+          - name: default
+            masquerade: {}
+        cpu: 
           cores: defn(`VM_CPU_NUM')
           sockets: 1
 ifelse("defn(`CPU_PLACEMENT')","1",`dnl
@@ -102,14 +105,20 @@ ifelse("defn(`CPU_PLACEMENT')","1",`dnl
             - matchExpressions:
               - key: HAS-SETUP-CEPH-STORAGE
                 operator: Exists
+        podAntiAffinity:
 ifelse("defn(`VM_SCALING')","1",`dnl
-              - key: VM-SCALING-NODE
-                operator: Exists
-              - key: zone-defn(`VM_ZONE')
-                operator: Exists
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                  - key: kubevirt.io/vm
+                    operator: In
+                    values:
+                    - ubuntu
+                topologyKey: kubernetes.io/hostname
 ',)dnl
 ifelse("defn(`VM_SCALING')","0",`dnl
-        podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
           - labelSelector:
               matchExpressions:
@@ -120,6 +129,9 @@ ifelse("defn(`VM_SCALING')","0",`dnl
             topologyKey: kubernetes.io/hostname
 ',)dnl
       terminationGracePeriodSeconds: 0
+      networks:
+      - name: default
+        pod: {}
       volumes:
       - name: block-disk1
         persistentVolumeClaim:
@@ -133,7 +145,7 @@ ifelse("eval(defn(`RBD_IMAGE_NUM') > 2)","1",`dnl
       - name: block-disk3
         persistentVolumeClaim:
           claimName: defn(`PVC_NAME')-3
-',)dnl
+',)dnl          
       - containerDisk:
           image: defn(`DOCKER_IMAGE_GUESTOS')
           imagePullPolicy: Always
@@ -149,13 +161,13 @@ ifelse("eval(defn(`RBD_IMAGE_NUM') > 2)","1",`dnl
               expire: False
             ssh_pwauth: True
             ssh_authorized_keys:
-              - ssh-rsa
-            runcmd:
+              - ssh-rsa 
+            runcmd: 
               - timedatectl set-timezone Asia/Shanghai
               - echo "export benchmark_options=\"defn(`BENCHMARK_OPTIONS')\"" >>/etc/profile
               - echo "export configuration_options=\"defn(`CONFIGURATION_OPTIONS')\"" >>/etc/profile
               - sudo bash -x /opt/test/run_test.sh
-        name: cloudinitdisk
+        name: cloudinitdisk 
 ',)dnl
 
 
@@ -175,15 +187,15 @@ spec:
         kubevirt.io/vm: ubuntu
     spec:
       domain:
-        cpu:
+        cpu: 
           cores: defn(`VM_CPU_NUM')
           sockets: 1
 ifelse("defn(`CPU_PLACEMENT')","1",`dnl
           dedicatedCpuPlacement: true
 ',)dnl
-        memory:
-          hugepages:
-            pageSize: "2Mi"
+        memory: 
+          hugepages: 
+            pageSize: "2Mi"       
         devices:
           disks:
           - disk:
@@ -203,8 +215,11 @@ ifelse("eval(defn(`RBD_IMAGE_NUM') > 1)","1",`dnl
 ifelse("eval(defn(`RBD_IMAGE_NUM') > 2)","1",`dnl
           - disk:
               bus: virtio
-            name: spdk-vhost-blk3
-',)dnl
+            name: spdk-vhost-blk3    
+',)dnl        
+          interfaces:
+          - name: default
+            masquerade: {}
         machine:
           type: ""
         resources:
@@ -223,14 +238,20 @@ ifelse("eval(defn(`RBD_IMAGE_NUM') > 2)","1",`dnl
                 operator: Exists
               - key: HAS-SETUP-HUGEPAGE-2048kB-32768
                 operator: Exists
+        podAntiAffinity:
 ifelse("defn(`VM_SCALING')","1",`dnl
-              - key: VM-SCALING-NODE
-                operator: Exists
-              - key: zone-defn(`VM_ZONE')
-                operator: Exists
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                  - key: kubevirt.io/vm
+                    operator: In
+                    values:
+                    - ubuntu
+                topologyKey: kubernetes.io/hostname
 ',)dnl
 ifelse("defn(`VM_SCALING')","0",`dnl
-        podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
           - labelSelector:
               matchExpressions:
@@ -239,8 +260,11 @@ ifelse("defn(`VM_SCALING')","0",`dnl
                 values:
                 - ubuntu
             topologyKey: kubernetes.io/hostname
-',)dnl
+',)dnl             
       terminationGracePeriodSeconds: 0
+      networks:
+      - name: default
+        pod: {}
       volumes:
       - name: spdk-vhost-blk1
         spdkVhostBlkDisk:
@@ -253,7 +277,7 @@ ifelse("eval(defn(`RBD_IMAGE_NUM') > 1)","1",`dnl
 ifelse("eval(defn(`RBD_IMAGE_NUM') > 2)","1",`dnl
       - name: spdk-vhost-blk3
         spdkVhostBlkDisk:
-          capacity: defn(`RBD_IMG_SIZE')
+          capacity: defn(`RBD_IMG_SIZE')   
 ',)dnl
       - containerDisk:
           image: defn(`DOCKER_IMAGE_GUESTOS')
@@ -270,8 +294,8 @@ ifelse("eval(defn(`RBD_IMAGE_NUM') > 2)","1",`dnl
               expire: False
             ssh_pwauth: True
             ssh_authorized_keys:
-              - ssh-rsa
-            runcmd:
+              - ssh-rsa 
+            runcmd: 
               - timedatectl set-timezone Asia/Shanghai
               - echo "export benchmark_options=\"defn(`BENCHMARK_OPTIONS')\"" >>/etc/profile
               - echo "export configuration_options=\"defn(`CONFIGURATION_OPTIONS')\"" >>/etc/profile

@@ -73,10 +73,11 @@ spec:
           value: "{{ .Values.DURATION }}"
         - name: AUTO_EXTEND_INPUT
           value: "{{ .Values.AUTO_EXTEND_INPUT }}"
+        - name: MORE_EXT_SLA_SCAN
+          value: "{{ .Values.MORE_EXT_SLA_SCAN }}"
         - name: NODES
           value: "{{ .Values.NODES }}"
       restartPolicy: Never
       nodeSelector:
         kubernetes.io/hostname: ${ISTIO_ENVOY_CLIENT_HOSTNAME}
   backoffLimit: 5
-  

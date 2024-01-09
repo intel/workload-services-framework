@@ -1,0 +1,22 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: get total memory
+  shell:
+    cmd: "sed -n '/^MemTotal:/{s/.*: *//;p}' /proc/meminfo"
+    executable: /bin/bash
+  register: meminfo
+
+- name: fail if total memory does not meet the requirement
+  fail:
+    msg: "Total memory {{ mem_gb | int }}GB less than required {{ mem_req }}GB."
+  when:
+  - (mem_gb | int) < (mem_req | int)
+  vars:
+    mem_value: "{{ meminfo.stdout | split(' ') | first }}"
+    mem_gb: "{{ ('kB' in meminfo.stdout) | ternary((mem_value | int) / 1048576, ('mB' in meminfo.stdout) | ternary((mem_value | int) / 1024, mem_value)) }}"
+    mem_req: "{{ 3 | extract(label_name | split('=') | first | split('-')) }}"
+

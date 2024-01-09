@@ -108,3 +108,21 @@ resource "aws_spot_instance_request" "default" {
     ]))
   }
 }
+
+resource "null_resource" "cleanup" {
+  for_each = local.spot_instances
+
+  triggers = {
+    region = data.aws_region.default.name
+    spot_instance_id = aws_spot_instance_request.default[each.key].spot_instance_id
+    tags = join(" ", [
+      for k,v in aws_spot_instance_request.default[each.key].tags_all:
+        format("Key=%s", k)
+    ])
+  }
+
+  provisioner "local-exec" {
+    when = destroy
+    command = format("aws ec2 delete-tags --color=off --region %s --resources %s --tags %s", self.triggers.region, self.triggers.spot_instance_id, self.triggers.tags)
+  }
+}

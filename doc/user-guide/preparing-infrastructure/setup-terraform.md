@@ -180,5 +180,4 @@ $ exit
 [WSF Cloud Setup]: setup-wsf.md#cloud-development-setup
 [WSF On-Premises Setup]: setup-wsf.md#on-premises-development-setup
 [terraform-config.static.tf]: ../../../script/terraform/terraform-config.static.tf
-[WSF KVM Setup]: setup-wsf.md#kvm-development-setup
 [Trace Module]: ../executing-workload/terraform-options.md#trace-module-parameters

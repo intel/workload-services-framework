@@ -1,0 +1,19 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+*aws*:
+    AWS_CONTROLLER_INSTANCE_TYPE: m6i.xlarge
+    AWS_WORKER_INSTANCE_TYPE: m6i.xlarge
+    AWS_CLIENT_INSTANCE_TYPE: m6i.xlarge
+    AWS_ZONE: us-west-1a
+    AWS_DISK_SPEC_1_DISK_COUNT: 2
+    AWS_DISK_SPEC_1_DISK_SIZE: 120
+    AWS_DISK_SPEC_1_DISK_TYPE: io2
+    AWS_DISK_SPEC_1_DISK_IOPS: 32000
+
+*kafka*:
+    ENABLE_MUL_DISK: true
+    MOUNT_DISK_COUNT: 2
+

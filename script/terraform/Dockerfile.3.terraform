@@ -14,23 +14,23 @@ ARG DOCKER_CLI_IMG=docker:${DOCKER_CLI_VER}-dind
 FROM ${DOCKER_CLI_IMG} as dockercli
 
 FROM ${OS_IMAGE}:${OS_VER} as flamegraph
-RUN  apt-get update && apt-get install -y git
+RUN apt-get update && apt-get install -y git
 
-ARG FLAMEGRAPH_VER=d9fcc272b6a08c3e3e5b7919040f0ab5f8952d65
+ARG FLAMEGRAPH_VER=v1.0
 ARG FLAMEGRAPH_REPO=https://github.com/brendangregg/FlameGraph.git
-RUN  git clone ${FLAMEGRAPH_REPO} && \
-    cd FlameGraph && \
+RUN git clone ${FLAMEGRAPH_REPO} flamegraph && \
+    cd flamegraph && \
     git checkout ${FLAMEGRAPH_VER}
 
 FROM ${OS_IMAGE}:${OS_VER}
 ENV DEBIAN_FRONTEND=noninteractive
-RUN  apt-get update && apt-get install -y skopeo zip less gnupg curl gawk netcat connect-proxy sudo openssh-client bzip2 tzdata && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN  apt-get update && apt-get install -y skopeo zip less gnupg curl gawk netcat connect-proxy sudo openssh-client bzip2 tzdata rsync && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # python3, Ansible and various validation tools
 ARG CONDA_DIR=/opt/conda
 ARG CONDA_VER=Miniconda3-py311_23.5.2-0
 ARG CONDA_REPO=https://repo.anaconda.com/miniconda/${CONDA_VER}-Linux-x86_64.sh
-ARG ANSIBLE_VER=8.3.0
+ARG ANSIBLE_VER=8.5.0
 ARG ANSIBLE_REPO=conda
 RUN curl -L -o ~/miniconda.sh ${CONDA_REPO} && \
     bash ~/miniconda.sh -b -p ${CONDA_DIR} && \
@@ -43,7 +43,7 @@ RUN curl -L -o ~/miniconda.sh ${CONDA_REPO} && \
 ENV PATH=${CONDA_DIR}/bin:$PATH
 
 # Install terraform & packer
-ARG TERRAFORM_VER=1.5.5
+ARG TERRAFORM_VER=1.5.7
 ARG TERRAFORM_REPO=https://apt.releases.hashicorp.com
 ARG PACKER_VER=1.9.4
 ARG PACKER_REPO=https://apt.releases.hashicorp.com
@@ -58,8 +58,8 @@ RUN  curl ${TERRAFORM_REPO}/gpg | gpg --dearmor > /usr/share/keyrings/hashicorp-
 COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/
 
 # Copy FlameGraph utilities
-COPY --from=flamegraph /FlameGraph/stackcollapse-perf.pl /usr/local/bin/
-COPY --from=flamegraph /FlameGraph/flamegraph.pl /usr/local/bin/
+COPY --from=flamegraph /flamegraph/stackcollapse-perf.pl /usr/local/bin/
+COPY --from=flamegraph /flamegraph/flamegraph.pl /usr/local/bin/
 
 ####
 ARG USER=tfu

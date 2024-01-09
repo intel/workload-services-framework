@@ -3,36 +3,68 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
-- name: record timing
-  shell:
-    cmd: |
-      echo "workload_itr{{ itr }}_roi{{ roi_index }}_start: \"$(date -Ins)\"" >> {{ wl_logs_dir}}/timing.yaml
-    executable: /bin/bash
-  delegate_to: localhost
+
+- block:
+
+  - name: wait for previous stop job to complete
+    async_status:
+      jid: "{{ startstop_job.job }}"
+    when:
+    - (startstop_job.mode == 'stop')
+    - (startstop_job.job != '')
+    register: statusrc
+    until: statusrc.finished
+    retries: "{{ (((trace_stop_timeout|int)+4)/5) | int }}"
+    delay: 5
+    ignore_errors: true
+
+  - name: record timing
+    shell:
+      cmd: |
+        echo "workload_itr{{ itr | default(1) }}_roi{{ roi_index }}_start: \"$(date -Ins)\"" >> {{ wl_logs_dir}}/timing.yaml
+      executable: /bin/bash
+    delegate_to: localhost
+    async: 30
+    poll: 0
+
+  - name: "start trace roi {{ roi_index }}"
+    shell: 
+      cmd: |
+        {% for h in ((((vmhost_reqs|length>0) | ternary(trace_vmhosts,[]))+((vminst_reqs|length>0) | ternary(groups.trace_hosts,[]))) | unique) %}
+          {% if ((hostvars[h].ansible_connection|default('ssh'))=='ssh') %}
+            ssh -p {{ hostvars[h]['ansible_port'] | default(22) }} {{ hostvars[h]['ansible_user'] }}@{{ hostvars[h]['ansible_host'] }} -i {{ ansible_private_key_file }} sudo -E /tmp/{{ wl_namespace }}-{{ h }}-start-trace.sh {{ roi_index }} &
+          {% endif %}
+          {% if ((hostvars[h].ansible_connection|default('ssh'))=='winrm') %}
+            {{ role_path }}/scripts/runps1.py {{ h }} "& {{ win_tmp_path }}\{{ wl_namespace }}-{{ h }}-start-trace.ps1 {{ roi_index }}" &
+          {% endif %}
+        {% endfor %}
+        wait
+      executable: /bin/bash
+      chdir: "{{ wl_logs_dir }}"
+    delegate_to: localhost
+    register: trace_startrc
+    ignore_errors: yes
+    async: "{{ trace_start_timeout }}"
+    poll: 0
+    become: false
+    vars:
+      vmhost_reqs: "{{ wl_trace_modules|default('')|split(',')|reject('==','')|select('match','.*:host.*') }}"
+      vminst_reqs: "{{ wl_trace_modules|default('')|split(',')|reject('==','')|reject('match','.*:host.*') }}"
+      unique_vmhosts: "{{ dict(groups.vmhost_hosts | map('extract', hostvars, ['ansible_host']) | zip(groups.vmhost_hosts | map('extract', hostvars, ['ansible_port'])) | map('join',':') | zip(groups.vmhost_hosts)).values() }}"
+      trace_vmhosts: "{{ groups.trace_hosts|map('extract',hostvars,['vmhost_host'])|map('default',[])|flatten|select('in',unique_vmhosts) }}"
+
+  - name: set trace started
+    set_fact:
+      trace_startstop_job:
+        mode: start
+        job: "{{ trace_startrc.ansible_job_id }}"
+    delegate_to: "{{ trace_logs_host | default(inventory_hostname) }}"
+    delegate_facts: true
+
   when:
   - sut_sudo | default(true) | bool
-  - trace_start | default(false) == false
-
-- name: start trace
-  shell:
-    cmd: |
-      {% for h in groups['trace_hosts'] %}
-      ssh -p {{ hostvars[h]['ansible_port'] | default(22) }} {{ hostvars[h]['ansible_user'] }}@{{ hostvars[h]['ansible_host'] }} -i {{ ansible_private_key_file }} sudo -E /tmp/{{ wl_namespace }}-{{ h }}-start-trace.sh {{ roi_index }} &
-      {% endfor %}
-      wait
-    executable: /bin/bash
-  delegate_to: localhost
-  ignore_errors: yes
+  - (startstop_job.mode != 'start')
   run_once: true
-  become: false
-  when:
-  - sut_sudo | default(true) | bool
-  - trace_start | default(false) == false
-
-- name: set trace started
-  set_fact:
-    trace_started: true
-  when:
-  - sut_sudo | default(true) | bool
-  - trace_start | default(false) == false
+  vars:
+    startstop_job: "{{ hostvars[trace_logs_host | default(inventory_hostname)].trace_startstop_job | default({'mode':'','job':''}) }}"
 

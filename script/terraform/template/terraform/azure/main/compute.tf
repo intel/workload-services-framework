@@ -74,6 +74,7 @@ resource "random_password" "default" {
 
   length = 16
   special = true
+  override_special = "!#&*()_=+[]<>?"
 }
   
 resource "azurerm_windows_virtual_machine" "default" {

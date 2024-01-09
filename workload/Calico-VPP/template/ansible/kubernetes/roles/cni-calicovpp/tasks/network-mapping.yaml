@@ -1,0 +1,112 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+### mapping ip/interface/mac_address/pci_device_id relationship
+#########################################################
+# 192.168.1.100/23  ens21f0 40:a6:b7:97:34:b1 0000:b1:00.0
+#########################################################
+- name: Generate get_interface.sh script by ip
+  shell: |
+    cat<<EOF>/tmp/{{ wl_namespace }}-get_interface.sh
+    #!/bin/bash
+    interfaces=(\$(ip link show |grep -v 'lo\|@'|awk -F":" '/^[^ ]/{print \$2}'|awk '{print \$1}'))
+    for interface in \${interfaces[@]}; do
+      if ip a show \$interface |grep -F -q "{{ private_ip }}"; then
+        echo \$interface
+        exit 0
+      fi
+    done
+    exit 1
+    EOF
+    chmod +x /tmp/{{ wl_namespace }}-get_interface.sh
+  become: true
+
+- name: Execute {{ wl_namespace }}-get_interface.sh script
+  become: true
+  shell: /tmp/{{ wl_namespace }}-get_interface.sh
+  ignore_errors: true
+  register: get_interface
+  until: get_interface is success
+  retries: 20
+  delay: 20
+  become: true
+
+# - name: Fail if no network interface available
+#   fail:
+#     msg: \***********************************************************
+#          \ Network interface not found by private ip {{ private_ip }}
+#          \ Double check if network interface does not bring up 
+#          \ or ip address manually changed
+#          \***********************************************************
+#   when: ( get_interface.rc != 0 ) or ( get_interface.stdout |trim == "")
+
+- name: Install ethtool
+  apt: 
+    name:
+      - ethtool
+    state: present
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+  become: true
+
+- name: Get device id by network interface name
+  become: true
+  shell: "ethtool -i {{ get_interface.stdout }} |awk '/bus-info:/{print $2}'"
+  ignore_errors: true
+  register: get_device_id
+
+- name: Fail if no network interface available
+  fail:
+    msg: \***********************************************************
+         \ Network interface not found by private ip {{ private_ip }}
+         \ Double check if network interface bound by dpdk
+         \***********************************************************
+  when: ( get_device_id.rc != 0 ) or ( get_device_id.stdout |trim == "tap")
+
+- name: Set physic NIC MTU 
+  become: true
+  shell: "ip link set dev {{ get_interface.stdout }} mtu {{ k8s_calico_mtu }}"
+
+- name: Set fact for vpp dataplane interface
+  set_fact:
+    vpp_dataplane_interface: "{{ get_interface.stdout }}"
+    cacheable: yes
+
+- name: Get ip with podSubnet
+  shell: |
+    ip addr show {{ vpp_dataplane_interface }} |awk '/inet /{print $2}'
+  ignore_errors: true
+  register: get_ip_with_subnet
+
+- name: Get mac address by network interface name
+  become: true
+  shell: "ethtool -P {{ vpp_dataplane_interface }} |awk -F 'Permanent address: ' '{print $2}'"
+  ignore_errors: true
+  register: get_mac_address
+
+- name: Set fact for vpp dataplane interface mac address
+  set_fact:
+    vpp_dataplane_mac_address: "{{ get_mac_address.stdout }}"
+    cacheable: yes
+
+- name: Generate network device mapping config {{ k8s_calicovpp_network_mapping }}
+  become: true
+  shell: |
+    printf "{{ get_ip_with_subnet.stdout }} {{ vpp_dataplane_interface }} {{ vpp_dataplane_mac_address }} {{ get_device_id.stdout }}\n" > {{ k8s_calicovpp_network_mapping }}
+  when:
+  - get_interface.rc == 0 and get_interface.stdout | trim != ""
+  - get_ip_with_subnet.rc == 0 and get_ip_with_subnet.stdout | trim != ""
+  - get_device_id.rc == 0 and get_device_id.stdout | trim != ""
+  - get_mac_address.rc == 0 and get_mac_address.stdout | trim != ""
+
+- name: Remove temp files
+  become: true
+  file:
+    path: "/tmp/{{ wl_namespace }}-get_interface.sh"
+    state: absent
+  ignore_errors: true

@@ -21,7 +21,7 @@ source /opt/intel/oneapi/setvars.sh
 
 if [ $N_SIZE == "auto" ]; then
     mem=$(free -b | awk '/Mem:/{print $2}')
-    N_SIZE=$(echo "sqrt(0.9 * $mem / 8)" | bc)
+    N_SIZE=$(echo "sqrt(0.9 * $mem / 32)" | bc)
 fi
 
 if [[ $P_SIZE == "auto" ]]; then

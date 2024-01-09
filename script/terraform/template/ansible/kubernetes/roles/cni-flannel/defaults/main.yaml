@@ -4,6 +4,9 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-k8s_flannel_version: "v0.21.5"
+k8s_flannel_version: "v0.22.3"
 k8s_flannel_repo: "https://raw.githubusercontent.com/flannel-io/flannel/{{ k8s_flannel_version }}/Documentation/kube-flannel.yml"
+k8s_flannel_backend_type: vxlan
+k8s_flannel_backend_mtu: 0
+k8s_flannel_backend_iface: ""
 

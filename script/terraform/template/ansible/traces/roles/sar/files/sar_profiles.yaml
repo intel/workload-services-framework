@@ -1,0 +1,87 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+cpu:
+  filters:
+    group_by: CPU
+    metrics:
+      CPU utilization:
+        metric_name: '%idle'
+        recipe: 'lambda x : 100-x'
+      Sys CPU utilization (without interrupt handling):
+        metric_name: '%sys'
+      CPU time for HW IRQ:
+        metric_name: '%irq'
+      CPU time for SW IRQ:
+        metric_name: '%soft'
+      CPU frequency:
+        metric_name: MHz
+    rename: 'lambda n : ''all'' if n == -1 else str(n)'
+  # HINT: add `-P all` option if separate metrics per each CPU core are needed
+  sar_options: -u ALL -m CPU
+
+interrupt:
+  filters:
+    group_by: INTR
+    metrics:
+      Interrupts (/s):
+        metric_name: intr/s
+    rename: 'lambda n : ''all'' if n == -1 else str(n)'
+  sar_options: -I SUM
+
+net:
+  filters:
+    group_by: IFACE
+    metrics:
+      Network utilization:
+        metric_name: '%ifutil'
+      Receive (KB/s):
+        metric_name: rxkB/s
+      Transmit (KB/s):
+        metric_name: txkB/s
+  sar_options: -n DEV,EDEV
+
+paging:
+  filters:
+    metrics:
+      Page faults (/s):
+        metric_name: 'fault/s'
+      Major faults (/s):
+        metric_name: 'majflt/s'
+      Paged In (KB/s):
+        metric_name: 'pgpgin/s'
+      Paged Out (KB/s):
+        metric_name: 'pgpgout/s'
+  sar_options: -B
+
+memory:
+  filters:
+    metrics:
+      Memory (KB):
+        metric_name: 'kbmemused'
+      Memory (%):
+        metric_name: '%memused'
+  sar_options: -r
+
+huge:
+  filters:
+    metrics:
+      Huge page memory (KB):
+        metric_name: 'kbhugused'
+      Huge page memory (%):
+        metric_name: '%hugused'
+  sar_options: -H
+
+disk:
+  filters:
+    group_by: DEV
+    metrics:
+      Read from device:
+        metric_name: rkB/s
+      Utilization:
+        metric_name: '%util'
+      Write to device:
+        metric_name: wkB/s
+  sar_options: -p -d

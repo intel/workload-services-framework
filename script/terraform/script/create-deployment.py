@@ -26,11 +26,11 @@ for argv in sys.argv:
     argv = argv[2:]
     if "=" in argv:
       k, _, v = argv.partition("=")
-      options[k.replace('-', '_')] = v.strip().replace('%20', ' ')
+      options[k.replace('-', '_').split(':')[0]] = v.strip().replace('%20', ' ')
     elif argv.startswith("no"):
-      options[argv[2:].replace('-', '_')] = False
+      options[argv[2:].replace('-', '_').split(':')[0]] = False
     else:
-      options[argv.replace('-', '_')] = True
+      options[argv.replace('-', '_').split(':')[0]] = True
 instances = tfoutput["values"]["outputs"]["instances"]["value"]
 options["wl_logs_dir"] = "/opt/workspace"
 
@@ -212,7 +212,7 @@ if ((options.get("docker", False) or options.get("native", False)) and ("docker_
 elif os.path.exists(KUBERNETES_CONFIG):
   registry_map = options["wl_registry_map"].split(",")
   if _RegistryEnabled():
-    k8s_registry_port = options.get("k8s_registry_port", "20668")
+    k8s_registry_port = options.get("k8s_registry_port", "30668")
     k8s_registry_ip = inventories["controller"]["hosts"]["controller-0"]["private_ip"] if "controller" in inventories else "127.0.0.1"
     registry_map[1] = options.get("k8s_remote_registry_url", k8s_registry_ip + ":" + k8s_registry_port)
     if not registry_map[1].endswith("/"):

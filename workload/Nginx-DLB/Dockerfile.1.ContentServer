@@ -1,0 +1,49 @@
+# nginx-dlb-content-server
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=22.04
+ARG OS_IMAGE=ubuntu
+
+FROM ${OS_IMAGE}:${OS_VER} AS build
+
+RUN apt-get update && apt-get install -y wget make gcc libpcre3-dev zlib1g-dev libxml2 libxslt-dev python3 python3-pip && pip3 install numpy
+
+ARG NGINX_VER=1.16.1
+ARG NGINX_PKG=http://nginx.org/download/nginx-${NGINX_VER}.tar.gz
+RUN wget ${NGINX_PKG} && tar xf nginx-${NGINX_VER}.tar.gz && \
+    export PREFIX=/ && mkdir -p $PREFIX/var/www/tmp && \
+    cd nginx-${NGINX_VER} && \
+    ./configure \
+        --prefix=$PREFIX \
+        --sbin-path=$PREFIX/sbin/nginx \
+        --modules-path=$PREFIX/lib64/nginx/modules \
+        --conf-path=$PREFIX/etc/nginx/nginx.conf \
+        --error-log-path=$PREFIX/var/www/log/error.log \
+        --pid-path=$PREFIX/var/www/nginx.pid \
+        --lock-path=$PREFIX/var/www/nginx.lock \
+        --http-log-path=$PREFIX/var/www/log/access.log \
+        --http-client-body-temp-path=$PREFIX/var/www/tmp/client_body \
+        --http-proxy-temp-path=$PREFIX/var/www/tmp/proxy \
+        --http-fastcgi-temp-path=$PREFIX/var/www/tmp/fastcgi \
+        --http-uwsgi-temp-path=$PREFIX/var/www/tmp/uwsgi \
+        --http-scgi-temp-path=$PREFIX/var/www/tmp/scgi \
+        --user=nobody --group=nobody \
+        --with-select_module --with-poll_module --with-threads \
+        --with-pcre && \
+    make -j && \
+    make install
+
+COPY content-server/*.conf /etc/nginx/
+COPY content-server/http_obj_generator_scripts/* /
+COPY content-server/run_content_server.sh /
+
+RUN chmod +x /run_content_server.sh && chmod +x /*.py
+
+RUN mkfifo /export-logs
+CMD (/run_content_server.sh; echo $? > status) 2>&1 | tee output.logs && \
+    tar cf /export-logs status output.logs && \
+    sleep infinity

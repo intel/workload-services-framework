@@ -5,9 +5,32 @@
 #
 
 - block:
-    - name: Install trace module
-      include_role:
-        name: "{{ trace_module }}"
-        tasks_from: install
-  ignore_errors: yes
+
+    - block:
+
+      - name: Install Linux trace module
+        include_role:
+          name: "{{ trace_module_name }}"
+          tasks_from: install
+        when:
+        - ((ansible_connection | default('ssh')) == 'ssh')
+
+      - name: Install Windows trace module
+        include_role:
+          name: "{{ trace_module_name }}"
+          tasks_from: install-win
+        when:
+        - ((ansible_connection | default('ssh')) == 'winrm')
+        - (playbook_dir+'/../traces/roles/'+trace_module_name+'/tasks/install-win.yaml') is exists
+
+    - name: Set flag to prevent from reinstallation
+      set_fact:
+        trace_modules_installed: "{{ (trace_modules_installed|default([])) + [trace_module_name] }}"
+      delegate_facts: true
+
+  when:
+  - not (trace_module_name in (hostvars[trace_node.1].trace_modules_installed|default([])))
+  delegate_to: "{{ trace_node.1 }}"
+  vars:
+    trace_module_name: "{{ trace_node.0 | split(':') | first }}"
 

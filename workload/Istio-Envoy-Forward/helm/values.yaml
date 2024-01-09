@@ -1,0 +1,33 @@
+### Gloabl Configuration ###
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+REGISTRY: ""
+RELEASE: ""
+PLATFORM: ""
+BACKEND: ""
+
+### Workload Configuration ###
+SERVER_DOMAIN_NAME: ""
+SERVER_PORT: ""
+CLIENT_CORE_NUM: ""
+CLIENT_MEM: ""
+CLIENT_CONCURRENCY: ""
+CLIENT_CONNECTIONS: ""
+CLIENT_RPS: ""
+CLIENT_RPS_MAX: ""
+CLIENT_RPS_STEP: ""
+CLIENT_LATENCY_BASE: ""
+KILL_DELAY: ""
+MODE: ""
+PROTOCOL: ""
+SERVER_IP: ""
+SERVER_DOMAIN_NAME: ""
+SERVER_PORT: ""
+DURATION: ""
+AUTO_EXTEND_INPUT: ""
+
+CLIENT_REQUEST_BODY_SIZE: ""
+SERVER_RESPONSE_BODY_SIZE: ""

@@ -7,8 +7,8 @@
   - name: check if containerd is installed
     command: containerd --version
     register: containerd
-    ignore_errors: yes
-    become: yes
+    ignore_errors: true
+    become: true
 
   - name: Detect OS
     shell:
@@ -25,7 +25,7 @@
   - name: check containerd configuration
     command: containerd config dump
     register: config
-    ignore_errors: yes
+    ignore_errors: true
 
   - name: check if containerd must be reconfigured
     set_fact:
@@ -36,30 +36,30 @@
       path: "{{ containerd_config_toml | dirname }}"
       state: directory
     when: reconfigure
-    become: yes
+    become: true
 
   - name: configure containerd
     shell: "containerd config default > {{ containerd_config_toml }}"
     when: reconfigure
-    become: yes
+    become: true
 
   - name: Configure SystemdCgroup=true
     lineinfile:
       path: "{{ containerd_config_toml }}"
       regexp: '^(\s*)SystemdCgroup\s*='
       line: '\1SystemdCgroup = true'
-      backrefs: yes
+      backrefs: true
     when: reconfigure
-    become: yes
+    become: true
 
   - name: Configure sandbox_image
     lineinfile:
       path: "{{ containerd_config_toml }}"
       regexp: '^(\s*)sandbox_image\s*=\s*".*(/.*)"'
       line: '\1sandbox_image = "{{ containerd_pause_registry }}\2"'
-      backrefs: yes
+      backrefs: true
     when: reconfigure
-    become: yes
+    become: true
 
   - name: Configure insecure registry cert
     shell: |
@@ -67,32 +67,32 @@
       printf "server = \"http://{{ item }}\"\n[host.\"http://{{ item }}\"]\n  capabilities = [\"pull\", \"resolve\"]\n[plugin.\"io.containerd.grpc.v1.cri\".registry.configs.\"{{ item }}\".tls]\n  insecure_skip_verify = true\n" > "/etc/containerd/certs.d/{{ item }}/hosts.toml"
     loop: "{{ containerd_insecure_registry.split(',') }}"
     when: containerd_insecure_registry != "" and reconfigure
-    become: yes
+    become: true
 
   - name: Configure insecure registry
     lineinfile:
       path: "{{ containerd_config_toml }}"
       regexp: '^(\s*)config_path\s*='
       line: '\1config_path = "/etc/containerd/certs.d"'
-      backrefs: yes
+      backrefs: true
     when: reconfigure
-    become: yes
+    become: true
 
   - name: "Ensure {{ containerd_data_root }} exists"
     file:
       path: "{{ containerd_data_root }}"
       state: directory
     when: reconfigure
-    become: yes
+    become: true
 
   - name: configure containerd root
     lineinfile:
       path: "{{ containerd_config_toml }}"
       regexp: '^(\s*)root\s*='
       line: '\1root = "{{ containerd_data_root }}"'
-      backrefs: yes
+      backrefs: true
     when: reconfigure
-    become: yes
+    become: true
 
   - name: check proxy value
     shell: "echo :$http_proxy$https_proxy$no_proxy:"
@@ -108,7 +108,7 @@
       mkdir -p {{ containerd_proxy_conf | dirname }}
       printf "[Service]\nEnvironment=\"HTTP_PROXY=$http_proxy\" \"HTTPS_PROXY=$https_proxy\" \"NO_PROXY=$no_proxy{{ ((k8s_registry_ip is defined) and (k8s_enable_registry | default(true))) | ternary(',' + (k8s_registry_ip | default('')),'') }}\"\n" > {{ containerd_proxy_conf }}
     when: proxy != "::" and not proxy_conf.stat.exists
-    become: yes
+    become: true
     
   - name: Abort if containerd must be restarted
     fail:

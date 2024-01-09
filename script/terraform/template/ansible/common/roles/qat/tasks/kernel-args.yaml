@@ -7,5 +7,4 @@
 - name: set hugepage kernel args
   set_fact:
     wl_kernel_args: "{{ wl_kernel_args | combine({ 'intel_iommu': 'intel_iommu=on', 'iommu': 'iommu=pt' }) }}"
-    startup_reboot_required: true
 

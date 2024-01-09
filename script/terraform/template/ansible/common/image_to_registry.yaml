@@ -3,6 +3,7 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
+
 - hosts: "{{ ('controller' in groups) | ternary('controller','localhost') }}"
   gather_facts: false
   become: false
@@ -15,13 +16,17 @@
         executable: /bin/bash
       delegate_to: localhost
       run_once: true
-      when: (wl_docker_images | length) > 0
+      when:
+      - ((ansible_connection|default('ssh')) == 'ssh')
+      - (wl_docker_images | length) > 0
+      async: 30
+      poll: 0
 
     - name: Transfer image(s) to docker registry
       include_role:
         name: image-to-registry
       when:
-      - ansible_connection != 'winrm'
+      - ((ansible_connection|default('ssh')) == 'ssh')
       - (wl_docker_images | length) > 0
 
     - name: Recording timing
@@ -31,4 +36,8 @@
         executable: /bin/bash
       delegate_to: localhost
       run_once: true
-      when: (wl_docker_images | length) > 0
+      when:
+      - ((ansible_connection|default('ssh')) == 'ssh')
+      - (wl_docker_images | length) > 0
+      async: 30
+      poll: 0

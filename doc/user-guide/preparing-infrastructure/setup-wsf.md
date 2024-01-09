@@ -19,7 +19,7 @@ flowchart TD;
   net <--> sut3;;
 ```
 
-where the SUT machines can be physical hosts in the On-Premesis case, or virtualized VMs in the Cloud or KVM execution. If Kubernetes is used, it is assumed that the SUT hosts form a Kubernetes cluster, where one of the SUTs be the Kubernetes controller.  
+where the SUT machines can be physical hosts in the On-Premesis case, or virtualized VMs in the Cloud. If Kubernetes is used, it is assumed that the SUT hosts form a Kubernetes cluster, where one of the SUTs be the Kubernetes controller.  
 
 There can be many variations of the above diagram:
 - Combine dev and the Kubernetes controller on the same machine.  
@@ -167,18 +167,16 @@ Use the following setup steps:
 
 - Use `cmake -DREGISTRY=<registry_url> ..` to set the private registry URL.
 - Set `k8s_enable_registry: false` in `script/terraform/terraform-config.static.tf`. This is the default.
-- If the host has enough CPU cores and memory, suggest to use the KVM development setup for more flexibility.
 
 ---
 
 ## Setup Scripts
-> Note: All scripts mentioned below, such as setup-dev.sh, setup-sut-kvm.sh, etc, are found inside ```script/setup/``` and must be executed from there.
+> Note: All scripts mentioned below, such as setup-dev.sh, etc, are found inside ```script/setup/``` and must be executed from there.
 - **[`setup-dev.sh`][setup-dev.sh-self]**: Setup the dev host.   
 - **[`setup-reg.sh`][setup-reg.sh-self]**: Setup a private docker registry.   
 - **[`setup-sut-native.sh`][setup-sut-native.sh-self]**: Setup the SUT host for native workload execution.  
 - **[`setup-sut-docker.sh`][setup-sut-docker.sh-self]**: Setup the SUT host for docker/docker-compose workload execution.  
 - **[`setup-sut-k8s.sh`][setup-sut-k8s.sh-self]**: Setup the SUT host for Kubernetes workload execution.  
-- **[`setup-sut-kvm.sh`][setup-sut-kvm.sh-self]**: Setup the KVM host.  
 
 ### setup-dev.sh
 
@@ -266,7 +264,6 @@ where `options` are:
 
 [Instructions of Cloud Setup]: #cloud-setup
 [Instructions of On-Premises Setup]: #on-premises-setup
-[Instructions of KVM Setup]: #kvm-setup
 [Manual of Setup Scripts]: #setup-scripts
 [Prerequisites]: #prerequisites
 [RFC-1178]: http://www.faqs.org/rfcs/rfc1178.html
