@@ -12,9 +12,8 @@ Table 1: Software Components
 | Component| Version |
 | :---        |    :----:   |
 | UBUNTU | [v22.04](https://ubuntu.com/) |
-| ONEAPI HPCKIT | [v2023.0.0-devel](https://hub.docker.com/r/intel/oneapi-hpckit) |
-| LAMMPS | [v29Sep2021](https://github.com/lammps/lammps/archive/refs/tags/stable_29Sep2021.tar.gz) |
-| NUMACTL | [2.0.14-3](http://archive.ubuntu.com/ubuntu/pool/main/n/numactl/numactl_2.0.14-3ubuntu2_amd64.deb) |
+| HPCKIT | [v2024.0.1](https://hub.docker.com/r/intel/hpckit) |
+| LAMMPS | [v28Mar2023](https://download.lammps.org/tars/lammps-28Mar2023.tar.gz) |
 
 
 ## Configuration Snippets
@@ -29,26 +28,32 @@ docker pull ubuntu:22.04
 
 ### ONEAPI HPCKIT
 ```
-docker pull intel/oneapi-hpckit:2023.0.0-devel-ubuntu22.04
+docker pull intel/hpckit:latest
 ```
 
-### LAMMPS
+### LAMMPS - MPI
 ```
 BASEDIR=hpc-lammps
-LAMMPS_VER="29Sep2021"
-LAMMPS_PACKAGE="https://github.com/lammps/lammps/archive/refs/tags/stable_${LAMMPS_VER}.tar.gz"
+LAMMPS_VER="28Mar2023"
+ARG LAMMPS_PACKAGE="https://download.lammps.org/tars/lammps-${LAMMPS_VER}.tar.gz"
 wget ${LAMMPS_PACKAGE} && \
-    mkdir -p ${BASEDIR} && \
-    tar vxf stable_${LAMMPS_VER}.tar.gz -C ${BASEDIR} && \
-    rm stable_${LAMMPS_VER}.tar.gz && \
-    cd ${BASEDIR} && \
-    ln -s lammps-stable_${LAMMPS_VER} lammps
+    gunzip lammps-${LAMMPS_VER}.tar.gz && \
+    tar -xf lammps-${LAMMPS_VER}.tar && \
+    cd lammps-${LAMMPS_VER} && mkdir build && cd build && \
+    cmake -C ../cmake/presets/oneapi.cmake -D BUILD_MPI=on -D PKG_INTEL=yes ../cmake && \
+    make -j && make install && ln -s /lammps-${LAMMPS_VER}/build/lmp /usr/bin/lmp
 ```
-
-### NUMACTL
+### LAMMPS - Serial
 ```
-NUMACTL_VER="2.0.14-3ubuntu2"
-apt install -y numactl="${NUMACTL_VER}"
+BASEDIR=hpc-lammps
+LAMMPS_VER="28Mar2023"
+ARG LAMMPS_PACKAGE="https://download.lammps.org/tars/lammps-${LAMMPS_VER}.tar.gz"
+wget ${LAMMPS_PACKAGE} && \
+    gunzip lammps-${LAMMPS_VER}.tar.gz && \
+    tar -xf lammps-${LAMMPS_VER}.tar && \
+    cd lammps-${LAMMPS_VER} && mkdir build && cd build && \
+    cmake -C ../cmake/presets/oneapi.cmake -D BUILD_MPI=off  -D PKG_INTEL=yes ../cmake && \
+    make -j && make install && ln -s /lammps-${LAMMPS_VER}/build/lmp /usr/bin/lmp
 ```
 
 Workload Services Framework
