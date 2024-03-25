@@ -3,8 +3,8 @@
 Outlined below are the instructions to setup the gRPC Go server. 
 
 ## Requirements
-- go v1.19.4 linux/amd64
-- grpc v1.49.0
+- go v1.22.1 linux/amd64
+- grpc v1.62.2
 - ghz v0.110.0
 
 ## General Setup
