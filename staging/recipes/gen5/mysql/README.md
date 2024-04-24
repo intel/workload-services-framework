@@ -7,14 +7,15 @@ We provide a configuration file that was tuned for performance with MySQL for ge
 This file can be mounted on the community version of MySQL using the command:
 
 ```
-docker run -v $(pwd)/mysql.cnf:/etc/mysql/conf.d/mysql.cnf -d mysql
+docker run -v $(pwd)/mysql.cnf:/etc/mysql/conf.d/mysql.cnf -e MYSQL_ROOT_PASSWORD=my-secret-pw  -d mysql
 ```
-Adjust the path of the local mysql.cnf if not in print working directory (PWD).
+* Adjust the path of the local mysql.cnf if not in print working directory (PWD).
+* Adjust the root password (my-secret-pw)
 
 Some of optimizations are implemented as low-level kernel configuration. The --privileged flag can be used to run with escalated priviliges.
 
 ```
-docker run --privileged -v $(pwd)/mysql.cnf:/etc/mysql/conf.d/mysql.cnf -d mysql
+docker run --privileged -v $(pwd)/mysql.cnf:/etc/mysql/conf.d/mysql.cnf -e MYSQL_ROOT_PASSWORD=my-secret-pw -d mysql
 ```
 
 Please see [Docker Documentation](https://docs.docker.com/reference/cli/docker/container/run/#privileged) on implications of running containers in privileged mode.
