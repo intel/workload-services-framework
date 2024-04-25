@@ -3,21 +3,23 @@ Database performance is one of the most important components for enterprise appl
 
 ### PostgreSQL Configuration
 
-We provide a configuration file that was tuned for performance with PostgreSQL for general deployment scenarios : [postgresql.cnf](postgrsql.cnf)
+We provide a configuration file that was tuned for performance with PostgreSQL for general deployment scenarios : [postgresql.conf](postgrsql.conf)
 
 ### Container Execution
 This file can be mounted on the community version of PostgreSQL using the command:
 
 ```
-docker run -v $(pwd)/postgres.conf:/usr/share/postgresql/postgresql.conf.sample -e POSTGRES_PASSWORD=mysecretpassword  -d postgres
+docker run -v  $(pwd)/postgresql.conf:/etc/postgresql/postgresql.conf -e POSTGRES_PASSWORD=mysecretpassword -d postgres -c config_file=/etc/postgresql/postgresql.conf
 ```
+
 * Adjust the path of the local postgres.conf if not in print working directory (PWD).
 * Adjust the root password (mysecretpassword )
 
 Some of optimizations are implemented as low-level kernel configuration. The --privileged flag can be used to run with escalated priviliges.
 
+
 ```
-docker run --privileged -v $(pwd)/postgres.conf:/usr/share/postgresql/postgresql.conf.sample -e POSTGRES_PASSWORD=mysecretpassword  -d postgres
+docker run --privileged -v  $(pwd)/postgresql.conf:/etc/postgresql/postgresql.conf -e POSTGRES_PASSWORD=mysecretpassword  -d postgres -c config_file=/etc/postgresql/postgresql.conf
 ```
 
 Please see [Docker Documentation](https://docs.docker.com/reference/cli/docker/container/run/#privileged) on implications of running containers in privileged mode.
