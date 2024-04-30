@@ -1,5 +1,5 @@
 ## Overview
-Database performance is one of the most important components for enterprise applications experience. The entire industry, be it web-based ecommerce, social media, cloud services or most other enterprise applications, they use databases.  [MySQL](https://www.mysql.com/products/community/) is the most popular open source RDBMS and has been running on Intel platforms for over 25 years. The latest version 8.0.23 was released January 2021. MySQL supports the use of multiple storage engines definable for table creation. 
+Database performance is one of the most important components for enterprise applications experience. The entire industry, be it web-based ecommerce, social media, cloud services or most other enterprise applications, they use databases.  [MySQL](https://www.mysql.com/products/community/) is the most popular open source RDBMS and has been running on Intel platforms for over 25 years. MySQL supports the use of multiple storage engines definable for table creation. 
 
 ### MySQL Configuration
 
