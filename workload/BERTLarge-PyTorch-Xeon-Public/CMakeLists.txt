@@ -19,7 +19,7 @@
 # It is recommendded to condition your workload build on the supported platforms.
 # The full list of supported platforms is in workload/platforms.  
 
-include(cmake/${PLATFORM}.cmake OPTIONAL)
+# include(cmake/${PLATFORM}.cmake OPTIONAL)
 
 # For workloads with multiple versions, repeat the definitions to support multiple
 # versions. The recommendation is to suffix the versions as part of the workload 
