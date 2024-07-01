@@ -13,7 +13,7 @@ psutil==5.9.5
 joblib==1.2.0
 scipy==1.11.2
 threadpoolctl==3.1.0
-scikit-learn==1.2.2
+scikit-learn==1.5.0
 defusedxml==0.7.1
 h5py==3.8.0
 Cython==0.29.34
