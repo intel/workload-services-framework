@@ -8,10 +8,10 @@ log-error       = /var/log/mysql/error.log
 default_authentication_plugin=mysql_native_password
 
 # Benchmarking only.  To be removed for production configuration.
-skip-log-bin
-innodb_flush_log_at_trx_commit=0
-innodb_flush_method=O_DIRECT_NO_FSYNC
-innodb_doublewrite=0
+#skip-log-bin
+#innodb_flush_log_at_trx_commit=0
+#innodb_flush_method=O_DIRECT_NO_FSYNC
+#innodb_doublewrite=0
 
 # general
 max_connections=4000

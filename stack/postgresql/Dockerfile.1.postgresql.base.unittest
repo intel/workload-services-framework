@@ -1,0 +1,15 @@
+# postgresql-base-unittest
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+FROM postgresql1411-base${RELEASE}
+
+COPY unittest.sh /
+RUN mkfifo /export-logs
+CMD (/unittest.sh;  echo $? > status) 2>&1 && \
+    tar cf /export-logs status && \
+    sleep infinity
