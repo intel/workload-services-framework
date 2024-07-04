@@ -1,0 +1,40 @@
+# mysql8036-oh
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG MYSQL_VER="8.0.36"
+ARG MYSQL_IMG=mysql
+
+FROM ${MYSQL_IMG}:${MYSQL_VER}
+
+RUN set -eux; \
+    microdnf install -y util-linux numactl; \
+    microdnf clean all
+
+ENV GOSU_VERSION=1.17
+RUN /bin/sh -c set -eux; arch="$(uname -m)"; case "$arch" in aarch64) gosuArch='arm64' ;; x86_64) gosuArch='amd64' ;; *) echo >&2 "error: unsupported architecture: '$arch'"; exit 1 ;; esac; curl -fL -o /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$gosuArch.asc"; curl -fL -o /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$gosuArch"; export GNUPGHOME="$(mktemp -d)"; gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4; gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu; rm -rf "$GNUPGHOME" /usr/local/bin/gosu.asc; chmod +x /usr/local/bin/gosu; gosu --version; gosu nobody true
+
+VOLUME /var/lib/mysql
+
+COPY --chown=mysql:mysql script/prepare_database.sh /
+COPY --chown=mysql:mysql script/entrypoint.sh /
+COPY --chown=mysql:mysql opt/mysql.cnf /etc/mysql/conf.d/
+
+ENV DB_TYPE="mysql"
+ENV ENABLE_MOUNT_DIR="true"
+ENV DB_MOUNT_DIR="/var/lib/mysql"
+ENV RUN_SINGLE_NODE="false"
+ENV ENABLE_SOCKET_BIND="false"
+ENV SERVER_SOCKET_BIND_NODE=""
+ENV SERVER_SOCKET_BIND_CORE_LIST=""
+ENV EXCLUDE_IRQ_CORES="false"
+ENV MYSQL_LOG_DIR="/var/log/mysql"
+ENV MYSQL_INITDB_SKIP_TZINFO="true"
+
+HEALTHCHECK --interval=5s --timeout=3s --retries=2 CMD mysqladmin ping -h 127.0.0.1 --silent
+ENTRYPOINT [ "/entrypoint.sh" ]
+EXPOSE 3306 33060
+CMD ["mysqld"]

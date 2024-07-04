@@ -1,0 +1,18 @@
+# mysql8036-oh-unittest
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+FROM mysql8036-oh${RELEASE}
+
+COPY unittest.sh /home/
+
+WORKDIR /home
+RUN mkfifo /export-logs
+ENTRYPOINT [ "" ]
+CMD  (bash unittest.sh ; echo $? > status) 2>&1 | tee benchmark_unittest_$(date +"%m-%d-%y-%H-%M-%S").log && \
+     tar cf /export-logs status $(find . -name "*.log") && \
+     sleep infinity
