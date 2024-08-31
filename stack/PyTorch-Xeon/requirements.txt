@@ -4,7 +4,7 @@ tornado==6.4.1
 tqdm==4.66.3
 Pillow==10.3.0
 yacs==0.1.8
-opencv-python==4.7.0.72
+opencv-python==4.8.1.78
 Unidecode==1.3.6
 toml==0.10.2
 soundfile==0.12.1
