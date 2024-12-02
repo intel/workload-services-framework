@@ -17,6 +17,7 @@ locals {
         disk_size = v.data_disk_spec.disk_size
         disk_type = v.data_disk_spec.disk_type
         disk_iops = v.data_disk_spec.disk_iops
+        disk_throughput = v.data_disk_spec.disk_throughput
         lun       = i
       }
     ]
@@ -27,6 +28,7 @@ locals {
       disk_size = dsk.disk_size
       disk_type = dsk.disk_type
       disk_iops = contains(local.prohibit_set_iops_disktype, dsk.disk_type) ? null : dsk.disk_iops
+      disk_throughput = contains(local.prohibit_set_iops_disktype, dsk.disk_type) ? null : dsk.disk_throughput
       lun       = dsk.lun
     }
   }
@@ -44,6 +46,7 @@ resource "google_compute_disk" "default" {
   size     = each.value.disk_size
   type     = each.value.disk_type
   provisioned_iops = each.value.disk_iops
+  provisioned_throughput = each.value.disk_throughput
 }
 
 resource "google_compute_attached_disk" "default" {

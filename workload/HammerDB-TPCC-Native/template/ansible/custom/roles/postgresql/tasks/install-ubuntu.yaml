@@ -1,0 +1,64 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Add postgresql apt repo
+  shell: 
+    cmd: |
+      # Import the repository signing key:
+      sudo apt install curl ca-certificates
+      sudo install -d /usr/share/postgresql-common/pgdg
+      sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+
+      # Create the repository configuration file:
+      sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+
+      # Update the package lists:
+      sudo apt update
+  become: true
+
+- name: Install PostgreSQL
+  apt:
+    name:
+    - postgresql-13
+    update_cache: true
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+  become: true
+
+- name: Setup data dir
+  shell: |
+    mkdir -p /mnt/disk1/pgdata
+    sudo chown -R postgres:postgres /mnt/disk1/pgdata
+    echo "PGDATA=/mnt/disk1/pgdata" >> /etc/postgresql/13/main/environment
+  become: true
+
+- name: Init data dir
+  shell: |
+    systemctl stop postgresql
+    sudo -u postgres /usr/lib/postgresql/13/bin/initdb -D /mnt/disk1/pgdata
+  become: true
+
+- name: Copy cnf file
+  template:
+    src: "pg.cnf.j2"
+    dest: "/mnt/disk1/pgdata/postgresql.conf"
+  become: true
+
+- name: Update pg_hba
+  shell: |
+    echo "host all all all password" >> /mnt/disk1/pgdata/pg_hba.conf
+  become: true
+
+- name: Start database
+  shell: |
+    sudo -u postgres /usr/lib/postgresql/13/bin/pg_ctl -D /mnt/disk1/pgdata start
+  become: true
+
+- name: Set password
+  shell: |
+    sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'Postgres@123';"
+  become: true

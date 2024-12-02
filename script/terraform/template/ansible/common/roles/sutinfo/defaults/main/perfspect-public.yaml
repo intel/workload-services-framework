@@ -1,0 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+perfspect_public_package: "https://github.com/intel/PerfSpect/releases/download/v{{ perfspect_version }}/perfspect_{{ perfspect_version }}.tgz"
+

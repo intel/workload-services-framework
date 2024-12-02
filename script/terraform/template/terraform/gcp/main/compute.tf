@@ -30,12 +30,15 @@ resource "google_compute_instance" "default" {
       image = each.value.os_image!=null?each.value.os_image:local.os_images[each.key]
       size = each.value.os_disk_size
       type = each.value.os_disk_type
+      provisioned_iops = contains(local.prohibit_set_iops_disktype, each.value.os_disk_type)?null:each.value.os_disk_iops
+      provisioned_throughput = contains(local.prohibit_set_iops_disktype, each.value.os_disk_type)?null:each.value.os_disk_throughput
     }
   }
 
   metadata = {
     ssh-keys = "${local.os_image_user[each.value.os_type]}:${var.ssh_pub_key}"
     user-data = "${data.template_cloudinit_config.default[each.key].rendered}"
+    enable-oslogin = "FALSE"
   }
   
   network_interface {

@@ -1,0 +1,22 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Copy config script
+  template:
+    src: "config.ps1"
+    dest: "C:\\config.ps1"
+
+- name: Copy depence script
+  template:
+    src: "AdjustVirtualMemoryPagingFileSize.psm1"
+    dest: "C:\\AdjustVirtualMemoryPagingFileSize.psm1"
+
+- name: Run config script
+  win_shell: |
+    powershell .\config.ps1
+  args:
+    chdir: "C:\\"
+
+  

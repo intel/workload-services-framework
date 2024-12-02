@@ -4,24 +4,62 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+- name: Ensure the data root exists
+  file:
+    path: "{{ k8s_data_root }}"
+    state: directory
+  become: true
+
 - block:
 
-    - name: Join workers
-      shell: "{{ hostvars['controller-0']['ansible_facts']['join_cmd'] }} --v={{ k8s_logs_level }}"
-      timeout: "{{ k8s_join_timeout }}"
-      become: true
+    - name: Create the kubeadm config file
+      copy:
+        content: "{{ kubeadm_options | to_nice_yaml }}"
+        dest: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-kubeadm-config.yaml"
+      vars:
+        kubeadm_join_cmd: "{{ hostvars['controller-0'].join_cmd }}"
+        kubeadm_options:
+          apiVersion: kubeadm.k8s.io/v1beta3
+          kind: JoinConfiguration
+          discovery:
+            bootstrapToken:
+              token: "{{ kubeadm_join_cmd | regex_replace('^.*--token ([^ ]*).*$','\\1') }}"
+              apiServerEndpoint: "{{ kubeadm_join_cmd | regex_replace('^.*join ([^ ]*).*$','\\1') }}"
+              caCertHashes: ["{{ kubeadm_join_cmd | regex_replace('^.*--discovery-token-ca-cert-hash ([^ ]*).*$','\\1') }}"]
+          nodeRegistration:
+            name: "{{ inventory_hostname }}"
+            criSocket: "{{ k8s_containerd_socket }}"
+            kubeletExtraArgs:
+              "node-ip": "{% if (private_ip|ipaddr) %}{{ private_ip }}{% else %}{{ query('dig',private_ip)|first }}{% endif %}"
+              "root-dir": "{{ k8s_data_root }}"
+      
+    - block:
+  
+      - name: Join workers
+        shell:
+          cmd: |
+            kubeadm join --v={{ k8s_logs_level }} --config=/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-kubeadm-config.yaml
+          executable: /bin/bash
+        timeout: "{{ k8s_join_timeout }}"
+  
+      rescue:
+  
+      - name: kubeadm reset
+        include_tasks:
+          file: reset.yaml
+  
+      - name: Rejoin workers
+        shell:
+          cmd: |
+            kubeadm join --v={{ k8s_logs_level }} --config=/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-kubeadm-config.yaml
+          executable: /bin/bash
+        timeout: "{{ k8s_join_timeout }}"
 
-  rescue:
+  always:
 
-    - name: kubeadm reset
-      include_tasks:
-        file: reset.yaml
+    - name: Remove the kubeadm config file
+      file:
+        path: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-kubeadm-config.yaml"
+        state: absent
 
-    - name: Rejoin workers
-      shell: "{{ hostvars['controller-0']['ansible_facts']['join_cmd'] }} --v=5"
-      become: true
-
-- name: Customize kubelet
-  include_role:
-    name: kubelet
-    tasks_from: customize-kubelet
+  become: true

@@ -1,0 +1,13 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+HAMMERDB_VER: "4.2"
+HAMMERDB_REPO_WIN: "https://github.com/TPC-Council/HammerDB/releases/download/v{{ HAMMERDB_VER }}/HammerDB-{{ HAMMERDB_VER }}-Win.zip"
+HAMMERDB_REPO_LINUX: "https://github.com/TPC-Council/HammerDB/releases/download/v{{ HAMMERDB_VER }}/HammerDB-{{ HAMMERDB_VER }}-Linux.tar.gz"
+
+MYSQL_PACKAGE_WIN: "https://cdn.mysql.com/archives/mysql-8.0/mysql-8.0.33-winx64.zip"
+PG_PACKAGE_WIN: "https://get.enterprisedb.com/postgresql/postgresql-14.12-1-windows-x64.exe"
+POSTGRES_CENTOS9_VER: "42.0-46PGDG"
+POSTGRES_CENTOS9_PKG: "https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-42.0-46PGDG.noarch.rpm"

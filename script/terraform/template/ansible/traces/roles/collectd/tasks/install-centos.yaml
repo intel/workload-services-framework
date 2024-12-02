@@ -15,7 +15,7 @@
     until: yumrc is success
     retries: 10
     delay: 10
-
+  
   - name: Install collectd
     yum:
       name:

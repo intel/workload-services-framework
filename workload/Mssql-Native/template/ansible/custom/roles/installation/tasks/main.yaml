@@ -1,0 +1,34 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Create HammerDB install path
+  win_file:
+    path: "C:\\HammerDB"
+    state: directory
+
+- name: Create workspace path
+  win_file:
+    path: "C:\\workspace"
+    state: directory
+  
+- name: Download HammerDB package
+  ansible.windows.win_get_url:
+    url: "{{ HAMMERDB_REPO }}"
+    dest: "C:\\"
+
+- name: Unzip HammerDB package
+  win_unzip:
+    src: "C:\\HammerDB-{{ HAMMERDB_VER }}-Win.zip"
+    dest: "C:\\HammerDB"
+
+- name: Copy build.tcl script to client
+  template:
+    src: "build.tcl.j2"
+    dest: "C:\\HammerDB\\build.tcl"
+
+- name: Copy run.tcl script to client
+  template:
+    src: "run.tcl.j2"
+    dest: "C:\\HammerDB\\run.tcl"

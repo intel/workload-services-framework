@@ -5,8 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-PLATFORM=${PLATFORM:-SPR}
-
 DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
 
-. "$DIR/../../script/build.sh"
+if [ -e "$DIR/../../stack/Linpack/build/build_${PLATFORM}.sh" ]; then
+    . $DIR/../../stack/Linpack/build/build_${PLATFORM}.sh
+fi

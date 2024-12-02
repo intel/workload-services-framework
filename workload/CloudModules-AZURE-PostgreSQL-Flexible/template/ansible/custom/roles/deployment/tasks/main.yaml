@@ -1,0 +1,36 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Running HammerDB CLI
+  shell: "cd {{ workspace }}; ./prepare_hammerdb.sh; ./run_hammerdb.sh {{ itr }}"
+  register: results
+
+- name: Create the logs directory
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}/worker-0-logs"
+    state: directory
+    recurse: yes
+  delegate_to: localhost
+
+- name: Create the metrics logs directory
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}/worker-0-logs/metrics"
+    state: directory
+    recurse: yes
+  delegate_to: localhost
+
+- name: Write the logs content
+  copy:
+    dest: "{{ wl_logs_dir }}/itr-{{ itr }}/worker-0-logs/output.log"
+    content: |
+        {{ results.stdout }}
+        {{ results.stderr }}
+  delegate_to: localhost
+
+- name: Write the status code
+  copy:
+    dest: "{{ wl_logs_dir }}/itr-{{ itr }}/worker-0-logs/status"
+    content: "{{ results.rc }}"
+  delegate_to: localhost

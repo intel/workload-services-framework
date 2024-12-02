@@ -1,0 +1,20 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# You can specify the optional docker-compose deployment if the workload works
+# on a single worker node. 
+
+# The IMAGENAME macro extract the docker image name from the Dockerfile and 
+# apply the REGISTRY and RELEASE tags. 
+
+services:
+  dummy-benchmark:   # The name must match in JOB_FILTER
+    image: "{{ REGISTRY }}dummy{{ IMAGESUFFIX }}{{ RELEASE }}"
+    environment:
+      SCALE: "{{ SCALE }}"
+      RETURN_VALUE: "{{ RETURN_VALUE }}"
+      SLEEP_TIME: "{{ SLEEP_TIME }}"
+      ROI: "{{ ROI }}"

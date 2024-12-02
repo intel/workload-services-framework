@@ -1,0 +1,82 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Running HammerDB CLI
+  shell: "cd {{ workspace }}; ./prepare_hammerdb.sh; ./run_hammerdb.sh {{ itr }}"
+  register: results
+
+- name: Create the logs directory
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}/worker-0-logs"
+    state: directory
+    recurse: yes
+  delegate_to: localhost
+
+- name: Create the metrics logs directory
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}/worker-0-logs/metrics"
+    state: directory
+    recurse: yes
+  delegate_to: localhost
+
+- name: Write the logs content
+  copy:
+    dest: "{{ wl_logs_dir }}/itr-{{ itr }}/worker-0-logs/output.log"
+    content: |
+        {{ results.stdout }}
+        {{ results.stderr }}
+  delegate_to: localhost
+
+- name: Write the status code
+  copy:
+    dest: "{{ wl_logs_dir }}/itr-{{ itr }}/worker-0-logs/status"
+    content: "{{ results.rc }}"
+  delegate_to: localhost
+
+# - name: Save the Json data to a Variable as a Fact
+#   set_fact:
+#     jsondata: "{{ lookup('file', '/opt/workspace/tfplan.json') | from_json }}"
+#   delegate_to: localhost
+
+# - name: Set database id
+#   set_fact:
+#     DATABASE_ID: "{{ jsondata['values']['outputs']['instances']['value']['dbinstance']['database_id'] }}"
+#   delegate_to: localhost
+
+# - name: Get metric definitions
+#   shell: "az monitor metrics list-definitions --resource {{ DATABASE_ID }}"
+#   register: metric_output
+#   changed_when: false
+#   delegate_to: localhost
+
+# - name: Parse metric definitions
+#   set_fact:
+#     metric_info: "{{ metric_output.stdout | from_json | json_query('[].{name: name.value, aggregationType: primaryAggregationType}') }}"
+#   delegate_to: localhost
+
+# - name: Process metric info and save logs
+#   shell: |
+#     {% if item.name == 'backup_storage_used' %}
+#       az monitor metrics list --resource {{ DATABASE_ID }} --metric {{ item.name }} --interval 15m --output table
+#     {% else %}
+#       az monitor metrics list --resource {{ DATABASE_ID }} --metric {{ item.name }} --interval 1m --output table
+#     {% endif %}
+#   register: metric_logs
+#   loop: "{{ metric_info }}"
+#   delegate_to: localhost
+
+# - name: Save logs to files
+#   copy:
+#     content: |
+#       {{ item.stdout_lines[0] }}
+#       {{ item.stdout_lines[1] }}
+#       {% for line in item.stdout_lines[2:] %}
+#       {{ line }}
+#       {% endfor %}
+#     dest: "{{ wl_logs_dir }}/itr-{{ itr }}/worker-0-logs/metrics/{{ item.item.name }}.log"
+#   loop: "{{ metric_logs.results }}"
+#   loop_control:
+#     loop_var: item
+#   delegate_to: localhost

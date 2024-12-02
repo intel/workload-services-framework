@@ -8,6 +8,16 @@
   get_url:
     url: "{{ k8s_flannel_repo }}"
     dest: "/tmp/{{ wl_namespace }}-flannel.yaml"
+    timeout: 600
+  when: (k8s_flannel_version != k8s_flannel_local_version) or ((role_path+'/scripts/kube-flannel.yaml') is not exists)
+  delegate_to: localhost
+  run_once: true
+  become: false
+
+- name: Copy the deployment script
+  copy:
+    src: "{{ ((k8s_flannel_version != k8s_flannel_local_version) or ((role_path+'/scripts/kube-flannel.yaml') is not exists)) | ternary('/tmp/'+wl_namespace+'-flannel.yaml',role_path+'/scripts/kube-flannel.yaml') }}"
+    dest: "/tmp/{{ wl_namespace }}-flannel.yaml"
 
 - name: Change Backend Type
   lineinfile:
@@ -28,8 +38,25 @@
   lineinfile:
     path: "/tmp/{{ wl_namespace }}-flannel.yaml"
     insertafter: '--kube-subnet-mgr'
-    line: "        - --iface={{ k8s_flannel_backend_iface }}"
-  when: k8s_flannel_backend_iface != ''
+    line: "        - '--iface{{ (item=='can-reach') | ternary('-can-reach='+apiserver_ip,(item.startswith('/') and item.endswith('/')) | ternary('-regex='+(item|regex_replace('^/(.*)/$','\\1')),'='+item)) }}'"
+  loop: "{{ k8s_flannel_backend_iface | split(',') | reject('==','') }}"
+  vars:
+    apiserver_addr: "{{ k8s_apiserver_ip|default(private_ip,true) }}"
+    apiserver_ip: "{% if (apiserver_addr|ipaddr) %}{{ apiserver_addr }}{% else %}{{ query('dig',apiserver_addr)|first }}{% endif %}"
+
+- name: Change CNI version
+  lineinfile:
+    path: "/tmp/{{ wl_namespace }}-flannel.yaml"
+    regex: '^(\s*"cniVersion":\s*)".*"\s*,\s*$'
+    line: '\1"{{ k8s_flannel_cni_version }}",'
+    backrefs: true
+  when: k8s_flannel_cni_version != ''
+
+- name: Change the CNI repo
+  replace:
+    path: "/tmp/{{ wl_namespace }}-flannel.yaml"
+    regexp: '^(\s*image:\s*)docker.io/flannel(/.*)$'
+    replace: '\1{{ k8s_flannel_cni_repo }}\2'
 
 - name: install flannel
   command: "kubectl apply -f /tmp/{{ wl_namespace }}-flannel.yaml"
@@ -41,9 +68,7 @@
   async: 10
   poll: 0
 
-### fix known issue: flannel namespace changed from kube-system to kube-flannel since v0.19.0
-- name: Wait for flannel pod ready
-  shell:
-    cmd: |
-      timeout 600s bash -c "while ! kubectl wait --namespace={{ 'kube-flannel' if (k8s_flannel_version is version('v0.19.0', '>=') ) else 'kube-system' }} pod --for=condition=Ready -l app=flannel --timeout 30s; do sleep 1s; done"
+- name: Wait for controller flannel pod ready
+  include_tasks:
+    file: wait-complete.yaml
 

@@ -19,6 +19,11 @@
       name: containerd
       tasks_from: check
 
+  - name: Preload images
+    include_tasks:
+      file: preload-images.yaml
+    when: k8s_preload_images | length > 0
+
   - name: Reset k8s
     include_role:
       name: kubeadm

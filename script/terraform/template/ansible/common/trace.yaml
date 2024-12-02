@@ -9,6 +9,91 @@
   gather_facts: no
   tasks:
 
+    - set_fact:
+        trace_reboot_required: false
+
+    - block:
+
+      - name: Install trace module for VM instances
+        include_role:
+          name: trace
+          tasks_from: trace-install
+        loop: "{{ trace_module_groups | zip_longest([],fillvalue=inventory_hostname) }}"
+        loop_control:
+          loop_var: trace_node
+        vars:
+          trace_module_names: "{{ trace_modules_on_instances | map('regex_replace',':.*$','') }}"
+          trace_module_groups: "{{ dict(trace_modules_on_instances | zip(trace_module_names)) | dict2items | groupby('value') | map('last') | map('map',attribute='key') | map('join',':,') }}"
+
+      when:
+      - sut_sudo | default(true) | bool
+      - (trace_modules_on_instances | length) > 0
+      vars:
+        trace_modules_on_instances: "{{ wl_trace_modules | default('') | split(',') | reject('==','') | reject('match','.*:host.*') }}"
+
+
+    - block:
+
+      - name: Restart the Linux instance
+        include_role:
+          name: startup
+          tasks_from: reboot
+        when:
+        - (ansible_connection | default('ssh')) in ['ssh']
+
+      - name: Restart the Windows instance
+        include_role:
+          name: startup
+          tasks_from: reboot-win
+        when:
+        - (ansible_connection | default('ssh')) in ['winrm']
+        - (playbook_dir+'/roles/startup/tasks/reboot-win.yaml') is exists
+
+      when:
+      - sut_sudo | default('true') | bool
+      - sut_reboot | default('true') | bool
+      - trace_reboot_required
+
+    - block:
+
+      - name: Install trace module for VM hosts
+        include_role:
+          name: trace
+          tasks_from: trace-install
+        loop: "{{ trace_module_groups | zip_longest([],fillvalue=vmhost_host) }}"
+        loop_control:
+          loop_var: trace_node
+        vars:
+          trace_module_names: "{{ trace_modules_on_vmhosts | map('regex_replace',':.*$','') }}"
+          trace_module_groups: "{{ dict(trace_modules_on_vmhosts | zip(trace_module_names)) | dict2items | groupby('value') | map('last') | map('map',attribute='key') | map('join',':,') }}"
+
+      when:
+      - vmhost_host is defined
+      - sut_sudo | default(true) | bool
+      - (trace_modules_on_vmhosts | length) > 0
+      - vmhost_host in unique_vmhosts
+      vars:
+        trace_modules_on_vmhosts: "{{ wl_trace_modules | default('') | split(',') | select('match','.*:host.*') }}"
+        all_trace_vmhosts: "{{ groups.trace_hosts | map('extract', hostvars, ['vmhost_host']) | map('default','') | reject('==','') }}"
+        unique_vmhosts: "{{ dict(all_trace_vmhosts | map('extract', hostvars, ['ansible_host']) | zip(all_trace_vmhosts | map('extract', hostvars, ['ansible_port'])) | map('join',':') | zip(all_trace_vmhosts)).values() }}"
+
+- hosts: localhost
+  become: false
+  gather_facts: no
+  tasks:
+
+    - name: Install localhost trace scripts
+      include_role:
+        name: trace
+        tasks_from: trace-script
+      vars:
+        trace_host: localhost
+
+- hosts: trace_hosts
+  become: "{{ sut_sudo | default(true) | bool }}"
+  gather_facts: no
+  tasks:
+
     - block:
 
       - block:
@@ -18,7 +103,7 @@
             name: trace
             tasks_from: trace-script
           when:
-          - ((ansible_connection | default('ssh')) == 'ssh')
+          - (ansible_connection | default('ssh')) in ['ssh','local']
 
         - name: Install trace script for VM Windows instances
           include_role:
@@ -31,10 +116,10 @@
         vars:
           trace_host: "{{ inventory_hostname }}"
 
-      - name: Install trace module for VM instances
+      - name: Setup trace module for VM instances
         include_role:
           name: trace
-          tasks_from: trace-block
+          tasks_from: trace-setup
         loop: "{{ trace_module_groups | zip_longest([],fillvalue=inventory_hostname) }}"
         loop_control:
           loop_var: trace_node
@@ -42,39 +127,57 @@
           trace_module_names: "{{ trace_modules_on_instances | map('regex_replace',':.*$','') }}"
           trace_module_groups: "{{ dict(trace_modules_on_instances | zip(trace_module_names)) | dict2items | groupby('value') | map('last') | map('map',attribute='key') | map('join',':,') }}"
 
+      - name: Copy trace scripts for VM Linux instances
+        include_role:
+          name: trace
+          tasks_from: trace-script-copy
+        vars:
+          trace_host: "{{ inventory_hostname }}"
+        when:
+        - ((ansible_connection | default('ssh')) == 'ssh')
+
+      - name: Copy trace scripts for VM Windows instances
+        include_role:
+          name: trace
+          tasks_from: trace-script-copy-win
+        vars:
+          trace_host: "{{ inventory_hostname }}"
+        when:
+        - ((ansible_connection | default('ssh')) == 'winrm')
+        - (playbook_dir+'/roles/trace/tasks/trace-script-copy-win.yaml') is exists
+
       when:
       - sut_sudo | default(true) | bool
       - (trace_modules_on_instances | length) > 0
-
       vars:
         trace_modules_on_instances: "{{ wl_trace_modules | default('') | split(',') | reject('==','') | reject('match','.*:host.*') }}"
 
     - block:
 
       - block:
-
-        - name: Install trace script for VM Linux hosts
+      
+        - name: Setup trace script for VM Linux hosts
           include_role:
             name: trace
             tasks_from: trace-script
           when:
-          - ((ansible_connection | default('ssh')) == 'ssh')
+          - ((hostvars[trace_host].ansible_connection | default('ssh')) == 'ssh')
 
         - name: Install trace script for VM Windows hosts
           include_role:
             name: trace
             tasks_from: trace-script-win
           when:
-          - ((ansible_connection | default('ssh')) == 'winrm')
+          - ((hostvars[trace_host].ansible_connection | default('ssh')) == 'winrm')
           - (playbook_dir+'/roles/trace/tasks/trace-script-win.yaml') is exists
 
         vars:
           trace_host: "{{ vmhost_host | default(inventory_hostname) }}"
 
-      - name: Install trace module for VM hosts
+      - name: Setup trace module for VM hosts
         include_role:
           name: trace
-          tasks_from: trace-block
+          tasks_from: trace-setup
         loop: "{{ trace_module_groups | zip_longest([],fillvalue=vmhost_host) }}"
         loop_control:
           loop_var: trace_node
@@ -82,11 +185,23 @@
           trace_module_names: "{{ trace_modules_on_vmhosts | map('regex_replace',':.*$','') }}"
           trace_module_groups: "{{ dict(trace_modules_on_vmhosts | zip(trace_module_names)) | dict2items | groupby('value') | map('last') | map('map',attribute='key') | map('join',':,') }}"
 
+      - name: Copy trace script for VM Windows hosts
+        include_role:
+          name: trace
+          tasks_from: trace-script-win-copy
+        vars:
+          trace_host: "{{ vmhost_host | default(inventory_hostname) }}"
+        when:
+        - ((hostvars[trace_host].ansible_connection | default('ssh')) == 'winrm')
+        - (playbook_dir+'/roles/trace/tasks/trace-script-win.yaml') is exists
+
       when:
       - vmhost_host is defined
-      - vmhost_host in unique_vmhosts
       - sut_sudo | default(true) | bool
       - (trace_modules_on_vmhosts | length) > 0
+      - vmhost_host in unique_vmhosts
       vars:
-       trace_modules_on_vmhosts: "{{ wl_trace_modules | default('') | split(',') | select('match','.*:host.*') }}"
-       unique_vmhosts: "{{ dict(groups.vmhost_hosts | map('extract', hostvars, ['ansible_host']) | zip(groups.vmhost_hosts | map('extract', hostvars, ['ansible_port'])) | map('join',':') | zip(groups.vmhost_hosts)).values() }}"
+        trace_modules_on_vmhosts: "{{ wl_trace_modules | default('') | split(',') | select('match','.*:host.*') }}"
+        all_trace_vmhosts: "{{ groups.trace_hosts | map('extract', hostvars, ['vmhost_host']) | map('default','') | reject('==','') }}"
+        unique_vmhosts: "{{ dict(all_trace_vmhosts | map('extract', hostvars, ['ansible_host']) | zip(all_trace_vmhosts | map('extract', hostvars, ['ansible_port'])) | map('join',':') | zip(all_trace_vmhosts)).values() }}"
+

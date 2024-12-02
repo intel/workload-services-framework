@@ -1,0 +1,57 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+vtune: false
+# if there is existing one installed with proper drivers being loaded, new version will not be installed unless old version is removed manually. 
+# Please refer to README on how to remove manually.
+vtune_version: "2023.2.0*"
+vtune_group: "vtune"
+
+# Force vtune installation even if there is an existing vtune
+vtune_force_install: no
+
+# set "yes" to fetch raw data also. "no" for report only
+vtune_fetch_data: yes
+
+# if emtpy or unset, it means to profile whole system 
+#vtune_target_process: ""
+# Function still in experiment to attach to specific process in a docker image. Please try process name (string). PID is not support here.
+# Some `collect_type` will need to attach to a specific process, such as `memory-consumption`
+# Please try to specific name as clear as possible to prevent there are multi similar processes, which can't be distinguished 
+# Please try not to use name, such as `bash`, `run_test.sh`, which failed in current experiments (still working with vtune team)
+# example for Llama2 OOB WL. Need to have roi setting paired
+#vtune_target_process: "python -u run_llama.py"
+# example for Llama2 Dev WL
+#vtune_target_process: "python run_generation.py"
+
+# unit is second
+vtune_collect_time: unlimited
+
+# various type can be set here: `hotspots`, `uarch-exploration`, `memory-consumption`, `memory-access`, `threading`...
+vtune_collect_type: "hotspots"
+
+# unit is MB
+vtune_data_limit: "200"
+
+# if "", it means to use User-Mode Sampling
+# hw mode is needed for profiling whole system
+# some `collect_type` only use User-Mode Sampling, such as memory-access, ...
+vtune_sampling_mode: "-knob sampling-mode=hw" 
+# stack-size = 0 (unlimited); unlimited can not be used for system wide profiling
+vtune_options: "-knob enable-stack-collection=true -knob stack-size=4096"
+
+# Various types of report can be generated like `summary`, `hotspots`, `top-down`, `callstacks`…
+# By default, it will always/at least generate a summary report if value is not empty
+# If no report needed, just set it to empty, which will help save runtime. 
+vtune_report: ""
+
+# Only summary can use format "html", please use "text" for others
+vtune_report_format: "text"
+
+# Function still in experiment
+vtune_bin_search_dir: ""
+vtune_src_search_dir: ""
+vtune_start_paused: ""
+

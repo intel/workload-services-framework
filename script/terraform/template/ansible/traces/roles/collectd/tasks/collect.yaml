@@ -6,74 +6,32 @@
 
 - block:
 
-  - name: Create the collectd directory
-    file:
-      path: "{{ wl_logs_dir}}/{{ trace_node.1 }}-{{ itr | default(1) }}-collectd"
-      state: directory
-    delegate_to: localhost
-    become: no
-    ignore_errors: yes
-
   - name: Archive collectd files
     shell:
       cmd: "tar cfz /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.tgz ."
-      chdir: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd"
+      chdir: "{{ trace_data_path }}"
       executable: /bin/bash
-    become: no
-    ignore_errors: yes
-
+  
   - name: Fetch collectd files
     fetch:
       src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.tgz"
-      dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-collectd/"
+      dest: "/tmp/"
       flat: yes
-    become: no
-    ignore_errors: yes
-
+  
   - name: Untar collectd files
-    shell:
+    shell: 
       cmd: |
-        tar xfz {{ wl_namespace }}-{{ trace_node.1 }}-collectd.tgz ./conf/ --strip-components=2 --warning=no-timestamp
-        tar xfz {{ wl_namespace }}-{{ trace_node.1 }}-collectd.tgz ./csv/ --strip-components=3 --warning=no-timestamp
-      chdir: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-collectd"
+        tar xfz /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.tgz ./conf/ --strip-components=2 --warning=no-timestamp
+        tar xfz /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.tgz ./csv/ --strip-components=3 --warning=no-timestamp
+      chdir: "{{ trace_data_local_path }}"
       executable: /bin/bash
     delegate_to: localhost
-    become: no
-    ignore_errors: yes
-
-  - name: Remove any collection files
-    file:
-      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd"
-      state: absent
-    become: yes
-    ignore_errors: yes
-
+  
   - name: Remove any collectd tar files
     file:
       path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.tgz"
       state: absent
-    become: no
-    ignore_errors: yes
-
-  - name: Remove any collectd tar files
-    file:
-      path: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-collectd/{{ wl_namespace }}-{{ trace_node.1 }}-collectd.tgz"
-      state: absent
-    delegate_to: localhost
-    become: no
-    ignore_errors: yes
-
-  - name: Generate HTML
-    include_tasks:
-      file: collectd-html.yaml
-    when: (roi.0 != '---') and (roi.1 != '---')
-    loop: "{{ start | zip(stop) }}"
-    loop_control:
-      loop_var: roi
-      index_var: roi_index
-    vars:
-      collectd_dir: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-collectd"
-      start: "{{ lookup('file', collectd_dir + '/TRACE_START') | split('\n') }}"
-      stop: "{{ lookup('file', collectd_dir + '/TRACE_STOP') | split('\n') }}"
-
+  
   delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: false

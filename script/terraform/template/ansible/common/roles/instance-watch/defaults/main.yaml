@@ -11,3 +11,4 @@ instance_watch_cpu_load: "10"
 instance_watch_cpu_load_count: "3"
 instance_watch_cpu_load_span: "15s"
 instance_watch_shutdown_postpone: "30"
+

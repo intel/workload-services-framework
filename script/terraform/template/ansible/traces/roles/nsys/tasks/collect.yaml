@@ -1,0 +1,61 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Post-process nsys records
+    shell:
+      cmd: |
+        docker exec {{ container }} sh -c '
+          cd /tmp
+          for f in nsys-*.qdstrm nsys-*.nsys-rep; do
+            [ -e "$f" ] || continue
+            (
+              rep1="$(echo "$f" | sed "s|qdstrm|nsys-rep|")"
+              case "$f" in
+              *.qdstrm)
+                QdstrmImporter -i $f -o $rep1 >> $rep1.logs 2>&1
+                rm -f $f
+                ;;
+              esac
+              echo "stats:" > $rep1.logs
+              nsys stats {{ nsys_stats_options }} --format csv --force-overwrite true --output $rep1 --force-export true $rep1 >> $rep1.logs 2>&1 
+              echo "analyze:" >> $rep1.logs
+              nsys analyze {{ nsys_analyze_options }} --format csv --force-overwrite true --output $rep1 $rep1 >> $rep1.logs 2>&1
+            ) &
+          done
+          wait
+          tar cf - /tmp/nsys-*.nsys-rep*
+        ' | tar xf - --strip-components=1 >> nsys-collect.logs 2>&1
+      executable: /bin/bash
+      chdir: "{{ trace_data_path }}"
+    loop: "{{ workload_progresses.startswith('docker:') | ternary(workload_progresses.replace('docker:','').split(' '),[]) | reject('==','') }}"
+    loop_control:
+      loop_var: container
+      index_var: i
+    become: true
+    vars:
+      workload_progresses: "{{ hostvars[trace_node.1].WORKLOAD_PROCESSES | default('') }}"
+
+  - name: Get nsys files 
+    shell:
+      cmd: |
+        ls -1
+      chdir: "{{ trace_data_path }}"
+      executable: /bin/bash
+    register: nsys_files
+
+  - name: Fetch nsys files
+    fetch:
+      src: "{{ trace_data_path }}/{{ item }}"
+      dest: "{{ trace_data_local_path }}/"
+      flat: true
+    loop: "{{ nsys_files.stdout_lines }}"
+
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: false
+

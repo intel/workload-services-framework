@@ -1,0 +1,17 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: "recording timing of stopping ROI-{{ roi_index }}"
+  shell:
+    cmd: |
+      echo "workload_itr{{ itr | default(1) }}_roi{{ roi_index }}_end: \"$(date -Ins)\"" >> {{ wl_logs_dir}}/timing.yaml
+    executable: /bin/bash
+  delegate_to: localhost
+  run_once: true
+  become: false
+  async: 30
+  poll: 0
+

@@ -1,0 +1,17 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+wl_bios: {}
+
+sut_update_bios: false
+sut_bios_tool: syscfg
+sut_bios_passwd: ''
+sut_bios_probe: false
+sut_reboot: true
+sut_update_msr: false
+
+# format: <group>:key=value[,...]
+sut_bios_options: ''

@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Intel GPU Top Stat (Igtstat)</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-4bw+/aepP/YC94hEpVNVgiZdgIC5+VKNBQNGCHeKRQN+PtmoHDEXuppvnDJzQIu9" crossorigin="anonymous">
+
+  <style>
+    body {
+      padding-top: 20px;
+      padding-bottom: 20px;
+    }
+
+    .header {
+      padding-bottom: 20px;
+      padding-right: 15px;
+      padding-left: 15px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .header h3 {
+      margin-top: 0;
+      margin-bottom: 0;
+      line-height: 40px;
+    }
+
+    .container {}
+
+    .wrapper {
+      display: flex;
+      box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
+      margin: 2rem;
+    }
+
+    .handle {
+      height: 70px;
+      width: 5px;
+      background-color: DodgerBlue;
+    }
+
+    .content {
+      flex-grow: 1;
+    }
+
+    .tab {
+      overflow: hidden;
+      border: 1px solid #ccc;
+      background-color: #f1f1f1;
+    }
+
+    /* Style the buttons that are used to open the tab content */
+    .tab button {
+      background-color: inherit;
+      float: left;
+      border: 1px solid lightgray;
+      outline: none;
+      cursor: pointer;
+      padding: 8px 10px;
+      transition: 0.3s;
+      font-weight: 600;
+      font-size: 0.8rem;
+    }
+
+    /* Change background color of buttons on hover */
+    .tab button:hover {
+      background-color: #ddd;
+    }
+
+    /* Create an active/current tablink class */
+    .tab button.active {
+      background-color: #00aeef;
+      font-size: bold !important;
+      color: white !important;
+    }
+
+    /* Style the tab content */
+    .tabcontent {
+      display: none;
+      padding: 6px 12px;
+      border: 1px solid #ccc;
+      border-top: none;
+    }
+
+    @media print {
+      .printable {
+        zoom: 50%;
+      }
+    }
+  </style>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/apexcharts/3.42.0/apexcharts.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-HwwvtgBNo3bZJJLYd8oVXjrBZt8cqVSpeBNS5n7C8IVInixGAoxmnlMuBnhbgrkm"
+    crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/apexcharts/3.42.0/apexcharts.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+</head>
+
+<body>
+
+  <div class="card shadow py-2 px-2">
+    <div class="tab">
+      <button class="tablinks active" onclick="openTabContent(event, 'io_read')">IO Read Trend</button>
+    </div>
+    
+    <div id="io_read" class="tabcontent active px-0 py-2" style="display: block">
+      <div class="card-header">
+        <span style="font-weight: 500;">IO Read</span>
+        <button class="btn btn-success btn-sm" style="float:right;" onClick="window.print()"><i class="fa fa-print"
+            aria-hidden="true"></i>Save as PDF</button>
+        <div class="row d-flex"></div>
+      </div>
+      <div class="row" id="sortable_read">
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="io-read-FreqReq-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="io-read-FreqAct-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="io-read-IRQ-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="io-read-RC6-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="io-read-RCS-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="io-read-BCS-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="io-read-VCS0-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="io-read-VCS1-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="io-read-VECS-id" style="height: 400px;"></div>
+        </div>
+        <div id="Power_GPU" class="overflow-auto row col-12 wrapper" style="display: none"> 
+          <div  id="Power1" class="handle col-1" style="display: none"></div>
+          <div  class="col-11 printable " id="io-read-PowerGPU-id" style="height: 400px;display: none"></div>
+        </div>
+        <div id="Power_PKG" class="overflow-auto row col-12 wrapper" style="display: none">
+          <div  id="Power2" class="handle col-1" style="display: none"></div>
+          <div  class="col-11 printable " id="io-read-PowerPKG-id" style="height: 400px;display: none"></div>
+        </div>
+          <div id="CCS" class="overflow-auto row col-12 wrapper" style="display: none">
+          <div  id="Compute_Engine" class="handle col-1" style="display: none"></div>
+          <div  class="col-11 printable " id="io-read-CCS-id" style="height: 400px;display: none"></div>
+        </div>
+      </div>
+  
+    </div>
+
+  <script>
+    var data_PowerGPU = "";
+    var data_PowerPKG = "";
+    
+    {{ igtstat_data }}
+    if (data_PowerGPU || data_PowerPKG) {
+      document.getElementById('Power_GPU').style.display = 'block';
+      document.getElementById('Power1').style.display = 'block';
+      document.getElementById('io-read-PowerGPU-id').style.display = 'block';
+      document.getElementById('Power_PKG').style.display = 'block';
+      document.getElementById('Power2').style.display = 'block';
+      document.getElementById('io-read-PowerPKG-id').style.display = 'block';
+      document.getElementById('CCS').style.display = 'block';
+      document.getElementById('Compute_Engine').style.display = 'block';
+      document.getElementById('io-read-CCS-id').style.display = 'block';
+    }
+    else {
+      document.getElementById('Power_GPU').style.display = 'none';
+      document.getElementById('Power1').style.display = 'none';
+      document.getElementById('io-read-PowerGPU-id').style.display = 'none';
+      document.getElementById('Power_PKG').style.display = 'none';
+      document.getElementById('Power2').style.display = 'none';
+      document.getElementById('io-read-PowerPKG-id').style.display = 'none';
+      document.getElementById('CCS').style.display = 'none';
+      document.getElementById('Compute_Engine').style.display = 'none';
+      document.getElementById('io-read-CCS-id').style.display = 'none';
+    }
+  </script>
+
+  <script type="text/javascript">
+    function hide_chart(id) {
+      const el = document.getElementById(id);
+      el.parentNode.style.display = 'none';
+    }
+
+    function create_line_chart(id, options) {
+      const el = document.getElementById(id);
+      const chart = new ApexCharts(el, _.merge(options, {
+        chart: {
+          id: id,
+          type: 'line',
+          height: '350px',
+          redrawOnParentResize: true,
+          redrawOnWindowResize: true,
+          group: 'synchronized',
+          zoom: {
+            enabled: true
+          },
+          toolbar: {
+            show: true,
+            offsetX: 0,
+            offsetY: 0,
+            tools: {
+              download: true,
+              selection: true,
+              zoom: true,
+              zoomin: true,
+              zoomout: true,
+              pan: true,
+              reset: true | '<img src="/static/icons/reset.png" width="20">',
+              customIcons: []
+            },
+            export: {
+              csv: {
+                filename: undefined,
+                columnDelimiter: ',',
+                headerCategory: 'category',
+                headerValue: 'value',
+                dateFormatter(timestamp) {
+                  return new Date(timestamp).toDateString()
+                }
+              },
+              svg: {
+                filename: undefined,
+              },
+              png: {
+                filename: undefined,
+              }
+            },
+            autoSelected: 'zoom'
+          },
+        },
+        stroke: {
+          width: 1.5,
+          opacity: 1
+        },
+        xaxis: {
+          type: 'datetime',
+          labels: {
+            datetimeUTC: true,
+          },
+          min: min_time,
+          max: max_time,
+        },
+        yaxis: {
+          labels: {
+            minWidth: 20,
+          },
+        },
+        tooltip: {
+          shared: false,
+          x: {
+            format: 'MMM dd HH:mm:ss',
+          },
+        },
+        legend: {
+          show: true,
+          position: 'bottom',
+          horizontalAlign: 'center',
+          onItemClick: {
+            toggleDataSeries: true
+          },
+          onItemHover: {
+            highlightDataSeries: true
+          },
+        },
+      }));
+      chart.render();
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      create_io_chart('io-read-FreqReq-id', 'IGPU Frequency Request (MHz)', data_FreqREQ)
+      create_io_chart('io-read-FreqAct-id', 'IGPU Frequency Actual (MHz)', data_FreqACT)
+      create_io_chart('io-read-IRQ-id', 'IGPU Interrupt Request (/s)', data_IRQ)
+      create_io_chart('io-read-RC6-id', 'IGPU RC6 Render Standby (%)', data_RC6)
+      create_io_chart('io-read-RCS-id', 'IGPU Render Engine (%)', data_RCS)
+      create_io_chart('io-read-BCS-id', 'IGPU Blitter Engine (%)', data_BCS)
+      create_io_chart('io-read-VCS0-id', 'IGPU VD Box 0 Engine (%)', data_VCS0)
+      create_io_chart('io-read-VCS1-id', 'IGPU VD Box 1 Engine  (%)', data_VCS1)
+      create_io_chart('io-read-VECS-id', 'IGPU Video Enhance Engine (%)', data_VECS)
+      create_io_chart('io-read-PowerGPU-id', 'IGPU Power  (W)', data_PowerGPU)
+      create_io_chart('io-read-PowerPKG-id', 'IGPU Package Power (W)', data_PowerPKG)
+      create_io_chart('io-read-CCS-id', 'IGPU Compute Engine (%)', data_CCS)
+
+      
+      function create_io_chart(id, title, data) {
+        try {
+          var series = [];
+          for (let k in data) {
+            series.push({
+              name: k,
+              data: data[k],
+            });
+          }
+          create_line_chart(id, {
+            title: {
+              text: title,
+            },
+            yaxis: {
+              decimalsInFloat: 2,
+            },
+            series: series,
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+      }
+      createSortable('sortable_read');
+
+      function createSortable(div_id) {
+        Sortable.create(document.getElementById(div_id), {
+          group: {
+            name: 'shared',
+            pull: 'clone' // To clone: set pull to 'clone'
+          },
+          ghostClass: 'blue-background-class',
+          animation: 150
+        });
+      }
+    });
+  </script>
+  <script type="text/javascript">
+    function openTabContent(evt, tabContentName) {
+      // Declare all variables
+      var i, tabcontent, tablinks;
+
+      // Get all elements with class="tabcontent" and hide them
+      tabcontent = document.getElementsByClassName("tabcontent");
+      for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+      }
+
+      // Get all elements with class="tablinks" and remove the class "active"
+      tablinks = document.getElementsByClassName("tablinks");
+      for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+      }
+
+      // Show the current tab, and add an "active" class to the button that opened the tab
+      document.getElementById(tabContentName).style.display = "block";
+      evt.currentTarget.className += " active";
+    }
+  </script>
+</body>
+</html>

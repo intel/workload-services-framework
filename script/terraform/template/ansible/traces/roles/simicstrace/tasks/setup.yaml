@@ -1,0 +1,12 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- set_fact:
+    trace_module_start_block: |
+            echo {{ simicstrace_start_string }} > {{ simicstrace_serial_device }}
+    trace_module_stop_block: |
+            echo {{ simicstrace_stop_string }} > {{ simicstrace_serial_device }}
+  

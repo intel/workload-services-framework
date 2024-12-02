@@ -1,0 +1,25 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Download Postgresql installation exe
+  ansible.windows.win_get_url:
+    url: "{{ PG_PACKAGE_WIN }}"
+    dest: "C:\\"
+
+- name: Install Postgresql commandlinetools
+  win_shell: |
+    Start-Process -Wait -FilePath "C:\postgresql-14.12-1-windows-x64.exe" -ArgumentList "--mode unattended --install_runtimes 0  --disable-components server,pgAdmin,stackbuilder"
+
+- name: Adding pg/lib to PATH  
+  win_shell: |
+    $CurrentPATH = ([Environment]::GetEnvironmentVariable("PATH")).Split(";")
+    $NewPATH = ($CurrentPATH + "C:\Program Files\PostgreSQL\14\lib") -Join ";"
+    [Environment]::SetEnvironmentVariable("PATH", $NewPath, [EnvironmentVariableTarget]::Machine) 
+
+- name: Adding pg/bin to PATH  
+  win_shell: |
+    $CurrentPATH = ([Environment]::GetEnvironmentVariable("PATH")).Split(";")
+    $NewPATH = ($CurrentPATH + "C:\Program Files\PostgreSQL\14\bin") -Join ";"
+    [Environment]::SetEnvironmentVariable("PATH", $NewPath, [EnvironmentVariableTarget]::Machine) 

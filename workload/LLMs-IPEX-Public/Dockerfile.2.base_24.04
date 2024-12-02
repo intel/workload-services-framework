@@ -1,0 +1,79 @@
+# llms-ipex-public-base-24.04
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+RUN apt update && \
+    apt full-upgrade -y && \
+    DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends -y \
+    sudo \
+    ca-certificates \
+    git \
+    curl \
+    wget \
+    vim \
+    numactl \
+    gcc-12 \
+    g++-12 \
+    make
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100 && \
+    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100 && \
+    update-alternatives --install /usr/bin/cc cc /usr/bin/gcc 100 && \
+    update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++ 100
+
+# Prepare the Conda environment
+ARG PYTHON_VER="3.10"
+ARG PYTHON_REPO="conda"
+ARG MINIFORGE_VER="24.3.0-0"
+ARG MINIFORGE_REPO="https://github.com/conda-forge/miniforge/releases/download"
+RUN wget --progress=bar:force:noscroll ${MINIFORGE_REPO}/${MINIFORGE_VER}/Mambaforge-${MINIFORGE_VER}-Linux-x86_64.sh -O miniforge.sh && \
+    chmod +x miniforge.sh && \
+    ./miniforge.sh -b -p /root/miniforge && \
+    rm ./miniforge.sh
+ENV CONDA_PREFIX=/root/miniforge
+ENV PATH="/root/miniforge/bin:${PATH}"
+RUN conda create -n llm python=${PYTHON_VER} -y
+
+RUN mkdir -p /home/workspace
+WORKDIR /home/workspace
+
+SHELL ["/bin/bash", "-c"]
+
+# Install IPEX
+ARG IPEX_VER="v2.3.0+cpu"
+ARG IPEX_REPO="https://github.com/intel/intel-extension-for-pytorch.git"
+RUN source activate llm && \ 
+    git clone ${IPEX_REPO} && \
+    cd intel-extension-for-pytorch && \
+    git checkout ${IPEX_VER} && \
+    git submodule sync && git submodule update --init --recursive
+
+# Get the example scripts with git command
+WORKDIR /home/workspace/intel-extension-for-pytorch/examples/cpu/inference/python/llm/
+
+RUN source activate llm && bash ./tools/env_setup.sh 7
+
+ARG TRANSFORMERS_SG_VER="0.0.5"
+ARG TRANSFORMERS_SG_REPO="pip"
+ARG TIKTOKEN_VER="0.6.0"
+ARG TIKTOKEN_REPO="pip"
+ARG BITSANDBYTES_VER="0.43.0"
+ARG BITSANDBYTES_REPO="pip"
+ARG NUMPY_VER="1.26.1"
+ARG NUMPY_REPO="pip"
+RUN source activate llm && pip install transformers_stream_generator==${TRANSFORMERS_SG_VER} \
+    tiktoken==${TIKTOKEN_VER} bitsandbytes==${BITSANDBYTES_VER} numpy==${NUMPY_VER}
+    
+# download lambada dataset in cache 
+RUN source activate llm && \
+    python -c "from datasets import load_dataset; full_dataset = load_dataset(\"NeelNanda/pile-10k\",trust_remote_code=True)" && \
+    python -c "from datasets import load_dataset; full_dataset = load_dataset(\"EleutherAI/lambada_openai\",trust_remote_code=True)"
+
+

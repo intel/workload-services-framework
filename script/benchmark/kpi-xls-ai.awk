@@ -19,7 +19,11 @@ function get_value() {
     exit 3
 }
 
-/^#svrinfo: / {
+/^#(bom|timestamp|pdu|pcm|uprof|emon|perfspect)[:-] / {
+    next
+}
+
+/^#sutinfo: / {
     product=$3
 }
 
@@ -219,9 +223,9 @@ END {
             print "</Worksheet>"
         }
 
-        # write svrinfo
-        if (length(svrinfo_values[ws])>0) 
-            add_svrinfo(ws)
+        # write sutinfo
+        if (length(sutinfo_values[ws])>0) 
+            add_sutinfo(ws)
     }
     print "</Workbook>"
 }

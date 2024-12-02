@@ -1,0 +1,29 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: read {{ request.key }} value
+  shell: 
+    cmd: "rdmsr --processor 0 {{ request.key }}"
+    executable: /bin/bash
+  register: msrclirc
+
+- name: "set {{ request.key }}={{ request.value }}"
+  shell:
+    cmd: "wrmsr -a {{ request.key }} {{ request.value }}"
+    executable: /bin/bash
+
+- name: Print out MSR changes
+  debug:
+    msg: "[{{ inventory_hostname }}]: Host MSR+ {{ request.key }}={{ request.value }}"
+
+- name: touch a restore file
+  lineinfile:
+    path: "{{ wl_logs_dir }}/{{ inventory_hostname }}-msrinfo/restore"
+    line: "{{ request.key }} {{ register_value }}"
+    create: true
+  delegate_to: localhost
+  become: false
+  vars:
+    register_value: "0x{{ msrclirc.stdout }}"

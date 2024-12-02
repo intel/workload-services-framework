@@ -1,0 +1,261 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+{{- if eq .Values.STORAGE_MEDIUM "disk" }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cache0-claim
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.DISK_SIZE }}
+  storageClassName: local-static-storage
+
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cache1-claim
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.DISK_SIZE }}
+  storageClassName: local-static-storage
+
+{{- if not .Values.SINGLE_SOCKET }}
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cache2-claim
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.DISK_SIZE }}
+  storageClassName: local-static-storage
+
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cache3-claim
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.DISK_SIZE }}
+  storageClassName: local-static-storage
+{{- end }}
+{{- end }}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: cachenginxurl
+  labels:
+    app: cache-nginx
+spec:
+  ports:
+  - port: {{ .Values.PORT }}
+    targetPort: {{ .Values.PORT }}
+    protocol: TCP
+  selector:
+    app: cache-nginx
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cache-nginx
+  labels:
+     app: cache-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cache-nginx
+  template:
+    metadata:
+      labels:
+        app: cache-nginx
+    spec:
+{{- if ne .Values.GATED "gated" }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+{{- end }}
+      initContainers:
+      - name: wait-for-cdn-ready
+        image: curlimages/curl:latest
+        imagePullPolicy: {{ include "imagepolicy" .Values }}
+        command: ["/bin/sh","-c","while [ $(curl -k -sw '%{http_code}' -m 5 'http://originnginxurl:18080' -o /dev/null) -ne 200 ];do echo Waiting...;sleep 1s;done"]
+      containers:
+      - name: cache-nginx
+        image: {{ .Values.REGISTRY }}{{ .Values.CACHE_NGINX_IMAGE }}{{ .Values.RELEASE }}
+        imagePullPolicy: {{ include "imagepolicy" .Values }}
+        env:
+        - name: WORKLOAD
+          value: "{{ .Values.WORKLOAD }}"
+        - name: NODE
+          value: "{{ .Values.NODE }}"
+        - name: HTTPMODE
+          value: "{{ .Values.HTTPMODE }}"
+        - name: SYNC
+          value: "{{ .Values.SYNC }}"
+        - name: GATED
+          value: "{{ .Values.GATED }}"
+        - name: QAT_RESOURCE_NUM
+          value: "{{ .Values.QAT_RESOURCE_NUM }}"
+        - name: PROTOCOL
+          value: "{{ .Values.PROTOCOL }}"
+        - name: CERT
+          value: "{{ .Values.CERT }}"
+        - name: CIPHER
+          value: "{{ .Values.CIPHER }}"
+        - name: CURVE
+          value: "{{ .Values.CURVE }}"
+        - name: NICIP_W2
+          value: "{{ .Values.NICIP_W2 }}"
+        - name: SINGLE_SOCKET
+          value: "{{ .Values.SINGLE_SOCKET }}"
+        - name: CPU_AFFI
+          value: "{{ .Values.CPU_AFFI }}"
+        - name: NGINX_WORKERS
+          value: "{{ .Values.NGINX_WORKERS }}"
+        - name: NGINX_CPU_LISTS
+          value: "{{ .Values.NGINX_CPU_LISTS }}"
+{{- if eq .Values.STORAGE_MEDIUM "memory" }}
+{{- if contains "_qathw" .Values.WORKLOAD }}
+        resources:
+          limits:
+            {{ .Values.QAT_RESOURCE_TYPE }}: {{ .Values.QAT_RESOURCE_NUM }}
+            hugepages-2Mi: 8Gi
+          requests:
+            {{ .Values.QAT_RESOURCE_TYPE }}: {{ .Values.QAT_RESOURCE_NUM }}
+            hugepages-2Mi: 8Gi
+            cpu: 8
+{{- end }}
+{{- else }}
+{{- if contains "_qathw" .Values.WORKLOAD }}
+        resources:
+          limits:
+            {{ .Values.QAT_RESOURCE_TYPE }}: {{ .Values.QAT_RESOURCE_NUM }}
+            hugepages-2Mi: 8Gi
+            memory: 12Gi
+          requests:
+            {{ .Values.QAT_RESOURCE_TYPE }}: {{ .Values.QAT_RESOURCE_NUM }}
+            hugepages-2Mi: 8Gi
+            cpu: 8
+            memory: 10Gi
+{{- else }}
+        resources:
+          limits:
+            memory: 12Gi
+          requests:
+            memory: 10Gi
+{{- end }}
+{{- end }}
+        securityContext:
+          capabilities:
+            add:
+            - "CAP_SYS_NICE"
+{{- if contains "_qathw" .Values.WORKLOAD }}
+            - "IPC_LOCK"
+{{- end }}
+        ports:
+        - containerPort: {{ .Values.PORT }}
+        volumeMounts:
+        - mountPath: /etc/localtime
+          name: timezone
+          readOnly: true
+        - mountPath: /mnt/cache0
+          name: cache0
+        - mountPath: /mnt/cache1
+          name: cache1
+{{- if not .Values.SINGLE_SOCKET }}
+        - mountPath: /mnt/cache2
+          name: cache2
+        - mountPath: /mnt/cache3
+          name: cache3
+{{- end }}
+      volumes:
+      - name: timezone
+        hostPath:
+          path: /etc/localtime
+          type: File
+{{- if .Values.SINGLE_SOCKET }}
+{{- if eq .Values.STORAGE_MEDIUM "memory" }}
+      - name: cache0
+        emptyDir:
+          medium: Memory
+          sizeLimit: {{ .Values.CACHE_SIZE }}
+      - name: cache1
+        emptyDir:
+          medium: Memory
+          sizeLimit: {{ .Values.CACHE_SIZE }}
+{{- else if eq .Values.STORAGE_MEDIUM "disk" }}
+      - name: cache0
+        persistentVolumeClaim:
+          claimName: cache0-claim
+      - name: cache1
+        persistentVolumeClaim:
+          claimName: cache1-claim
+{{- end }}
+
+{{- else }}
+{{- if eq .Values.STORAGE_MEDIUM "memory" }}
+      - name: cache0
+        emptyDir:
+          medium: Memory
+          sizeLimit: {{ .Values.CACHE_SIZE }}
+      - name: cache1
+        emptyDir:
+          medium: Memory
+          sizeLimit: {{ .Values.CACHE_SIZE }}
+      - name: cache2
+        emptyDir:
+          medium: Memory
+          sizeLimit: {{ .Values.CACHE_SIZE }}
+      - name: cache3
+        emptyDir:
+          medium: Memory
+          sizeLimit: {{ .Values.CACHE_SIZE }}
+{{- else if eq .Values.STORAGE_MEDIUM "disk" }}
+      - name: cache0
+        persistentVolumeClaim:
+          claimName: cache0-claim
+      - name: cache1
+        persistentVolumeClaim:
+          claimName: cache1-claim
+      - name: cache2
+        persistentVolumeClaim:
+          claimName: cache2-claim
+      - name: cache3
+        persistentVolumeClaim:
+          claimName: cache3-claim
+{{- end }}
+{{- end }}
+{{- if ne .Values.GATED "gated" }}
+      nodeSelector:
+        HAS-SETUP-DISK-SPEC-1: "yes"
+{{- if eq .Values.NODE "3n" }}
+      affinity:
+        {{- $args := list "content-server" }}
+        {{- include "podAntiAffinity" $args }}
+{{- end }}
+{{- end }}

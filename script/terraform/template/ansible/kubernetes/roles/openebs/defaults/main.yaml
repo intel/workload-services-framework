@@ -1,0 +1,7 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+k8s_openebs_operator: "https://openebs.github.io/charts/openebs-operator-lite.yaml"
+k8s_openebs_provisioner: "openebs.io/component-name=openebs-localpv-provisioner"

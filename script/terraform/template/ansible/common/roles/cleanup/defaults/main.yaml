@@ -6,8 +6,9 @@
 
 sut_restore_services: "unattended-upgrades"
 k8s_node_labels: []
-win_tmp_path: "C:"
 sut_reboot: true
 sut_restore_bios: true
 sut_restore_msr: true
+trace_tmp_path: "/tmp"
+trace_win_tmp_path: "C:"
 

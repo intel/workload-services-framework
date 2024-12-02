@@ -1,0 +1,42 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: check proxy value
+  shell:
+    cmd: |
+      . <(sed '/^# BEGIN WSF Setup/,/^# END WSF Setup/{d}' /etc/environment) > /dev/null
+      echo "|$http_proxy|$https_proxy|$no_proxy|"
+      echo "|$(sed -n '/Environment=.*HTTP_PROXY=/{s/^.*HTTP_PROXY=\([^"]*\).*$/\1/;p;q}' {{ containerd_proxy_conf }} 2> /dev/null || true)|$(sed -n '/Environment=.*HTTPS_PROXY=/{s/^.*HTTPS_PROXY=\([^"]*\).*$/\1/;p;q}' {{ containerd_proxy_conf }} 2> /dev/null || true)|$(sed -n '/Environment=.*NO_PROXY=/{s/^.*NO_PROXY=\([^"]*\).*$/\1/;p;q}' {{ containerd_proxy_conf }} 2> /dev/null || true)|"
+    executable: /bin/bash
+  register: proxies
+
+- block:
+
+  - name: configure proxy
+    shell:
+      cmd: |
+        mkdir -p "{{ containerd_proxy_conf | dirname }}"
+        for conf in "{{ containerd_proxy_conf|dirname }}"/*proxy*.conf "{{ containerd_proxy_conf|dirname }}"/*proxies*.conf; do
+          [ ! -e "$conf" ] || mv -f "$conf" "$conf.bak"
+        done
+        printf "[Service]\nEnvironment=\"HTTP_PROXY={{ http_proxy_env }}\" \"HTTPS_PROXY={{ https_proxy_env }}\" \"NO_PROXY={{ no_proxy_must | join(',') }}\"\n" > {{ containerd_proxy_conf }}
+      executable: /bin/bash
+    become: true
+
+  - name: set to restart containerd
+    set_fact:
+      containerd_restart_required: [true]
+
+  when: (http_proxy_env != http_proxy_conf) or (https_proxy_env != https_proxy_conf) or (no_proxy_must | difference(no_proxy_conf) | length > 0)
+  vars:
+    http_proxy_env: "{{ 1 | extract(proxies.stdout_lines | first | split('|')) }}"
+    http_proxy_conf: "{{ 1 | extract(proxies.stdout_lines | last | split('|')) }}"
+    https_proxy_env: "{{ 2 | extract(proxies.stdout_lines | first | split('|')) }}"
+    https_proxy_conf: "{{ 2 | extract(proxies.stdout_lines | last | split('|')) }}"
+    no_proxy_conf: "{{ 3 | extract(proxies.stdout_lines | last | split('|')) | split(',') }}"
+    containerd_insecure_registries_list: "{% if containerd_insecure_registries | type_debug == 'list' %}{{ containerd_insecure_registries }}{% else %}{{ containerd_insecure_registries | default('',true) | split(',') | reject('==','') }}{% endif %}"
+    no_proxy_must: "{{ ((3 | extract(proxies.stdout_lines | first | split('|')) | split(',')) + (k8s_enable_registry | default(true) | bool | ternary([k8s_registry_ip | default('')],[])) + (containerd_insecure_registries_list | map('regex_replace',':.*',''))) | reject('==','') | unique }}"
+

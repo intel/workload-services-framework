@@ -1,0 +1,44 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- block:
+
+  - name: Post-process hlprof records
+    shell:
+      cmd: |
+        docker exec {{ container }} tar cf - /tmp/{{ wl_namespace }}-hlprof | tar xf - --strip-components=2 >> hlprof-collect.logs 2>&1
+      executable: /bin/bash
+      chdir: "{{ trace_data_path }}"
+    loop: "{{ workload_progresses.startswith('docker:') | ternary(workload_progresses.replace('docker:','').split(' '),[]) | reject('==','') }}"
+    loop_control:
+      loop_var: container
+    become: true
+    vars:
+      workload_progresses: "{{ hostvars[trace_node.1].WORKLOAD_PROCESSES | default('') }}"
+
+  - name: Get hlprof files 
+    shell:
+      cmd: find . -type f -print
+      chdir: "{{ trace_data_path }}"
+      executable: /bin/bash
+    register: hlprof_files
+
+  - name: Create sub-directories
+    file:
+      path: "{{ trace_data_local_path }}/{{ item }}"
+      state: directory
+    delegate_to: localhost
+    loop: "{{ hlprof_files.stdout_lines | map('regex_replace','/[^/]*$','') | unique | reject('==','.') }}"
+
+  - name: Fetch hlprof files
+    fetch:
+      src: "{{ trace_data_path }}/{{ item }}"
+      dest: "{{ trace_data_local_path }}/{{ item | regex_replace('/[^/]*$','') }}/"
+      flat: true
+    loop: "{{ hlprof_files.stdout_lines }}"
+
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: false

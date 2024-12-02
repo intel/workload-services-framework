@@ -1,0 +1,34 @@
+# stream-repo-ubuntu24
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+
+FROM ${OS_IMAGE}:${OS_VER} AS clone
+
+# Install necessary packages: git and wget
+RUN apt-get update -y && \
+    apt-get install -y git wget && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+
+ARG STREAM_INSTALL_DIR=/opt/stream_repo
+WORKDIR ${STREAM_INSTALL_DIR}
+
+ARG STREAM_VER=5.10
+ARG STREAM_REPO=https://www.cs.virginia.edu/stream/FTP/Code/stream.c
+
+RUN  cd ${STREAM_INSTALL_DIR} && \
+     wget ${STREAM_REPO}
+
+FROM scratch
+
+ARG STREAM_INSTALL_DIR=/opt/stream_repo
+WORKDIR ${STREAM_INSTALL_DIR}
+
+COPY --from=clone /opt/stream_repo ${STREAM_INSTALL_DIR}/
+

@@ -1,0 +1,33 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Get the pcm files
+    shell:
+      cmd: |
+        find . -type f ! -name pcm.pid -print
+      chdir: "{{ trace_data_path }}"
+    register: pcm_files
+
+  - name: Create sub-directories
+    file:
+      path: "{{ trace_data_local_path }}/{{ item }}"
+      state: directory
+    delegate_to: localhost
+    loop: "{{ pcm_files.stdout_lines | map('regex_replace','/[^/]*$','') | unique | reject('==','.') }}"
+
+  - name: Fetch pcm files
+    fetch:
+      src: "{{ trace_data_path }}/{{ item }}"
+      dest: "{{ trace_data_local_path }}/{{ item | regex_replace('/[^/]*$','') }}/"
+      flat: true
+    loop: "{{ pcm_files.stdout_lines }}"
+
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: false
+

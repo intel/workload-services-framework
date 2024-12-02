@@ -9,4 +9,5 @@ trace_start_timeout: "100"
 trace_stop_timeout: "100"
 sut_unreachable_retries: 1
 sut_unreachable_delay: 1m
-win_tmp_path: "C:"
+trace_tmp_path: "/tmp"
+trace_win_tmp_path: "C:"

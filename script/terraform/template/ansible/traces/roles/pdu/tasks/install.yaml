@@ -1,0 +1,29 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Check if curl is available
+    shell:
+      cmd: |
+        curl --version
+      executable: /bin/bash
+    register: pdu_rc
+    ignore_errors: true
+
+  - name: Install curl
+    package:
+      name:
+      - curl
+    register: pkgrc
+    until: pkgrc is success
+    retries: 10
+    delay: 10
+    when: pdu_rc is failed
+  
+  when: not (pdu_local | bool)
+  delegate_to: "{{ trace_node.1 }}"
+  

@@ -22,7 +22,7 @@ def send_message(message):
     if not is_valid_ip(server_name):
         service_ip = socket.gethostbyname(server_name)
     else:
-        service_ip =  server_name
+        service_ip =  server_name     
     print(f"service_ip: {service_ip}")
     # Create a TCP/IP socket
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -59,13 +59,13 @@ def data_compaction_wait():
             wait = 0
         else:
             time.sleep(60) #sleep 60s
-
+    
 if __name__ == '__main__':
     if sys.argv[1] is not None and sys.argv[1] != "":
-        #operation:
+        #operation: 
         #          compact_wait : wait database compaction finished.
         #          clean        : clean DB data after testing finished.
-        op = sys.argv[1]
+        op = sys.argv[1]  
     if sys.argv[2] is not None and sys.argv[2] != "":
         server_name = sys.argv[2]
     if sys.argv[3] is not None and sys.argv[3] != "":
@@ -74,4 +74,5 @@ if __name__ == '__main__':
     if OP_COMPACT_WAIT == op:
         data_compaction_wait()
     if OP_CLEAN == op:
-        data_clean()
+        data_clean()       
+        

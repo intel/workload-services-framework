@@ -1,0 +1,45 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Create folder
+  file:
+    path: "{{ wl_logs_dir }}/{{ inventory_hostname }}-tpmi"
+    state: directory
+  delegate_to: localhost
+  become: false
+
+- name: Set global tpmi options
+  set_fact:
+     tpmi_option: "{{ tpmi_option + sut_tpmi_options | split(',') | map('trim') | select('match', item + ':.*') | map('regex_replace', '^[^:]*:', '') | map('trim') | reject('==', '') | join('')  }}"
+  loop: "{{ group_names }}"
+  vars:
+    tpmi_option: ""
+
+- block:
+  - name: create tpmi workspace
+    file:
+      path: "/tmp/{{ wl_namespace }}-tpmi"
+      state: directory
+
+  - name: Install tpmi
+    include_tasks:
+      file: "install-tpmi.yaml"
+
+  - name: Save pcm-tpmi settings
+    include_tasks:
+      file: "save-tpmi.yaml"
+
+  - name: Update tpmi setting
+    include_tasks:
+      file: update-tpmi.yaml
+    when:
+    - tpmi_settings != (tpmi_option | default(wl_tpmi, true))
+    vars:
+      tpmi_settings: "{{ lookup('file', wl_logs_dir + '/' + inventory_hostname + '-tpmi/tpmi') }}"
+
+  when: (wl_tpmi | length > 0) or (tpmi_option | length > 0)
+
+
+

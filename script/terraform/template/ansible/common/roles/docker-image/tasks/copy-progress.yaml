@@ -1,0 +1,20 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: "skopeo copy {{ inspect.item.key }}: {{ ((image_layers | ansible.utils.index_of('eq',item,wantlist=true) | first | int+1) * 100 / (image_layers | length)) | int }}%"
+  shell:
+    cmd: |
+      while kill -0 {{ copy_result.stdout }}; do
+        grep -q -E 'FATA\[[0-9]*\]|level=fatal|Error:' /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-skopeo-progress.logs && break
+        grep -q -F "Copying blob {{ item }} done" /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-skopeo-progress.logs && break
+        sleep 1s
+      done
+    executable: /bin/bash
+  delegate_to: localhost
+  ignore_errors: true
+  become: true
+  no_log: true
+

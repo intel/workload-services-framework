@@ -10,6 +10,8 @@ CLUSTER_CONFIG_M4="${CLUSTER_CONFIG_M4:-$SOURCEROOT/cluster-config.yaml.m4}"
 CLUSTER_CONFIG_J2="${CLUSTER_CONFIG_J2:-$SOURCEROOT/cluster-config.yaml.j2}"
 CLUSTER_CONFIG="${CLUSTER_CONFIG:-$LOGSDIRH/cluster-config.yaml}"
 EXPORT_LOGS="${EXPORT_LOGS:-/export-logs}"
+RECONFIG_OPTIONS=" ${RECONFIG_OPTIONS:-$(for k in ${WORKLOAD_PARAMS[@]%%#*};do echo -n "-D$k=${!k} ";done)}"
+J2_OPTIONS="${J2_OPTIONS:-${RECONFIG_OPTIONS// -D/ -e }}"
 
 (
     cd "$SOURCEROOT" && \

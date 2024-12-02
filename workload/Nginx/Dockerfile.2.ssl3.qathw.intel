@@ -1,0 +1,60 @@
+# async_nginx_qathw
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+ARG RELEASE
+
+FROM qathw-crypto-base-ssl3-ubuntu-24.04.1${RELEASE} AS build
+RUN  apt-get update && apt-get install -y git make gcc g++ autoconf automake pkg-config libtool zlib1g-dev libpcre3-dev libtcmalloc-*
+RUN  cd /usr/lib/x86_64-linux-gnu && \
+     ln -f -s libtcmalloc_minimal.so.4 libtcmalloc_minimal.so
+
+ARG ASYNC_NGINX_VER="v0.5.1"
+ARG ASYNC_NGINX_REPO=https://github.com/intel/asynch_mode_nginx.git
+RUN git clone -b $ASYNC_NGINX_VER --depth 1 ${ASYNC_NGINX_REPO} && \
+    cd /asynch_mode_nginx && \
+    ./configure \
+      --prefix=/var/www \
+      --conf-path=/usr/local/share/nginx/conf/nginx.conf \
+      --sbin-path=/usr/local/bin/nginx \
+      --pid-path=/run/nginx.pid \
+      --lock-path=/run/lock/nginx.lock \
+      --modules-path=/var/www/modules/ \
+      --without-http_rewrite_module \
+      --with-http_ssl_module \
+      --with-pcre \
+      --add-dynamic-module=modules/nginx_qat_module/ \
+      --with-cc-opt="-DNGX_SECURE_MEM -O3 -I/usr/local/include/openssl -Wno-error=deprecated-declarations -Wimplicit-fallthrough=0" \
+      --with-ld-opt="-ltcmalloc_minimal -Wl,-rpath=/usr/local/lib64 -L/usr/local/lib64" && \
+    make -j && \
+    make install
+
+
+FROM qathw-crypto-base-ssl3-ubuntu-24.04.1${RELEASE}
+RUN  apt-get update && apt-get install -y numactl zlib1g libpcre3 libtcmalloc-* systemd && apt-get clean
+RUN  cd /usr/lib/x86_64-linux-gnu && \
+     ln -f -s libtcmalloc_minimal.so.4 libtcmalloc_minimal.so
+COPY --from=build /usr/local/ /usr/local/
+COPY --from=build /var/www/ /var/www/
+COPY conf/*.conf /usr/local/share/nginx/conf/
+COPY prepare_nginx.sh /
+
+RUN rm -f /var/www/html/index.html && touch /var/www/html/index.html && \
+dd bs=1 count=1024 if=/dev/urandom of=/var/www/html/random_content_1KB && \
+dd bs=1 count=2048 if=/dev/urandom of=/var/www/html/random_content_2KB && \
+dd bs=1 count=4096 if=/dev/urandom of=/var/www/html/random_content_4KB && \
+dd bs=512 count=1024 if=/dev/urandom of=/var/www/html/random_content_512KB && \
+dd bs=1024 count=1024 if=/dev/urandom of=/var/www/html/random_content_1MB && \
+dd bs=1024 count=4096 if=/dev/urandom of=/var/www/html/random_content_4MB
+
+ENV QAT_POLICY=1
+
+RUN mkfifo /export-logs
+CMD (ldconfig && /prepare_nginx.sh; echo $? > status) 2>&1 | tee output.logs && \
+    tar cf /export-logs status output.logs && \
+    sleep infinity

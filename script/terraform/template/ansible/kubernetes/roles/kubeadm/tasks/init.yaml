@@ -4,27 +4,69 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: Merge the configrations
-  set_fact:
-    kubeadm_options: "{{ k8s_kubeadm_options_default | combine(k8s_kubeadm_options, recursive=True) }}"
-    k8s_pod_cidr: "{{ k8s_pod_cidr }}"
-    k8s_service_cidr: "{{ k8s_service_cidr }}"
-    cacheable: yes
+- name: Ensure the data root exists
+  file:
+    path: "{{ k8s_data_root }}"
+    state: directory
+  become: true
 
-- name: Create the kubeadm config file
-  copy:
-    content: "{{ kubeadm_options.values() | map('to_nice_yaml') | join('---\n') }}"
-    dest: "/tmp/{{ wl_namespace }}-kubeadm-config.yaml"
+- block:
 
-- name: Remove bindPort quote as integer
-  lineinfile:
-    dest: "/tmp/{{ wl_namespace }}-kubeadm-config.yaml"
-    regexp: '^.*bindPort: (.*)$'
-    line: "    bindPort: {{ k8s_apiserver_port | default(6443) }}"
+    - name: Create the kubeadm config file
+      copy:
+        content: "{{ kubeadm_options.values() | map('to_nice_yaml') | join('---\n') | regex_replace('(bindPort: |maxPods: |imageGCLowThresholdPercent: |imageGCHighThresholdPercent: ).([0-9]*).','\\1\\2') }}"
+        dest: "/tmp/{{ wl_namespace }}-kubeadm-config.yaml"
+      vars:
+        apiserver_addr: "{{ k8s_apiserver_ip | default(private_ip,true) }}"
+        apiserver_ip: "{% if (apiserver_addr|ipaddr) %}{{ apiserver_addr }}{% else %}{{ query('dig',apiserver_addr)|first }}{% endif %}"
+        kubeadm_options_default:
+          ClusterConfiguration:
+            apiVersion: kubeadm.k8s.io/v1beta3
+            kind: ClusterConfiguration
+            networking:
+              serviceSubnet: "{{ k8s_service_cidr }}"
+              podSubnet: "{{ k8s_pod_cidr }}"
+            kubernetesVersion: "v{{ k8s_version }}"
+            controlPlaneEndpoint: "{{ apiserver_ip }}:{{ k8s_apiserver_port | default(6443,true) | int }}"
+          KubeletConfiguration:
+            apiVersion: kubelet.config.k8s.io/v1beta1
+            kind: KubeletConfiguration
+            cgroupDriver: "{{ k8s_cgroup_driver }}"
+            maxPods: "{{ k8s_max_pods | int }}"
+            imageGCLowThresholdPercent: "{{ k8s_image_gc_low_threshold_percent | int }}"
+            imageGCHighThresholdPercent: "{{ k8s_image_gc_high_threshold_percent | int }}"
+            allowedUnsafeSysctls: "{{ k8s_allowed_unsafe_sysctls | split(',') | reject('==','') }}"
+            runtimeRequestTimeout: "{{ k8s_runtime_request_timeout }}"
+          InitConfiguration:
+            apiVersion: kubeadm.k8s.io/v1beta3
+            kind: InitConfiguration
+            localAPIEndpoint:
+              advertiseAddress: "{{ apiserver_ip }}"
+              bindPort: "{{ k8s_apiserver_port | default(6443,true) | int }}"
+            nodeRegistration:
+              name: "{{ inventory_hostname }}"
+              criSocket: "{{ k8s_containerd_socket }}"
+              kubeletExtraArgs:
+                "node-ip": "{% if (private_ip|ipaddr) %}{{ private_ip }}{% else %}{{ query('dig',private_ip)|first }}{% endif %}"
+                "root-dir": "{{ k8s_data_root }}"
+        kubeadm_untaint_options:
+          InitConfiguration:
+            nodeRegistration:
+              taints: []
+        kubeadm_should_untaint: "{{ groups.cluster_hosts | difference(groups.controller) | map('extract', hostvars, ['ansible_host']) | intersect(groups.controller | map('extract', hostvars, ['ansible_host'])) | length > 0 }}"
+        kubeadm_options: "{{ kubeadm_options_default | combine(k8s_kubeadm_options, recursive=True) | combine(kubeadm_should_untaint | ternary(kubeadm_untaint_options,{}), recursive=True) }}"
+    
+    - name: kubeadm init
+      command: "kubeadm init --config /tmp/{{ wl_namespace }}-kubeadm-config.yaml"
 
-- name: kubeadm init
-  command: "kubeadm init --config /tmp/{{ wl_namespace }}-kubeadm-config.yaml"
-  become: yes
+  always:
+
+    - name: Remove the kubeadm config file
+      file:
+        path: "/tmp/{{ wl_namespace }}-kubeadm-config.yaml"
+        state: absent
+
+  become: true
 
 - name: find out the home directory
   shell:
@@ -49,17 +91,6 @@
     mode: "0600"
   become: yes
 
-- name: Remove the kubeadm config file
-  file:
-    path: "/tmp/{{ wl_namespace }}-kubeadm-config.yaml"
-    state: absent
-  become: yes
-
-- name: Customize kubelet
-  include_role:
-    name: kubelet
-    tasks_from: customize-kubelet
-
 - name: Wait for all control-plane pods become created
   shell: "kubectl get po --namespace=kube-system --selector tier=control-plane --output=jsonpath='{.items[*].metadata.name}'"
   register: pods
@@ -73,5 +104,5 @@
     - kube-scheduler
 
 - name: Wait for control-plane pods become ready
-  shell: "timeout 600s kubectl wait --namespace=kube-system --for=condition=Ready pods --selector tier=control-plane"
+  shell: "timeout {{ k8s_node_ready_wait }} kubectl wait --namespace=kube-system --for=condition=Ready pods --selector tier=control-plane"
 

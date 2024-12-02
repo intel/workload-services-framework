@@ -1,0 +1,64 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+kvm_packages:
+  debian:
+    - libvirt-clients
+    - qemu-kvm
+    - libvirt-daemon-system
+    - virtinst
+    - virt-manager
+    - arp-scan
+    - bridge-utils
+  centos:
+    - libvirt-client
+    - qemu-kvm
+    - libvirt-daemon
+    - libvirt-daemon-kvm
+    - virt-manager
+    - virt-install
+    - arp-scan
+    - bridge-utils
+kvm_grub_actions:
+  debian:
+    grub_path: /etc/default/grub.d/99-kvm-settings.cfg
+    update_grub_cmd: |
+        update-grub
+  centos:
+    grub_path: /etc/default/grub
+    update_grub_cmd: |
+        grub2-mkconfig -o /boot/grub2/grub.cfg
+        grub2-mkconfig -o /etc/grub2.cfg
+kvm_hugepage_paths:
+  "2m":
+    mount_path: /dev/hugepages-2M
+    page_size: 2M
+    sysfs_path: /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+    hugepagesz: 2048k
+  "1g":
+    mount_path: /dev/hugepages-1G
+    page_size: 1024M
+    sysfs_path: /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages
+    hugepagesz: 1048576k
+kvm_reboot: false
+kvm_reset: false
+
+kvm_vxlan_mode: ""
+kvm_vxlan_subnet: "172.33.0.0/16"
+kvm_vxlan_name: wsfvxlan
+kvm_vxlan_mtu: "1440"
+kvm_vxlan_ttl: "5"
+kvm_vxlan_id: "20680"
+kvm_vxlan_dstport: "20680"
+kvm_vxlan_group: "239.206.80.1"
+kvm_bridge_name: wsfbr0
+kvm_bridge_subnet: "172.22.0.0/24"
+kvm_bridge_dhcp_start: "16"
+kvm_bridge_dhcp_end: "200"
+kvm_default_name: default
+kvm_default_bridge: virbr0
+kvm_default_subnet: "192.168.122.0/24"
+

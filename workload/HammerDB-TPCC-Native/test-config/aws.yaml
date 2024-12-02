@@ -1,0 +1,28 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+*centos*:
+    AWS_WORKER_INSTANCE_TYPE: m6i.xlarge
+    AWS_CLIENT_INSTANCE_TYPE: m6i.xlarge
+    AWS_WORKER_OS_TYPE: centos7
+    AWS_CLIENT_OS_TYPE: centos7
+    AWS_DISK_COUNT: 1
+    AWS_DISK_SIZE: 200
+
+*windows*mysql*:
+    AWS_WORKER_INSTANCE_TYPE: m6i.xlarge
+    AWS_CLIENT_INSTANCE_TYPE: m6i.xlarge
+    AWS_WORKER_OS_TYPE: windows2019
+    AWS_CLIENT_OS_TYPE: windows2019
+    AWS_DISK_COUNT: 1
+    AWS_DISK_SIZE: 200
+
+*windows*postgresql*:
+    AWS_WORKER_INSTANCE_TYPE: m6i.xlarge
+    AWS_CLIENT_INSTANCE_TYPE: m6i.xlarge
+    AWS_WORKER_OS_TYPE: windows2016
+    AWS_CLIENT_OS_TYPE: windows2016
+    AWS_DISK_COUNT: 1
+    AWS_DISK_SIZE: 200

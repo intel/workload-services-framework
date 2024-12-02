@@ -1,0 +1,40 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- hosts: client-0
+  gather_facts: no
+  tasks:
+  - name: Install HammerDB Tool
+    include_role:
+      name: installation
+
+- hosts: worker-0
+  gather_facts: no
+  tasks:
+  - name: Config Server
+    win_shell: |
+      # Windows firewall (Close firewell)
+      $firewallStatus = Get-NetFirewallProfile | Select-Object -Property Name, Enabled
+      if ($firewallStatus.Enabled -contains 'True') {
+          Set-NetFirewallProfile -Profile Domain, Public, Private -Enabled False
+          Write-Host "Windows firewall closed"
+      } else {
+          Write-Host "Windows firewall has been shut down"
+      }
+
+      # Remove Windows Defender 
+      Remove-WindowsFeature -Name Windows-Defender
+
+      # Power profile (High Performance)
+      $powerpolicy = powercfg /GetActiveScheme
+      if ($powerpolicy.contains("Balanced")) {
+          $powerPlanGuid = powercfg -l | Select-String -Pattern "High Performance" |  ForEach-Object { $_.ToString().Trim() -split '\s+' } | Select-Object -Index 3
+          powercfg -s $powerPlanGuid
+      }
+    when: wl_tunables.HOSTOS_VER not in ['centos7', 'centos9', 'ubuntu2204', 'ubuntu2004']
+
+  - name: Setup server
+    include_role:
+      name: "{{ (wl_tunables.SERVER_VER in ['mysql8033']) | ternary('mysql','postgresql') }}"

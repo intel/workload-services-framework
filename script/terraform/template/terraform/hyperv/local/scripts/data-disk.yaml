@@ -1,0 +1,32 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- hosts: all
+  gather_facts: no
+  tasks:
+
+  - name: Remove data disk
+    ansible.windows.win_file:
+      path: "{{ disk_path }}"
+      state: absent
+    register: filerc
+    until: filerc is success
+    retries: 10
+    delay: 10
+    ignore_errors: true
+    tags:
+    - create
+    - destroy
+
+  - name: Creae data disk
+    win_shell: |
+      New-VHD -Path "{{ disk_path }}" -SizeBytes {{ lookup('env','DISK_SIZE') }} -{{ lookup('env','DISK_TYPE') }}
+    tags:
+    - create
+
+  vars:
+    disk_path: "{{ lookup('env','DISK_PATH') }}"
+

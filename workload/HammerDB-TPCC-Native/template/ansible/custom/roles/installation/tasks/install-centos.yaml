@@ -1,0 +1,54 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Create HammerDB install path
+  file: 
+    path: "/tmp/HammerDB"
+    state: directory
+  
+- name: Download HammerDB package
+  get_url:
+    url: "{{ HAMMERDB_REPO_LINUX }}"
+    dest: "/tmp"
+
+- name: Untar HammerDB package
+  unarchive:
+    src: "/tmp/HammerDB-{{ HAMMERDB_VER }}-Linux.tar.gz"
+    dest: "/tmp/HammerDB"
+    remote_src: yes
+
+- name: Install the prerequests
+  yum:
+    name:
+    - "{{ POSTGRES_CENTOS9_PKG }}"
+    update_cache: true
+    disable_gpg_check: true
+  register: yumrc
+  until: yumrc is success
+  retries: 10
+  delay: 10
+  become: true
+
+- name: Install PostgreSQL-client
+  yum:
+    name:
+    - postgresql14
+    update_cache: true
+    disable_gpg_check: true
+  register: yumrc
+  until: yumrc is success
+  retries: 10
+  delay: 10
+  become: true
+
+- name: Copy build.tcl script to client
+  template:
+    src: "build_{{ (wl_tunables.SERVER_VER in ['mysql8033']) | ternary('mysql','pg') }}.tcl.j2"
+    dest: "/tmp/HammerDB/build.tcl"
+
+- name: Copy run.tcl script to client
+  template:
+    src: "run_{{ (wl_tunables.SERVER_VER in ['mysql8033']) | ternary('mysql','pg') }}.tcl.j2"
+    dest: "/tmp/HammerDB/run.tcl"

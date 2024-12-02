@@ -1,0 +1,32 @@
+# pytorch-intel-public-unittest-24.04
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+FROM pytorch-intel-public-24.04${RELEASE}
+
+ENV PYTORCH_VER="2.0.0+cpu"
+ENV PYTHON_VER="3.10"
+ENV IPEX_VER="2.0.0+cpu"
+
+WORKDIR /
+RUN mkfifo /export-logs
+
+CMD python_version=$(python -V | awk -F '[[:space:]]*' '{print $2}' | awk -F '.' '{print $1"."$2}') && \
+    pytorch_version=$(python -c "import torch; print(torch.__version__)") && \
+    ipex_version=$(python -c "import intel_extension_for_pytorch as ipex; print(ipex.__version__)") && \
+    error=0 && \
+    ( if [ "${python_version}" = "${PYTHON_VER}" ]; \
+      then echo "\e[1;32mPython Version: ${python_version}\e[0m"; \
+      else echo "\e[1;31mPython Version: ${python_version}\e[0m" && error=1; fi; \
+      if [ "${pytorch_version}" = "${PYTORCH_VER}" ]; \
+      then echo "\e[1;32mPyTorch Version: ${pytorch_version}\e[0m"; \
+      else echo "\e[1;31mPyTorch Version: ${pytorch_version}\e[0m" && error=1; fi; \
+      if [ "${ipex_version}" = "${IPEX_VER}" ]; \
+      then echo "\e[1;32mIPEX Version: ${ipex_version}\e[0m"; \
+      else echo "\e[1;31mIPEX Version: ${ipex_version}\e[0m" && error=1; fi; \
+      echo $(($? || $error)) > status ) 2>&1 | tee benchmark_$(date +"%m-%d-%y-%H-%M-%S").log && \
+    tar cf /export-logs status $(find . -name "*.log") && \
+    sleep infinity

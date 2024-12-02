@@ -1,0 +1,25 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: get uname -m
+  command: uname -m
+  register: unamem
+
+- name: download and unpackage cilium cli
+  unarchive:
+    src: "{{ k8s_cilium_cli_repository }}/cilium-linux-{{ (unamem.stdout == 'aarch64') | ternary('arm64','amd64') }}.tar.gz"
+    remote_src: true
+    dest: /usr/local/bin
+    mode: a+rx
+  become: true
+
+- name: install cilium
+  command: "cilium install --version {{ k8s_cilium_version }}"
+
+- name: wait for controller cilium ready
+  include_tasks:
+    file: wait-complete.yaml
+

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Numa Memory Statistics(numastat)</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-4bw+/aepP/YC94hEpVNVgiZdgIC5+VKNBQNGCHeKRQN+PtmoHDEXuppvnDJzQIu9" crossorigin="anonymous">
+
+  <style>
+    body {
+      padding-top: 20px;
+      padding-bottom: 20px;
+    }
+
+    .header {
+      padding-bottom: 20px;
+      padding-right: 15px;
+      padding-left: 15px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .header h3 {
+      margin-top: 0;
+      margin-bottom: 0;
+      line-height: 40px;
+    }
+
+    .container {}
+
+    .wrapper {
+      display: flex;
+      box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
+      margin: 2rem;
+    }
+
+    .handle {
+      height: 70px;
+      width: 5px;
+      background-color: DodgerBlue;
+    }
+
+    .content {
+      flex-grow: 1;
+    }
+
+    /* Style the tab content */
+    .tabcontent {
+      display: block;
+      padding: 6px 12px;
+      border: 1px solid #ccc;
+      border-top: none;
+    }
+
+    @media print {
+      .printable {
+        zoom: 50%;
+      }
+    }
+  </style>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/apexcharts/3.42.0/apexcharts.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-HwwvtgBNo3bZJJLYd8oVXjrBZt8cqVSpeBNS5n7C8IVInixGAoxmnlMuBnhbgrkm"
+    crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/apexcharts/3.42.0/apexcharts.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+</head>
+
+<body>
+
+  <div class="card shadow py-2 px-2">
+
+    <div id="NumaUtil" class="tabcontent px-0 py-2">
+      <div class="card-header">
+        <span style="font-weight: 500;">Numa Node Memory Usage Trend</span>
+        <button class="btn btn-success btn-sm" style="float:right;" onClick="window.print()"><i class="fa fa-print"
+            aria-hidden="true"></i>Save as PDF</button>
+        <div class="row d-flex"></div>
+      </div>
+      <div class="row" id="sortable_numa_util">
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="numa-hit-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="numa-miss-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="numa-foreign-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="interleave-hit-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="local-node-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="other-node-id" style="height: 400px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    {{ numastat_data }}
+  </script>
+
+  <script type="text/javascript">
+    function hide_chart(id) {
+      const el = document.getElementById(id);
+      el.parentNode.style.display = 'none';
+    }
+
+    function create_line_chart(id, options) {
+      const el = document.getElementById(id);
+      const chart = new ApexCharts(el, _.merge(options, {
+        chart: {
+          id: id,
+          type: 'line',
+          height: '350px',
+          redrawOnParentResize: true,
+          redrawOnWindowResize: true,
+          group: 'synchronized',
+          zoom: {
+            enabled: true
+          },
+          toolbar: {
+            show: true,
+            offsetX: 0,
+            offsetY: 0,
+            tools: {
+              download: true,
+              selection: true,
+              zoom: true,
+              zoomin: true,
+              zoomout: true,
+              pan: true,
+              reset: true | '<img src="/static/icons/reset.png" width="20">',
+              customIcons: []
+            },
+            export: {
+              csv: {
+                filename: undefined,
+                columnDelimiter: ',',
+                headerCategory: 'category',
+                headerValue: 'value',
+                dateFormatter(timestamp) {
+                  return new Date(timestamp).toDateString()
+                }
+              },
+              svg: {
+                filename: undefined,
+              },
+              png: {
+                filename: undefined,
+              }
+            },
+            autoSelected: 'zoom'
+          },
+        },
+        stroke: {
+          width: 1.5,
+          opacity: 1
+        },
+        xaxis: {
+          type: 'datetime',
+          labels: {
+            datetimeUTC: true,
+          },
+          min: min_time,
+          max: max_time,
+          title: {
+            text: 'Time',
+          },
+        },
+        yaxis: {
+          labels: {
+            minWidth: 20,
+          },
+          title: {
+            text: 'Memory(MB)',
+          },
+        },
+        tooltip: {
+          shared: false,
+          x: {
+            format: 'MMM dd HH:mm:ss',
+          },
+        },
+        legend: {
+          show: true,
+          position: 'bottom',
+          horizontalAlign: 'center',
+          onItemClick: {
+            toggleDataSeries: true
+          },
+          onItemHover: {
+            highlightDataSeries: true
+          },
+        },
+      }));
+      chart.render();
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      function create_numastat_chart(id, title, data) {
+        try {
+          var series = [];
+          for (let k in data) {
+            series.push({
+              name: k,
+              data: data[k],
+            });
+          }
+          create_line_chart(id, {
+            title: {
+              text: title,
+            },
+            yaxis: {
+              decimalsInFloat: 2,
+            },
+            series: series,
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+      }
+
+      create_numastat_chart('numa-hit-id', 'Numa Hit', data_numa_hit);
+      create_numastat_chart('numa-miss-id', 'Numa Miss',data_numa_miss);
+      create_numastat_chart('numa-foreign-id', 'Numa Foreign', data_numa_foreign);
+      create_numastat_chart('interleave-hit-id', 'Interleave Hit', data_interleave_hit);
+      create_numastat_chart('local-node-id', 'Local Node', data_local_node);
+      create_numastat_chart('other-node-id', 'Other Node', data_other_node);
+
+      function createSortable(div_id) {
+        Sortable.create(document.getElementById(div_id), {
+          group: {
+            name: 'shared',
+            pull: 'clone' // To clone: set pull to 'clone'
+          },
+          ghostClass: 'blue-background-class',
+          animation: 150
+        });
+      }
+      createSortable('sortable_numa_util');
+    });
+  </script>
+</body>
+
+</html>

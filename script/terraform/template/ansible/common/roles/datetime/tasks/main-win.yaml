@@ -1,0 +1,66 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Get datetime from Linux vmhost
+    shell:
+      cmd: |
+        timedatectl show --va -p Timezone 2> /dev/null || echo $TZ
+        date --rfc-3339=ns
+      executable: /bin/bash
+    register: datetime
+    delegate_to: "{{ vmhost_host }}"
+
+  - name: Set instance datetime
+    win_shell: |
+      Set-TimeZone -Name "{{ zones.supplementalData.windowsZones.mapTimezones.mapZone | selectattr('@territory','==','001') | selectattr('@type','match','.*'+(datetime.stdout_lines|first)+'.*') | map(attribute='@other') | first }}"
+      Set-Date -Date "{{ datetime.stdout_lines | last }}"
+    vars:
+      zones: "{{ lookup('file','windows-zones.xml') | ansible.utils.from_xml('xmltodict') }}"
+      
+  when:
+  - vmhost_host is defined
+  - (hostvars[vmhost_host].ansible_connection | default('ssh')) in ['ssh']
+  become: false
+  ignore_errors: true
+
+- block:
+
+  - name: Get datetime from Windows vmhost
+    win_shell: |
+      (Get-TimeZone).StandardName
+      Get-Date -Format "yyyy-MM-dd HH:mm:ss.fffffffzzz"
+    delegate_to: "{{ vmhost_host }}"
+    register: datetime
+
+  - name: Set instance datetime
+    win_shell: |
+      Set-TimeZone -Name "{{ datetime.stdout_lines | first }}"
+      Set-Date -Date "{{ datetime.stdout_lines | last }}"
+
+  when:
+  - vmhost_host is defined
+  - (hostvars[vmhost_host].ansible_connection | default('ssh')) in ['winrm']
+  become: false
+  ignore_errors: true
+
+- block:
+
+  - name: Set instance datetime from local datetime
+    win_shell: |
+      Set-TimeZone -Name "{{ zones.supplementalData.windowsZones.mapTimezones.mapZone | selectattr('@territory','==','001') | selectattr('@type','match','.*'+timezone+'.*') | map(attribute='@other') | first }}"
+      Set-Date -Date "{{ datetime }}"
+    vars:
+      timezone: "{{ lookup('pipe', 'timedatectl show --va -p Timezone 2> /dev/null || echo $TZ') }}"
+      datetime: "{{ lookup('pipe', 'date --rfc-3339=ns') }}"
+      zones: "{{ lookup('file','windows-zones.xml') | ansible.utils.from_xml('xmltodict') }}"
+
+  when:
+  - vmhost_host is not defined
+  become: false
+  ignore_errors: true
+

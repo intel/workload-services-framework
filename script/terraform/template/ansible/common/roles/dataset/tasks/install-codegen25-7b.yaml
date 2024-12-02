@@ -1,0 +1,35 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- include_role:
+    name: hf-dataset
+  vars:
+    DEST_DIR: "/opt/dataset/codegen25/7b"
+    MODEL_ID: "Salesforce/codegen25-7b-multi_P"
+    DATASET_SIZE: 36
+    exclude: []
+    revision: 0bdf3f45a09e4f53b333393205db1388634a0e2e
+    HF_LOGIN: false
+
+- name: install patch
+  block:
+    - name: copy patch tokenization_codegen25.py
+      ansible.builtin.copy:
+        src: "patches/tokenization_codegen25.py"
+        dest: "{{DEST_DIR}}/models--Salesforce--codegen25-7b-multi_P/snapshots/{{ revision }}"
+
+    - name: Create directory refs
+      ansible.builtin.file:
+        path: "{{DEST_DIR}}/models--Salesforce--codegen25-7b-multi_P/refs"
+        state: directory
+
+    - name: Create a file wirte content
+      ansible.builtin.copy:
+        content: "{{ revision }}"
+        dest: "{{DEST_DIR}}/models--Salesforce--codegen25-7b-multi_P/refs/main"
+  vars: 
+    DEST_DIR: "/opt/dataset/codegen25/7b"
+    revision: 0bdf3f45a09e4f53b333393205db1388634a0e2e
+

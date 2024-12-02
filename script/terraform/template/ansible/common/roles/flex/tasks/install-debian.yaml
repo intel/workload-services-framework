@@ -1,0 +1,124 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Install pre-requisite package
+  apt:
+    name:
+    - gpg
+    - hwinfo
+    state: present
+    update_cache: yes 
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 5
+  become: true
+
+- name: Download the signing key
+  get_url:
+    url: "{{ flex_repository }}/intel-graphics.key"
+    dest: /tmp/intel-graphics.key
+    mode: '0644'
+    force: true
+  become: false
+  register: getrc
+  until: getrc is success
+  retries: 10
+  delay: 10
+  environment:
+    no_proxy: "{{ no_proxy }}"
+    NO_PROXY: "{{ no_proxy }}"
+
+- name: deamor the GPG key
+  command: gpg --yes --dearmor -o /usr/share/keyrings/intel-graphics.gpg /tmp/intel-graphics.key
+  become: true
+
+- block:
+
+    - name: Add Intel graphic driver repo
+      apt_repository:
+        filename: "intel-graphics-{{ os.stdout_lines | last }}"
+        repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] {{ flex_repository }}/{{ os.stdout_lines | first }} {{ os.stdout_lines | last }}/lts/{{ flex_version }} unified"
+        state: present
+        update_cache: true
+      environment:
+        no_proxy: "{{ no_proxy }}"
+        NO_PROXY: "{{ no_proxy }}"
+           
+    - name: Install Ubuntu common prerequisite
+      apt:
+        name: "{{ drivers.prerequisite | unique }}"
+        state: present
+      register: aptrc
+      until: aptrc is success
+      retries: 10
+      delay: 10
+      environment:
+        no_proxy: "{{ no_proxy }}"
+        NO_PROXY: "{{ no_proxy }}"
+      vars:
+        drivers:
+          prerequisite:
+          - "{{ ('linux-headers' in flex_package_skip) | ternary('flex','linux-headers-'+unamer.stdout) }}"
+          - "{{ ('linux-modules-extra' in flex_package_skip) | ternary('flex','linux-modules-extra-'+unamer.stdout) }}"
+          - flex
+          - bison
+
+    - name: Install Ubuntu Package Installation
+      apt:
+        name: "{{ flex_driver_for | split(',') | map('extract',drivers) | flatten | difference(flex_package_skip|split(',')) | unique }}"
+        state: present
+      register: aptrc
+      until: aptrc is success
+      retries: 10
+      delay: 10
+      environment:
+        no_proxy: "{{ no_proxy }}"
+        NO_PROXY: "{{ no_proxy }}"
+      vars:
+        drivers:
+          common:
+          - intel-fw-gpu
+          - xpu-smi
+          - intel-i915-dkms
+          compute:
+          - intel-opencl-icd
+          - intel-level-zero-gpu
+          - level-zero
+          - clinfo
+          glmesa:
+          - libegl-mesa0
+          - libegl1-mesa
+          - libgbm1
+          - libgl1-mesa-dri
+          - libglapi-mesa
+          - libglx-mesa0
+          - libigdgmm12
+          - libxatracker2
+          - mesa-va-drivers
+          - mesa-vdpau-drivers
+          - mesa-vulkan-drivers
+          media:
+          - intel-media-va-driver-non-free
+          - libmfx1
+          - libmfxgen1
+          - libvpl2
+          - vainfo
+
+  always:
+
+    # Intel graphics repo is incompatible if no_proxy contains intel.com
+    # remove it to keep apt-get healthy
+    - name: Remove Intel graphic driver repo
+      apt_repository:
+        filename: "intel-graphics-{{ os.stdout_lines | last }}"
+        repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] {{ flex_repository }}/{{ os.stdout_lines | first }} {{ os.stdout_lines | last }}/lts/{{ flex_version }} unified"
+        state: absent
+        update_cache: false
+      when: no_proxy_env.stdout|split(',')|select('match','[.]*intel[.]com$')|length > 0
+
+  become: true
+

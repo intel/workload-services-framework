@@ -1,0 +1,236 @@
+#!/bin/bash
+
+CPU_CORES=$(nproc)
+if [[ "{{ TPCC_THREADS_BUILD_SCHEMA }}" -gt  "$CPU_CORES" ]]; then
+    echo "Warning: specified build schema thread count {{ TPCC_THREADS_BUILD_SCHEMA }} greater than current cpu cores $CPU_CORES adjust to current cpu cores"
+    TPCC_THREADS_BUILD_SCHEMA="$CPU_CORES"
+fi
+
+echo "TPCC_HAMMER_NUM_VIRTUAL_USERS = {{ TPCC_HAMMER_NUM_VIRTUAL_USERS }}"
+
+function buildschema_mysql() {
+    cat >"{{ TPCC_TCL_SCRIPT_PATH }}/build_schema.tcl"<<EOF
+#!/bin/tclsh
+puts "SETTING CONFIGURATION"
+global complete
+proc wait_to_complete {} {
+    global complete
+    set complete [vucomplete]
+    puts "Is it complete ?: \$complete"
+    if {!\$complete} {
+        after {{ TPCC_WAIT_COMPLETE_MILLSECONDS }} wait_to_complete
+    } else {
+        puts "BUILD SCHEMA COMPLETE"
+        exit
+    }
+}
+dbset db mysql
+dbset bm TPC-C
+diset connection mysql_host {{ DB_HOST }}
+diset connection mysql_port {{ DB_PORT }}
+diset connection mysql_socket /tmp/mysql.sock
+diset tpcc mysql_user {{ ROOT_USER }}
+diset tpcc mysql_pass {{ ROOT_PASSWORD }}
+diset tpcc mysql_count_ware {{ TPCC_NUM_WAREHOUSES }}
+diset tpcc mysql_partition true
+diset tpcc mysql_num_vu {{ TPCC_THREADS_BUILD_SCHEMA }}
+diset tpcc mysql_storage_engine {{ MYSQL_STORAGE_ENGINE }}
+print dict
+buildschema
+wait_to_complete
+vwait forever
+EOF
+}
+
+function rumhammer_mysql() {
+    cat >"{{ TPCC_TCL_SCRIPT_PATH }}/run_timer.tcl"<<EOF
+#!/bin/tclsh
+proc runtimer { seconds } {
+    set x 0
+    set timerstop 0
+    while {!\$timerstop} {
+        incr x
+        after 1000
+        if { ![ expr {\$x % 60} ] } {
+            set y [ expr \$x / 60 ]
+            puts "Timer: \$y minutes elapsed"
+        }
+        update
+        if {  [ vucomplete ] || \$x eq \$seconds } {
+            set timerstop 1
+        }
+    }
+    return
+}
+puts "SETTING CONFIGURATION"
+dbset db mysql
+dbset bm TPC-C
+diset connection mysql_host {{ DB_HOST }}
+diset connection mysql_port {{ DB_PORT }}
+diset tpcc mysql_user {{ ROOT_USER }}
+diset tpcc mysql_pass {{ ROOT_PASSWORD }}
+diset tpcc mysql_driver timed
+diset tpcc mysql_rampup {{ TPCC_MINUTES_OF_RAMPUP }}
+diset tpcc mysql_duration {{ TPCC_MINUTES_OF_DURATION }}
+diset tpcc mysql_total_iterations {{ TPCC_TOTAL_ITERATIONS }}
+diset tpcc mysql_async_scale false
+diset tpcc mysql_connect_pool false
+vuset logtotemp 1
+vuset unique 1
+loadscript
+puts "SEQUENCE STARTED"
+foreach z [ split "{{ TPCC_HAMMER_NUM_VIRTUAL_USERS }}" "_" ] {
+    puts "\$z VU TEST"
+    vuset vu \$z
+    vucreate
+    vurun
+    runtimer {{ TPCC_RUNTIMER_SECONDS }}
+    vudestroy
+    after {{ TPCC_WAIT_COMPLETE_MILLSECONDS }}
+}
+puts "TEST SEQUENCE COMPLETE"
+exit
+EOF
+}
+
+function rumhammer_mssql() {
+    cat >"{{ TPCC_TCL_SCRIPT_PATH }}/run_timer.tcl"<<EOF
+#!/bin/tclsh
+proc runtimer { seconds } {
+    set x 0
+    set timerstop 0
+    while {!\$timerstop} {
+        incr x
+        after 1000
+        if { ![ expr {\$x % 60} ] } {
+            set y [ expr \$x / 60 ]
+            puts "Timer: \$y minutes elapsed"
+        }
+        update
+        if {  [ vucomplete ] || \$x eq \$seconds } {
+            set timerstop 1
+        }
+    }
+    return
+}
+puts "SETTING CONFIGURATION"
+dbset db mssqls
+dbset bm TPC-C
+diset connection mssqls_server {{ DB_HOST }}
+diset connection mssqls_linux_server {{ DB_HOST }}
+diset connection mssqls_port {{ DB_PORT }}
+diset connection mssqls_tcp true
+diset connection mssqls_azure true
+diset connection mssqls_linux_authent sql
+diset connection mssqls_uid {{ ROOT_USER }}
+diset connection mssqls_pass {{ ROOT_PASSWORD }}
+diset connection mssqls_odbc_driver "ODBC Driver 17 for SQL Server"
+diset connection mssqls_linux_odbc "ODBC Driver 17 for SQL Server"
+
+diset tpcc mssqls_driver timed
+diset tpcc mssqls_rampup {{ TPCC_MINUTES_OF_RAMPUP }}
+diset tpcc mssqls_duration {{ TPCC_MINUTES_OF_DURATION }}
+diset tpcc mssqls_total_iterations {{ TPCC_TOTAL_ITERATIONS }}
+diset tpcc mssqls_async_scale false
+diset tpcc mssqls_connect_pool false
+diset tpcc mssqls_dbase {{ DATABASE }}
+vuset logtotemp 1
+vuset unique 1
+loadscript
+puts "SEQUENCE STARTED"
+foreach z [ split "{{ TPCC_HAMMER_NUM_VIRTUAL_USERS }}" "_" ] {
+    puts "\$z VU TEST"
+    vuset vu \$z
+    vucreate
+    vurun
+    runtimer {{ TPCC_RUNTIMER_SECONDS }}
+    vudestroy
+    after {{ TPCC_WAIT_COMPLETE_MILLSECONDS }}
+}
+puts "TEST SEQUENCE COMPLETE"
+exit
+EOF
+}
+
+
+function buildschema_mssql() {
+    cat >"{{ TPCC_TCL_SCRIPT_PATH }}/build_schema.tcl"<<EOF
+#!/bin/tclsh
+puts "SETTING CONFIGURATION"
+global complete
+proc wait_to_complete {} {
+    global complete
+    set complete [vucomplete]
+    puts "Is it complete ?: \$complete"
+    if {!\$complete} {
+        after {{ TPCC_WAIT_COMPLETE_MILLSECONDS }} wait_to_complete
+    } else {
+        puts "BUILD SCHEMA COMPLETE"
+        exit
+    }
+}
+dbset db mssqls
+dbset bm TPC-C
+diset connection mssqls_server {{ DB_HOST }}
+diset connection mssqls_linux_server {{ DB_HOST }}
+diset connection mssqls_port {{ DB_PORT }}
+diset connection mssqls_tcp true
+diset connection mssqls_azure true
+diset connection mssqls_linux_authent sql
+diset connection mssqls_uid {{ ROOT_USER }}
+diset connection mssqls_pass {{ ROOT_PASSWORD }}
+diset tpcc mssqls_count_ware {{ TPCC_NUM_WAREHOUSES }}
+diset tpcc mssqls_num_vu {{ TPCC_THREADS_BUILD_SCHEMA }}
+diset connection mssqls_odbc_driver "ODBC Driver 17 for SQL Server"
+diset connection mssqls_linux_odbc "ODBC Driver 17 for SQL Server"
+diset connection mssqls_encrypt_connection true
+diset connection mssqls_trust_server_cert true
+diset tpcc mssqls_dbase {{ DATABASE }}
+print dict
+buildschema
+wait_to_complete
+vwait forever
+EOF
+}
+
+
+if [[ ! -d "{{ TPCC_TCL_SCRIPT_PATH }}" ]]; then
+    mkdir -p "{{ TPCC_TCL_SCRIPT_PATH }}"
+fi
+
+if [[ "{{ DB_TYPE }}" == "mysql" ]]; then
+    buildschema_mysql
+    rumhammer_mysql
+elif [[ "{{ DB_TYPE }}" == "mssql" ]]; then
+    buildschema_mssql
+    rumhammer_mssql
+fi
+
+# Make sure with a stable connection to database server
+echo "Checking if database connection is stable..."
+counter=0
+until ((counter >= 5)); do
+    nc -z -w5 {{ DB_HOST }} {{ DB_PORT }}
+    if [ $? -eq 0 ]; then
+        ((counter++))
+    else
+        echo "database service connection is unstable, retry"
+        counter=0
+    fi
+    sleep 1
+done
+echo "Database connection is stable for $counter seconds"
+
+cd {{ HAMMERDB_INSTALL_DIR }}
+
+echo "===Stage 1: Build schema started==="
+start=$(date +%s)
+./hammerdbcli auto {{ TPCC_TCL_SCRIPT_PATH }}/build_schema.tcl
+end=$(date +%s)
+echo "===Stage 1: Build schema finished spent $(( end - start )) seconds"
+
+echo "===Stage 2: Run timer started"
+./hammerdbcli auto {{ TPCC_TCL_SCRIPT_PATH }}/run_timer.tcl
+echo "===Stage 2: Run timer finished"
+
+exit

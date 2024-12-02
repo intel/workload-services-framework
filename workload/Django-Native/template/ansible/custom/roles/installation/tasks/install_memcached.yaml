@@ -1,0 +1,15 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Ensure Memcached working directory exist
+  ansible.builtin.file:
+    path: "{{ MEMCACHED_WORKING_DIR }}"
+    state: directory
+
+- name: Install Memcached
+  ansible.builtin.package:
+    name: memcached
+    state: present

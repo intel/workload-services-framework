@@ -1,0 +1,119 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Set Siege Parameters
+  set_fact:
+    siege_worker: "{{ wl_tunables['SIEGE_WORKER'] }}"
+    siege_duration: "{{ wl_tunables['DURATION'] }}"
+    siege_log: "{{ SIEGE_WORKING_DIR }}/siege.log"
+    tls: "{{ wl_tunables['TLS'] }}"
+    app_ip: "{{ hostvars['worker-0']['private_ip'] }}"
+    siege_protocol: "http"
+
+- name: Set variable 'siege_protocol' based on tls
+  set_fact:
+    siege_protocol: "https"
+  when: tls == "1"
+
+- name: Set variable 'siege_worker' if not set
+  set_fact:
+    siege_worker: "{{ ansible_processor_vcpus * 2 }}"
+  when: siege_worker == ""
+
+- debug:
+    msg: "siege_worker = {{ siege_worker }}"
+
+- name: Create the Logs Directory
+  file:
+    path: "{{ WORKSPACE }}/itr-{{ itr }}/benchmark"
+    state: directory
+    recurse: yes  
+
+- name: Create run log file for siege
+  file:
+    path: "{{ WORKSPACE }}/itr-{{ itr }}/benchmark/output.log"
+    state: touch
+    mode: "0666"  
+
+- name: Install Template of urls
+  template:
+    src: "benchmark.urls.txt.j2"
+    dest: "{{ SIEGE_WORKING_DIR }}/siege_client/client/benchmark_urls.txt"
+
+- name: Install Template of siegerc
+  template:
+    src: "siegerc.j2"
+    dest: "{{ SIEGE_WORKING_DIR }}/siegerc"
+    force: yes
+
+- name: Install Template of run_siege
+  template:
+    src: "run.siege.j2"
+    dest: "{{ SIEGE_WORKING_DIR }}/siege_client/client/run-siege"
+    force: yes
+    mode: "0755"
+
+- name: Update siege run script
+  ansible.builtin.lineinfile:
+    path: "{{ SIEGE_WORKING_DIR }}/siege_client/client/run-siege"
+    regexp: '^#!/usr/bin/python3'
+    line: "#!{{ PYTHON_VENV_DIR }}/bin/python{{ PYTHON_VENV_VER }}"
+    state: present
+
+- name: waitproc to wait for run_siege complete
+  become: true
+  shell:
+    cmd: |
+      cd {{ SIEGE_WORKING_DIR }}/siege_client/client
+      nohup bash -c 'source {{ PYTHON_VENV_DIR }}/bin/activate && (WORKERS={{ siege_worker }} DURATION={{ siege_duration }} LOG={{ siege_log }} SOURCE=benchmark_urls.txt ./run-siege); echo $? > /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-waitproc.status'  > {{ WORKSPACE }}/itr-{{ itr }}/benchmark/output.log 2>&1 &      
+      echo $? > {{ WORKSPACE }}/itr-{{ itr }}/benchmark/status
+      echo $!
+      disown
+    executable: /bin/bash
+  register: waitproc  
+
+- name: invoke the trace procedure
+  include_role:
+    name: trace
+  vars:
+    trace_waitproc_pid: "{{ waitproc.stdout }}"
+    trace_logs_scripts: ["cat {{ WORKSPACE }}/itr-{{ itr }}/benchmark/output.log"]
+    trace_logs_host: "worker-0"
+
+- name: collect trace data
+  include_role:
+    name: trace
+    tasks_from: collect
+  when: wl_trace_modules | default('') | split(',') | reject('==','') | length > 0
+
+- name: Archive Logs
+  archive:
+    path: "{{ WORKSPACE }}/itr-{{ itr }}"
+    dest: "{{ WORKSPACE }}/itr-{{ itr }}.tar.gz"  
+
+- name: Fetch Logs to Localhost
+  become: false
+  fetch:
+    src: "{{ WORKSPACE }}/itr-{{ itr }}.tar.gz"
+    dest: "{{ wl_logs_dir }}/"
+    flat: yes
+    validate_checksum: yes  
+
+- name: UnArchive Logs on Localhost
+  become: false
+  unarchive:
+    src: "{{ wl_logs_dir }}/itr-{{ itr }}.tar.gz"
+    dest: "{{ wl_logs_dir }}"
+    mode: "0777"
+  delegate_to: localhost  
+
+- name: delete Logs tar file
+  become: false
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}.tar.gz"
+    state: absent
+  delegate_to: localhost
+  ignore_errors: true
+  

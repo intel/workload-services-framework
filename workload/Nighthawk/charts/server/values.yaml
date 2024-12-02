@@ -1,0 +1,24 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+REGISTRY: ""
+RELEASE: ""
+
+replicaCount: 1
+
+clusterName: "cluster.local"
+
+nodeSelector: {}
+
+image:
+  name: nighthawk
+  pullPolicy: Always
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "1.0"
+
+# Nighthawk Server POD configuration
+NIGHTHAWK_SERVER_LIMITS_CPU: 0
+NIGHTHAWK_SERVER_REQUEST_CPU: 0

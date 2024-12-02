@@ -1,0 +1,15 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+worker-0:
+- image: "{{ REGISTRY }}mlc{{ IMAGESUFFIX }}{{ RELEASE }}"
+  options:
+  - -e TEST={{ TEST }}
+  - -e WORKLOAD={{ WORKLOAD }}
+  - -e DURATION={{ DURATION }}
+  - -e ARGS={{ ARGS }}
+  - -e HUGEPAGE_MEMORY_NUM={{ HUGEPAGE_MEMORY_NUM }}
+  - --privileged
+  export-logs: true

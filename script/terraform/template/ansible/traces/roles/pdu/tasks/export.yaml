@@ -1,0 +1,14 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: generate pdu html page
+  template:
+    src: pdu-charts.html.j2
+    dest: "{{ trace_data_path }}/roi-{{ roi_index }}.html"
+  vars:
+    pdu_data: "{{ lookup('pipe', 'gawk -f ' + ((role_path + '/scripts/pdu.awk') | quote) + ' ' + ((trace_data_path + '/pdu-' + (roi_index | string) + '.logs') | quote)) }}"
+  ignore_errors: true
+

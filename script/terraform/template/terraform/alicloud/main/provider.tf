@@ -7,7 +7,7 @@ terraform {
   required_providers {
     alicloud = {
       source = "aliyun/alicloud"
-      version = "= 1.209.0"
+      version = "= 1.228.0"
     }
     template = {
       source = "hashicorp/template"
@@ -21,7 +21,7 @@ terraform {
 }
 
 locals {
-  region = var.region!=null?var.region:(var.zone=="cn-hangzhou"?var.zone:length(regexall("^cn-",var.zone))>0?replace(var.zone,"/-[a-z0-9]*$/",""):replace(var.zone,"/.$/",""))
+  region = var.region!=null?var.region:(length(regexall("^cn-",var.zone))>0?replace(var.zone,"/-[0-9a-z]*$/",""):replace(var.zone,"/.$/",""))
   profiles = sensitive([
     for p in jsondecode(file(var.config_file))["profiles"] : p
       if p["name"] == var.profile

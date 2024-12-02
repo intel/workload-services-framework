@@ -110,7 +110,6 @@
         cores)</button>
       <button class="tablinks" onclick="openTabContent(event, 'CPUFrequency')">CPU Frequency Trend</button>
       <button class="tablinks" onclick="openTabContent(event, 'CPUUtil')">CPU Utilization Trend</button>
-      <button class="tablinks" onclick="openTabContent(event, 'Load')">Load Utilization Trend</button>
       <button class="tablinks" onclick="openTabContent(event, 'MemoryUtil')">Memory Usage Trend</button>
       <button class="tablinks" onclick="openTabContent(event, 'DiskUtil')">Disk Usage Trend</button>
       <button class="tablinks" onclick="openTabContent(event, 'NetworkUtil')">Network Usage Trend</button>
@@ -178,17 +177,6 @@
       </div>
       <div class="card-body overflow-auto row col-12">
         <div class="col-11 printable" id="cpu-freq-id" style="height: 400px;"></div>
-      </div>
-    </div>
-    <div id="Load" class="tabcontent px-0 py-2">
-      <div class="card-header">
-        <span style="font-weight: 500;">Load Utilization Trend</span>
-        <button class="btn btn-success btn-sm" style="float:right;" onClick="window.print()"><i class="fa fa-print"
-            aria-hidden="true"></i>Save as PDF</button>
-        <div class="row d-flex"></div>
-      </div>
-      <div class="card-body overflow-auto row col-12">
-        <div class="col-11 printable" id="load-id" style="height: 400px;"></div>
       </div>
     </div>
     <div id="MemoryUtil" class="tabcontent px-0 py-2">
@@ -297,7 +285,7 @@
         xaxis: {
           type: 'datetime',
           labels: {
-            datetimeUTC: false,
+            datetimeUTC: true,
           },
           min: min_time,
           max: max_time,
@@ -377,12 +365,12 @@
         try {
           var series = [{
             name: 'all',
-            data: cpu_freq.map((x) => [x[0], x[1] / 1024 / 1024 / 1024]),
+            data: cpu_freq.map((x) => [x[0], x[1] / 1000000000]),
           }];
           for (let k in cpu_x_freq) {
             series.push({
               name: 'cpu-' + k,
-              data: cpu_x_freq[k].map((x) => [x[0], x[1] / 1024 / 1024 / 1024]),
+              data: cpu_x_freq[k].map((x) => [x[0], x[1] / 1000000000]),
             });
           }
           create_line_chart(id, {
@@ -395,7 +383,7 @@
               text: title,
             },
             yaxis: {
-              decimalsInFloat: 2,
+              decimalsInFloat: 3,
             },
             series: series,
           });
@@ -511,46 +499,18 @@
         }
       }
 
-      function create_load_chart(id, title) {
-        try {
-          create_line_chart(id, {
-            title: {
-              text: title,
-            },
-            yaxis: {
-              min: 0,
-              max: 100,
-              decimalsInFloat: 2,
-            },
-            series: [{
-              name: 'short-term',
-              data: load_shortterm,
-            }, {
-              name: 'mid-term',
-              data: load_midterm,
-            }, {
-              name: 'long-term',
-              data: load_longterm,
-            }],
-          });
-        } catch (e) {
-          hide_chart(id);
-          console.log(e);
-        }
-      }
-
       function create_disk_chart(id, title) {
         try {
           var series = [];
           for (let k in disk_ops_read) {
             series.push({
-              name: "read-" + k,
+              name: "read-" + (k.replace('dev_','')),
               data: disk_ops_read[k],
             });
           }
           for (let k in disk_ops_write) {
             series.push({
-              name: "write-" + k,
+              name: "write-" + (k.replace('dev_','')),
               data: disk_ops_write[k],
             });
           }
@@ -637,7 +597,6 @@
       create_cpu_freq_chart('cpu-freq-id', 'CPU Frequency (GHz)');
       create_network_chart('network-id', 'Network Usage Trend (packets)');
       create_disk_chart('disk-id', 'Disk Usage Trend');
-      create_load_chart('load-id', 'Load Utilization Trend (%)');
       create_memory_gb_chart('memory-gb-id', 'Memory Usage Trend (GB)');
       create_memory_percentage_chart('memory-percentage-id', 'Memory Usage Trend (%)');
 

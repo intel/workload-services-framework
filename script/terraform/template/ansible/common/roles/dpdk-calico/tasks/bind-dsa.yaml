@@ -1,0 +1,11 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Bind DSA get_dsa_device_ids by device ids
+  become: true
+  shell: |
+    {{ dpdk_devbind }} -b {{ dsa_dpdk_driver | default('vfio-pci')  }} {{ dsa_device_ids | join(' ') }} --force
+  ignore_errors: true

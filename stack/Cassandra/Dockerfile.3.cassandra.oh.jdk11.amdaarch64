@@ -1,0 +1,70 @@
+# cassandra-server-jdk11-oh
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+FROM ${OS_IMAGE}:${OS_VER} 
+
+ARG JDKTAG
+ARG OPENJDK_VER=openjdk-11
+ARG OPENJDK_PKG=https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.19%2B7/OpenJDK11U-jdk_${JDKTAG}_linux_hotspot_11.0.19_7.tar.gz
+ARG CASSANDRA_VER=4.1.4
+ARG CASSANDRA_PKG=https://archive.apache.org/dist/cassandra/${CASSANDRA_VER}/apache-cassandra-${CASSANDRA_VER}-bin.tar.gz
+
+#Configure
+RUN set -eux \
+	&& groupadd -r cassandra --gid=989 \
+	&& useradd -r -g cassandra --uid=989 cassandra
+
+ENV JAVA_HOME /opt/${OPENJDK_VER}
+ENV JRE_HOME=/opt/${OPENJDK_VER}/jre
+ENV CASSANDRA_HOME /opt/cassandra
+ENV CASSANDRA_CONF /etc/cassandra
+ENV PATH=/opt/${OPENJDK_VER}/bin:/opt/${OPENJDK_VER}/jre/bin:$CASSANDRA_HOME/bin:$PATH
+
+WORKDIR /temurin-build
+
+#Get pkg
+RUN apt-get update \
+    && apt-get install -y wget curl git procps net-tools numactl python3 kmod sudo vim iproute2 iputils-ping dnsutils nmap  netcat-traditional \    
+    && wget ${OPENJDK_PKG} \
+    && wget ${CASSANDRA_PKG} \
+    && mkdir -p ${JAVA_HOME} \
+    && mkdir -p ${CASSANDRA_HOME} \
+    && mkdir -p ${CASSANDRA_CONF} \
+    && tar -zxvf OpenJDK11U-jdk_${JDKTAG}_linux_hotspot_11.0.19_7.tar.gz -C ${JAVA_HOME} --strip-components 1 \
+    && tar -zxvf apache-cassandra-${CASSANDRA_VER}-bin.tar.gz -C ${CASSANDRA_HOME} --strip-components 1 \
+    && mv ${CASSANDRA_HOME}/conf/* ${CASSANDRA_CONF} \
+    && rm -rf ${CASSANDRA_HOME}/conf \
+    && ln -sT ${CASSANDRA_CONF} ${CASSANDRA_HOME}/conf \
+    && mkdir -p /var/lib/cassandra /var/log/cassandra \
+    && chmod 1777 "$CASSANDRA_CONF" /var/lib/cassandra /var/log/cassandra \
+	  && chmod -R a+rwX "$CASSANDRA_CONF" \
+	  && ln -sT /var/lib/cassandra "$CASSANDRA_HOME/data" \
+	  && ln -sT /var/log/cassandra "$CASSANDRA_HOME/logs"
+
+VOLUME /var/lib/cassandra
+COPY jvm11-server.options.new  /cassandra/conf/jvm11-server.options
+COPY script/docker-entrypoint-oh.sh /usr/local/bin/docker-entrypoint.sh
+RUN chown -R cassandra:cassandra /cassandra \
+  && chmod +x /usr/local/bin/docker-entrypoint.sh \
+  && chown -R cassandra:cassandra /usr/local/bin/ \
+  && chown -R cassandra:cassandra ${CASSANDRA_CONF} \
+  && chmod 777 ${CASSANDRA_CONF} \
+  && chown -R cassandra:cassandra "$CASSANDRA_CONF" /var/lib/cassandra /var/log/cassandra
+
+ENV PATH=/opt/${OPENJDK_VER}/bin:/opt/${OPENJDK_VER}/jre/bin:$CASSANDRA_HOME/bin:$PATH
+ENTRYPOINT ["docker-entrypoint.sh"]
+
+# 7000: intra-node communication
+# 7001: TLS intra-node communication
+# 7199: JMX
+# 9042: CQL
+# 9160: thrift service
+
+EXPOSE 7000 7001 7199 9042 9160
+CMD ["cassandra", "-f"]

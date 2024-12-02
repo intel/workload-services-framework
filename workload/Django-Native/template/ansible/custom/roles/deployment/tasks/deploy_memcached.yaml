@@ -1,0 +1,27 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Set Memcached Parameters
+  set_fact:
+    memcached_log_file: "{{ MEMCACHED_WORKING_DIR }}/memcached.log"
+    port: "11811"
+    user: "{{ hostvars['worker-0']['user_name'] }}"
+    memory: "{{ wl_tunables['MEMCACHE_MEMORY'] }}"
+    listen: "127.0.0.1"
+    thread: "{{ wl_tunables['MEMCACHE_THREAD'] }}"
+
+- name: Kill memcached processes
+  ansible.builtin.shell: "kill -9 $(pgrep -f  'memcached') || true"
+  ignore_errors: true
+
+- name: Ensure Memcached log directory exist
+  ansible.builtin.file:
+    path: "{{ MEMCACHED_WORKING_DIR }}"
+    state: directory
+
+- name: Start Memcached
+  ansible.builtin.shell: 
+    cmd: "nohup /usr/bin/memcached -p {{ port }} -u {{ user }} -m {{ memory }} -l {{ listen }} -t {{ thread }} -vv > {{ memcached_log_file }} 2>&1 &"
+    executable: /bin/bash

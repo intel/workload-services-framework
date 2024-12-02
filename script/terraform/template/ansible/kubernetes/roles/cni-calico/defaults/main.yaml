@@ -4,14 +4,17 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-k8s_calico_version: "v3.25"
+k8s_pod_cidr: "10.244.0.0/16"
+k8s_calico_version: "v3.27.3"
+k8s_calico_local_version: "v3.27.3"
+k8s_calico_cni_repo: "docker.io/calico"
+k8s_calico_iface: can-reach
 
 # ipip or vxlan
 # Note that: IP-IN-IP is blocked on Azure Cloud
 k8s_calico_encapsulation: "VXLAN"
-k8s_calico_ipinip_repo: "https://projectcalico.docs.tigera.io/archive/{{ k8s_calico_version }}/manifests/calico.yaml"
-k8s_calico_vxlan_repo: "https://projectcalico.docs.tigera.io/archive/{{ k8s_calico_version }}/manifests/calico-vxlan.yaml"
-k8s_calico_iface: ""
+k8s_calico_ipinip_yaml: "https://raw.githubusercontent.com/projectcalico/calico/{{ k8s_calico_version }}/manifests/calico.yaml"
+k8s_calico_vxlan_yaml: "https://raw.githubusercontent.com/projectcalico/calico/{{ k8s_calico_version }}/manifests/calico-vxlan.yaml"
 
-# calicoctl is helpful tool to diagnose calico network
-k8s_calicoctl_rep: "https://projectcalico.docs.tigera.io/archive/{{ k8s_calico_version }}/manifests/calicoctl.yaml"
+k8s_apiserver_ip: ""
+k8s_cni_ready_wait: "1200s"

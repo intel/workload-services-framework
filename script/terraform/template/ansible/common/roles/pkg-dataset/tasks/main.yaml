@@ -1,0 +1,145 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: delete folder {{ dataset_model_path_container }}.wip
+  file:
+    path: "{{ dataset_model_path_container }}.wip"
+    state: absent
+
+- name: create dir "{{ dataset_model_path_container }}.wip"
+  file:
+    path: "{{ dataset_model_path_container }}.wip"
+    state: directory
+    recurse: true
+    
+- name: Get disk space of sut /opt/dataset
+  shell:
+    cmd: "df -BG --output=avail /opt/dataset | sed '1{d};s/.$//'"
+    executable: /bin/bash
+  register: free_space_sut
+
+- name: Check free space of sut /opt/dataset
+  fail:
+    msg: "Free space of /opt/dataset is less than {{ dataset_size * (dataset_package.endswith('.zip') | ternary(2,1)) }}G on SUT. Can not finish downloading required dataset. Exiting."
+  when: free_space_sut.stdout | int < (dataset_size * (dataset_package.endswith('.zip') | ternary(2,1)))
+
+- name: Check if unzip is installed
+  command: unzip -h
+  register: unzip_installed
+  when: dataset_package.endswith('.zip')
+  ignore_errors: true
+  no_log: true
+
+- name: Install unzip if not present
+  package:
+    name: unzip
+    state: present
+  when:
+  - dataset_package.endswith('.zip')
+  - unzip_installed.failed
+
+- name: Check if repo is reachable
+  wait_for:
+    port: 22
+    host: "{{ 2 | extract(dataset_package | split('/')) }}"
+    state: started
+    timeout: 5
+  ignore_errors: yes
+  register: repo_reachable
+
+- name: Download dataset on sut
+  block:
+
+    - name: Check if curl is installed
+      command: curl --version
+      register: curl_installed
+      ignore_errors: true
+    
+    - name: Install curl if not present
+      package:
+        name: curl
+        state: present
+      when: curl_installed.failed
+
+    - name: Start the download task
+      shell:
+        cmd: |
+          {% if dataset_package.endswith('.zip') %}
+            nohup bash -c "curl --netrc-optional --retry 10 --retry-connrefused -fL {{ dataset_package }} -o /tmp/{{ wl_namespace }}-dataset.zip 2> /tmp/{{ wl_namespace }}-dataset-progress.logs; unzip /tmp/{{ wl_namespace }}-dataset.zip -d {{ dataset_model_path_container }}.wip; rm -f /tmp/{{ wl_namespace }}-dataset.zip" > /dev/null 2>&1 &
+          {% else %}
+            nohup bash -c "curl --netrc-optional --retry 10 --retry-connrefused -fL {{ dataset_package }} 2> /tmp/{{ wl_namespace }}-dataset-progress.logs | tar --no-same-owner --no-same-permissions {{ dataset_package.endswith('gz') | ternary('-zxf','-xf') }} - -C {{ dataset_model_path_container }}.wip" > /dev/null 2>&1 &
+          {% endif %}
+          echo $!
+          disown
+        executable: /bin/bash
+      register: download_process
+
+    - include_tasks:
+        file: "show-progress.yaml"
+      loop: "{{ range(0,110,10) }}"
+
+    - name: wait until download completes
+      command: "tail -f --pid={{ download_process.stdout }} /dev/null"
+
+    - name: move wip folder to {{ dataset_model_path_container }}
+      command: mv {{ dataset_model_path_container }}.wip {{ dataset_model_path_container }}
+
+  always:
+
+    - name: delete folder {{ dataset_model_path_container }}.wip
+      file:
+        path: "{{ dataset_model_path_container }}.wip"
+        state: absent
+
+  when: not repo_reachable.failed
+
+- name: Download dataset in container and copy to sut
+  block:
+
+    - name: start the download task to container
+      shell:
+        cmd: |
+          {% if dataset_package.endswith('.zip') %}
+            nohup bash -c "curl --netrc-optional --retry 10 --retry-connrefused -fL -L -o - {{ dataset_package }} 2> /tmp/{{ wl_namespace }}-dataset-progress.logs | {% if (hostvars[inventory_hostname].ansible_connection|default('ssh'))!='local' %}ssh -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -i {{ ansible_private_key_file }} {% endif %} sudo dd status=none of={{ dataset_model_path_container }}.wip/{{ wl_namespace }}-dataset.zip" > /dev/null 2>&1 &
+          {% else %}
+            nohup bash -c "curl --netrc-optional --retry 10 --retry-connrefused -fL -L -o - {{ dataset_package }} 2> /tmp/{{ wl_namespace }}-dataset-progress.logs | {% if (hostvars[inventory_hostname].ansible_connection|default('ssh'))!='local' %}ssh -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -i {{ ansible_private_key_file }} {% endif %} sudo tar --no-same-owner --no-same-permissions {{ dataset_package.endswith('gz') | ternary('-zxf','-xf') }} - -C {{ dataset_model_path_container }}.wip" > /dev/null 2>&1 &
+          {% endif %}
+          echo $!
+          disown
+        executable: /bin/bash
+      register: download_process
+      delegate_to: localhost
+      become: false  
+    
+    - include_tasks:
+        file: "show-progress-localhost.yaml"
+      loop: "{{ range(0,110,10) }}"  
+    
+    - name: wait until download completes
+      command: "tail -f --pid={{ download_process.stdout }} /dev/null"
+      delegate_to: localhost
+      become: false
+
+    - name: unzip dataset
+      command: "unzip -qq {{ dataset_model_path_container }}.wip/{{ wl_namespace }}-dataset.zip -d {{ dataset_model_path_container }}.wip"
+      when: dataset_package.endswith('.zip')
+
+    - name: delete zip
+      file:
+        path: "{{ dataset_model_path_container }}.wip/{{ wl_namespace }}-dataset.zip"
+        state: absent
+      when: dataset_package.endswith('.zip')
+
+    - name: move wip folder to {{ dataset_model_path_container }}
+      command: "mv {{ dataset_model_path_container }}.wip {{ dataset_model_path_container }}"
+
+  always:
+
+    - name: delete folder {{ dataset_model_path_container }}.wip
+      file:
+        path: "{{ dataset_model_path_container }}.wip"
+        state: absent
+
+  when: repo_reachable.failed

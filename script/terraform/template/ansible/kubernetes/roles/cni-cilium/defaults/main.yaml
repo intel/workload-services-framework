@@ -1,0 +1,9 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+k8s_cilium_cli_version: "v0.15.8"
+k8s_cilium_cli_repository: "https://github.com/cilium/cilium-cli/releases/download/{{ k8s_cilium_cli_version }}"
+k8s_cilium_version: "1.14.2"

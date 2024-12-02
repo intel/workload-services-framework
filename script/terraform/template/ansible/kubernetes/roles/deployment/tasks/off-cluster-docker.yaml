@@ -20,8 +20,6 @@
         executable: /bin/bash
       register: waitproc
       delegate_to: "{{ off_cluster_host }}"
-      vars:
-        workload_config: "{{ lookup('file', wl_logs_dir+'/workload-config.yaml') | from_yaml }}"
 
     - name: start the trace procedure
       include_role:

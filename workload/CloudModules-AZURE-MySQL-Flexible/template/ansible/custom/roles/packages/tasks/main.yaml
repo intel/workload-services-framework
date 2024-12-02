@@ -1,0 +1,68 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Run "apt update"
+  apt: update_cache=yes
+
+- name: Add mysql software dependencies
+  apt:
+    name:
+    - wget
+    - libmysqlclient-dev
+    - netcat-openbsd
+    - bc
+    - numactl
+    - procps
+    - net-tools
+    state: present
+  ignore_errors: no
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+  when: DB_TYPE == "mysql"
+
+- name: Add mssql software dependencies
+  apt:
+    name:
+    - wget
+    - libiodbc2
+    - libiodbc2-dev
+    - netcat-openbsd
+    - bc
+    - numactl
+    - procps
+    - net-tools
+    - curl
+    - gnupg
+    state: present
+  ignore_errors: no
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+  when: DB_TYPE == "mssql"
+
+# ODBC driver for mssql
+- name: Add mssql driver link
+  shell: "curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -; curl https://packages.microsoft.com/config/ubuntu/18.04/prod.list > /etc/apt/sources.list.d/mssql-release.list"
+  ignore_errors: no
+  when: DB_TYPE == "mssql"
+
+- name: Run "apt update"
+  apt: update_cache=yes
+  when: DB_TYPE == "mssql"
+
+- name: Install odbc driver
+  shell: "ACCEPT_EULA=Y apt-get install -y msodbcsql17"
+  when: DB_TYPE == "mssql"
+
+- name: Install unixODBC development headers
+  shell: "ACCEPT_EULA=Y apt-get install -y unixodbc-dev"
+  when: DB_TYPE == "mssql"
+
+- name: Install sqlcmd
+  shell: "ACCEPT_EULA=Y apt-get install -y mssql-tools"
+  when: DB_TYPE == "mssql"

@@ -5,69 +5,99 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-if [ ${#@} -lt 2 ]; then
+DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
+. "$DIR"/setup-common.sh
+
+print_help () {
   echo "Usage: [options] <user@controller-ip[:private-ip]> <user>@worker-ip[:private-ip] [<user>@worker-ip[:private_ip]...]"
   echo ""
   echo "--port port    Specify the ssh port."
-  echo "--reset        Reset Kubernetes."
-  echo "--purge        Reset Kubernetes and remove k8s packages."
   echo "--nointelcert  Do not install Intel certificates."
-  echo "--cni          Specify the CNI option."
-  echo "--plugins      Specify a list of k8s plugins to install, separated with comma."
+  echo "--no-password  Do not ask for password. Use DEV_SUDO_PASSWORD, SUT_SSH_PASSWORD and/or SUT_SUDO_PASSWORD instead."
+  echo "--worker       Specify the worker group."  
+  echo "--client       Specify the client group."
+  echo "--controller   Specify the controller group."
   echo ""
   exit 3
-fi
+}
 
-if [ -n "$SUDO_COMMAND" ]; then
-    echo "!!!sudo detected!!!"
-    echo "Please run setup-sut-k8s.sh as a regular user."
-    exit 3
+if [ ${#@} -lt 2 ]; then
+  print_help
 fi
 
 ssh_port=22
-hosts=()
+controller_hosts=()
+worker_hosts=()
+client_hosts=()
+setup_ansible_options=()
+setup_native_options=()
+ansible_options=(
+  '-e' 'k8s_reset=true'
+  '-e' 'containerd_reset=true'
+  '-e' 'k8s_enable_registry=false'
+)
+[ ! -e vars.yaml ] || ansible_options+=(-e "@vars.yaml")
 last=""
-reset=false
-purge=false
-intelcert=true
-cni=flannel
-plugins=""
+vm_group="controller"
 for v in $@; do
+  k1="$(echo "${v#--}" | cut -f1 -d=)"
+  v1="$(echo "${v#--}" | cut -f2- -d= | sed 's/%20/ /g')"
   case "$v" in
+  --help)
+    print_help
+    ;;
+  --worker)
+    vm_group=worker
+    ;;
+  --client)
+    vm_group=client
+    ;;
+  --controller)
+    vm_group=controller
+    ;;
   --port=*)
     ssh_port="${v#--port=}"
     ;;
   --port)
     ;;
-  --reset)
-    reset="true"
-    ;;
-  --purge)
-    purge="true"
-    reset="true"
-    ;;
   --nointelcert)
-    intelcert=false
+    setup_native_options+=("$v")
     ;;
-  --cni=*)
-    cni="${v#--cni=}"
+  --no-password)
+    setup_ansible_options+=("$v")
+    setup_native_options+=("$v")
     ;;
-  --cni)
+  --*=*)
+    validate_ansible_option $k1 $v
+    setup_native_options+=("$v")
+    ansible_options+=("-e" "$k1=$v1")
     ;;
-  --plugins=*)
-    plugins="${v#--plugins=}"
+  --no*)
+    validate_ansible_option ${k1#no} $v
+    setup_native_options+=("$v")
+    ansible_options+=("-e" "${k1#no}=false")
     ;;
-  --plugins)
+  --*)
+    validate_ansible_option $k1 $v
+    setup_native_options+=("$v")
+    ansible_options+=("-e" "$k1=true")
     ;;
   *)
     if [ "$last" = "--port" ]; then
       ssh_port="$v"
-    elif [ "$last" = "--cni" ]; then
-      cni="$v"
-    elif [ "$last" = "--plugins" ]; then
-      plugins="$v"
     elif [[ "$v" = *"@"* ]]; then
-      hosts+=("$v")
+      case "$vm_group" in
+      controller)
+        controller_hosts+=("$v")
+        vm_group=worker
+        ;;
+      worker)
+        worker_hosts+=("$v")
+        ;;
+      client)
+        client_hosts+=("$v")
+        ;;
+      esac
     else
       echo "Unsupported argument: $v"
       exit 3
@@ -77,28 +107,17 @@ for v in $@; do
   last="$v"
 done
 
-set -o pipefail
-DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
-cd "$DIR"
+./setup-ansible.sh "${setup_ansible_options[@]}" 2>&1 | tee setup-sut-k8s.logs
+./setup-sut-native.sh --port $ssh_port --controller ${controller_hosts[@]} --worker ${worker_hosts[@]} --client ${client_hosts[@]} "${setup_native_options[@]}" 2>&1 | tee -a setup-sut-k8s.logs
 
-./setup-ansible.sh 2>&1 | tee "$DIR"/setup-sut-k8s.logs
-./setup-sut-native.sh --port $ssh_port $(echo ${hosts[@]} | sed 's|:[^ ]*||g') 2>&1 | tee -a "$DIR"/setup-sut-k8s.logs
-
-controller=${hosts[0]}
+controller=${controller_hosts[0]}
 controller_hh="${controller/*@/}"
 controller_h1="${controller_hh/:*/}"
 controller_h2="${controller_hh/*:/}"
 
-k8s_taint="true"
-for h in ${hosts[@]:1}; do 
-  if [ "${controller/*@/}" = "${h/*@/}" ]; then
-    k8s_taint="false"
-  fi
-done
-
 workers="$(
   i=0
-  for h in ${hosts[@]:1}; do 
+  for h in ${worker_hosts[@]}; do 
     hh="${h/*@/}"
     h1="${hh/:*/}"
     h2="${hh/*:/}"
@@ -110,12 +129,34 @@ workers="$(
           ansible_port: "$ssh_port"
 EOF
 i=$((i+1));done)"
-workers_ref="$(i=0;for h in ${hosts[@]:1}; do cat <<EOF
+workers_ref="$(i=0;for h in ${worker_hosts[@]}; do cat <<EOF
         worker-$i: *worker-$i
 EOF
 i=$((i+1));done)"
 
-ANSIBLE_ROLES_PATH=../terraform/template/ansible/kubernetes/roles:../terraform/template/ansible/common/roles:../terraform/template/ansible/traces/roles ANSIBLE_INVENTORY_ENABLED=yaml ansible-playbook --flush-cache -vv -e install_intelca=$intelcert -e wl_logs_dir="$DIR" -e my_ip_list=1.1.1.1 -e k8s_plugins=$plugins -e k8s_cni=$cni -e k8s_taint=$k8s_taint -e k8s_reset=$reset -e containerd_reset=$reset -e k8s_purge=$purge --inventory <(cat <<EOF
+clients="$(
+  i=0
+  for h in ${client_hosts[@]}; do 
+    hh="${h/*@/}"
+    h1="${hh/:*/}"
+    h2="${hh/*:/}"
+    cat <<EOF
+        client-$i: &client-$i
+          ansible_host: "${h1}"
+          ansible_user: "${h/@*/}"
+          private_ip: "${h2:-$h1}"
+          ansible_port: "$ssh_port"
+EOF
+i=$((i+1));done)"
+clients_ref="$(i=0;for h in ${client_hosts[@]}; do cat <<EOF
+        client-$i: *client-$i
+EOF
+i=$((i+1));done)"
+
+. <(sed '/^# BEGIN WSF Setup/,/^# END WSF Setup/{d}' /etc/environment)
+export http_proxy https_proxy no_proxy
+rm -f /tmp/wsf-setup-ssh-* 2> /dev/null || true
+ANSIBLE_ROLES_PATH=../terraform/template/ansible/kubernetes/roles:../terraform/template/ansible/common/roles:../terraform/template/ansible/traces/roles ANSIBLE_INVENTORY_ENABLED=yaml ansible-playbook --flush-cache -vv -e wl_logs_dir="$DIR" -e my_ip_list=1.1.1.1 "${ansible_options[@]}" --inventory <(cat <<EOF
 all:
   children:
     cluster_hosts:
@@ -126,13 +167,20 @@ all:
           private_ip: "${controller_h2:-$controller_h1}"
           ansible_port: "$ssh_port"
 $workers
+$clients
     controller:
       hosts:
         controller-0: *controller-0
     workload_hosts:
       hosts:
 $workers_ref
+$clients_ref
     trace_hosts:
+      hosts:
+$workers_ref
+$clients_ref
+    off_cluster_hosts:
+      hosts:
 EOF
-) ./setup-sut-k8s.yaml 2>&1 | tee -a "$DIR"/setup-sut-k8s.logs
-rm -f cluster-info.json
+) ./setup-sut-k8s.yaml 2>&1 | tee -a setup-sut-k8s.logs
+rm -f cluster-info.json timing.yaml

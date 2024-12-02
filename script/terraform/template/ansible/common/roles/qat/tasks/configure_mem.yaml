@@ -1,0 +1,24 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: configure memory
+  ansible.builtin.blockinfile:
+    path: /etc/systemd/system/containerd.service.d/memlock.conf
+    block: |
+        [Service]
+        LimitMEMLOCK=167772160
+    create: true
+  become: true
+  ignore_errors: true
+
+- name: restart container service
+  shell:
+    cmd: |
+        systemctl daemon-reload
+        systemctl restart containerd
+    executable: /bin/bash
+  become: true
+  ignore_errors: true

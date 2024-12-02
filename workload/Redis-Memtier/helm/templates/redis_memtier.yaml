@@ -1,0 +1,162 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+{{- $startPort := .Values.REDIS_NATIVE_TRANSPORT_PORT -}}
+{{- $nInstance := .Values.CPU_USED -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: benchmark 
+spec:
+  parallelism: {{ $nInstance }}
+  completions: {{ $nInstance }}
+  completionMode: Indexed
+  template:
+    metadata:
+      labels:
+        name: REDIS-MEMTIER
+    spec: 
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: benchmark
+        image: {{ $.Values.REGISTRY }}redis-memtier-ubuntu{{ $.Values.UBUNTU_OS }}{{ $.Values.RELEASE }}
+        imagePullPolicy: {{ include "imagepolicy" $.Values }}
+        resources:
+          requests:
+            cpu: "0.5"
+        env:
+        - name: RUN_SINGLE_NODE
+          value: "{{ $.Values.RUN_SINGLE_NODE }}"
+        - name: MEMTIER_CLIENT_NUMACTL_OPTIONS
+          value: "{{ $.Values.MEMTIER_CLIENT_NUMACTL_OPTIONS }}"
+        - name: redis_numactl_strategy
+          value: "{{ $.Values.REDIS_NUMACTL_STRATEGY }}"
+        - name: r_client_server_pair
+          value: "{{ $nInstance }}"
+        - name: start_numa_node
+          value: "{{ $.Values.START_NUMA_NODE }}"
+        - name: MEMTIER_SERVER_IP
+          value: "{{ $.Values.REDIS_SERVICE }}"
+        - name: MEMTIER_STARTPORT
+          value: "{{ $startPort }}"
+        - name: MEMTIER_CONFIG_CENTER_PORT
+          value: "{{ $.Values.CONFIG_CENTER_PORT }}"
+        - name: MEMTIER_UNIX_SOCKET
+          value: "{{ $.Values.MEMTIER_UNIX_SOCKET }}" 
+        - name: MEMTIER_PROTOCOL
+          value: "{{ $.Values.MEMTIER_PROTOCOL }}" 
+        - name: MEMTIER_AUTHENTICATE
+          value: "{{ $.Values.MEMTIER_AUTHENTICATE }}" 
+        - name: MEMTIER_TLS
+          value: "{{ $.Values.MEMTIER_TLS }}" 
+        - name: MEMTIER_KEY
+          value: "{{ $.Values.MEMTIER_KEY }}" 
+        - name: MEMTIER_CACERT
+          value: "{{ $.Values.MEMTIER_CACERT }}" 
+        - name: MEMTIER_TLS_SKIP_VERIFY
+          value: "{{ $.Values.MEMTIER_TLS_SKIP_VERIFY }}" 
+        - name: MEMTIER_SNI
+          value: "{{ $.Values.MEMTIER_SNI }}"
+        - name: MEMTIER_RUN_COUNT
+          value: "{{ $.Values.MEMTIER_RUN_COUNT }}" 
+        - name: MEMTIER_DEBUG
+          value: "{{ $.Values.MEMTIER_DEBUG }}" 
+        - name: MEMTIER_CLIENT_STATS
+          value: "{{ $.Values.MEMTIER_CLIENT_STATS }}" 
+        - name: MEMTIER_OUT_FILE
+          value: "{{ $.Values.MEMTIER_OUT_FILE }}" 
+        - name: MEMTIER_JSON_OUT_FILE
+          value: "{{ $.Values.MEMTIER_JSON_OUT_FILE }}" 
+        - name: MEMTIER_HDR_FILE_PREFIX
+          value: "{{ $.Values.MEMTIER_HDR_FILE_PREFIX }}" 
+        - name: MEMTIER_SHOW_CONFIG
+          value: "{{ $.Values.MEMTIER_SHOW_CONFIG }}"
+        - name: MEMTIER_HIDE_HISTOGRAM
+          value: "{{ $.Values.MEMTIER_HIDE_HISTOGRAM }}"
+        - name: MEMTIER_PRINT_PERCENTILES
+          value: "{{ $.Values.MEMTIER_PRINT_PERCENTILES }}"
+        - name: MEMTIER_CLUSTER_MODE
+          value: "{{ $.Values.MEMTIER_CLUSTER_MODE }}"
+        - name: MEMTIER_REQUESTS 
+          value: "{{ $.Values.MEMTIER_REQUESTS }}" 
+        - name: MEMTIER_POPULATE_REQUESTS
+          value: "{{ $.Values.MEMTIER_POPULATE_REQUESTS }}"
+        - name: MEMTIER_CLIENTS
+          value: "{{ $.Values.MEMTIER_CLIENTS }}"
+        - name: MEMTIER_THREADS
+          value: "{{ $.Values.MEMTIER_THREADS }}"
+        - name: MEMTIER_TEST_TIME 
+          value: "{{ $.Values.MEMTIER_TEST_TIME }}"
+        - name: MEMTIER_RATIO
+          value: "{{ $.Values.MEMTIER_RATIO }}"
+        - name: MEMTIER_PIPELINE
+          value: "{{ $.Values.MEMTIER_PIPELINE }}"
+        - name: MEMTIER_RECONNECT_INTERVAL
+          value: "{{ $.Values.MEMTIER_RECONNECT_INTERVAL }}"
+        - name: MEMTIER_MULTI_KEY_GET
+          value: "{{ $.Values.MEMTIER_MULTI_KEY_GET }}"
+        - name: MEMTIER_MULTI_SELECT_DB
+          value: "{{ $.Values.MEMTIER_SELECT_DB }}"
+        - name: MEMTIER_DISTINCT_CLIENT_SEED
+          value: "{{ $.Values.MEMTIER_DISTINCT_CLIENT_SEED }}"
+        - name: MEMTIER_RANDOMIZE
+          value: "{{ $.Values.MEMTIER_RANDOMIZE }}"
+        - name: MEMTIER_DATA_SIZE
+          value: "{{ $.Values.MEMTIER_DATA_SIZE }}"
+        - name: MEMTIER_DATA_OFFSET
+          value: "{{ $.Values.MEMTIER_DATA_OFFSET }}"
+        - name: MEMTIER_RANDOM_DATA
+          value: "{{ $.Values.MEMTIER_RANDOM_DATA }}"
+        - name: MEMTIER_DATA_SIZE_RANGE
+          value: "{{ $.Values.MEMTIER_DATA_SIZE_RANGE }}"
+        - name: MEMTIER_DATA_SIZE_LIST
+          value: "{{ $.Values.MEMTIER_DATA_SIZE_LIST }}"
+        - name: MEMTIER_DATA_SIZE_PATTERN
+          value: "{{ $.Values.MEMTIER_DATA_SIZE_PATTERN }}"
+        - name: MEMTIER_EXPIRY_RANGE
+          value: "{{ $.Values.MEMTIER_EXPIRY_RANGE }}"
+        - name: MEMTIER_DATA_IMPORT
+          value: "{{ $.Values.MEMTIER_DATA_IMPORT }}"
+        - name: MEMTIER_DATA_VERIFY 
+          value: "{{ $.Values.MEMTIER_DATA_VERIFY }}"
+        - name: MEMTIER_VERIFY_ONLY 
+          value: "{{ $.Values.MEMTIER_VERIFY_ONLY }}"
+        - name: MEMTIER_GENERATE_KEYS 
+          value: "{{ $.Values.MEMTIER_GENERATE_KEYS }}"
+        - name: MEMTIER_NO_EXPIRY 
+          value: "{{ $.Values.MEMTIER_NO_EXPIRY }}"
+        - name: MEMTIER_KEY_PREFIX 
+          value: "{{ $.Values.MEMTIER_KEY_PREFIX }}"
+        - name: MEMTIER_KEY_MINIMUM 
+          value: "{{ $.Values.MEMTIER_KEY_MINIMUM }}"
+        - name: MEMTIER_KEY_MAXIMUM 
+          value: "{{ $.Values.MEMTIER_KEY_MAXIMUM }}"
+        - name: MEMTIER_KEY_PATTERN 
+          value: "{{ $.Values.MEMTIER_KEY_PATTERN }}"
+        - name: MEMTIER_KEY_STDDEV 
+          value: "{{ $.Values.MEMTIER_KEY_STDDEV }}"
+        - name: MEMTIER_KEY_MEDIAN 
+          value: "{{ $.Values.MEMTIER_KEY_MEDIAN }}"
+        - name: MEMTIER_WAIT_RATIO 
+          value: "{{ $.Values.MEMTIER_WAIT_RATIO }}"
+        - name: MEMTIER_NUM_SLAVES 
+          value: "{{ $.Values.MEMTIER_NUM_SLAVES }}"
+        - name: MEMTIER_WAIT_TIMEOUT 
+          value: "{{ $.Values.MEMTIER_WAIT_TIMEOUT }}"
+      restartPolicy: Never
+{{- if not $.Values.RUN_SINGLE_NODE }}
+      {{- $args := dict "anti" "REDIS-SERVER" }}
+      {{- include "podAffinity" $args }}
+      {{- $args2 := dict "nkey" "VM-GROUP" "nvalue" "client" }}
+      {{- include "nodeAffinity" $args2 }}
+      topologySpreadConstraints:
+        - topologyKey: kubernetes.io/hostname
+          maxSkew: {{ $.Values.MAX_SKEW }}
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              name: REDIS-MEMTIER
+{{- end }}

@@ -1,37 +1,35 @@
-# Docker Setup
 
-The `docker` engine is a prerequisite to build the docker images. 
+## Introduction
 
-## Setup Docker
+The `docker` validation backend runs any workloads locally on the development host, either through multiple docker sessions or through docker-compose. 
 
-Follow the instructions to install the `docker` engine on your local system. The docker version `20.10.10` or later is required for full features.  
+## Execute a Workload
 
-```shell
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
+Switch to the docker validation backend as follows:
+
+```
+cd build
+cmake -DBACKEND=docker ..     # Select the docker backend 
 ```
 
-> It is recommended that you complete the [post-installation steps][post-installation steps] to manage `docker` as a non-root user.
-
-## Setup Proxies
-
-If you are behind a firewall, complete the following steps to setup the proxies:  
-
-```shell
-sudo mkdir -p /etc/systemd/system/docker.service.d
-printf "[Service]\nEnvironment=\"HTTP_PROXY=$http_proxy\" \"HTTPS_PROXY=$https_proxy\" \"NO_PROXY=$no_proxy\"\n" | sudo tee /etc/systemd/system/docker.service.d/proxy.conf
-sudo systemctl daemon-reload
-sudo systemctl restart docker
+Then test any workload as follows:
+```
+cmake -DBENCHMARK=dummy ..                      # Select the dummy workload
+./ctest.sh -N                                   # List all testcases
+./ctest.sh -R _pkm -V                           # Run the _pkm testcase
+./list-kpi.sh workload/dummy/logs-dummy_pi_pkm  # Show the KPIs
 ```
 
-## Docker Login
+## Setup arm64 Emulation
 
-Optionally, login to your dockerhub account so that you can pull images from dockerhub.
+You can setup the development host as an arm64 emulator. To do so, run the `setup.sh` script:
+
+```
+script/march/setup.sh
+```
 
 ## See Also
 
-- [Docker Setup][Docker Setup]
+- [cmake commands](../executing-workload/cmake.md)   
+- [ctest commands](../executing-workload/ctest.md)   
 
-
-[post-installation steps]: https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user
-[Docker Setup]: https://docs.docker.com/engine/install/#server

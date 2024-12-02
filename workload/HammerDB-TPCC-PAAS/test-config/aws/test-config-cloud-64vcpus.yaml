@@ -1,0 +1,15 @@
+# test-config-cloud.yaml
+# Overwrite the test cases for performance tunning on Cloud instances.
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+*:
+    INNODB_BUFFER_POOL_SIZE: 68719476736
+    TPCC_NUM_WAREHOUSES: 800
+    TPCC_THREADS_BUILD_SCHEMA: 64
+    TPCC_HAMMER_NUM_VIRTUAL_USERS: "116"
+    AWS_WORKER_INSTANCE_TYPE: c6i.16xlarge
+    INSTANCE_CLASS: db.m5.24xlarge
+    MAX_CONNECTIONS: 4000

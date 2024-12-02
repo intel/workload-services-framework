@@ -10,60 +10,9 @@
 
 - name: Launch a docker registry
   command: |
-    docker run -d -p {{ dev_registry_port }}:5000 --restart=always -v {{ dev_cert_conf_dir }}:/etc/wsf/certs:ro --name {{ dev_registry_name }} -e REGISTRY_HTTP_TLS_CERTIFICATE=/etc/wsf/certs/{{ dev_cert_host }}:{{ dev_registry_port }}.crt -e REGISTRY_HTTP_TLS_KEY=/etc/wsf/certs/{{ dev_cert_host }}:{{ dev_registry_port }}.key registry:2
-  when: dev_registry_mirror == ""
-
-- name: Detect OS
-  shell:
-    cmd: '. /etc/os-release; echo $ID'
-    executable: /bin/bash
-  register: os
-  when: not dev_registry_mirror == ""
-
-- name: Find Custom CA Certificates
-  find:
-    paths: "{{ dev_registry_certs_path[os.stdout] }}"
-    patterns: "{{ dev_registry_certs_prefix }}*"
-  register: cert_files
-  when: not dev_registry_mirror == ""
-
-- name: Get a temp filename
-  tempfile:
-  register: dockerfile
-  when: 
-  - not dev_registry_mirror == ""
-  - cert_files.matched > 0
-    
-- name: Create Dockerfile
-  template:
-    src: Dockerfile.j2
-    dest: "{{ dockerfile.path }}"
-  when:
-  - not dev_registry_mirror == ""
-  - cert_files.matched > 0
-
-- name: Create custom registry:2 with extra CA-certificates
-  command: 
-    cmd: "docker build -t registry:2c -f {{ dockerfile.path }} ."
-    chdir: "{{ dev_registry_certs_path[os.stdout] }}"
-  when: 
-  - not dev_registry_mirror == ""
-  - cert_files.matched > 0
-
-- name: Remove Dockerfile
-  file:
-    path: "{{ dockerfile.path }}"
-    state: absent
-  when: 
-  - not dev_registry_mirror == ""
-  - cert_files.matched > 0
-
-- name: Start the pull through cache
-  command: |
-    docker run -d -p {{ dev_registry_port }}:5000 --restart=always -v {{ dev_cert_conf_dir }}:/etc/wsf/certs:ro --name {{ dev_registry_name }} -e REGISTRY_HTTP_TLS_CERTIFICATE=/etc/wsf/certs/{{ dev_cert_host }}:{{ dev_registry_port }}.crt -e REGISTRY_HTTP_TLS_KEY=/etc/wsf/certs/{{ dev_cert_host }}:{{ dev_registry_port }}.key -e REGISTRY_PROXY_REMOTEURL={{ dev_registry_mirror }} registry:{{ (cert_files.matched > 0) | ternary('2c', '2') }}
-  when: not dev_registry_mirror == ""
+    docker run -d -p {{ dev_registry_port }}:5000 --restart=always -v {{ dev_cert_conf_dir }}:/etc/wsf/certs:ro --name {{ dev_registry_name }} -e REGISTRY_HTTP_TLS_CERTIFICATE=/etc/wsf/certs/{{ dev_cert_host }}:{{ dev_registry_port }}.crt -e REGISTRY_HTTP_TLS_KEY=/etc/wsf/certs/{{ dev_cert_host }}:{{ dev_registry_port }}.key {{ dev_registry_image }}
 
 - name: Print the message
   debug:
-    msg: "A {{ (dev_registry_mirror == '') | ternary('docker', 'pull-through') }} registry is created at {{ dev_cert_host }}:{{ dev_registry_port }}." 
+    msg: "A docker registry is created at {{ dev_cert_host }}:{{ dev_registry_port }}." 
 

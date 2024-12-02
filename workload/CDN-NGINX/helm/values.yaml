@@ -1,0 +1,45 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+### Global Configuration ###
+REGISTRY: ""
+RELEASE: ""
+PLATFORM: ""
+BACKEND: ""
+
+### Workload Configuration ###
+WORKLOAD: ""
+TESTCASE: ""
+NODE: ""
+SYNC: ""
+GATED: ""
+
+NICIP_W1: ""
+NICIP_W2: ""
+STORAGE_MEDIUM: ""
+CACHE_SIZE: ""
+DISK_SIZE: ""
+
+HTTPMODE: ""
+PORT: 0
+PROTOCOL: ""
+CERT: ""
+CIPHER: ""
+CURVE: ""
+
+SINGLE_SOCKET: ""
+CPU_AFFI: ""
+NGINX_WORKERS: 0
+NGINX_CPU_LISTS: ""
+KEEPALIVE: ""
+
+QAT_RESOURCE_NUM: 0
+QAT_RESOURCE_TYPE: ""
+
+NUSERS: 0
+NTHREADS: 0
+DURATION: 0
+WRKLOG_TIMEOUT: 0

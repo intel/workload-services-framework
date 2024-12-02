@@ -1,0 +1,47 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+    - name: Uncompress the perfspect package
+      unarchive:
+        src: "{{ perfspect_private_package | default(perfspect_public_package) }}"
+        dest: /tmp/
+        remote_src: true
+
+  rescue:
+
+    - name: Uncompress the perfspect package
+      unarchive:
+        src: "{{ perfspect_public_package }}"
+        dest: /tmp/
+        remote_src: true
+      register: perfspect_get_rc
+      until: perfspect_get_rc is success
+      retries: 2
+      delay: 10
+      ignore_errors: true
+
+  become: false
+  delegate_to: localhost
+  run_once: true
+
+- name: Create the perfspect directory
+  file:
+    path: "{{ wl_logs_dir }}/{{ inventory_hostname }}-sutinfo"
+    state: directory
+  delegate_to: localhost
+  ignore_errors: yes
+
+- name: Run perfspect report
+  command: "/tmp/perfspect/perfspect report {{ perfspect_report_options }} {% if ansible_host!='127.0.0.1' %} --target {{ ansible_host }} --port {{ ansible_port | default(22) }} --user {{ ansible_user }} --key {{ ansible_ssh_private_key_file }} {% endif %} --output {{ wl_logs_dir }}/{{ inventory_hostname }}-sutinfo"
+  register: perfspect_rc
+  until: perfspect_rc is success
+  retries: 2
+  delay: 10
+  delegate_to: localhost
+  ignore_errors: yes
+

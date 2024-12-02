@@ -1,0 +1,26 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Remove local hosts from no_proxy
+  ansible.windows.win_shell: |
+    $registryPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
+    $proxy=(Get-ItemProperty -Path "$registryPath")
+    if ($proxy.ProxyOverride.StartsWith("{{ local_hosts }}")) {
+      $bypass=($proxy.ProxyOverride.Replace("{{ local_hosts }}", ""))
+      Set-ItemProperty -Path $registryPath -Name ProxyServer -Value "$($proxy.ProxyServer)"
+      Set-ItemProperty -Path $registryPath -Name ProxyOverride -Value "$bypass"
+      netsh winhttp set proxy proxy-server="$($proxy.ProxyServer)" bypass-list="$bypass"
+
+      $proxyBytes = [system.Text.Encoding]::ASCII.GetBytes("$($proxy.ProxyServer)")
+      $bypassBytes = [system.Text.Encoding]::ASCII.GetBytes("$bypass")
+      $defaultConnectionSettings = [byte[]]@(@(70,0,0,0,0,0,0,0,11,0,0,0,$proxyBytes.Length,0,0,0)+$proxyBytes+@($bypassBytes.Length,0,0,0)+$bypassBytes+ @(1..36 | % {0}))
+      Set-ItemProperty -Path "$registryPath\Connections" -Name DefaultConnectionSettings -Value $defaultConnectionSettings
+    }
+  become: false
+  vars:
+    addr_list: "{{ groups['cluster_hosts'] | union(groups['off_cluster_hosts']) | map('extract', hostvars, ['ansible_host']) | union(groups['cluster_hosts'] | union(groups['off_cluster_hosts']) | map('extract', hostvars, ['private_ip'])) | select('defined') | unique }}"
+    ip_list: "{% for h in (addr_list|difference(addr_list|ipaddr)) %}{{ query('dig',h)|first }},{% endfor %}"
+    local_hosts: "{{ addr_list | union(ip_list|split(',')) | reject('==','') | unique | join(';') }};"

@@ -1,0 +1,9 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+docker_auth_reuse: false
+docker_auth_config_json: ".docker/config.json"
+docker_auth_secret_name: "wsf-registry-secret"

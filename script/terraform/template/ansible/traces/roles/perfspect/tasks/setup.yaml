@@ -1,0 +1,18 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- set_fact:
+    trace_module_start_block: |
+            mkdir -p roi-$roi
+            cd roi-$roi
+            nohup /usr/local/perfspect/perfspect metrics --format csv {{ perfspect_metrics_options }} --interval {{ perfspect_metrics_interval }} --noupdate --output . > perfspect.logs 2>&1 &
+            echo $! > perfspect.pid
+            disown
+    trace_module_stop_block: |
+            cd roi-$roi
+            killall -s SIGINT perf
+            tail -f --pid=$(cat perfspect.pid) /dev/null
+

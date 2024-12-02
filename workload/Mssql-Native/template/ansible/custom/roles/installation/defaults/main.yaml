@@ -1,0 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+HAMMERDB_VER: "4.2"
+HAMMERDB_REPO: https://github.com/TPC-Council/HammerDB/releases/download/v{{ HAMMERDB_VER }}/HammerDB-{{ HAMMERDB_VER }}-Win.zip
+Workspace: "C:\\HammerDB"

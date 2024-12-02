@@ -1,0 +1,18 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: generate pcm html page
+  template:
+    src: pcm-charts.html.j2
+    dest: "{{ trace_data_path }}/roi-{{ roi_index }}.html"
+  vars:
+    time_spec: "{{ lookup('pipe', 'date -u -d ' + (roi[0] | quote) + ' +%s') }}"
+    pcm_data: "{{ lookup('pipe', ((role_path + '/scripts/parse-pcmdata.py') | quote) + ' ' + (pcm_action | quote) + ' ' + (time_spec | quote) + ' ' + ((trace_data_path + '/roi-' + (roi_index | string)) | quote)) }}"
+  when: pcm_action in ['pcm-power']
+  delegate_to: localhost
+  become: false
+  ignore_errors: true
+

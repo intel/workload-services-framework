@@ -29,7 +29,7 @@ ifelse(defn(`NODE'),3n,`dnl
     HAS-SETUP-NIC-100G: required
 ')dnl
   vm_group: worker
-')dnl
+')dnl  
 ')dnl
 ifelse(defn(`GATED'),gated,`',`dnl
 - labels:

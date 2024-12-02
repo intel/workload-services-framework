@@ -1,0 +1,41 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Download MySQL zip
+  ansible.windows.win_get_url:
+    url: "{{ MYSQL_PACKAGE_WIN }}"
+    dest: "C:\\"
+
+- name: Unzip MySQL package
+  win_unzip:
+    src: "C:\\mysql-8.0.33-winx64.zip"
+    dest: "C:\\mysql"
+
+- name: Copy MySQL cnf
+  template:
+    src: "my.ini.j2"
+    dest: "C:\\my.ini"
+
+- name: Create MySQL data dir
+  win_file:
+    path: "H:\\data"
+    state: directory
+
+- name: Initialize MySQL
+  win_shell: |
+    cd  C:\mysql\mysql-8.0.33-winx64\bin
+    ./mysqld.exe --defaults-file=C:\\my.ini --initialize-insecure --console 
+    ./mysqld.exe -install
+
+- name: Start MySQL Service
+  win_shell: |
+    net start mysql
+    (Get-Service MySQL).WaitForStatus('Running')
+
+- name: Update MySQL password and access
+  win_shell: |
+    cd  C:\mysql\mysql-8.0.33-winx64\bin
+    ./mysql.exe -u root -e 'use mysql; update user set host = \"%\" where user= \"root\"; flush privileges;'
+    ./mysql.exe -u root -e 'use mysql; ALTER USER \"root\"@\"%\" IDENTIFIED WITH mysql_native_password BY \"Mysql@123\"; flush privileges;'

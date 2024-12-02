@@ -1,0 +1,57 @@
+# rocksdb-iaa
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=9.3
+ARG OS_IMAGE=rockylinux
+ARG RELEASE
+FROM rocksdb-iaa-base${RELEASE} as build
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+RUN yum update -y && \
+    yum install pciutils numactl wget unzip lz4-devel -y && \
+    yum install snappy-devel --enablerepo=crb sysstat bc -y && \
+    yum clean all
+
+COPY  --from=build /qpl /qpl
+
+RUN rm -rf /usr/lib64/libzstd*
+COPY --from=build /usr/local/lib/libzstd* /usr/lib64/
+
+COPY  --from=build /rocksdb/db_bench /rocksdb/rocksdb/db_bench
+COPY  --from=build /usr/bin/accel-config /usr/bin/accel-config
+COPY  --from=build /usr/bin/gflags_completions.sh /usr/bin/gflags_completions.sh
+
+COPY --from=build /usr/lib/libgflags.so /usr/lib/libgflags.so
+COPY --from=build /usr/lib/libgflags.so.2.2 /usr/lib/libgflags.so.2.2
+COPY --from=build /usr/lib/libgflags.so.2.2.2 /usr/lib/libgflags.so.2.2.2
+COPY --from=build /usr/lib/libgflags_nothreads.so /usr/lib/libgflags_nothreads.so
+COPY --from=build /usr/lib/libgflags_nothreads.so.2.2 /usr/lib/libgflags_nothreads.so.2.2
+COPY --from=build /usr/lib/libgflags_nothreads.so.2.2.2 /usr/lib/libgflags_nothreads.so.2.2.2
+
+COPY --from=build /usr/lib64/libaccel-config.la /usr/lib64/libaccel-config.la
+COPY --from=build /usr/lib64/libaccel-config.so /usr/lib64/libaccel-config.so
+COPY --from=build /usr/lib64/libaccel-config.so.1 /usr/lib64/libaccel-config.so.1
+COPY --from=build /usr/lib64/libaccel-config.so.1.0.0 /usr/lib64/libaccel-config.so.1.0.0
+
+# copy test script
+COPY script/configure_iaa_user /rocksdb/scripts/configure_iaa_user
+COPY script/db_bench_test_scaling.sh /db_bench_test_scaling.sh
+COPY script/run_test.sh /run_test.sh
+
+
+RUN chmod +x /rocksdb/scripts/configure_iaa_user  && \
+    chmod +x /db_bench_test_scaling.sh && \
+    chmod +x /run_test.sh
+
+HEALTHCHECK NONE
+WORKDIR /
+RUN  mkfifo /export-logs
+CMD (bash run_test.sh ; echo $? > status) 2>&1 | tee run_test_log.logs && \
+    ls /rocksdb/rocksdb_data/ && DB_LOGS="/rocksdb/rocksdb_data/*" || DB_LOGS="" && \
+    tar cf /export-logs status run_test_log.logs $DB_LOGS && \
+    sleep infinity

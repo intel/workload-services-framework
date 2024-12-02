@@ -1,0 +1,37 @@
+# bertlarge-pytorch-xeon-public-model-24.04
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER="24.04"
+ARG OS_IMAGE="ubuntu"
+FROM ${OS_IMAGE}:${OS_VER} as build
+
+RUN apt update && apt install -y wget unzip
+
+ARG SQUAD_CONFIG_VER=""
+ARG SQUAD_CONFIG_REPO="https://s3.amazonaws.com/models.huggingface.co/bert/bert-large-uncased-whole-word-masking-finetuned-squad-config.json"
+
+ARG PYTORCH_MODEL_VER=""
+ARG PYTORCH_MODEL_REPO="https://cdn.huggingface.co/bert-large-uncased-whole-word-masking-finetuned-squad-pytorch_model.bin"
+
+ARG VOCAB_VER=""
+ARG VOCAB_REPO="https://s3.amazonaws.com/models.huggingface.co/bert/bert-large-uncased-whole-word-masking-finetuned-squad-vocab.txt"
+
+ARG MODEL_CONFIG_VER="bert_large"
+ARG MODEL_CONFIG_REPO="https://s3.amazonaws.com/models.huggingface.co/bert/bert-large-uncased-whole-word-masking-config.json"
+
+RUN mkdir -p /home/bert_squad_model	
+WORKDIR /home/bert_squad_model
+
+RUN wget ${SQUAD_CONFIG_REPO} -O config.json && \
+    wget --progress=bar:force:noscroll ${PYTORCH_MODEL_REPO} -O pytorch_model.bin && \
+    wget ${VOCAB_REPO} -O vocab.txt && \
+    wget ${MODEL_CONFIG_REPO} -O bert_config.json
+
+ENV MODEL_DIR="/home/bert_squad_model"
+# construct the final image
+FROM scratch
+COPY --from=build /home/bert_squad_model /home/bert_squad_model

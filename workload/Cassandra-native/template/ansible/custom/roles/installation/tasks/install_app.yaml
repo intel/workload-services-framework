@@ -1,0 +1,34 @@
+#env: {{WORKSPACE}} {{CASSANDRA_PKG}} {{CASSANDRA_HOME}}
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Create Workspace
+  file:
+    path: "{{ WORKSPACE }}"
+    state: directory
+
+- name: Wget cassandra
+  shell:
+    cmd: |
+      cd "{{ WORKSPACE }}"
+      wget {{CASSANDRA_PKG}} -O cassandra.tgz
+    executable: /bin/bash
+  register: wget_fetch_cassandra
+  until: wget_fetch_cassandra is succeeded
+  retries: 10
+  delay: 10
+
+- name: Create Cassandra Home
+  file:
+    path: "{{ WORKSPACE }}/home/"
+    state: directory
+
+- name: Install cassandra
+  shell:
+    cmd: |
+      cd "{{ WORKSPACE }}"
+      tar -zxvf cassandra.tgz -C {{CASSANDRA_HOME}} --strip-components 1
+    executable: /bin/bash

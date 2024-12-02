@@ -1,0 +1,7 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+perfmon: false
+perfmon_duration: "600"

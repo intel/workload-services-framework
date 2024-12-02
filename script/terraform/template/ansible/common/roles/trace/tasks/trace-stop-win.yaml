@@ -1,0 +1,66 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+    - name: "wait for the stopping phrase: {{ stop_phrase }}"
+      ansible.windows.win_shell: |
+        $pids=@()
+        {% for script1 in trace_logs_scripts %}
+          $pids += (Start-Job -ScriptBlock {
+            while ((Get-Process -Id {{ trace_waitproc_pid }} -ErrorAction SilentlyContinue) -ne $null) {
+              if {% if (stop_phrase.startswith('/') and stop_phrase.endswith('/')) %} ([string]::join("~",(({{ script1 }}).Split("`n"))) | Select-String -Pattern "{{ stop_phrase.split('/')[1:-1] | join('/') }}") {% else %} (({{ script1 }}) | Select-String -SimpleMatch -Pattern "{{ stop_phrase }}") {% endif %} {
+                break
+              }
+              Start-Sleep -Seconds {{ trace_waitproc_precision }}
+            }
+          }).ID
+        {% endfor %}
+        Wait-Job -Any -Id ($pids -join ",")
+        Stop-Job -Id ($pids -join ",") -ErrorAction SilentlyContinue
+      delegate_to: "{{ trace_logs_host | default(inventory_hostname) }}"
+      register: waitrc
+      ignore_unreachable: true
+      ignore_errors: true
+      become: false
+
+    - name: fail if host is unreachable
+      command: "sleep {{ sut_unreachable_delay }}"
+      failed_when: true
+      delegate_to: localhost
+      when: waitrc is unreachable
+
+  when:
+  - ((roi_region | first) == 'roi')
+  - (stop_phrase != '')
+  vars:
+    stop_phrase: "{{ 2 | extract(roi_region) | default('STOP_TRACE') | replace('%44',',') | regex_replace('[+][0-9]*[smh]$','') }}"
+
+- block:
+
+    - name: "wait for the stopping delay: {{ stop_delay }}"
+      ansible.windows.win_shell: |
+        Wait-Process -Timeout {{ stop_delay_sec }} -Id {{ trace_waitproc_pid }} -ErrorAction SilentlyContinue
+      delegate_to: "{{ trace_logs_host | default(inventory_hostname) }}"
+      register: waitrc
+      ignore_unreachable: true
+      ignore_errors: true
+      become: false
+      vars:
+        stop_delay_sec: "{{ (stop_delay | regex_replace('^([0-9]*)[smh]$','\\1') | int) * (stop_delay.endswith('s') | ternary(1, stop_delay.endswith('m') | ternary(60,3600))) }}"
+
+    - name: fail if host is unreachable
+      command: "sleep {{ sut_unreachable_delay }}"
+      failed_when: true
+      delegate_to: localhost
+      when: waitrc is unreachable
+
+  when:
+  - ((roi_region | first) == 'time') or ((roi_region | first) == 'roi')
+  - stop_delay is match('^[0-9]*[smh]$')
+  - (stop_delay | regex_replace('[smh]$','') | int) != 0
+  vars:
+    stop_delay: "{{ ((roi_region | first) == 'time') | ternary(2 | extract(roi_region) | default(0) | regex_replace('^([0-9]*)$','\\1s'), 2 | extract(roi_region) | default('+0s') | regex_replace('^.*[+]([0-9]*[smh])$','\\1')) }}"

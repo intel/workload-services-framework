@@ -1,0 +1,55 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- hosts: all
+  gather_facts: no
+  tasks:
+
+  - name: remove the vhd file
+    ansible.windows.win_file:
+      path: "{{ dest }}"
+      state: absent
+    register: filerc
+    until: filerc is success
+    retries: 10
+    delay: 10
+    ignore_errors: true
+    tags:
+    - create
+    - destroy
+
+  - block:
+
+      - name: copy the vhd file from remote local
+        ansible.windows.win_copy:
+          src: "{{ os_disk_path }}\\{{ src | win_basename }}"
+          dest: "{{ dest }}"
+          remote_src: true
+
+    rescue:
+
+      - name: copy the vhd file from network
+        ansible.windows.win_get_url:
+          url: "{{ src }}"
+          dest: "{{ dest }}"
+
+    always:
+
+      - name: resize the vhd file
+        ansible.windows.win_shell: |
+          Resize-VHD -Path "{{ dest }}" -SizeBytes "{{ size }}"
+        when: (size|int) > 0
+
+    vars:
+      os_disk_path: "{{ lookup('env','OS_DISK_PATH') }}"
+      src: "{{ lookup('env', 'SRC') }}"
+      size: "{{ lookup('env', 'SIZE') }}"
+    tags:
+    - create
+
+  vars:
+    dest: "{{ lookup('env', 'DEST') }}"
+

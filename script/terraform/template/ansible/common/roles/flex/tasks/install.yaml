@@ -1,0 +1,67 @@
+#check if dGPU is installed
+#see https://dgpu-docs.intel.com/devices/hardware-table.html
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Check if driver i915 already installed
+  shell: |
+    /usr/sbin/hwinfo --display | grep -q -F 'Driver Status: i915 is active'
+  ignore_errors: true
+  register: hwinfo_rc
+  become: true
+
+- block:  
+
+    - name: detect OS
+      shell:
+        cmd: ". /etc/os-release;echo $ID;echo $VERSION_CODENAME"
+        executable: /bin/bash
+      register: os
+        
+    - name: get no_proxy
+      command: echo "$no_proxy"
+      register: no_proxy_env
+
+    - name: get unamer
+      command: uname -r 
+      register: unamer
+
+    - name: install GPU driver
+      include_tasks:
+        file: "{{ task_file }}"
+      when: (role_path+'/tasks/'+task_file) is exists
+      vars:
+        task_file: "install-{{ ((os.stdout_lines|first) in ['ubuntu','debian']) | ternary('debian', 'centos') }}.yaml"
+        no_proxy: "{{ no_proxy_env.stdout | split(',') | reject('match','[.]*intel[.]com$') | join(',') }}"
+      
+    - name: modprobe i915
+      command: "modprobe i915"
+      become: true
+
+    - name: Create render group if it doesn't exist
+      group:
+        name: render
+        state: present
+      become: true
+
+    - name: Get user group name
+      command: id -gn
+      register: user_group
+      become: false
+
+    - name: Add the current user to the render node group
+      user:
+        name: "{{ user_group.stdout }}"
+        groups: render
+        append: true
+      become: true
+
+    - name: Apply the current user to the new group id immediately
+      meta:
+        reset_connection
+
+  when: hwinfo_rc is failed
+

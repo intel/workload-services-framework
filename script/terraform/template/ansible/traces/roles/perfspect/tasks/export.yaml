@@ -1,0 +1,14 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Move html to upper level
+  shell:
+    cmd: |
+      cp -f roi-{{ roi_index }}/*.html roi-{{ roi_index }}.html
+    executable: /bin/bash
+    chdir: "{{ trace_data_path }}"
+  ignore_errors: true
+

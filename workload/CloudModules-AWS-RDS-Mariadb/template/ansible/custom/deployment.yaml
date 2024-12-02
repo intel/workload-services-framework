@@ -1,0 +1,16 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- hosts: worker-0
+  gather_facts: no
+  vars:
+    workspace: /tmp/workspace
+  tasks:
+  - name: Running iterations benchmark
+    include_role:
+      name: deployment
+    loop: "{{ range(1, run_stage_iterations | default(1) | int+1) }}"
+    loop_control:
+      loop_var: itr

@@ -1,0 +1,52 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+worker-0:
+{% for DB_INDEX in range(0, DB_INSTANCE|int) %}
+{% set DB_PORT=5432+DB_INDEX %}
+{% set DB_DISK_INDEX=DB_INDEX%(MULTI_DISK_NUM|int) %}
+{% set DB_DISK_INDEX=DB_DISK_INDEX+1 %}
+- image: "{{ REGISTRY }}pgsql{{ RELEASE }}"
+  options:
+  - --network=host
+  - --privileged
+{% if ENABLE_MOUNT_DIR == 'true' %}
+  - -v /mnt/disk{{ DB_DISK_INDEX }}/data{{ DB_INDEX }}:/var/lib/postgresql/data
+{% endif %}
+  - -e DB_HOST={{ DB_HOST }}
+  - -e DB_PORT={{ DB_PORT }}
+  - -e DB_INDEX={{ DB_INDEX }}
+  - -e POSTGRES_PASSWORD={{ POSTGRES_PASSWORD }}
+  - -e TPCC_NUM_WAREHOUSES={{ TPCC_NUM_WAREHOUSES }}
+  - -e TPCC_MINUTES_OF_RAMPUP={{ TPCC_MINUTES_OF_RAMPUP }}
+  - -e TPCC_MINUTES_OF_DURATION={{ TPCC_MINUTES_OF_DURATION }}
+  - -e TPCC_VU_THREADS={{ TPCC_VU_THREADS }}
+  - -e TPCC_VU_NUMBER={{ TPCC_VU_NUMBER }}
+  - -e HUGE_PAGES_STATUS={{ HUGE_PAGES_STATUS }}
+  - -e SERVER_CORES_PI={{ SERVER_CORES_PI }}
+  - -e SERVER_SOCKET_BIND_NODE={{ SERVER_SOCKET_BIND_NODE }}
+{% endfor %}
+
+client-0:
+{% for DB_INDEX in range(0, DB_INSTANCE|int) %}
+{% set DB_PORT=5432+DB_INDEX %}
+- image: "{{ REGISTRY }}hammerdb-{{ 'ubuntu24' if 'ubuntu24' in TESTCASE else 'ubuntu22' }}{{ RELEASE }}"
+  options:
+  - --network=host
+  - --privileged
+  - -e DB_HOST={{ DB_HOST }}
+  - -e DB_PORT={{ DB_PORT }}
+  - -e DB_INDEX={{ DB_INDEX }}
+  - -e POSTGRES_PASSWORD={{ POSTGRES_PASSWORD }}
+  - -e TPCC_NUM_WAREHOUSES={{ TPCC_NUM_WAREHOUSES }}
+  - -e TPCC_MINUTES_OF_RAMPUP={{ TPCC_MINUTES_OF_RAMPUP }}
+  - -e TPCC_MINUTES_OF_DURATION={{ TPCC_MINUTES_OF_DURATION }}
+  - -e TPCC_VU_THREADS={{ TPCC_VU_THREADS }}
+  - -e TPCC_VU_NUMBER={{ TPCC_VU_NUMBER }}
+  - -e TPCC_TCL_SCRIPT_PATH="/tcls"
+  - -e CLIENT_CORES_PI={{ CLIENT_CORES_PI }}
+  - -e CLIENT_SOCKET_BIND_NODE={{ CLIENT_SOCKET_BIND_NODE }}
+  export-logs: true
+{% endfor %}

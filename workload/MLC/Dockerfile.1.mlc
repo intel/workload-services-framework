@@ -1,0 +1,33 @@
+# mlc
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+# ingredient list
+ARG MLC_VER="3.11"
+ARG MLC_REPO="https://downloadmirror.intel.com/793041/mlc_v${MLC_VER}.tgz"
+ARG USER_AGENT="Mozilla/5.0 (X11; Fedora; Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0"
+
+RUN apt-get update && apt-get install -y --no-install-recommends wget findutils bc dmidecode && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /mlc
+
+RUN no_proxy=$(echo $no_proxy | tr ',' '\n' | grep -v -E '^.?intel.com$' | tr '\n' ',') \
+    wget --no-check-certificate ${MLC_REPO} -U "$USER_AGENT" -O - | tar -xzvf - -C /mlc/ && \
+    mlc_bin=$(find /mlc/ -type f -name mlc) && \
+    mv ${mlc_bin} /mlc/ && chmod +x mlc
+
+COPY ./run_mlc.sh run_mlc.sh
+RUN chmod +x run_mlc.sh
+
+RUN mkfifo /export-logs
+CMD (./run_mlc.sh;echo $? > status) 2>&1 | tee output.logs && \
+    tar cf /export-logs status output.logs && \
+    sleep infinity

@@ -1,0 +1,18 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: check adaptor information
+  shell:
+    cmd: |
+      lspci -nn | grep -Ei 'VGA|DISPLAY' | grep Intel | grep -q -Ei '{{ flex_device_ids | split(',') | join('|') }}'
+  ignore_errors: true
+  register: is_supported
+  become: true
+
+- fail:
+    msg: "Adaptor with device id {{ flex_device_ids }} not found"
+  when: is_supported is failed
+

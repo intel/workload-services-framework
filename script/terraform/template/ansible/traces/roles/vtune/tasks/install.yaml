@@ -1,0 +1,75 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Check if vtune is already installed
+    stat:
+      path: /opt/intel/oneapi/vtune
+    register: vtune_st
+  
+  - name: Determine whether sep driver been loaded properly
+    shell: |
+      lsmod | grep sep
+    register: sep_loaded
+    ignore_errors: true
+  
+  - name: Determine whether vtsspp driver been loaded properly
+    shell: |
+      lsmod | grep vtsspp
+    register: vtsspp_loaded
+    ignore_errors: true
+  
+  - name: Determin if vtune install or reinstall is needed
+    ansible.builtin.command: /bin/true
+    register: install_needed
+    ignore_errors: true
+    when: (vtune_force_install) or (sep_loaded.stdout == "") or (vtsspp_loaded.stdout == "") or (not vtune_st.stat.exists)
+  
+  - name: no_proxy without intel.com
+    shell:
+      cmd: |
+        echo $no_proxy | tr ',' '\n' | grep -v -E '^.?intel.com$' | tr '\n' ','
+      executable: /bin/bash
+    register: no_proxy
+    when: install_needed is changed
+  
+  - name: Detect OS
+    shell:
+      cmd: ". /etc/os-release; echo $ID"
+      executable: /bin/bash
+    register: os
+    when: install_needed is changed
+  
+  - name: "Add user to the {{ vtune_group }} group"
+    user:
+      name: "{{ ansible_user }}"
+      append: yes
+      groups: 
+        - "{{ vtune_group }}"
+    become: yes
+    when: install_needed is changed
+  
+  - name: Install vtune
+    include_tasks:
+      file: "install-{{ (os.stdout in ['ubuntu','debian']) | ternary('debian','centos') }}.yaml"
+    when: install_needed is changed
+  
+  - name: get existing kernel args perf_event_paranoid
+    command: cat /proc/sys/kernel/perf_event_paranoid
+    register: vtune_perf_event_paranoid
+    ignore_errors: true
+    
+  - name: get existing kernel args kptr_restrict
+    command: cat /proc/sys/kernel/kptr_restrict
+    register: vtune_kptr_restrict
+    ignore_errors: true
+  
+  - name: reset ssh connection
+    meta: reset_connection
+  
+  delegate_to: "{{ trace_node.1 }}"
+

@@ -1,0 +1,30 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: stop any pending gprofile session
+    shell:
+      cmd: |
+        killall -9 gprofiler
+        rm -rf /tmp/gprofiler_tmp
+      executable: /bin/bash
+    become: true
+    ignore_errors: true
+
+  delegate_to: "{{ trace_node.1 }}"
+
+- set_fact:
+    trace_module_start_block: |
+        nohup /usr/local/bin/gprofiler {{ gprofiler_options }} --continuous --output {{ trace_data_path }} > gprofiler-$roi.logs 2>&1 &
+        echo $! > gprofiler.pid
+        disown
+    trace_module_stop_block: |
+        kill $(cat gprofiler.pid)
+        tail -f --pid=$(cat gprofiler.pid) /dev/null
+        rm -rf /tmp/gprofiler_tmp
+
+  

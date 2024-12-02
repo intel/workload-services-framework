@@ -1,0 +1,54 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: "skopeo copy {{ inspect.item.key }}"
+  shell:
+    cmd: |
+      {% if inspect.rc==0 %}
+        nohup bash -c '
+          for i in { 1..{{ skopeo_copy_retries }} }; do
+            skopeo copy {{ skopeo_copy_options }} --src-tls-verify={{ ((inspect.item.value|bool) and (inspect.item.key is not match('^'+(skopeo_insecure_registries|split(',')|reject('==','')|default(['NO-REGISTRY'],true)|join('|'))+'.*$'))) | ternary('true','false') }} --dest-daemon-host=http://{{ local_daemon_url }} docker-daemon:{{ inspect.item.key }} docker-daemon:{{ inspect.item.key }} >> /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-skopeo-progress.logs 2>&1 && break
+            sleep {{ skopeo_copy_delay }}
+          done
+        ' &
+      {% else %}
+        nohup bash -c '
+          for i in { 1..{{ skopeo_copy_retries }} }; do
+            skopeo copy {{ skopeo_copy_options }} --src-tls-verify={{ ((inspect.item.value|bool) and (inspect.item.key is not match('^'+(skopeo_insecure_registries|split(',')|reject('==','')|default(['NO-REGISTRY'],true)|join('|'))+'.*$'))) | ternary('true','false') }} --dest-daemon-host=http://{{ local_daemon_url }} docker://{{ inspect.item.key }} docker-daemon:{{ inspect.item.key }} >> /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-skopeo-progress.logs 2>&1 && break
+            sleep {{ skopeo_copy_delay }}
+          done
+        ' &
+      {% endif %}
+      echo $!
+      disown
+    executable: /bin/bash
+  environment:
+    ALL_PROXY: ""
+    all_proxy: ""
+  register: copy_result
+  until: copy_result is not failed
+  delegate_to: localhost
+  become: true
+  no_log: true
+  retries: 10
+  delay: 5
+
+- include_tasks:
+    file: copy-progress.yaml
+  loop: "{{ image_layers | slice(10) | select() | map('last') }}"
+  vars:
+    image_layers: "{% if inspect.rc==0 %}{{ (inspect.stdout | from_json | first).RootFS.Layers }}{% else %}{{ (inspect_lreg.results[inspect_idx].stdout | from_json).Layers }}{% endif %}"
+    
+- name: check fatal errors
+  shell:
+    cmd: |
+      if grep -q -E 'FATA\[[0-9]*\]|level=fatal|Error:' /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-skopeo-progress.logs; then
+        cat /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-skopeo-progress.logs 1>&2
+        exit 3
+      fi
+    executable: /bin/bash
+  delegate_to: localhost
+  become: false

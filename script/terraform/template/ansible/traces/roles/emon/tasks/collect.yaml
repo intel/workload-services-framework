@@ -6,50 +6,26 @@
 
 - block:
 
-  - name: Create the emon directory
-    file:
-      path: "{{ wl_logs_dir}}/{{ trace_node.1 }}-{{ itr | default(1) }}-emon"
-      state: directory
-    delegate_to: localhost
-    become: false
-    ignore_errors: true
-
   - name: Get emon files
     shell:
       cmd: ls -1
-      chdir: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon"
+      chdir: "{{ trace_data_path }}"
       executable: /bin/bash
     register: emon_files
-    become: false
-    ignore_errors: true
-
+  
   - name: Fetch emon files
     fetch:
-      src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon/{{ item }}"
-      dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-emon/"
+      src: "{{ trace_data_path }}/{{ item }}"
+      dest: "{{ trace_data_local_path }}/"
       flat: true
-    become: false
     loop: "{{ emon_files.stdout_lines }}"
-    ignore_errors: true
     register: fetchrc
     until: fetchrc is success
     retries: 10
     delay: 10
-
-  - name: Remove any collection files
-    file:
-      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon"
-      state: absent
-    become: true
-    ignore_errors: true
-
-  - name: Post Processing
-    include_tasks:
-      file: edp.yaml
-    when:
-    - not (emon_skip_edp | bool)
-    - emon_files.stdout_lines | select('match','.*.dat') | length > 0
-    ignore_errors: true
-
+  
   delegate_to: "{{ trace_node.1 }}"
+  when: (hostvars[trace_node.1].ansible_connection|default('ssh')) not in ['local']
+  ignore_errors: true
+  become: false
 

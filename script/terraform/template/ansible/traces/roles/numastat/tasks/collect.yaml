@@ -1,0 +1,25 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Get numastat files
+    shell:
+      cmd: ls -1
+      chdir: "{{ trace_data_path }}"
+      executable: /bin/bash
+    register: numastat_files
+  
+  - name: Fetch numastat files
+    fetch:
+      src: "{{ trace_data_path }}/{{ item }}"
+      dest: "{{ trace_data_local_path }}/"
+      flat: yes
+    loop: "{{ numastat_files.stdout_lines | reject('==', 'numastat.pid') }}"
+  
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: false

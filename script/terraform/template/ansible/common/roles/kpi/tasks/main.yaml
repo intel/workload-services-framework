@@ -4,14 +4,14 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+- block:
+
     - name: copy kpi.sh to the itr directory
       copy:
         src: "{{ wl_logs_dir }}/kpi.sh"
         dest: "{{ wl_logs_dir }}/itr-{{ item }}/"
         mode: "a+rx"
       loop: "{{ range(1, run_stage_iterations | default(1) |int+1, 1) | list }}"
-      when: ((wl_logs_dir + '/kpi.sh') is exists)
-      ignore_errors: true
 
     - name: modify top level kpi.sh to point to itr-1
       lineinfile:
@@ -20,6 +20,8 @@
         insertafter: "^#!.*"
         firstmatch: true
         state: present
-      when: ((wl_logs_dir + '/kpi.sh') is exists)
-      ignore_errors: true
+      run_once: true
+
+  when: ((wl_logs_dir + '/kpi.sh') is exists)
+  ignore_errors: true
 

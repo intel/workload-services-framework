@@ -18,8 +18,10 @@
         enabled: yes
         daemon_reload: yes
         state: started
+      no_log: true
 
   ignore_errors: true
   when:
   - instance_watch | bool
   - not ((csp | default('static')) in [ 'static', 'kvm', 'hyperv' ])
+

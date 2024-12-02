@@ -1,0 +1,34 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Set start/stop cmds
+  set_fact:
+    start_cmds:
+    - "ip link add {{ kvm_vxlan_name }}0 type vxlan id {{ kvm_vxlan_id }} dstport {{ kvm_vxlan_dstport }} dev {{ kvm_vxlan_dev }} nolearning"
+    - "ip link set dev {{ kvm_vxlan_name }}0 mtu {{ kvm_vxlan_mtu }}"
+    - "ip link set {{ kvm_vxlan_name }}0 master {{ kvm_bridge_name }}"
+    - "ip link set {{ kvm_vxlan_name }}0 up"
+    - "{{ [] | zip_longest(kvm_hosts_str|split(',')|reject('==',''),fillvalue='bridge fdb append 00:00:00:00:00:00 dev '+kvm_vxlan_name+'0 dst') | map('join',' ') }}"
+    stop_cmds:
+    - "ip link set {{ kvm_vxlan_name }}0 down"
+    - "ip link del {{ kvm_vxlan_name }}0"
+  vars:
+    kvm_hosts_str: "{% for h in groups.kvm_hosts | reject('==',inventory_hostname) | map('extract',hostvars,['ansible_host']) %}{% if h | ipaddr %}{{ h }}{% else %}{{ query('dig',h)|first }}{% endif %},{% endfor %}"
+
+- name: Add service for managing VXLAN interfaces
+  template:
+    src: vxlan.service.j2
+    dest: /etc/systemd/system/wsf-vxlan.service
+    mode: '0644'
+
+- name: Start service managing VXLANs
+  systemd:
+    name: wsf-vxlan
+    daemon_reload: true
+    enabled: true
+    state: restarted
+  no_log: true
+

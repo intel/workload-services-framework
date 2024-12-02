@@ -1,0 +1,14 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- include_role:
+    name: hf-dataset
+  vars:
+    DEST_DIR: "/opt/dataset/opt/6b7"
+    MODEL_ID: "facebook/opt-6.7b"
+    DATASET_SIZE: 23
+    exclude: ['msgpack','h5']
+    revision: []
+    HF_LOGIN: false

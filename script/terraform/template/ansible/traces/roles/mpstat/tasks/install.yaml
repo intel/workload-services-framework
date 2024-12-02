@@ -1,0 +1,29 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: check if mpstat exists
+    command: "mpstat -V"
+    register: mpstat_rc
+    ignore_errors: true
+
+  - block:
+
+    - name: Detect OS
+      shell:
+        cmd: ". /etc/os-release; echo $ID"
+        executable: /bin/bash
+      register: os
+  
+    - name: Install sysstat
+      include_tasks:
+        file: "install-{{ (os.stdout in ['ubuntu','debian']) | ternary('debian','centos') }}.yaml"
+
+    when: mpstat_rc is failed
+  
+  delegate_to: "{{ trace_node.1 }}"
+  

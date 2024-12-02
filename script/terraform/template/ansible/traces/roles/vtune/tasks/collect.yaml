@@ -1,0 +1,63 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Process vtune records
+    shell:
+      cmd: |
+        . /opt/intel/oneapi/setvars.sh
+  
+        for vtuneout in vtune-*.record; do
+          if [ -e "$vtuneout" ]; then
+            {% if vtune_report != '' %}
+                report_prefix="${vtuneout/.record/.}"
+                {% if vtune_report != 'summary' %}
+                  vtune -report summary -r $vtuneout -search-dir={{ vtune_bin_search_dir or "/" }} -source-search-dir={{ vtune_src_search_dir or "/" }} -format html -report-output "./${report_prefix}summary.html"
+                {% endif %}
+                vtune -report {{ vtune_report }} -r $vtuneout -search-dir={{ vtune_bin_search_dir or "/" }} -source-search-dir={{ vtune_src_search_dir or "/" }} -format {{ vtune_report_format }} -report-output "./${report_prefix}{{ vtune_report }}.{{ vtune_report_format }}"
+            {% endif %}
+            
+            {% if not vtune_fetch_data %}
+              rm -fr $vtuneout
+            {% endif %}
+          fi
+        done
+  
+      chdir: "{{ trace_data_path }}"
+      executable: /bin/bash
+    become: true
+  
+  - name: Tar vtune records
+    archive:
+      path: "{{ trace_data_path }}"
+      dest: /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-vtune.tgz
+      format: gz
+    become: true
+  
+  - name: Fetch perf files
+    fetch:
+      src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-vtune.tgz"
+      dest: "/tmp/"
+      flat: yes
+  
+  - name: Untar vtune records
+    unarchive:
+      src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-vtune.tgz"
+      dest: "{{ trace_data_local_path }}/"
+      extra_opts: --strip-components=1
+    delegate_to: localhost
+  
+  - name: Remove tmp tar file
+    file:
+      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-vtune.tgz"
+      state: absent
+    become: yes
+  
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: false
+

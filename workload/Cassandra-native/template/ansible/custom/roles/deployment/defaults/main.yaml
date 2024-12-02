@@ -1,0 +1,79 @@
+### Application Server Configuration
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+WORKSPACE: "/tmp/cassandra"
+CASSANDRA_HOME: "/tmp/cassandra/home"
+cassandra_cluster_name: "cassandra-server-service"
+CASSANDRA_NATIVE_TRANSPORT_PORT: 9042
+clean_port: 30000 #for DB data clean when testing finished. Only used if CASSANDRA_DISK_MOUNT=true
+
+### Application Client Configuration
+CONFIG: ""
+NODE: "cassandra-server-service"
+CLIENT_DURATION: "10m"
+CLIENT_THREADS: ""
+CLIENT_INSERT: ""
+CLIENT_SIMPLE: ""
+retries: 10
+CLIENT_CL: "ONE"
+CLIENT_POP_MIN: 1
+CLIENT_POP_MAX: 100
+CLIENT_POP_MAX_PERFORMANCE_DIV: ""
+STRESS_NUM_PER_INSTANCE: ""
+DATA_COMPACTION: ""
+DATA_COMPRESSION: ""
+DATA_CHUNK_SIZE: ""
+DEBUG_MODE: ""
+CLIENT_POD_LEVEL: ""
+CLIENT_POD_MEMORY: ""
+CLIENT_POD_CPU: ""
+CASSANDRA_FILL_DATA: ""
+CLIENT_NODE_NUM: 1
+REPLICATE_NUM: ""
+
+# standalone deault value
+cassandra_cluster_name: "cassandra-standalone"
+cassandra_native_transport_port: 9042
+cassandra_storage_port: 7000
+cassandra_JMX_port: 7199
+cassandra_server_addr: "localhost"
+cassandra_concurrent_reads: 8
+cassandra_concurrent_writes: 24
+cassandra_cross_node_timeout: false
+cassandra_server_instance_num: 1
+cassandra_numactl_enable: false
+cassandra_numactl_vcores_enable: true
+numa_options: ""
+cassandra_slow_query_log_timeout_in_ms: 60000
+CASSANDRA_JVM_HEAP_SIZE: 12
+CASSANDRA_JVM_GC_TYPE: "+UseG1GC"
+RPS_TUNE: false
+disks_path: ""
+
+# entrypoint deault values
+deploy_mode: "standalone"
+node_num: 1
+fill_data: false
+insert: 30
+simple: 70
+duration: "10m"
+node: "localhost"
+threads: 16
+cl: "ONE"
+retries: 10
+client_instance_num: 1
+stress_number: 1
+server_port: 9042
+pop_min: 1
+pop_max: 100
+pop_performance_div: 1
+data_chunk_size: 64
+data_compaction: "SizeTieredCompactionStrategy"
+data_compression: "LZ4Compressor"
+replicate_num: 3
+
+OP_COMPACT_WAIT: "compact_wait"
+OP_CLEAN: "clean"

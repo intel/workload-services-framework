@@ -6,63 +6,70 @@
 
 - block:
 
-  - name: wait for previous start job to complete
+  - name: wait for previous trace jobs to complete
     async_status:
-      jid: "{{ startstop_job.job }}"
-    when: (startstop_job.job != '')
+      jid: "{{ item }}"
+    loop: "{{ hostvars[this_trace_host].trace_start_async_jobs | default([]) }}"
     register: statusrc
     until: statusrc.finished
-    retries: "{{ (((trace_start_timeout|int)+4)/5) | int }}"
-    delay: 5
-    ignore_errors: true
+    retries: "{{ trace_start_timeout | int }}"
+    delay: 1
+    no_log: true
 
-  - name: record timing
-    shell:
-      cmd: |
-        echo "workload_itr{{ itr | default(1) }}_roi{{ roi_index }}_end: \"$(date -Ins)\"" >> {{ wl_logs_dir}}/timing.yaml
-      executable: /bin/bash
-    delegate_to: localhost
-    async: 30
-    poll: 0
+  - name: clear trace jobs
+    set_fact:
+      trace_start_async_jobs: []
+    delegate_to: "{{ this_trace_host }}"
+    delegate_facts: true
+
+  - include_role:
+      name: timing
+      tasks_from: stop-roi
+    when: roi_key not in (hostvars[this_trace_host].trace_stopped_roi_list | default([]))
 
   - name: "stop trace roi {{ roi_index }}"
     shell:
       cmd: |
+        {{ trace_tmp_path }}/{{ wl_namespace }}-localhost-trace/stop-trace.sh {{ roi_index }} {{ itr | default(1) }} {% if hostvars['controller-0'].WORKLOAD_PROCESSES is defined %}{{ hostvars['controller-0'].WORKLOAD_PROCESSES }}{% endif %} &
         {% for h in ((((vmhost_reqs|length>0) | ternary(trace_vmhosts,[]))+((vminst_reqs|length>0) | ternary(groups.trace_hosts,[]))) | unique) %}
+          {% if ((hostvars[h].ansible_connection|default('ssh'))=='local') %}
+            sudo -E {{ trace_tmp_path }}/{{ wl_namespace }}-{{ h }}-trace/stop-trace.sh {{ roi_index }} {{ itr | default(1) }} &
+          {% endif %}
           {% if ((hostvars[h].ansible_connection|default('ssh'))=='ssh') %}
-            ssh -p {{ hostvars[h]['ansible_port'] | default(22) }} {{ hostvars[h]['ansible_user'] }}@{{ hostvars[h]['ansible_host'] }} -i {{ ansible_private_key_file }} sudo -E /tmp/{{ wl_namespace }}-{{ h }}-stop-trace.sh {{ roi_index }} &
+            ssh -p {{ hostvars[h]['ansible_port'] | default(22) }} {{ hostvars[h]['ansible_user'] }}@{{ hostvars[h]['ansible_host'] }} -i {{ ansible_private_key_file }} sudo -E {{ trace_tmp_path }}/{{ wl_namespace }}-{{ h }}-trace/stop-trace.sh {{ roi_index }} {{ itr | default(1) }} {% if hostvars[h].WORKLOAD_PROCESSES is defined %}{{ hostvars[h].WORKLOAD_PROCESSES }}{% endif %} &
           {% endif %}
           {% if ((hostvars[h].ansible_connection|default('ssh'))=='winrm') %}
-            {{ role_path }}/scripts/runps1.py {{ h }} "& {{ win_tmp_path }}\{{ wl_namespace }}-{{ h }}-stop-trace.ps1 {{ roi_index }}" &
+            {% if (csp|default('static')) in ['kvm','hyperv'] %}no_proxy="$no_proxy,{{ hostvars[h].ansible_host }}"{% endif %} {{ role_path }}/scripts/runps1.py {{ h }} "& {{ trace_win_tmp_path }}\\\\{{ wl_namespace }}-{{ h }}-trace\\\\stop-trace.ps1 {{ roi_index }} {{ itr | default(1) }}" &
           {% endif %}
         {% endfor %}
         wait
       executable: /bin/bash
       chdir: "{{ wl_logs_dir }}"
-    delegate_to: localhost
-    ignore_errors: yes
     async: "{{ trace_stop_timeout }}"
     poll: 0
     register: trace_stoprc
-    become: false
+    when: roi_key not in (hostvars[this_trace_host].trace_stopped_roi_list | default([]))
     vars:
       vmhost_reqs: "{{ wl_trace_modules|default('')|split(',')|reject('==','')|select('match','.*:host.*') }}"
       vminst_reqs: "{{ wl_trace_modules|default('')|split(',')|reject('==','')|reject('match','.*:host.*') }}"
-      unique_vmhosts: "{{ dict(groups.vmhost_hosts | map('extract', hostvars, ['ansible_host']) | zip(groups.vmhost_hosts | map('extract', hostvars, ['ansible_port'])) | map('join',':') | zip(groups.vmhost_hosts)).values() }}"
+      all_trace_vmhosts: "{{ groups.trace_hosts | map('extract', hostvars, ['vmhost_host']) | map('default','') | reject('==','') }}"
+      unique_vmhosts: "{{ dict(all_trace_vmhosts | map('extract', hostvars, ['ansible_host']) | zip(all_trace_vmhosts | map('extract', hostvars, ['ansible_port'])) | map('join',':') | zip(all_trace_vmhosts)).values() }}"
       trace_vmhosts: "{{ groups.trace_hosts|map('extract',hostvars,['vmhost_host'])|map('default',[])|flatten|select('in',unique_vmhosts) }}"
 
   - name: set trace stopped
     set_fact:
-      trace_startstop_job:
-        mode: stop
-        job: "{{ trace_stoprc.ansible_job_id }}"
-    delegate_to: "{{ trace_logs_host | default(inventory_hostname) }}"
+      trace_stop_async_jobs: "{{ (hostvars[this_trace_host].trace_stop_async_jobs | default([])) + ((trace_stoprc.ansible_job_id is defined) | ternary([ trace_stoprc.ansible_job_id ],[])) }}"
+      trace_stopped_roi_list: "{{ (hostvars[this_trace_host].trace_stopped_roi_list | default([])) + [ roi_key ] }}"
+    delegate_to: "{{ this_trace_host }}"
     delegate_facts: true
 
   when:
   - sut_sudo | default(true) | bool
-  - (startstop_job.mode == 'start')
   run_once: true
+  ignore_errors: true
+  become: false
+  delegate_to: localhost
   vars:
-    startstop_job: "{{ hostvars[trace_logs_host | default(inventory_hostname)].trace_startstop_job | default({'mode':'','job':''}) }}"
+    this_trace_host: "{{ trace_logs_host | default(inventory_hostname) }}"
+    roi_key: "{{ itr|default(1) }}:{{ roi_index }}"
 

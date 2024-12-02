@@ -72,7 +72,7 @@ function add_xls_header(align_left) {
     if (align_left) print "<Alignment ss:Horizontal=\"Left\" ss:Vertical=\"Bottom\"/>"
     print "<Interior ss:Color=\"#D9D9D9\" ss:Pattern=\"Solid\"/>"
     print "</Style>"
-    print "<Style ss:ID=\"svrinfo\">"
+    print "<Style ss:ID=\"sutinfo\">"
     print "<Borders>"
     print "<Border ss:Position=\"Bottom\" ss:LineStyle=\"Continuous\" ss:Weight=\"1\" ss:Color=\"#000000\"/>"
     print "<Border ss:Position=\"Left\" ss:LineStyle=\"Continuous\" ss:Weight=\"1\" ss:Color=\"#000000\"/>"
@@ -92,6 +92,24 @@ function ws_name_ex(a) {
 
 function ws_name(a) {
     a1=ws_name_ex(a)
+    if (ws_uniq[a1] == "") {
+        ws_uniq[a1]=a
+        return a1
+    }
+    print "Worksheet name conflict: "a1 > "/dev/stderr"
+    print "previous: "ws_uniq[a1] > "/dev/stderr"
+    print "new: "a > "/dev/stderr"
+    exit 3
+}
+
+function ws_name_ex2(a) {
+    a1=gensub(filter,"","g",a)
+    if (length(a1)>26) a1=substr(a1,length(a1)-26)
+    return a1
+}
+
+function ws_name2(a) {
+    a1=ws_name_ex2(a)
     if (ws_uniq[a1] == "") {
         ws_uniq[a1]=a
         return a1

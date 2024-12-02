@@ -1,0 +1,9 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+- name: set dsa kernel args
+  set_fact:
+    wl_kernel_args: "{{ wl_kernel_args | combine({ 'intel_iommu': 'intel_iommu=on', 'iommu': 'iommu=pt' }) }}"

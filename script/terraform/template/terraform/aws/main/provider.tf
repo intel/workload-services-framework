@@ -7,7 +7,7 @@ terraform {
   required_providers {
     aws = {
       source = "hashicorp/aws"
-      version = "= 5.13.1"
+      version = "= 5.63.0"
     }
     template = {
       source = "hashicorp/template"
@@ -17,11 +17,19 @@ terraform {
       source = "hashicorp/external"
       version = "= 2.3.1"
     }
+    null = {
+      source = "hashicorp/null"
+      version = "= 3.2.1"
+    }
   }
 }
 
-provider "aws" {
+locals {
   region = var.region!=null?var.region:replace(var.zone,"/(.*)[a-z]$/","$1")
+}
+
+provider "aws" {
+  region = local.region
   profile = var.profile
 
   default_tags {

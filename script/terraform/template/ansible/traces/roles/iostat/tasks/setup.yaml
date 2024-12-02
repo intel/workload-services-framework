@@ -1,0 +1,16 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- set_fact:
+    trace_module_start_block: |
+        export S_TIME_FORMAT=ISO
+        nohup iostat {{ iostat_options }} -t {{ iostat_interval }} > iostat-$roi.logs 2>&1 &
+        echo $! > iostat.pid
+        disown
+    trace_module_stop_block: |
+        kill $(cat iostat.pid)
+        tail -f --pid=$(cat iostat.pid) /dev/null
+

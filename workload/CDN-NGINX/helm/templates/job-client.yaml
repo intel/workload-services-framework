@@ -1,0 +1,62 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+{{- if eq .Values.GATED "gated" }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cdn-nginx-benchmark
+spec:
+  template:
+    metadata:
+      labels:
+    spec:
+      # hostNetwork: true
+      # dnsPolicy: ClusterFirstWithHostNet
+      restartPolicy: Never
+      initContainers:
+      - name: wait-for-cdn-ready
+        image: curlimages/curl:latest
+        imagePullPolicy: {{ include "imagepolicy" .Values }}
+        command: ["/bin/sh","-c","while [ $(curl -k -sw \"%{http_code}\" -m 5 \"{{ .Values.HTTPMODE }}://cachenginxurl:{{ .Values.PORT }}\" -o /dev/null) -ne 200 ];do echo Waiting...;sleep 1s;done"]
+      containers:
+      - name: test1
+        image: {{ .Values.REGISTRY }}cdn-nginx-wrk{{ .Values.RELEASE }}
+        imagePullPolicy: {{ include "imagepolicy" .Values }}
+        env:
+        - name: NUSERS
+          value: "{{ .Values.NUSERS }}"
+        - name: NTHREADS
+          value: "{{ .Values.NTHREADS }}"
+        - name: DURATION
+          value: "{{ .Values.DURATION }}"
+        - name: PORT
+          value: "{{ .Values.PORT }}"
+        - name: GATED
+          value: "{{ .Values.GATED }}"
+        - name: STORAGE_MEDIUM
+          value: "{{ .Values.STORAGE_MEDIUM }}"
+        - name: STATUS_FILE
+          value: "status1"
+        - name: LOG_FILE
+          value: "output1.log"
+        - name: KEEPALIVE
+          value: "{{ .Values.KEEPALIVE }}"
+        volumeMounts:
+        - name: shared-data
+          mountPath: /OUTPUT
+      - name: cdn-nginx-benchmark
+        image: {{ .Values.REGISTRY }}cdn-nginx-wrklog{{ .Values.RELEASE }}
+        imagePullPolicy: {{ include "imagepolicy" .Values }}
+        env:
+        - name: WRKLOG_TIMEOUT
+          value: "{{ .Values.WRKLOG_TIMEOUT }}"
+        volumeMounts:
+        - name: shared-data
+          mountPath: /OUTPUT
+      volumes:
+      - name: shared-data
+        emptyDir: {}
+{{- end }}

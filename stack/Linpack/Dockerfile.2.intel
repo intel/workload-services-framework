@@ -5,9 +5,8 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
-ARG OS_VER=22.04
+ARG OS_VER=24.04
 ARG OS_IMAGE=ubuntu
-
 FROM ${OS_IMAGE}:${OS_VER} as base
 
 ARG HPCKIT_VER="2023.2.0.49440_offline"
@@ -17,7 +16,6 @@ ARG BASEKIT_VER="2023.2.0.49397_offline"
 ARG BASEKIT_REPO="https://registrationcenter-download.intel.com/akdlm/IRC_NAS/992857b9-624c-45de-9701-f6445d845359/l_BaseKit_p_${BASEKIT_VER}.sh"
 ARG BASEKIT_SCRIPT="l_BaseKit_p_${BASEKIT_VER}.sh"
 ARG ONEAPI_PATH="/opt/intel/oneapi"
-ARG MPIKIT_VER="2021.10.0"
 
 # Install Dependencies
 RUN apt-get -y update && \
@@ -34,8 +32,6 @@ RUN cd / && \
     no_proxy=$(echo $no_proxy | tr ',' '\n' | grep -v -E '^.?intel.com$' | tr '\n' ',') wget -T 5 --tries=inf ${BASEKIT_REPO} && \
     bash "${BASEKIT_SCRIPT}" -a -s --silent --eula accept && \
     rm -rf ${BASEKIT_SCRIPT}
-
-RUN ln -s /opt/intel/oneapi/mkl/latest/ /opt/intel/mkl
 
 # Cleanup unneeded oneapi components
 RUN rm -rf ${ONEAPI_PATH}/compiler && \

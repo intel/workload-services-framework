@@ -4,20 +4,46 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: read no_proxy
-  shell:
-    cmd: |
-      . <(sed '/# BEGIN WSF Setup/,/# END WSF Setup/{d}' /etc/environment)
-      echo $no_proxy
-    executable: /bin/bash
-  register: no_proxy
-
 - name: add cluster proxy list to no-proxy
   blockinfile:
     path: /etc/environment
     marker: "# {mark} WSF Setup"
-    block: |
-      no_proxy="{{ (no_proxy.stdout.split(',') + [k8s_pod_cidr, k8s_service_cidr, k8s_apiserver_cluster_ip] + ((groups['cluster_hosts']+groups['off_cluster_hosts']) | map('extract', hostvars, ['ansible_host'])) + ((groups['cluster_hosts']+groups['off_cluster_hosts']) | map('extract', hostvars, ['private_ip']))) | select('defined') | unique | reject('==','') | join(',') }}"
+    state: absent
+
+- name: read no_proxy
+  shell:
+    cmd: |
+      . /etc/environment > /dev/null
+      echo $no_proxy
+    executable: /bin/bash
+  register: no_proxy
+
+- block:
+
+    - name: overwrite with dev setup
+      blockinfile:
+        path: /etc/environment
+        marker: "# {mark} WSF Dev Setup"
+        block: |
+          http_proxy="{{ lookup('env','http_proxy') }}"
+          https_proxy="{{ lookup('env','https_proxy') }}"
+          no_proxy="{{ lookup('env','no_proxy') | split(',') | union(no_proxy.stdout|split(',')) | union(cluster_addrs) | union(cluster_ips|split(',')) | reject('==','') | unique | join(',') }}"
+      register: dev_proxy
+      when:
+      - (sut_update_proxy | bool)
+      - ansible_host not in my_ip_list.split(',')
+
+    - name: add cluster proxy list to no-proxy
+      blockinfile:
+        path: /etc/environment
+        marker: "# {mark} WSF Setup"
+        block: |
+          no_proxy="{{ (sut_update_proxy|bool) | ternary(lookup('env','no_proxy')|split(','),[]) | union(no_proxy.stdout|split(',')) | union(cluster_addrs) | union(cluster_ips|split(',')) | reject('==','') | unique | join(',') }}"
+
+  vars:
+    cluster_addrs: "{{ [k8s_pod_cidr, k8s_service_cidr, k8s_apiserver_cluster_ip] | union(groups['cluster_hosts'] | union(groups['off_cluster_hosts']) | map('extract', hostvars, ['ansible_host'])) | union(groups['cluster_hosts'] | union(groups['off_cluster_hosts']) | map('extract', hostvars, ['private_ip'])) | select('defined') | reject('==','') | unique }}"
+    cluster_ips: "{% for h in (cluster_addrs|difference(cluster_addrs|ipaddr)) %}{{ query('dig',h)|first }},{% endfor %}"
 
 - name: reset ssh connection to make the setting effective
   ansible.builtin.meta: reset_connection
+

@@ -1,0 +1,19 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+# Note: update below variables values as per requirements if needed
+# Intel Device Plugin Operator setup
+dp_operator_ref: "v0.26.1"
+dp_operator_namespace: "inteldeviceplugins-system"
+
+# SGX Device Plugin Setup
+# Note: update below variables values as per requirements if needed
+sgx_device_plugin_ver: "0.26.1"
+intel_sgx_dp_namespace: "inteldeviceplugins-system"
+sgx_enclaveLimit: "20"
+sgx_provisionLimit: "20"
+sgx_device_plugin_nodeselector:
+  - "intel.feature.node.kubernetes.io/sgx=true"

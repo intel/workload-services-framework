@@ -1,0 +1,27 @@
+Use master
+GO
+SELECT
+name AS [LogicalName]
+,physical_name AS [Location]
+,state_desc AS [Status]
+FROM sys.master_files
+WHERE database_id = DB_ID(N'tempdb');
+GO
+ 
+ 
+USE [master];
+GO
+EXEC xp_instance_regwrite
+   N'HKEY_LOCAL_MACHINE',
+  N'Software\Microsoft\MSSQLServer\MSSQLServer',
+   N'DefaultData',
+   REG_SZ,
+   N'H:\'
+GO
+EXEC xp_instance_regwrite
+   N'HKEY_LOCAL_MACHINE',
+  N'Software\Microsoft\MSSQLServer\MSSQLServer',
+   N'DefaultLog',
+   REG_SZ,
+   N'I:\'
+GO

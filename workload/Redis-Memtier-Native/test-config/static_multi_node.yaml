@@ -1,0 +1,16 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+*_20write80read:
+  CPU_USED: 1
+  MEMTIER_PIPELINE: 6
+  MEMTIER_THREADS: 5
+  MEMTIER_CLIENTS: 5
+  CLIENT_COUNT: 1
+  MEMTIER_TEST_TIME: 300
+  MEMTIER_DATA_SIZE: 100
+  MEMTIER_KEY_MAXIMUM: 10000000
+  REDIS_PERSISTENCE_POLICY: false
+  MEMTIER_RATIO: "1:4"

@@ -9,8 +9,8 @@ DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
 
 clouds="$(
     for x in $TERRAFORM_SUT $PACKER_SUT; do 
-        [ -r "$DIR/terraform-config.$x.tf" ] && grep -E '^\s*csp\s*=' "$DIR"/terraform-config.$x.tf
-    done | awk -F'"' '{a[$2]=1}END{for(x in a)print x}'
+        [ -r "$DIR/terraform-config.$x.tf" ] && ( grep -m1 -E '^\s*csp\s*=' "$DIR"/terraform-config.$x.tf || echo '"static"' ) | cut -f2 -d'"'
+    done
 )"
 
 FIND_OPTIONS="-name Dockerfile.*.terraform"

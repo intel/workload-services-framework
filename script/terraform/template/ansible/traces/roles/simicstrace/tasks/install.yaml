@@ -1,0 +1,15 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: "Install simicstrace on {{ trace_node.1 }}"
+    file:
+      path: /tmp/simicstrace
+      state: touch 
+  
+  delegate_to: "{{ trace_node.1 }}"
+  

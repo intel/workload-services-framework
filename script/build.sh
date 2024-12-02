@@ -19,15 +19,15 @@ parse_dockerfile_ingredients () {
     while IFS= read line; do
         case "$line" in
         "ARG "*_VER=*|"ARG "*_VERSION=*|"ARG "*_REPO=*|"ARG "*_REPOSITORY=*|"ARG "*_IMAGE=*|"ARG "*_PACKAGE=*|"ARG "*_IMG=*|"ARG "*_PKG=*)
-            local var="$(echo "${line/ARG /}" | tr -d '" ' | cut -f1 -d=)"
-            local value="$(echo "${line/ARG /}" | tr -d '" ' | cut -f2- -d= | cut -f1 -d'#')"
+            local var="$(echo "${line/ARG /}" | tr -d "'"'" ' | cut -f1 -d=)"
+            local value="$(echo "${line/ARG /}" | tr -d "'"'" ' | cut -f2- -d= | cut -f1 -d'#')"
             eval "local $var=\"$value\""
             eval "local value=\"$value\""
             echo "$1${var^^}=$value"
             ;;
         "ARG "*=*)
-            local var="$(echo "${line/ARG /}" | tr -d '" ' | cut -f1 -d=)"
-            local value="$(echo "${line/ARG /}" | tr -d '" ' | cut -f2- -d= | cut -f1 -d'#')"
+            local var="$(echo "${line/ARG /}" | tr -d "'"'" ' | cut -f1 -d=)"
+            local value="$(echo "${line/ARG /}" | tr -d "'"'" ' | cut -f2- -d= | cut -f1 -d'#')"
             eval "local $var=\"$value\""
             ;;
         esac
@@ -39,7 +39,7 @@ parse_ansible_ingredients () {
         while IFS= read line; do
             case "$line" in
             *_ver:*|*_VER:*|*_version:*|*_VERSION:*|*_repo:*|*_REPO:*|*_repository:*|*_REPOSITORY:*|*_pkg:*|*_PKG:*|*_package:*|*_PACKAGE:*|*_image:*|*_IMAGE:*)
-                local var="$(echo "$line" | cut -f1 -d:)"
+                local var="$(echo "$line" | cut -f1 -d: | tr -d '"'"' ")"
                 local value="$(echo "$line" | sed 's/[^:]*:\s*\(.*[^ ]\)\s*$/\1/' | sed 's/{{ *\([^ }]*\) *}}/${\1}/g' | tr -d '"'"' " | cut -f1 -d'#')"
                 eval "local $var=\"$value\""
                 eval "local value=\"$value\""
@@ -51,23 +51,24 @@ parse_ansible_ingredients () {
 }
 
 build_commits () {
+    local commit_id="$(flock /dev/urandom cat /dev/urandom | tr -dc '0-9a-f' | head -c 40)"
     if git --version > /dev/null 2>&1; then
-        commit_id="$(GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo git log -1 2> /dev/null | head -n1 | cut -f2 -d' ' || echo -n "")"
-        if [ -n "$commit_id" ]; then
-            echo "--label BUILD_COMMIT_ID=$commit_id"
+        commit_id="$(cd "$PROJECTROOT"; GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo flock .git git rev-parse HEAD 2> /dev/null || true)"
+        local branch_id=""
+        local show_ref="$(cd "$PROJECTROOT";GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo flock .git git show-ref 2> /dev/null | grep -F "$commit_id" || true)"
+        if [[ "$RELEASE" = :v* ]]; then
+            branch_id="$(echo "$show_ref" | grep -m1 -E "refs/tags/${RELEASE#:}\$" | cut -f2- -d/)"
+            [ -n "$branch_id" ] || branch_id="$(echo "$show_ref" | grep -m1 -E "refs/remotes/.*/${RELEASE#:v}\$" | cut -f3- -d/)"
         fi
-        branch_id="refs/tags/${RELEASE#:}"
-        if [ -z "$(GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo git show-ref -s $branch_id 2> /dev/null || echo -n "")" ]; then
-            branch_id="$(GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo git show-ref 2> /dev/null | grep -F "$commit_id" | tail -n1 | cut -f2 -d' ' || echo -n "")"
-        fi
-        if [ -n "$branch_id" ]; then
-            echo "--label BUILD_BRANCH=${branch_id#refs/}"
-        fi
+        [ -n "$branch_id" ] || branch_id="$(echo "$show_ref" | grep -m1 -E "refs/tags/" | cut -f2- -d/)"
+        [ -n "$branch_id" ] || branch_id="$(echo "$show_ref" | grep -m1 -E "refs/remotes/" | cut -f3- -d/)"
+        [ -z "$branch_id" ] || echo "--label BUILD_BRANCH=$branch_id"
     fi
+    echo "--label BUILD_COMMIT_ID=$commit_id"
 }
 
 macro_replacement () {
-    (
+    (   
         cd "$SOURCEROOT/$1"
         for file1 in *.m4; do
             if [[ "$file1" != *"-config.yaml.m4" ]] && [ -e "$file1" ]; then
@@ -80,10 +81,91 @@ macro_replacement () {
             if [[ "$file1" != *"-config.yaml.j2" ]] && [ -e "$file1" ]; then
                 tmp="$(mktemp -p . "${file1%.j2}.tmpj2.XXXX")"
                 echo "$SOURCEROOT/$1/$tmp"
-                ansible all -i "localhost," -c local -m template -a "src=\"$file1\" dest=\"$tmp\"" -e PLATFORM=$PLATFORM -e IMAGEARCH=$IMAGEARCH -e IMAGESUFFIX=$IMAGESUFFIX -e $2="$3" -e REGISTRY=$REGISTRY -e BACKEND=$BACKEND -e RELEASE=$RELEASE $J2_OPTIONS > /dev/null
+                ansible all -i "localhost," -c local -m template -a "src=\"$file1\" dest=\"$tmp\"" -e PLATFORM=$PLATFORM -e IMAGEARCH=$IMAGEARCH -e IMAGESUFFIX=$IMAGESUFFIX -e $2="$3" -e REGISTRY=$REGISTRY -e BACKEND=$BACKEND -e RELEASE=$RELEASE $J2_OPTIONS -o 1>&2
             fi
         done
     )
+}
+
+# ingredient.yaml dockerfile
+upgrade_ingredients () {
+    p=1
+    s=0
+    c=1
+    f=1
+    var=()
+    from=()
+    to=()
+
+    while IFS= read line; do
+        if [ "${line// /}" = "---" ]; then
+            [ $p -eq 1 ] && [ $s -eq 1 ] && [ $c -eq 1 ] && [ $f -eq 1 ] && \
+            [ ${#var[@]} -eq ${#from[@]} ] && [ ${#from[@]} -eq ${#to[@]} ] && [ ${#to[@]} -gt 0 ] && break
+
+            p=1
+            s=0
+            c=1
+            f=1
+            var=()
+            from=()
+            to=()
+        elif [[ "${line// /}" != "#"* ]] && [ -n "${line// /}" ]; then
+            k="$(echo "$line" | cut -f1 -d: | sed -e 's|^ *||' -e 's| *$||' | tr -d "\"'")"
+            v="$(echo "$line" | cut -f2- -d: | sed -e 's|^ *||' -e 's| *$||')"
+
+            if [[ "$v" = "'"* ]]; then
+                v="${v#"'"}"
+                v="${v%"'"}"
+            elif [[ "$v" = '"'* ]]; then
+                v="${v#'"'}"
+                v="${v%'"'}"
+            fi
+            case "$k" in
+            PLATFORM)
+                [ "$v" = "$PLATFORM" ] || p=0
+                ;;
+            SOURCEROOT)
+                [ "$v" = "${SOURCEROOT#"$PROJECTROOT/"}" ] && s=1
+                ;;
+            WORKLOAD)
+                [ "$v" = "$WORKLOAD" ] || c=0
+                ;;
+            STACK)
+                [ "$v" = "$STACK" ] || c=0
+                ;;
+            DOCKERFILE)
+                [ "$2" = "./$v" ] || [[ "$2" = "./$v.tmp"* ]] || f=0
+                ;;
+            FROM)
+                from+=($v)
+                ;;
+            TO)
+                to+=($v)
+                ;;
+            *)
+                [ -n "$k" ] && var+=($k)
+                ;;
+            esac
+        fi
+    done < <(echo "---"; cat "$1"; echo "---")
+
+    if [ $p -eq 1 ] && [ $s -eq 1 ] && [ $c -eq 1 ] && [ $f -eq 1 ] && \
+       [ ${#var[@]} -eq ${#from[@]} ] && [ ${#from[@]} -eq ${#to[@]} ] && [ ${#to[@]} -gt 0 ]; then
+
+        while IFS= read line; do
+            if [[ "${line// /}" = ARG*=* ]]; then
+                local k="$(echo "$line" | sed 's/^ *ARG *\([^ =]*\).*$/\1/')"
+                local v="$(echo "$line" | sed -e 's/^[^=]*= *\(.*\)$/\1/' -e 's/ *$//')"
+                for i in $(seq 0 $(( ${#var[@]} - 1 ))); do
+                    [ "$k" = "${var[$i]}" ] && [ "$v" = "${from[$i]}" ] && line="ARG $k=${to[$i]}"
+                done
+            fi
+            echo "$line"
+        done < <(cat "$2"; echo)
+
+    else
+        cat "$2"
+    fi
 }
 
 # overwrite SOURCEROOT for image and stack
@@ -98,7 +180,11 @@ fi
 if [ ${#BUILD_FILES[@]} -gt 0 ]; then
     options=""
     for file1 in ${BUILD_FILES[@]}; do
-        options="$options-name ${file1//*\/} -o "
+        if [[ "$file1" = */* ]]; then
+            options="$options-path ${file1} -o "
+        else
+            options="$options-name ${file1} -o "
+        fi
     done
     FIND_OPTIONS="$FIND_OPTIONS ( ${options% -o } )"
 fi
@@ -113,6 +199,8 @@ FIND_OPTIONS="$(echo "x$FIND_OPTIONS" | sed -e 's/^x//' -e 's/\([(*?)]\)/\\\1/g'
 
     # template substitution
     tmp_files=()
+    trap 'rm -f "${tmp_files[@]}";exit 0' SIGTERM SIGINT SIGKILL ERR EXIT
+
     if [[ "$SOURCEROOT" = "$PROJECTROOT"/workload/* ]]; then
         for bc in "${BUILD_CONTEXT[@]}"; do
             tmp_files+=($(macro_replacement "$bc" WORKLOAD $WORKLOAD))
@@ -132,48 +220,88 @@ FIND_OPTIONS="$(echo "x$FIND_OPTIONS" | sed -e 's/^x//' -e 's/\([(*?)]\)/\\\1/g'
         [[ "$SOURCEROOT" = *"/stack/"* ]] && echo "# ${SOURCEROOT/*\/stack/stack}"
         [[ "$SOURCEROOT" = *"/image/"* ]] && echo "# ${SOURCEROOT/*\/image/image}"
     
-        parse_ansible_ingredients < <(eval "find \"$SOURCEROOT/template/ansible\" \\( -path \"*/defaults/*.yaml\" -o -path \"*/defaults/*.yml\" \\) $FIND_OPTIONS -print" 2> /dev/null)
+        parse_ansible_ingredients < <(eval "find \"$SOURCEROOT/template/ansible\" \\( -path \"*/defaults/*.yaml\" -o -path \"*/defaults/*.yml\" -o -path \"*/defaults/*/*.yaml\" -o -path \"*/defaults/*/*.yml\" \\) $FIND_OPTIONS \\( -name \"*.yaml\" -o -name \"*.yml\" \\) -print" 2> /dev/null)
     fi
     
-    if [[ "$@" != *"--read-only-registry"* ]]; then
-        build_options=($(compgen -e | sed -nE '/_(proxy|PROXY)$/{s/^/--build-arg /;p}') --build-arg RELEASE=$RELEASE --build-arg IMAGESUFFIX=$IMAGESUFFIX --build-arg BUILDKIT_INLINE_CACHE=1)
+    build_options=(
+        $(compgen -e | sed -nE '/_(proxy|PROXY)$/{s/^/--build-arg /;p}')
+        --platform $IMAGEARCH
+        --build-arg RELEASE=$RELEASE
+        --build-arg IMAGESUFFIX=$IMAGESUFFIX
+        --label BUILD_ID=$(flock /dev/urandom cat /dev/urandom | tr -dc '0-9a-f' | head -c 64)
+        $(build_commits)
+    )
+
+    if [[ "$@" != *"--export-dockerfile"* ]]; then
+        build_options+=(--build-arg BUILDKIT_INLINE_CACHE=1)
+    fi
     
-        if [ "$IMAGEARCH" != "linux/amd64" ]; then
-            build_options+=(--platform $IMAGEARCH)
-        fi
-    
+    if [[ "$@" != *"--export-dockerfile"* ]]; then
         if [ -r "$HOME/.netrc" ]; then
             build_options+=(--secret id=.netrc,src=$HOME/.netrc)
         elif [ -r "/root/.netrc" ]; then
             build_options+=(--secret id=.netrc,src=/root/.netrc)
         fi
-    
-        for dc in "${BUILD_CONTEXT[@]}"; do (
-            cd "$SOURCEROOT/$dc"
-            for pat in '.9.*' '.8.*' '.7.*' '.6.*' '.5.*' '.4.*' '.3.*' '.2.*' '.1.*' '.tmpj2.*' '.tmpm4.*' ''; do
-                for dockerfile in $(eval "find . -maxdepth 1 -name \"Dockerfile$pat\" ! -name \"*.m4\" ! -name \"*.j2\" $FIND_OPTIONS -print" 2>/dev/null); do
-                    image="$(head -n 2 "$dockerfile" | grep -E '^#+ ' | tail -n 1 | cut -d' ' -f2)$IMAGESUFFIX"
-                    header=$(head -n 2 "$dockerfile" | grep -E '^#+ ' | tail -n 1 | cut -d' ' -f1)
-                    IMAGE="$REGISTRY$image$RELEASE"
-                    if [[ "$@" = *"--bom"* ]]; then
-                        echo "$header image: $IMAGE"
-                        parse_dockerfile_ingredients "ARG " < "$dockerfile"
-                    else
-                        ingredients="$(parse_dockerfile_ingredients "ARG_" < "$dockerfile" | sed "s|^\(.*\)$|--label \1|")"
-                        DOCKER_BUILDKIT=1 docker build $BUILD_OPTIONS ${build_options[@]} $([ -n "$DOCKER_CACHE_REGISTRY" ] && [ -n "$DOCKER_CACHE_REGISTRY_CACHE_TAG" ] && echo --cache-from $DOCKER_CACHE_REGISTRY/$image:$DOCKER_CACHE_REGISTRY_CACHE_TAG) -t $image -t $image$RELEASE $([ -n "$REGISTRY" ] && [ "$header" = "#" ] && echo -t $IMAGE) $ingredients $(build_commits) -f "$dockerfile" .
-    
-                        # if REGISTRY is specified, push image to the private registry
-                        if [ -n "$REGISTRY" ] && [ "$header" = "#" ]; then
-                            [ "$BACKEND" = "atscale" ] && . "$PROJECTROOT/script/atscale/build.sh"
-                            docker_push $IMAGE
-                        fi
-                    fi
-                done
-            done
-        ); done
     fi
     
-    # delete tmp files
-    rm -f "${tmp_files[@]}"
+    for dc in "${BUILD_CONTEXT[@]}"; do
+        pushd "$SOURCEROOT/$dc" > /dev/null
+        for pat in '.9.*' '.8.*' '.7.*' '.6.*' '.5.*' '.4.*' '.3.*' '.2.*' '.1.*' '.tmpj2.*' '.tmpm4.*' ''; do
+            for dockerfile in $(eval "find . -maxdepth 1 -name \"Dockerfile$pat\" ! -name \"*.m4\" ! -name \"*.j2\" $FIND_OPTIONS -name \"Dockerfile*\" -print" 2>/dev/null); do
+                image="$(head -n 2 "$dockerfile" | grep -E '^#+ ' | tail -n 1 | cut -d' ' -f2)$IMAGESUFFIX"
+                header=$(head -n 2 "$dockerfile" | grep -E '^#+ ' | tail -n 1 | cut -d' ' -f1)
+                IMAGE="$REGISTRY$image$RELEASE"
+
+                if [[ "$@" = *"--upgrade-ingredients="* ]]; then
+                    ingredients_yaml="$(echo "x$@" | sed -e 's/.*--upgrade-ingredients=//' -e 's/ .*//')"
+                    if [ -r "$ingredients_yaml" ]; then
+                        tmp="$(mktemp -p . "$dockerfile.tmp.XXXX")"
+                        tmp_files+=("$SOURCEROOT/$dc/$tmp")
+                        upgrade_ingredients "$ingredients_yaml" "$dockerfile" > "$tmp"
+                        dockerfile="$tmp"
+                    fi
+                fi
+
+                if [[ "$@" = *"--bom"* ]]; then
+                    echo "$header image: $IMAGE"
+                    parse_dockerfile_ingredients "ARG " < "$dockerfile"
+                elif [[ "$@" != *"--read-only-registry"* ]]; then
+                    if [[ "$@" = *"--export-dockerfile"* ]]; then
+                        dist_docker_file="$PROJECTROOT/dist/dockerfile/dockerfile.$PLATFORM.$image"
+                        mkdir -p "$(dirname "$dist_docker_file")"
+                        sed -n '1,/^[^# ]/{/^[# ]/{p};/^[^# ]/{q}}' "$dockerfile" > "$dist_docker_file"
+                        echo "#" >> "$dist_docker_file"
+                        eval "echo \"# DOCKER_BUILDKIT=1 docker build $BUILD_OPTIONS "${build_options[@]}" -t $image -t $image$RELEASE $([ -n "$REGISTRY" ] && [ "$header" = "#" ] && echo -t $IMAGE) -f ${dist_docker_file#"$PROJECTROOT/"} ${SOURCEROOT#"$PROJECTROOT/"}/$dc\"" >> "$dist_docker_file"
+                        echo "#" >> "$dist_docker_file"
+                        sed -n '/^[^# ]/,${p}' "$dockerfile" >> "$dist_docker_file"
+                    else
+                        this_build_options=(
+                            $(parse_dockerfile_ingredients "ARG_" < "$dockerfile" | sed "s|^\(.*\)$|--label \1|")
+                            -t $image
+                            -t $image$RELEASE 
+                        )
+                        if [ -n "$REGISTRY" ] && [ "$header" = "#" ]; then
+                            this_build_options+=(-t $IMAGE)
+                        fi
+                        if [ -n "$DOCKER_CACHE_REGISTRY" ] && [ -n "$DOCKER_CACHE_REGISTRY_CACHE_TAG" ]; then
+                            this_build_options+=(
+                                --cache-from ${DOCKER_CACHE_REGISTRY%/}/$image:${DOCKER_CACHE_REGISTRY_CACHE_TAG#:}
+                            )
+                        fi
+                        DOCKER_BUILDKIT=1 docker build $BUILD_OPTIONS "${build_options[@]}" "${this_build_options[@]}" -f "$dockerfile" . & 
+                        wait
+                    fi
+
+                    # if REGISTRY is specified, push image to the private registry
+                    if [ -n "$REGISTRY" ] && [ "$header" = "#" ]; then
+                        [ "$BACKEND" = "atscale" ] && . "$PROJECTROOT/script/atscale/build.sh"
+                        docker_push $IMAGE &
+                        wait
+                    fi
+                fi
+            done
+        done
+        popd > /dev/null
+    done
 ) 9< "$SOURCEROOT/build.sh"
 

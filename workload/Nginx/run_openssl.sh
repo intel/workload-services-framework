@@ -9,6 +9,10 @@ openssl version
 NODE=${NODE:-2}
 MODE=${MODE:-https}
 NGINX_HOST=${NGINX_SERVICE_NAME:-nginx-server-service}
+if [[ $EXEC_METHOD == "docker" ]]; then
+  NGINX_HOST=$WORKER_0_HOST
+fi
+echo $NGINX_HOST
 PORT=${PORT:-443}
 NGINX_WORKERS=${NGINX_WORKERS:-4}
 CLIENT_CPU_LISTS=${CLIENT_CPU_LISTS:-0} 
@@ -31,6 +35,21 @@ fi
 clients=${OPENSSL_CLIENTS:-$default_clients_num}
 _time=${TEST_TIME:-60}
 cipher=${CIPHER:-AES128-GCM-SHA256}
+
+function get_client_address() {
+  local client_num=$1
+  if [[ $client_num -le 0 ]]; then
+    echo "Invalid client num = $client_num"
+    exit 3;
+  fi
+  let "port=1001-$client_num"
+  if [[ $EXEC_METHOD == "docker" ]]; then
+    addr="CLIENT_$(( client_num - 1 ))_HOST"
+    echo "${!addr}:$port"
+    return
+  fi
+  echo "client${client_num}-service:${port}"
+}
 
 # client wait nginx server ready
 wget_cur_wait_loop=0
@@ -87,6 +106,50 @@ fi
 
 if [ $NODE == 1 ]; then
   NGINX_HOST="127.0.0.1"
+fi
+
+if [ $NODE -ge 3 ]; then
+  LOCAL_TEST_RESULT="OK"
+  echo $LOCAL_TEST_RESULT > /var/www/html/client${CLIENT_ID}_cps_ok.txt
+
+  if [ $CLIENT_ID -ge 2 ]; then
+    sed -i "s|listen 80|listen ${SERVICE_PORT}|" /usr/local/share/nginx/conf/nginx-http-with-upload.conf
+    nginx -c /usr/local/share/nginx/conf/nginx-http-with-upload.conf
+  fi
+
+  if [ $CLIENT_ID == 1 ]; then
+    for (( i=2 ; i<$NODE ; i++ )); 
+    do
+      wget_client_wait_loop=0
+      while [ ! -f "client${i}_cps_ok.txt" ] ;
+      do
+        wget_client_wait_loop=$(( $wget_client_wait_loop + 1 ))
+        if (( wget_client_wait_loop > 2000 )); then
+          echo client${CLIENT_ID} wait for client${i} timeout;
+          exit 3;
+        fi
+        echo client${CLIENT_ID} waiting client${i} ....
+        sleep 5;
+	      #let "port=1001-$i"
+        #timeout -s 9 20s wget http://client${i}-service:${port}/client${i}_cps_ok.txt
+        client_addr=$(get_client_address $i)
+        timeout -s 9 20s wget http://$client_addr/client${i}_cps_ok.txt
+      done
+    done
+    for (( i=2 ; i<$NODE ; i++ )); 
+    do  
+      #let "port=1001-$i"
+      #curl http://client${i}-service:${port}/client1_cps_ok.txt --upload-file /var/www/html/client1_cps_ok.txt
+      client_addr=$(get_client_address $i)
+      curl http://$client_addr/client1_cps_ok.txt --upload-file /var/www/html/client1_cps_ok.txt
+    done
+  else
+    while [ ! -s /var/www/html/client1_cps_ok.txt ]; do
+      echo client node ${CLIENT_ID} wait for other client to be ready ...
+      sleep 1;
+    done
+  fi
+  
 fi
 
 #cmd1 is the first part of the commandline and cmd2 is the second partrt
@@ -168,11 +231,11 @@ total=$(cat ./.test_$(($PORT))* | awk '(/^[0-9]* connections in [0-9]* real/){ t
 echo $total >> .test_sum
 sumTotal=$(cat .test_sum | awk '{total += $1 } END { print total }')
 
-printf "HTTPS($cipher)_Nginx_core_number:  $NGINX_WORKERS\n"
-printf "OpenSSL_test_client_number:  $clients\n"
-printf "Seconds_to_start_clients:    %d\n" $(($waitstarttime - $starttime))
-printf "OpenSSL_s_time_test_period:  $_time\n"
-printf "Connections_per_second:      $sumTotal\n"
+printf "Client${CLIENT_ID}_HTTPS($cipher)_Nginx_core_number:  $NGINX_WORKERS\n"
+printf "Client${CLIENT_ID}_OpenSSL_test_client_number:  $clients\n"
+printf "Client${CLIENT_ID}_Seconds_to_start_clients:    %d\n" $(($waitstarttime - $starttime))
+printf "Client${CLIENT_ID}_OpenSSL_s_time_test_period:  $_time\n"
+printf "Client${CLIENT_ID}_Connections_per_second:      $sumTotal\n"
 
 rm -f ./.test_*
 

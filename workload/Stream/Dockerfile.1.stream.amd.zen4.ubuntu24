@@ -1,0 +1,43 @@
+# stream-amd-zen4-ubuntu24
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+ARG RELEASE
+
+FROM stream-repo-ubuntu24${RELEASE} as repo
+FROM ${OS_IMAGE}:${OS_VER}
+
+RUN apt update && \
+    apt install -y --no-install-recommends pkg-config wget bc build-essential && \
+    apt clean && rm -rf /var/lib/apt/lists/*
+
+
+# This binary was built with AVX512 support, and will only run properly on
+# systems that support AVX512 instructions. (ie, Zen4 and later.)  It will
+# NOT run on older systems (Zen3 and earlier)
+ARG AMD_PRE_BUILT_COMPILER_VER=amd-zen-stream-2022_11
+ARG AMD_PRE_BUILT_COMPILER_REPO=https://download.amd.com/developer/eula/pre-built/stream/${AMD_PRE_BUILT_COMPILER_VER}.tar.gz
+
+ARG STREAM_INSTALL_DIR=/opt/stream
+WORKDIR ${STREAM_INSTALL_DIR}
+
+# AOCC Compiler Repo
+RUN wget --no-check-certificate https://download.amd.com/developer/eula/pre-built/stream/amd-zen-stream-2022_11.tar.gz && \
+    tar xzvf ${STREAM_INSTALL_DIR}/amd-zen-stream-2022_11.tar.gz amd-zen-stream-2022_11/amd_zen_stream amd-zen-stream-2022_11/libomp.so --strip-components=1
+
+# STREAM repo
+COPY --from=repo /opt/stream_repo/ ${STREAM_INSTALL_DIR}/
+COPY run_stream_amd_zen4.sh ${STREAM_INSTALL_DIR}/
+
+ENV LD_LIBRARY_PATH=${STREAM_INSTALL_DIR}/:$LD_LIBRARY_PATH
+
+# run stream
+RUN mkfifo /export-logs
+CMD (./run_stream_amd_zen4.sh;echo $? > status) 2>&1 | tee output.logs && \
+      tar cf /export-logs status output.logs && \
+      sleep infinity

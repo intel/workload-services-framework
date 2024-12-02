@@ -1,0 +1,36 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Create collectd.conf
+  template:
+    src: collectd.conf.j2
+    dest: "{{ trace_script_local_path }}/collectd.conf"
+  delegate_to: localhost
+  become: false
+
+- name: Stop collectd
+  service:
+    name: collectd
+    enabled: no
+    state: stopped
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: true
+  no_log: true
+
+- set_fact:
+    trace_module_start_block: |
+        mkdir -p csv conf
+        cd conf
+        nohup {{ collectd_bin_path }} -C {{ trace_script_path }}/collectd.conf -f > collectd.logs 2>&1 &
+        echo $! > collectd.pid
+        disown
+    trace_module_stop_block: |
+        cp -f TRACE_STOP TRACE_START conf
+        cd conf
+        kill $(cat collectd.pid)
+        tail -f --pid $(cat collectd.pid) /dev/null
+

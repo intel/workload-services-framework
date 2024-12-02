@@ -4,12 +4,19 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- hosts: localhost
-  connection: local
+- hosts: reg_host
   gather_facts: no
   become: true
   tasks:
     
+    - name: remove legacy Kubernetes entries
+      include_role:
+        name: legacy-repo
+
+    - name: check for essentials
+      include_role:
+        name: check
+
     - name: Create Certificate
       include_role:
         name: dev-cert
@@ -21,7 +28,7 @@
         tasks_from: install
 
 
-- hosts: cluster_hosts 
+- hosts: cluster_hosts
   gather_facts: no
   become: true
   tasks:
@@ -32,12 +39,29 @@
         tasks_from: install
 
 
-- hosts: localhost
-  connection: local
+- hosts: dev_host
+  gather_facts: no
+  become: true
+  tasks:
+
+    - name: Copy the dev-cert to remote
+      include_role:
+        name: dev-cert
+        tasks_from: install
+      when: (hostvars['reg_host'].ansible_connection != 'local')
+
+
+- hosts: reg_host
   gather_facts: no
   become: true
   tasks:
     
+    - name: Install docker
+      include_role:
+        name: docker
+      vars:
+        wl_namespace: install-docker
+
     - name: Install docker registry
       include_role:
         name: dev-cert

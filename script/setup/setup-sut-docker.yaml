@@ -4,32 +4,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- hosts: workload_hosts
-  any_errors_fatal: true
-  gather_facts: no
-  tasks:
-
-    - name: check for essentials
-      include_role:
-        name: check
-
 - import_playbook: ../terraform/template/ansible/docker/installation.yaml
   vars:
     wl_enable_reboot: true
     wl_trace_modules: ''
     wl_namespace: "install-docker"
     k8s_node_labels: []
-
-- hosts: workload_hosts
-  become: yes
-  any_errors_fatal: true
-  gather_facts: no
-  tasks:
-
-  - name: Intall Intel Certificate
-    include_role:
-      name: intel-ca
-    when:
-    - install_intelca | bool
-    - (playbook_dir + '/roles/intel-ca') is exists
 

@@ -37,7 +37,7 @@
               rescue:
 
                 - name: wait for ROI to start (unreachable host 5th attempt)
-                  include_tasks:
+                  include_tasks: 
                     file: "trace-start{{ win_suffix }}.yaml"
 
                   when: (sut_unreachable_retries|int) >= 4

@@ -4,10 +4,34 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: Remove trace script
-  file:
-    path: /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-{{ item }}
-    state: absent
-  loop:
-  - start-trace.sh
-  - stop-trace.sh
+- block:
+
+  - name: Remove trace files on VM instances
+    file:
+      path: "{{ trace_tmp_path }}/{{ wl_namespace }}-{{ inventory_hostname }}-{{ item }}"
+      state: absent
+    loop:
+    - trace
+    - waitproc.status
+
+  when:
+  - vmhost_host is not defined
+  - (wl_trace_modules | split(',') | reject('match','.*:host.*') | length) > 0
+  - ((csp | default('static')) in ['static'])
+
+- block:
+
+  - name: Remove trace files on VM Host
+    file:
+      path: "{{ trace_tmp_path }}/{{ wl_namespace }}-{{ vmhost_host }}-{{ item }}"
+      state: absent
+    loop:
+    - trace
+    - waitproc.status
+    delegate_to: "{{ vmhost_host }}"
+
+  when:
+  - vmhost_host is defined
+  - (wl_trace_modules | split(',') | select('match','.*:host.*') | length) > 0
+  - ((csp | default('static')) in ['kvm','hyperv','vsphere'])
+

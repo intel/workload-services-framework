@@ -1,0 +1,42 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Ensure data directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+  loop:
+    - "{{ SIEGE_WORKING_DIR }}"
+
+- name: Download Siege source
+  ansible.builtin.get_url:
+    url: "https://download.joedog.org/siege/siege-4.1.6.tar.gz"
+    dest: "{{ SIEGE_WORKING_DIR }}/siege.tar.gz"
+
+- name: Extract Siege source
+  ansible.builtin.unarchive:
+    src: "{{ SIEGE_WORKING_DIR }}/siege.tar.gz"
+    dest: "{{ SIEGE_WORKING_DIR }}"
+    remote_src: yes
+
+- name: Compile Siege
+  ansible.builtin.shell: 
+    cmd: "./configure --prefix={{ SIEGE_WORKING_DIR }} && make && make install"
+  args:
+    chdir: "{{ SIEGE_WORKING_DIR }}/siege-4.1.6"
+
+
+- name: install numpy
+  pip:
+    virtualenv: "{{ PYTHON_VENV_DIR }}"
+    name: numpy
+    state: present
+
+- name: Clone code from GitHub
+  ansible.builtin.git:
+    repo: https://github.com/facebookarchive/django-workload.git
+    dest: "{{ SIEGE_WORKING_DIR }}/siege_client"
+    version: v1.0rc1
+    force: yes

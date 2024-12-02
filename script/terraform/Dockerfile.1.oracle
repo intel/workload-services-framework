@@ -1,0 +1,29 @@
+# terraform-oracle
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+FROM terraform-csp-base${RELEASE}
+
+ARG OCICLI_VER=3.40.3
+ARG OCICLI_PKG=pip
+RUN apt-get update && apt-get install -y --no-install-recommends python3-pip pipx && \
+    PIPX_HOME=/opt/pipxhome PIPX_BIN_DIR=/usr/local/bin PIPX_MAN_DIR=/opt/pipxman pipx install --system-site-packages --include-deps --pip-args oci-cli==${OCICLI_VER} oci-cli && \
+    rm -rf /opt/pipxman && \
+    apt-get purge -y python3-pip pipx && \
+    apt-get autoremove -y && apt-get clean -y && \
+    rm -rf /var/lib/apt/lists/*
+
+# Add cleanup script
+RUN ln -s /opt/project/script/csp/opt/script/cleanup-oracle.sh /usr/local/bin/cleanup && \
+    ln -s /opt/project/script/csp/opt/script/cleanup-common.sh /usr/local/bin/cleanup-common.sh
+
+# Preload terraform plugins
+RUN mkdir -p /usr/local/share/terraform/plugins; \
+    for dir in /opt/terraform/template/terraform/oracle/*; do \
+      (cd $dir; terraform providers mirror /usr/local/share/terraform/plugins) \
+    done
+

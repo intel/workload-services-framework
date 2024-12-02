@@ -1,0 +1,36 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Create the svrinfo directory
+  file:
+    path: "{{ wl_logs_dir }}/{{ inventory_hostname }}-sutinfo"
+    state: directory
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: get host information
+  setup:
+
+- name: get NUMA information
+  win_shell: |
+    @(Get-CimInstance Win32_PerfFormattedData_PerfOS_NUMANodeMemory | FindStr "^Name " | FindStr -v _Total).count
+  register: numainfo
+
+- name: get memory information
+  win_shell: |
+    Get-WmiObject Win32_PhysicalMemory
+  register: meminfo
+
+- name: Generate svrinfo json
+  template:
+    src: perfspect.json.j2
+    dest: "{{ wl_logs_dir }}/{{ inventory_hostname }}-sutinfo/{{ private_ip | default(ansible_host) }}.json"
+  delegate_to: localhost
+  ignore_errors: true
+  vars:
+    mem_spec: "{% for c in (meminfo.stdout_lines | select('match','^Capacity *:.*') | map('split',':') | map('last') | map('trim') | map('int')) %}{{ (c / (1024*1024)) | int }}MB {% endfor %}"
+    mem_spec_list: "{{ mem_spec | split(' ') | reject('==','') }}"
+

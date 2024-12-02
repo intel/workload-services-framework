@@ -4,17 +4,29 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+- fail:
+    msg: "The native module only supports a single SUT."
+  when: groups.workload_hosts | length > 1
+
 - name: check sudo permission
   fail:
     msg: "sudo is required for --native execution on the SUT."
   when: not (sut_sudo | default(true) | bool)
 
+- set_fact:
+    docker_config1: "{{ inventory_hostname | extract(lookup('file',wl_logs_dir+'/docker-config.yaml') | from_yaml) }}"
+
+- name: test if single container
+  fail:
+    msg: "multiple container workloads on the same SUT is not supported"
+  when: docker_config1 | length != 1
+        
 - name: set workspace
   set_fact:
     workspace: "/tmp/{{ wl_namespace }}-workspace"
 
 - name: get proxy strings
-  shell:
+  shell: 
     cmd: |
       for k in $(compgen -e | grep -iE '_proxy$'); do
         eval 'v=$'$k
@@ -25,8 +37,8 @@
 
 - name: get data disks
   find:
-    path: "/mnt"
-    patterns: 'disk?'
+    path: "{{ item.path }}"
+    patterns: '{{ item.patterns }}'
     file_type: directory
     recurse: false
   register: disks
@@ -52,7 +64,7 @@
 
     - name: invoke docker create
       shell:
-        cmd: "docker create {{ (wl_registry_map == ',') | ternary('','--pull always') }} {{ workload_config.docker_options }} {{ workload_config.docker_image }}"
+        cmd: "docker create {{ (wl_registry_map == ',') | ternary('','--pull always') }} --platform={{ workload_config.image_arch }} {% if (docker_config1[0].options|type_debug)=='list' %}{{ docker_config1[0].options|map('string')|join(' ') }}{% else %}{{ docker_config1[0].options|default('',true)|string }}{% endif %} {% if (docker_config1[0].options|type_debug)=='list' %}{% if docker_config1[0].image not in (docker_config1[0].options|map('string')) %}{{ docker_config1[0].image }}{% endif %}{% else %}{% if docker_config1[0].image not in (docker_config1[0].options|default('',true)|split(' ')) %}{{ docker_config1[0].image }}{% endif %}{% endif %} {% if docker_config1[0].command is defined %} {{ docker_config1[0].command }} {% endif %}"
         executable: /bin/bash
       register: container_id
       delegate_to: localhost
@@ -63,15 +75,11 @@
       register: container_info
       delegate_to: localhost
       become: true
+      no_log: true
 
-    - name: record timing
-      shell:
-        cmd: |
-          echo "image_transfer_itr{{ itr }}_start: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
-        executable: /bin/bash
-      delegate_to: localhost
-      async: 30
-      poll: 0
+    - include_role:
+        name: timing
+        tasks_from: start-image-transfer
 
     - name: copy the workload file system
       shell:
@@ -80,14 +88,9 @@
         executable: /bin/bash
       delegate_to: localhost
 
-    - name: record timing
-      shell:
-        cmd: |
-          echo "image_transfer_itr{{ itr }}_end: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
-        executable: /bin/bash
-      delegate_to: localhost
-      async: 30
-      poll: 0
+    - include_role:
+        name: timing
+        tasks_from: stop-image-transfer
 
   always:
 
@@ -105,13 +108,17 @@
 - name: workload execution procedure
   block:
 
-    - name: mount /proc, /sys, /dev
+    - name: mount /proc, /sys, /dev, /etc/localtime
       shell: |
         mount -t proc /proc {{ workspace }}/proc
         mount --rbind /sys {{ workspace }}/sys
         mount --make-rslave {{ workspace }}/sys
         mount --rbind /dev {{ workspace }}/dev
         mount --make-rslave {{ workspace }}/dev
+        if [ ! -d {{ workspace }}/usr/share/zoneinfo ]; then
+          touch {{ workspace }}/etc/localtime
+          mount --bind /etc/localtime {{ workspace }}/etc/localtime
+        fi
       become: true
 
     - name: mount disks
@@ -121,34 +128,45 @@
       loop: "{{ disks | json_query('results[*].files') | flatten }}"
       become: true
 
-    - name: record timing
-      shell:
-        cmd: |
-          echo "workload_itr{{ itr }}_start: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
-        executable: /bin/bash
-      delegate_to: localhost
-      async: 30
-      poll: 0
+    - include_role:
+        name: timing
+        tasks_from: start-iteration
 
     - name: create startup script
       copy:
         content: |
+          export TZ=$1
+          shift
+          [ -d /usr/share/zoneinfo ] && ln -sf /usr/share/zoneinfo/$TZ /etc/localtime
           cd {{ container_info.Config.WorkingDir | default('/',true) }}
-          {% for env1 in container_info.Config.Env %}export {{ env1 }}{{ nl }}{% endfor %}
+          {% for env1 in container_info.Config.Env %}
+            export '{{ env1 }}'
+          {% endfor %}
+          {% for k in workload_secrets.keys() %}
+            export {{ k }}='{{ workload_secrets[k] }}'
+          {% endfor %}
           {{ proxies.stdout }}
-          {% for cmd1 in container_info.Config.Cmd %}'{{ cmd1 | replace(sq,sq+dq+sq+dq+sq) | replace('-c', '-vxc') }}' {% endfor %}
+          {% if docker_config1[0].image in (docker_options|split(' ')) %}
+            {% for cmd1 in (container_info.Config.Entrypoint|default(['/bin/sh','-c'],true)) %}'{{ cmd1 | replace(sq,sq+dq+sq+dq+sq) }}' {% endfor %} {{ docker_options.split(' '+docker_config1[0].image+' ')[-1] }} {{ docker_config1[0].command | default('') }}
+          {% else %}
+            {% for cmd1 in container_info.Config.Cmd %}'{{ cmd1 | replace(sq,sq+dq+sq+dq+sq) | replace('-c', '-vxc') }}' {% endfor %} {{ docker_config1[0].command | default('') }}
+          {% endif %}
+        mode: 700
         dest: "{{ workspace }}/tmp/{{ wl_namespace }}-startup"
       become: true
+      environment: "{{ workload_secrets }}"
       vars:
+        workload_secrets: "{{ lookup('file',wl_logs_dir+'/.workload-secret.yaml') | from_yaml | default({},true) }}"
         sq: "'"
         dq: '"'
         nl: "\n"
+        docker_options: "{% if (docker_config1[0].options|type_debug)=='list' %}{{ docker_config1[0].options|map('string')|join(' ') }}{% else %}{{ docker_config1[0].options|default('',true)|string }}{% endif %}"
 
     - name: run the workload natively
       shell:
         executable: /bin/bash
         cmd: |
-          nohup timeout {{ workload_config.timeout | split(',') | first }}s chroot --userspec={{ container_info.Config.User | default('root',true) }} {{ workspace }} /bin/sh /tmp/{{ wl_namespace }}-startup > /tmp/{{ wl_namespace }}-logs 2>&1 &
+          nohup timeout {{ workload_config.timeout | split(',') | first }}s chroot --userspec={{ container_info.Config.User | default('root',true) }} {{ workspace }} /bin/sh /tmp/{{ wl_namespace }}-startup $(timedatectl show --va -p Timezone 2> /dev/null || echo $TZ) > /tmp/{{ wl_namespace }}-logs 2>&1 & 
           echo $!
           disown
       register: pid
@@ -169,17 +187,13 @@
       vars:
         trace_waitproc_pid: "{{ waitproc.stdout }}"
         trace_logs_scripts: ["cat /tmp/{{ wl_namespace }}-logs"]
+        trace_status_file: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-waitproc.status"
 
   always:
 
-    - name: record timing
-      shell:
-        cmd: |
-          echo "workload_itr{{ itr }}_end: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
-        executable: /bin/bash
-      delegate_to: localhost
-      async: 30
-      poll: 0
+    - include_role:
+        name: timing
+        tasks_from: stop-iteration
 
     - name: kill the worker process
       command: "kill {{ pid.stdout }}"
@@ -225,7 +239,7 @@
       path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ wl_namespace }}-logs.tar"
       state: absent
     delegate_to: localhost
-    ignore_errors: true
+    ignore_errors: true 
 
   ignore_errors: true
 
@@ -247,3 +261,4 @@
     name: cleanup
     tasks_from: cleanup-native
   when: ((itr |int) < (run_stage_iterations | default(1) | int)) or ('cleanup' not in (stage | default('cleanup')))
+

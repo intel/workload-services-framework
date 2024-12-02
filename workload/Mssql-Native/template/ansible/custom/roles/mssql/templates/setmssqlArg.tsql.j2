@@ -1,0 +1,54 @@
+sp_configure show_advanced_options,1
+go
+RECONFIGURE WITH OVERRIDE
+go
+sp_configure backup_compression,1
+go
+RECONFIGURE WITH OVERRIDE
+go
+sp_configure "default trace enabled",0
+go
+RECONFIGURE WITH OVERRIDE
+go
+sp_configure lightweight_pooling,1
+go
+RECONFIGURE WITH OVERRIDE
+go
+sp_configure max_degree_of_parallelism,1
+go
+RECONFIGURE WITH OVERRIDE
+go
+sp_configure max_serv, {{ wl_tunables.MAX_SERV }}
+go
+RECONFIGURE WITH OVERRIDE
+go
+sp_configure max_worker_threads,3000
+go
+RECONFIGURE WITH OVERRIDE
+go
+sp_configure priority_boost,1
+go
+RECONFIGURE WITH OVERRIDE
+go
+sp_configure recovery_interval,32767
+go
+RECONFIGURE WITH OVERRIDE
+go
+sp_configure remote_query_timeout,0
+go
+RECONFIGURE WITH OVERRIDE
+go
+sp_configure set_working_set_size,1
+go
+RECONFIGURE WITH OVERRIDE
+go
+sp_configure network_packet_size,8192
+go
+RECONFIGURE WITH OVERRIDE
+Go
+ 
+/* Re-sizing TempDB */
+USE [master];
+GO
+ALTER DATABASE tempdb MODIFY FILE (NAME='tempdev', SIZE=1GB, FILEGROWTH = 100);
+GO

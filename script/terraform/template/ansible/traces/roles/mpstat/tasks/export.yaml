@@ -1,0 +1,13 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: generate mpstat html page
+  template:
+    src: mpstat-charts.html.j2
+    dest: "{{ trace_data_path }}/roi-{{ roi_index }}.html"
+  vars:
+    mpstat_data: "{{ lookup('pipe', 'gawk -v time_spec=' + (roi[0] | quote) + ' -f ' + ((role_path + '/scripts/parse-mpstat.awk') | quote) + ' ' + ((trace_data_path + '/mpstat-' + (roi_index | string) + '.logs') | quote)) }}"
+  ignore_errors: true

@@ -1,0 +1,49 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Check distribution
+  set_fact:
+    ansible_pkg_mgr: "{{ 'apt' if ansible_os_family == 'Debian' else 'yum' }}"
+
+- name: Install prerequisites
+  package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - automake
+    - make
+    - gcc
+    - autoconf
+    - libtool
+    - openssl-devel
+    - zlib-devel
+    - openssl
+    - pcre-devel
+    - git
+    - wget
+    - curl
+    - bzip2-devel
+    - libffi-devel
+  when: ansible_pkg_mgr == 'yum'
+
+- name: Install prerequisites
+  package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - automake
+    - make
+    - gcc
+    - build-essential
+    - libssl-dev
+    - libbz2-dev
+    - libffi-dev
+    - zlib1g-dev
+    - openssl
+    - libpcre3-dev
+    - git
+    - wget
+    - curl
+  when: ansible_pkg_mgr == 'apt'

@@ -1,0 +1,14 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: "Remove trace files on {{ trace_host }}"
+  ansible.windows.win_file: 
+    path: "{{ trace_win_tmp_path }}\\{{ wl_namespace }}-{{ trace_host }}-trace"
+    state: absent
+  delegate_to: "{{ trace_host }}"
+  ignore_errors: true
+  become: false
+

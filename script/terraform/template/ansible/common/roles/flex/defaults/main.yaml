@@ -1,0 +1,12 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+flex_version: "2350"
+flex_repository: https://repositories.intel.com/gpu
+flex_device_ids: "56c0,56c1,4626"
+flex_driver_for: "common"
+flex_package_skip: "linux-modules-extra,intel-i915-dkms"
+

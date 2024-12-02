@@ -1,0 +1,80 @@
+# linpack-arm
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+
+FROM ${OS_IMAGE}:${OS_VER} as base
+
+SHELL ["/bin/bash", "-c"]
+ENV DEBIAN_FRONTEND noninteractive
+RUN apt-get update -y && \
+    apt-get install -y build-essential bc wget unzip gcc g++ gfortran gcc-12 g++-12 gfortran-12 make numactl environment-modules openssh-client
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 12 --slave /usr/bin/g++ g++ /usr/bin/g++-12 --slave /usr/bin/gfortran gfortran /usr/bin/gfortran-12
+RUN update-alternatives --config gcc
+
+ENV OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+
+ARG OPENMPI_PKG_VER="4.1.1"
+ARG OPENMPI_PKG="openmpi-${OPENMPI_PKG_VER}"
+ARG OPENMPI_PKG_REPO="https://download.open-mpi.org/release/open-mpi/v4.1/${OPENMPI_PKG}.tar.gz"
+ARG ARM_PERF_LIB_VER="23.10_Ubuntu-22.04"
+ARG ARM_PERF_LIB="arm-performance-libraries_${ARM_PERF_LIB_VER}"
+ARG ARM_PERF_LIB_REPO="https://developer.arm.com/-/media/Files/downloads/hpc/arm-performance-libraries/23-10/ubuntu-22/${ARM_PERF_LIB}_gcc-12.2.tar"
+ARG HPL_PKG_VER="2.3"
+ARG HPL_PKG="hpl-${HPL_PKG_VER}"
+ARG HPL_PKG_REPO="http://www.netlib.org/benchmark/hpl/${HPL_PKG}.tar.gz"
+ARG BUILD_ARCH=Linux_GCCARM_neoverse-n1
+
+ARG BENCHMARKS=/home/ubuntu/benchmarks
+RUN mkdir -p ${BENCHMARKS}
+WORKDIR ${BENCHMARKS}
+
+RUN wget ${OPENMPI_PKG_REPO} && \
+    wget ${ARM_PERF_LIB_REPO} && \
+    wget ${HPL_PKG_REPO}
+
+RUN tar xzf ${OPENMPI_PKG}.tar.gz && \
+    cd ${OPENMPI_PKG} && \
+    ./configure --prefix=/usr/local --enable-mpi-fortran && \
+    make -j && make install
+
+RUN tar xvf ${ARM_PERF_LIB}_gcc-12.2.tar && \
+    cd ${ARM_PERF_LIB} && \
+    ./${ARM_PERF_LIB}.sh --accept --install-to ${BENCHMARKS}/Linpack --force
+
+RUN tar xzf ${HPL_PKG}.tar.gz
+COPY arm/Make.${BUILD_ARCH} ${HPL_PKG}/Make.${BUILD_ARCH}
+
+RUN export MODULEPATH=/home/ubuntu/benchmarks/Linpack/modulefiles:$MODULEPATH && \
+    export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH && \
+    source /etc/profile.d/modules.sh && \
+    module use /home/ubuntu/benchmarks/Linpack/modulefiles && \
+    module load armpl/23.10.0_gcc-12.2 && \
+    cd ${HPL_PKG} && \
+    make arch=${BUILD_ARCH}
+
+RUN cd ${HPL_PKG}/bin && \
+    ln -s ${BUILD_ARCH} Linux_GCCARM_neoverse
+
+RUN rm -rf ${OPENMPI_PKG}.tar.gz ${ARM_PERF_LIB}_gcc-12.2.tar ${HPL_PKG}.tar.gz
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+COPY --from=base / /
+
+ARG BENCHMARKS=/home/ubuntu/benchmarks
+WORKDIR ${BENCHMARKS}
+ENV OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+
+COPY run_test_arm.sh run_test.sh
+
+RUN mkfifo /export-logs
+
+CMD  (bash run_test.sh; echo $? > status) 2>&1  | tee output.logs && \
+     tar cf /export-logs status output.logs && \
+     sleep infinity

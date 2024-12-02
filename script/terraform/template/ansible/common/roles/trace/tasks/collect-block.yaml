@@ -6,23 +6,59 @@
 
 - block:
 
-    - name: collect Linux trace data
-      include_role:
-        name: "{{ trace_module_name }}"
-        tasks_from: collect
-      when:
-      - ((ansible_connection | default('.ssh')) == 'ssh')
-      - (playbook_dir+'/../traces/roles/'+trace_module_name+'/tasks/collect.yaml') is exists
+    - name: "Create {{ trace_module_name }} local directory"
+      file:
+        path: "{{ trace_data_local_path }}"
+        state: directory
+      delegate_to: localhost
+      become: false
 
-    - name: collect Windows trace data
-      include_role:
-        name: "{{ trace_module_name }}"
-        tasks_from: collect-win
+    - block:
+
+        - name: collect Linux trace data
+          include_role:
+            name: "{{ trace_module_name }}"
+            tasks_from: collect
+
+        - name: Remove any collection files
+          file:
+            path: "{{ trace_data_path }}"
+            state: absent
+          delegate_to: "{{ trace_node.1 }}"
+          ignore_errors: true
+          become: true
+
       when:
-      - ((ansible_connection | default('.ssh')) == 'winrm')
+      - (hostvars[trace_node.1].ansible_connection | default('ssh')) in ['ssh','local']
+      - (playbook_dir+'/../traces/roles/'+trace_module_name+'/tasks/collect.yaml') is exists
+      vars:
+        trace_script_path: "{{ trace_tmp_path }}/{{ wl_namespace }}-{{ trace_node.1 }}-trace"
+        trace_data_path: "{{ trace_tmp_path }}/{{ wl_namespace }}-{{ trace_node.1 }}-{{ trace_module_name }}"
+
+    - block:
+
+        - name: collect Windows trace data
+          include_role:
+            name: "{{ trace_module_name }}"
+            tasks_from: collect-win
+
+        - name: Remove any collection files
+          ansible.windows.win_file:
+            path: "{{ trace_win_tmp_path }}\\{{ wl_namespace }}-{{ trace_node.1 }}-{{ trace_module_name }}"
+            state: absent
+          delegate_to: "{{ trace_node.1 }}"
+          ignore_errors: yes
+          become: false
+
+      when:
+      - ((hostvars[trace_node.1].ansible_connection | default('ssh')) == 'winrm')
       - (playbook_dir+'/../traces/roles/'+trace_module_name+'/tasks/collect-win.yaml') is exists
+      vars:
+        trace_script_path: "{{ trace_win_tmp_path }}\\{{ wl_namespace }}-{{ trace_node.1 }}-trace"
+        trace_data_path: "{{ trace_win_tmp_path }}\\{{ wl_namespace }}-{{ trace_node.1 }}-{{ trace_module_name }}"
 
   vars:
     trace_module_name: "{{ trace_node.0 | split(':') | first }}"
+    trace_data_local_path: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-{{ trace_module_name }}"
   ignore_errors: yes
 

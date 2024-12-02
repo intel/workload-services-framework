@@ -1,0 +1,143 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+- name: check current golang version
+  shell: "set -o pipefail && /usr/local/go/bin/go version|sed -e 's/go version go//g'|cut -d' ' -f1"
+  args:
+    executable: /bin/bash
+  failed_when: false
+  changed_when: false
+  register: go_version
+  ignore_errors: true
+
+- name: start procedure to install golang in required version
+  block:
+    - name: uninstall existing golang
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - "/usr/local/go"
+        - "$HOME/go"
+      when: (additional_go_version | default('')) | length == 0
+      become: true
+
+    - name: download golang tarball
+      get_url:
+        url: "{{ golang_download_url }}"
+        dest: "/tmp/"
+        mode: 0755
+      register: golang_download
+      until: golang_download is not failed
+      retries: 5
+      become: false
+
+    - name: create directory for additional golang version
+      file:
+        path: "{{ item }}/{{ additional_go_version }}"
+        state: directory
+        mode: '0755'
+      with_items:
+        - "/usr/local"
+        - "$HOME"
+      when: (additional_go_version | default('')) | length > 0
+      become: true
+
+    - name: untar downloaded golang tarball
+      unarchive:
+        src: "{{ golang_download.dest }}"
+        dest: "/usr/local{% if (additional_go_version | default('')) | length > 0 %}/{{ additional_go_version }}{% endif %}"
+        copy: no
+        mode: 0755
+      become: true
+
+    - name: set GOPATH env and add golang bin to PATH for all users
+      copy:
+        content: |
+          export GOROOT=/usr/local/go
+          export GOPATH=$HOME/go
+          export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
+        dest: /etc/profile.d/golang.sh
+        mode: 0755
+      become: true
+      when: (additional_go_version | default('')) | length == 0
+
+    - name: create symlinks to golang binaries
+      file:
+        state: link
+        src: /usr/local/go/bin/{{ item }}
+        dest: /usr/bin/{{ item }}
+        mode: 0755
+      with_items:
+        - go
+        - gofmt
+      become: true
+      when: (additional_go_version | default('')) | length == 0
+  ignore_errors: true
+  when: golang_version != go_version.stdout
+
+# golang is successfully installed in required version
+# add GOPATH to ansible facts
+- name: get GOPATH
+  command: go env GOPATH
+  register: gopath
+  changed_when: false
+  when: (additional_go_version | default('')) | length == 0
+
+# install sriov-cni
+- name: check sriov cni installed or not
+  stat:
+    path: "/opt/cni/bin/sriov"
+  register: sriov_installed
+
+- name: install sriov-cni
+  block:
+    - setup:
+
+    - name: install dependencies
+      include_role:
+        name: install_dependencies
+        apply:
+          become: true
+
+    - name: clone sriov-cni repository
+      git:
+        repo: "{{ sriov_cni_url }}"
+        dest: "{{ sriov_cni_dir }}"
+        version: "{{ sriov_cni_version }}"
+        force: yes
+
+    - name: cleans up unused dependencies for golang before sriov-cni plugin
+      command: "go mod tidy"
+      args:
+        chdir: "{{ sriov_cni_dir }}"
+      changed_when: true
+
+    - name: update GOFLAGS for golang env before sriov-cni plugin
+      command: "go env -w GOFLAGS=-mod=mod"
+      changed_when: true
+
+    - name: build sriov-cni plugin
+      make:
+        chdir: "{{ sriov_cni_dir }}"
+
+    - name: create /opt/cni/bin
+      file:
+        path: "/opt/cni/bin"
+        state: directory
+        recurse: yes
+        mode: 0755
+      become: true
+
+    - name: install sriov-cni binary to /opt/cni/bin directory
+      copy:
+        src: "{{ sriov_cni_dir }}/build/sriov"
+        dest: /opt/cni/bin/sriov
+        mode: 0755
+        remote_src: yes
+      become: true
+  ignore_errors: true
+  when: not sriov_installed.stat.exists

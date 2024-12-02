@@ -1,0 +1,34 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+  - name: pull images locally
+    command: "docker pull --platform {{ workload_config.image_arch }} {{ item }}"
+    loop: "{{ k8s_preload_images }}"
+    become: true
+    delegate_to: localhost
+    run_once: true
+
+  - name: extract image archives
+    shell: "docker save {{ k8s_preload_images | join(' ') }} > /tmp/preload-images.tar"
+    become: true
+    delegate_to: localhost
+    run_once: true
+  
+  - name: copy to remote
+    copy:
+      src: "/tmp/preload-images.tar"
+      dest: "/tmp/preload-images.tar"
+    become: true
+  
+  - name: upload to containerd
+    command: "ctr -n k8s.io i import /tmp/preload-images.tar"
+    become: true
+
+  - name: remove tar file
+    file:
+      path: /tmp/preload-images.tar
+      state: absent
+    become: true

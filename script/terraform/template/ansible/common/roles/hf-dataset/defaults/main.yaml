@@ -1,0 +1,9 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+HF_DATASET_MINIFORGE_VER: "24.5.0-0"
+HF_DATASET_MINIFORGE_REPO: "https://github.com/conda-forge/miniforge/releases/download"
+HF_DATASET_ENV_NAME: "wsf_big_image"

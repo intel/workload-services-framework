@@ -9,16 +9,9 @@
   gather_facts: false
   tasks:
 
-    - name: Recording timing
-      shell:
-        cmd: |
-          echo "docker_setup_start: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
-        executable: /bin/bash
-      delegate_to: localhost
-      when: (ansible_connection|default('ssh')) == 'ssh'
-      become: false
-      async: 30
-      poll: 0
+    - include_role:
+        name: timing
+        tasks_from: start-setup
 
     - name: Install docker
       include_role:
@@ -28,13 +21,38 @@
       - (native | default(false) | bool) == false
       - sut_sudo | default(true) | bool
 
-    - name: Recording timing
-      shell:
-        cmd: |
-          echo "docker_setup_end: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
-        executable: /bin/bash
-      delegate_to: localhost
-      when: (ansible_connection|default('ssh')) == 'ssh'
-      become: false
-      async: 30
-      poll: 0
+    - include_role:
+        name: timing
+        tasks_from: stop-setup
+
+    - block:
+
+        - name: Record build-id
+          include_role:
+            name: docker-image
+            tasks_from: to-config
+          run_once: true
+          when:
+          - (ansible_connection|default('ssh')) in ['ssh','local']
+          - (wl_docker_images | length) > 0
+          vars:
+            wl_docker_images: "{{ dict(docker_config.values() | flatten | map(attribute='image') | union(compose_config.services.values() | map(attribute='image')) | zip_longest([],fillvalue=true)) }}"
+
+        - name: Transfer images
+          include_role:
+            name: docker-image
+            tasks_from: to-daemon
+          when:
+          - (ansible_connection|default('ssh')) == 'ssh'
+          - (native | default(false) | bool) == false
+          - (wl_docker_images | length) > 0
+          - ansible_host not in (my_ip_list | split(',')) or ((csp | default('static')) != 'static')
+          vars:
+            wl_docker_images: "{{ dict(docker_config[inventory_hostname] | default([]) | map(attribute='image') | union(compose_config.services.values() | map(attribute='image')) | zip_longest([],fillvalue=true)) }}"
+
+      vars:
+        docker_config_str: "{% if (wl_logs_dir+'/docker-config.yaml') is exists %}{{ lookup('file',wl_logs_dir+'/docker-config.yaml') }}{% else %}{}{% endif %}"
+        compose_config_str: "{% if (wl_logs_dir+'/compose-config.yaml') is exists %}{{ lookup('file',wl_logs_dir+'/compose-config.yaml') }}{% else %}{}{% endif %}"
+        docker_config: "{{ docker_config_str | from_yaml | default({},true) }}"
+        compose_config: "{{ compose_config_str | from_yaml | default({'services':{}},true) }}"
+

@@ -7,5 +7,4 @@ k8s_nfd_version: "v0.13.2" #  update as required.
 k8s_nfd_namespace: "node-feature-discovery"
 k8s_nfd_url: "https://github.com/kubernetes-sigs/node-feature-discovery/deployment/overlays/default?ref={{ k8s_nfd_version }}"
 k8s_nfd_registry: "registry.k8s.io/nfd"
-k8s_nfd_retries: "24"
-k8s_nfd_request_timeout: "2m"
+k8s_enable_nfd: false

@@ -10,16 +10,6 @@
       tasks_from: init
     when: install_k8s
 
-  - name: Untaint k8s
-    shell: "kubectl taint node $(kubectl get nodes -o='custom-columns=name:.metadata.name,ip:.status.addresses[?(@.address==\"{{ private_ip }}\")].address' --no-headers | cut -f1 -d' ') --overwrite {{ item }}"
-    with_items:
-      - "node-role.kubernetes.io/master-"
-      - "node-role.kubernetes.io/control-plane-"
-    ignore_errors: true
-    when:
-    - install_k8s
-    - ansible_host in (groups['workload_hosts'] | map('extract', hostvars, ['ansible_host']))
-
   - name: Install k8s CNI
     include_role:
       name: "cni-{{ k8s_cni }}"
@@ -60,4 +50,12 @@
     set_fact:
       join_cmd: "{{ join_cmd.stdout | default('echo') }}"
       cacheable: yes
+    when: install_k8s
+
+  - name: Restart containerd and kubelet
+    include_tasks:
+      file: restart-containerd-kubelet.yaml
+    when:
+    - sut_sudo | default(true) | bool
+    - install_k8s or (cert_updated | default(false) | bool)
 

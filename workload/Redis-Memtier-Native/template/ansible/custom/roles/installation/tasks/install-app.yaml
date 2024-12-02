@@ -1,0 +1,29 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Create directory
+  file:
+    path: "{{ WORKSPACE }}"
+    state: directory
+
+- name: Wget Redis
+  shell:
+    cmd: |
+      cd "{{ WORKSPACE }}"
+      wget --no-check-certificate {{REDIS_PACKAGE}} -O redis.tgz
+    executable: /bin/bash
+  register: wget_fetch_redis
+  until: wget_fetch_redis is succeeded
+  retries: 10
+  delay: 10
+
+- name: Install Redis
+  shell:
+    cmd: |
+      cd "{{ WORKSPACE }}"
+      tar -zxvf redis.tgz
+      cd redis-{{REDIS_VER}}
+      make install
+    executable: /bin/bash

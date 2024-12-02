@@ -6,11 +6,11 @@
 
 This is the **Workload Services Framework** repository. The repository contains a set of workloads optimized for Intel(R) Xeon(R) platforms. See the list of supported workloads under the [workload](workload) directory.  
 
-### Setup
+### Prerequisite
 
 - Sync your system date/time. This is required by any credential authorization.  
-- If you are behind a corporate firewall, please setup `http_proxy`, `https_proxy` and `no_proxy` in `/etc/environment`.
-- Run the [`setup-dev.sh`](doc/user-guide/preparing-infrastructure/setup-wsf.md#setup-devsh) script to setup the development host for Cloud and On-Premises workload development and evaluation. See [Cloud and On-Premises Setup](doc/user-guide/preparing-infrastructure/setup-wsf.md) for more details on the setup.
+- If you are behind a corporate firewall, please setup `http_proxy`, `https_proxy` and `no_proxy` in `/etc/environment`, and source the settings into the current shell environment.  
+- Run the [`setup-dev.sh`](doc/user-guide/preparing-infrastructure/setup-wsf.md#setup-devsh) script to setup the development host for workload development and evaluation. See [Cloud and On-Premises Setup](doc/user-guide/preparing-infrastructure/setup-wsf.md) for additional SUT setup. SUT stands for System Under Test, or workload test machines.   
   
 ### Evaluate Workload
 
@@ -28,7 +28,7 @@ cd workload/OpenSSL-RSAMB              # Go to any workload folder
 
 ---
 
-- The WSF supports multiple validation backends. By default, the [`docker`](doc/user-guide/preparing-infrastructure/setup-docker.md) backend, or the [`Kubernetes`](doc/user-guide/preparing-infrastructure/setup-kubernetes.md) backend if available, is used to evaluate any workload locally. To evaluate workloads on Cloud or in an on-premises cluster, please use the [terraform](doc/user-guide/preparing-infrastructure/setup-terraform.md) backend. Additional setup required such as configuring Cloud account credentials.
+The WSF supports multiple validation backends. By default, the [terraform](doc/user-guide/preparing-infrastructure/setup-terraform.md) backend covers on-premises or Cloud testing. You can also use the [`docker`](doc/user-guide/preparing-infrastructure/setup-docker.md) backend, or the [`Kubernetes`](doc/user-guide/preparing-infrastructure/setup-kubernetes.md) backend for evaluating any workload locally.   
 
 ---
 
@@ -43,7 +43,7 @@ make
 ./ctest.sh -N
 ```
 
-> TIP: You can specify `BENCHMARK` to limit the repository scope to the specified workload. The build and test operations on all other workloads are disabled. See [Build Options](doc/user-guide/executing-workload/cmake.md) for details.
+> TIP: You can specify `BENCHMARK` to limit the repository scope to the specified workload. The build and test operations on all other workloads are disabled. See [Build Options](doc/user-guide/executing-workload/cmake.md) for details.  
 
 ```
 cd build
@@ -54,7 +54,7 @@ make
 
 ### See Also
 
-- [Build Options](doc/user-guide/executing-workload/cmake.md)
-- [Test Options](doc/user-guide/executing-workload/ctest.md)
-- [Setup Terraform](doc/user-guide/preparing-infrastructure/setup-terraform.md)
+- [Build Options](doc/user-guide/executing-workload/cmake.md)   
+- [Test Options](doc/user-guide/executing-workload/ctest.md)   
+- [Setup Terraform](doc/user-guide/preparing-infrastructure/setup-terraform.md)  
 

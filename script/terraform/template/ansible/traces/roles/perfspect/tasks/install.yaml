@@ -1,0 +1,33 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: check if perfspect already exists
+  stat:
+    path: /usr/local/perfspect/perfspect
+  register: perfspect_st
+  delegate_to: "{{ trace_node.1 }}"
+  become: true
+  
+- block:
+
+    - name: Download and Extract 
+      unarchive:
+        src: "{{ perfspect_private_repository | default(perfspect_public_repository) }}"
+        dest: /usr/local
+        remote_src: true
+  
+  rescue:
+
+    - name: Download and Extract 
+      unarchive:
+        src: "{{ perfspect_repository }}"
+        dest: /usr/local
+        remote_src: true
+
+  when: (not perfspect_st.stat.exists) or (perfspect_reset | bool)
+  delegate_to: "{{ trace_node.1 }}"
+  become: true
+

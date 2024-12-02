@@ -1,0 +1,16 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Generate HTML
+  template:
+    src: collectd-charts.html.j2
+    dest: "{{ trace_data_path }}/roi-{{ roi_index }}.html"
+  ignore_errors: true
+  vars:
+    start_timestamp: "{{ lookup('pipe', 'date --utc -d' + (roi[0] | quote) + ' +%s') }}"
+    stop_timestamp: "{{ lookup('pipe', 'date --utc -d' + (roi[1] | quote) + ' +%s') }}"
+    collectd_data: "{{ lookup('pipe', 'gawk -v start=' + start_timestamp + ' -v stop=' + stop_timestamp + ' -f ' + role_path + '/scripts/parse-collectd.awk ' + trace_data_path + '/*/*') }}"
+

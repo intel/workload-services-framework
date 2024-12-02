@@ -6,24 +6,22 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 ARG RELEASE
-FROM terraform-static${RELEASE}
+FROM terraform-csp-base${RELEASE}
 
 # Install GCP CLI
-ARG GCP_CLI_VER=443.0.0-0
-ARG GCP_CLI_REPO=https://packages.cloud.google.com/apt
-RUN curl -L https://dl.k8s.io/apt/doc/apt-key.gpg > /usr/share/keyrings/cloud.google.gpg && \
-    echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] ${GCP_CLI_REPO} cloud-sdk main" > /etc/apt/sources.list.d/google-cloud-sdk.list && \
-    apt-get update && \
-    apt-get install -y google-cloud-cli=${GCP_CLI_VER} google-cloud-sdk-gke-gcloud-auth-plugin=${GCP_CLI_VER} && \
-    rm -f /etc/apt/sources.list.d/google-cloud-sdk.list && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Install kubectl
-ARG KUBECTL_CLI=v1.26.6
-ARG KUBECTL_REPO=https://dl.k8s.io/release/${KUBECTL_CLI}/bin/linux/amd64/kubectl
-RUN curl -o /usr/local/bin/kubectl -L ${KUBECTL_REPO} && \
-    chmod a+rx /usr/local/bin/kubectl
+ARG GCP_CLI_VER=476.0.0
+ARG GCP_CLI_PKG=https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCP_CLI_VER}-linux-x86_64.tar.gz
+RUN curl --netrc-optional --retry 10 --retry-connrefused -fsSL ${GCP_CLI_PKG} -o - | tar xvfz - -C /usr/local && \
+    /usr/local/google-cloud-sdk/install.sh --install-python false --usage-reporting false --no-compile-python --command-completion false --screen-reader false --quiet && \
+    ln -s /usr/local/google-cloud-sdk/bin/gcloud /usr/local/bin/gcloud
 
 # Add cleanup script
-RUN echo "alias cleanup=/opt/csp/script/cleanup-gcp.sh" >> /etc/bash.bashrc
+RUN ln -s /opt/project/script/csp/opt/script/cleanup-gcp.sh /usr/local/bin/cleanup && \
+    ln -s /opt/project/script/csp/opt/script/cleanup-common.sh /usr/local/bin/cleanup-common.sh
+
+# Preload terraform plugins
+RUN mkdir -p /usr/local/share/terraform/plugins; \
+    for dir in /opt/terraform/template/terraform/gcp/*; do \
+      (cd $dir; terraform providers mirror /usr/local/share/terraform/plugins) \
+    done
+

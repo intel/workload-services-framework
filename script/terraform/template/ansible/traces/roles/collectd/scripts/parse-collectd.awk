@@ -9,7 +9,7 @@
   next
 }
 
-/^.*,nan/ {
+/^.*,[-]*nan/ {
   next
 }
 
@@ -94,13 +94,10 @@ END {
   save1("memory_buffered", "memory/memory-buffered")
   save1("memory_slab_recl", "memory/memory-slab_recl")
   save1("memory_slab_unrecl", "memory/memory-slab_unrecl")
-  save1("load_shortterm", "load/load/shortterm")
-  save1("load_midterm", "load/load/midterm")
-  save1("load_longterm", "load/load/longterm")
-  save2("if_packages_rx", "interface-", "if_packets/rx", "^en[os]")
-  save2("if_packages_tx", "interface-", "if_packets/tx", "^en[os]")
-  save2("disk_ops_read", "disk-", "disk_ops/read", "^dev_([a-z]d[a-z]+|nvme)[0-9]+$")
-  save2("disk_ops_write", "disk-", "disk_ops/write", "^dev_([a-z]d[a-z]+|nvme)[0-9]+$")
+  save2("if_packages_rx", "interface-", "if_packets/rx", ".*")
+  save2("if_packages_tx", "interface-", "if_packets/tx", ".*")
+  save2("disk_ops_read", "disk-", "disk_ops/read", ".*")
+  save2("disk_ops_write", "disk-", "disk_ops/write", ".*")
   save2("cpu_x_idle", "cpu-", "cpu-idle", "[0-9]*")
   save2("cpu_x_nice", "cpu-", "cpu-nice", "[0-9]*")
   save2("cpu_x_interrupt", "cpu-", "cpu-interrupt", "[0-9]*")

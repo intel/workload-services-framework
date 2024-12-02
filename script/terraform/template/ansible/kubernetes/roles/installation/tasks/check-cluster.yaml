@@ -10,7 +10,6 @@
     delegate_to: "{{ ('controller' in groups) | ternary('controller-0','localhost') }}"
     run_once: true
     ignore_errors: true
-    run_once: true
 
   - name: Set fact
     set_fact:

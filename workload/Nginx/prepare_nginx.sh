@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+openssl version
 WORKLOAD=${WORKLOAD:-nginx_qatsw}
 PROTOCOL=${PROTOCOL:-TLSv1.3}
 QATACCL=${QATACCL:-async}
@@ -14,6 +15,17 @@ CERT=${CERT:-rsa2048}
 CIPHER=${CIPHER:-AES128-GCM-SHA256}
 NGINX_CPU_LISTS=${NGINX_CPU_LISTS:-0}
 CURVE=${CURVE:-auto}
+COMPRESSION=${COMPRESSION:-none}
+GZIP_COMP_LEVEL=${GZIP_COMP_LEVEL:-1}
+QATZIP_COMP_LEVEL=${GZIP_COMP_LEVEL:-1}
+
+BIND_CORE=${BIND_CORE:-1C1T}
+CORE_START=${CORE_START:-0}
+
+if [[ $EXEC_METHOD == "docker" ]]; then
+  POD_OWN_IP_ADDRESS=$WORKER_0_HOST
+  NODE_OWN_IP_ADDRESS=$WORKER_0_HOST
+fi
 
 echo POD_OWN_IP_ADDRESS:$POD_OWN_IP_ADDRESS
 echo NODE_OWN_IP_ADDRESS:$NODE_OWN_IP_ADDRESS
@@ -38,13 +50,15 @@ echo "CERT:${CERT}"
 echo "CIPHER: $CIPHER"
 echo "CURVE: $CURVE"
 echo "NODE: $NODE"
+echo "BIND_CORE: $BIND_CORE"
+echo "CORE_START: $CORE_START"
 
-whole_system_cores=`nproc`
+whole_system_cores=$(nproc)
 echo system cores $whole_system_cores
 if [[ $MAX_CORE_WORKER_CLIENT == "true" ]]; then
     NGINX_WORKERS=$whole_system_cores
 else
-    NGINX_WORKERS=${NGINX_WORKERS:-4}
+    NGINX_WORKERS=${NGINX_WORKERS:-1}
 fi
 echo "NGINX_WORKERS:${NGINX_WORKERS}"
 
@@ -54,8 +68,13 @@ if [ $NGINX_WORKERS -gt $whole_system_cores ]; then
 fi
 
 if [ $NGINX_CPU_LISTS == 0 ]; then
-  NGINX_LAST_CORE=$(( $NGINX_WORKERS - 1 ))
-  NGINX_CPU_LISTS=0-$NGINX_LAST_CORE
+  NGINX_LAST_CORE=$(( NGINX_WORKERS - 1 ))
+  NGINX_CPU_LISTS=${CORE_START}-$((NGINX_LAST_CORE + CORE_START))
+  if [[ $BIND_CORE == "1C2T" ]]; then
+      CORE_START2=$(lscpu | grep "NUMA node0 CPU(s):" | awk '{print $4}' | awk '{split($1, arr, ","); print arr[2]}' | awk '{split($1, arr, "-"); print arr[1]}')
+      CORE_NUM=$((NGINX_WORKERS / 2))
+      NGINX_CPU_LISTS="${CORE_START}-$((CORE_START + CORE_NUM-1)),$((CORE_START2 + CORE_START))-$((CORE_START2 + CORE_START+ CORE_NUM - 1))"
+  fi
 fi
 
 ulimit -a
@@ -152,16 +171,16 @@ fi
 echo "CERT: $CERT"
 echo "CERTKEY: $CERTKEY"
 
-if [[ $MODE == "http" ]]; then
+if [[ $MODE == "http" && $COMPRESSION == "none" ]]; then
   NGINXCONF=${NGINXCONF:-/usr/local/share/nginx/conf/nginx-http.conf}
   if [ $PORT ]; then
     echo replace $MODE port 80 to $PORT
     sed -i "s|listen 80|listen $PORT|" $NGINXCONF
   fi
-elif [[ $MODE == "https" ]]; then
-  if [[ $WORKLOAD == "nginx_original" ]] || [[ "$WORKLOAD" == nginx_original_ARMv* ]] || [[ $WORKLOAD == "nginx_original_MILAN" ]]; then
+elif [[ $MODE == "https" && $COMPRESSION == "none" ]]; then
+  if [[ "$WORKLOAD" == nginx_original* ]]; then
     NGINXCONF=${NGINXCONF:-/usr/local/share/nginx/conf/nginx-https.conf}
-  elif [[ $WORKLOAD == "nginx_qatsw" ]]  || [[ $WORKLOAD == "nginx_qathw" ]]; then
+  elif [[ $WORKLOAD == nginx_qatsw* ]]  || [[ $WORKLOAD == nginx_qathw* ]]; then
     if [[ $QATACCL == "off" ]];then
       NGINXCONF=${NGINXCONF:-/usr/local/share/nginx/conf/nginx-https.conf}
     elif [[ $QATACCL == "sync" ]];then
@@ -189,6 +208,43 @@ elif [[ $MODE == "https" ]]; then
   sed -i "s|ssl_ecdh_curve auto|ssl_ecdh_curve $CURVE|" $NGINXCONF
   sed -i "s|ssl_certificate  /certs/cert_rsa2048.crt|ssl_certificate  $CERT|" $NGINXCONF
   sed -i "s|ssl_certificate_key /keys/key_rsa2048.key|ssl_certificate_key $CERTKEY|" $NGINXCONF
+fi
+
+if [[ $COMPRESSION == "gzip" ]]; then
+  openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/certs/tls.key -out /etc/ssl/certs/tls.crt -batch
+  mv /usr/local/share/nginx/conf/nginx-gzip.conf /usr/share/nginx/conf/nginx-gzip.conf
+  NGINXCONF=${NGINXCONF:-/usr/share/nginx/conf/nginx-gzip.conf}
+  if [ $PORT ]; then
+    echo replace $MODE port 443 to $PORT
+    sed -i "s|listen 443|listen $PORT|" $NGINXCONF
+  fi
+  sed -i "s|gzip_comp_level 1|gzip_comp_level $GZIP_COMP_LEVEL|" $NGINXCONF
+  if [[ $MODE == "http" ]]; then
+    sed -i "s|listen $PORT ssl|listen $PORT|" $NGINXCONF
+    sed -i '/ssl_certificate/ s/^/#/' $NGINXCONF
+    sed -i '/ssl_certificate_key/ s/^/#/' $NGINXCONF
+    sed -i '/ssl_session_cache/ s/^/#/' $NGINXCONF
+    sed -i '/ssl_session_timeout/ s/^/#/' $NGINXCONF
+    sed -i '/ssl_protocols/ s/^/#/' $NGINXCONF
+  fi
+elif [[ $COMPRESSION == "qatzip" ]]; then
+  openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/certs/tls.key -out /etc/ssl/certs/tls.crt -batch
+  mv /usr/local/share/nginx/conf/nginx-qatzip.conf /usr/share/nginx/conf/nginx-qatzip.conf
+  NGINXCONF=${NGINXCONF:-/usr/share/nginx/conf/nginx-qatzip.conf}
+  if [ $PORT ]; then
+    echo replace $MODE port 443 to $PORT
+    sed -i "s|listen 443|listen $PORT|" $NGINXCONF
+  fi
+  sed -i "s|gzip_comp_level 1|gzip_comp_level $GZIP_COMP_LEVEL|" $NGINXCONF
+  sed -i "s|qatzip_comp_level 9|qatzip_comp_level $QATZIP_COMP_LEVEL|" $NGINXCONF
+  if [[ $MODE == "http" ]]; then
+    sed -i "s|listen $PORT ssl asynch|listen $PORT|" $NGINXCONF
+    sed -i '/ssl_certificate/ s/^/#/' $NGINXCONF
+    sed -i '/ssl_certificate_key/ s/^/#/' $NGINXCONF
+    sed -i '/ssl_session_cache/ s/^/#/' $NGINXCONF
+    sed -i '/ssl_session_timeout/ s/^/#/' $NGINXCONF
+    sed -i '/ssl_protocols/ s/^/#/' $NGINXCONF
+  fi
 fi
 
 echo real run NGINX_WORKERS: $NGINX_WORKERS

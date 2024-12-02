@@ -1,0 +1,20 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: "dispatch to {{ sut_bios_tool }} tasks"
+  include_tasks:
+    file: cleanup-{{ sut_bios_tool }}.yaml
+  when:
+  - sut_update_bios | bool
+  - restore_file is exists
+  vars:
+    restore_file: "{{ wl_logs_dir }}/{{ inventory_hostname }}-bios/restore"
+
+- name: remove workspace
+  file:
+    path: "/tmp/{{ wl_namespace }}-bios"
+    state: absent
+

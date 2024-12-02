@@ -143,17 +143,17 @@ set_instance_param() {
     cache_line=`sed -n '/'"saved_caches_directory:"'/=' $conf_path/cassandra.yaml`
     caches_directory="saved_caches_directory: /$base_path/current_data/$index/saved_caches"
     sed -i "${cache_line}c $caches_directory" $conf_path/cassandra.yaml    
-
+   
     #cdc_raw_directory
     cdc_line=`sed -n '/'"cdc_raw_directory:"'/=' $conf_path/cassandra.yaml`
     cdc_raw_directory="cdc_raw_directory: /$base_path/current_data/cdc_raw_directory"
-    sed -i "${cdc_line}c $cdc_raw_directory" $conf_path/cassandra.yaml
+    sed -i "${cdc_line}c $cdc_raw_directory" $conf_path/cassandra.yaml    
 
     #hints_directory
     hints_line=`sed -n '/'"hints_directory:"'/=' $conf_path/cassandra.yaml`
     hints_directory="hints_directory: /$base_path/current_data/hints"
     sed -i "${hints_line}c $hints_directory" $conf_path/cassandra.yaml
-
+ 
     #native_transport_port
     native_transport_port=$(($cassandra_native_transport_port+$index))
     sed_in_place "$conf_path/cassandra.yaml" \

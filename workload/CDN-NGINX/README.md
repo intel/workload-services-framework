@@ -75,10 +75,10 @@ Since this is a multi-container workload, we must use Kubernetes to schedule the
   - For TLSv1.3, default to `TLS_AES_128_GCM_SHA256`, available options: `TLS_AES_256_GCM_SHA384`, `TLS_CHACHA20_POLY1305_SHA256`.
 - **`CURVE`**: Specify ecdh curve in for Nginx [`ssl_ecdh_curve`](https://nginx.org/en/docs/http/ngx_http_ssl_module.html#ssl_ecdh_curve). Default is `auto`.
 
-- **`SINGLE_SOCKET`**: Specify test scenario. Default to "", if set to "true", will reduce cache device number from 4 to 2. For performance test, please ensure all disks are on the same socket with cores used by Nginx.
+- **`SINGLE_SOCKET`**: Specify test scenario. Default to "false", if set to "true", will reduce cache device number from 4 to 2. For performance test, please ensure all disks are on the same socket with cores used by Nginx.
 - **`NGINX_WORKERS`**: Specify the worker_processes number of cache server NGINX. Defaults to 4.
-- **`CPU_AFFI`**: Specify whether to do Nginx core binding for cache server. Default to ``, set `true` will bind above NGINX_WORKERS to NGINX_CPU_LISTS.
-- **`NGINX_CPU_LISTS`**: Specify the CPU list for Nginx core binding, for example 0-7,112-119. If not specified, use 0-${NGINX_WORKERS}.
+- **`CPU_AFFI`**: Specify whether to do Nginx core binding for cache server. Default to "false", set "true" will bind above NGINX_WORKERS to NGINX_CPU_LISTS.
+- **`NGINX_CPU_LISTS`**: Specify the CPU list for Nginx core binding. If there are two groups, concatenate them using "_", for example 0-7_112-119. If not specified, use 0-${NGINX_WORKERS}.
 
 - **`NUSERS`**: Specify the number of wrk simulated users (connection number). Default to 400.
 - **`NTHREADS`**: Specify the number of wrk threads. Default to the number of "NGINX_WORKERS".
@@ -160,7 +160,6 @@ The performance test setup takes the same steps as functionality test, only with
 - Disk: 4*1.8T NVME disk is required on worker-1, then you need manually mount the 4 disks to /mnt/diskx, please follow [setup-cdn](../../doc/user-guide/preparing-infrastructure/setup-cdn.md#storage-configuration).
 - BIOS setting for worker-1
 
-
   | BIOS setting                     | Required setting |
   | ---------------------------------- | ------------------ |
   | Intel(R) VT for Directed I/O     | Enable           |
@@ -203,18 +202,15 @@ The `wrk` http simulator generates the following KPIs:
 - **`Transfer/sec (GB/s)`**: The transaction throughput in gigabytes per second.
 - **`*Total throughput (GB/s)`**: The primary KPI is defined as the transaction throughput in gigabytes per second.
 
-### Setup Workload with RA
-
-If you use the Reference Architecture to set up your system, use the On-Premises profile for best performance.
-Detail please refer to https://networkbuilders.intel.com/solutionslibrary/network-and-edge-reference-system-architectures-integration-intel-workload-services-framework-user-guide
 
 ### Index Info
 
 - Name: `Content Distribution Network, NGINX`
 - Category: `uServices`
-- Platform: `SPR`, `ICX`
+- Platform: `SPR`, `ICX`, `EMR`
 - Keywords:
 - Permission:
+
 
 ### See Also
 

@@ -1,0 +1,27 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Create custom data collection set
+  template:
+    src: "dcs.xml.j2"
+    dest: "{{ trace_script_local_path }}/perfmon-dcs.xml"
+  delegate_to: localhost
+  become: false
+
+- set_fact:
+    trace_module_start_block: |
+      $dcs = New-Object -ComObject Pla.DataCollectorSet
+      $xml = Get-Content "{{ trace_script_path }}\perfmon-dcs.xml"
+      $xml = $xml -replace "perfmon-0", "perfmon-${roi}"
+      $dcs.SetXml($xml)
+      $dcs.Commit("wsf-{{ wl_namespace }}-{{ trace_node.1 }}-dcs" , $null , 0x0003)
+      $dcs.start($true)
+    trace_module_stop_block: |
+      $dcs = New-Object -ComObject Pla.DataCollectorSet
+      $dcs.Query("wsf-{{ wl_namespace }}-{{ trace_node.1 }}-dcs",$null)
+      $dcs.stop($true)
+      $dcs.Delete()
+  

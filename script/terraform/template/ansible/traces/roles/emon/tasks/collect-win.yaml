@@ -1,0 +1,29 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Get emon files
+    ansible.windows.win_shell: |
+      Get-ChildItem -Name
+    args:
+      chdir: "{{ trace_data_path }}"
+    register: emon_files
+  
+  - name: Fetch emon files
+    fetch:
+      src: "{{ trace_data_path }}\\{{ item }}"
+      dest: "{{ trace_data_local_path }}/"
+      flat: yes
+    loop: "{{ emon_files.stdout_lines }}"
+    register: fetchrc
+    until: fetchrc is success
+    retries: 10
+    delay: 10
+  
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: false

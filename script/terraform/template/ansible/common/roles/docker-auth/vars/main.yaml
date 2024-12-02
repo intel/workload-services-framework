@@ -1,0 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+docker_auth_cred_url: "https://github.com/docker/docker-credential-helpers/releases/download/v{{ docker_auth_cred_ver }}/docker-credential-pass-v{{ docker_auth_cred_ver }}.linux-amd64"
+docker_auth_pass_pkg: "pass={{ docker_auth_pass_ver }}"

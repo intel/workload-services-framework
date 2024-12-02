@@ -1,0 +1,30 @@
+# test-config.yaml
+############################################################################
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+*standalone_2n_pkm:
+  ALICLOUD_WORKER_INSTANCE_TYPE: ecs.g8i.2xlarge
+  ALICLOUD_CLIENT_INSTANCE_TYPE: ecs.g8i.2xlarge
+  ALICLOUD_DISK_TYPE: cloud_essd
+  ALICLOUD_DISK_PERFORMANCE: PL2
+  ALICLOUD_DISK_SPEC_1_DISK_FORMAT: xfs
+  ALICLOUD_DISK_SIZE: 1200
+  INSTANCE_NUM: 1
+  CASSANDRA_CONCURRENT_READS: 24
+  CASSANDRA_CONCURRENT_WRITE: 8
+  CASSANDRA_NUMACTL_ENABLE: true
+  CLIENT_DURATION: 30m
+  CLIENT_THREADS: 21
+  CLIENT_INSERT: 20
+  CLIENT_SIMPLE: 80
+  JVM_HEAP_SIZE: 16
+  CLIENT_POP_MAX: 90000000
+  JDK_VERSION: JDK11
+  CASSANDRA_FILL_DATA: true
+  CASSANDRA_DISK_MOUNT: true
+  DEPLOY_MODE: standalone
+  KERNEL_TUNE_ENABLE: true

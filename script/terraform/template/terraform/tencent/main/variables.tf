@@ -104,3 +104,4 @@ variable "cpu_model_timeout" {
   type = string
   default = "10m"
 }
+

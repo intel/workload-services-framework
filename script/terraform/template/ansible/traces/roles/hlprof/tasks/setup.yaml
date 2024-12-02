@@ -1,0 +1,30 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: set perf_event_paranoid to 2
+  shell:
+    cmd: |
+      [ $(cat /proc/sys/kernel/perf_event_paranoid) -le 2 ] || echo 2 > /proc/sys/kernel/perf_event_paranoid
+    executable: /bin/bash
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: true
+
+- set_fact:
+    trace_module_start_block: |
+      {% if ['0','host'] | intersect(trace_node.0|split(':')) | length == 0 %}
+        case "$1" in
+        docker:*)
+          i=0
+          for c in ${@/docker:/}; do
+            docker exec $c sh -c "mkdir -p /tmp/{{ wl_namespace }}-hlprof/hlprof-c${i}r$roi;hl-prof-config {{ hlprof_options }} -e off -r off -a on -o /tmp/{{ wl_namespace }}-hlprof/hlprof-c${i}r$roi -s hlprof-c${i}r$roi" > hlprof-c${i}r$roi.logs 2>&1 &
+            let i++
+          done
+          ;;
+        esac
+      {% endif %}
+    trace_module_stop_block: ""
+

@@ -1,0 +1,27 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- hosts: worker-0
+  gather_facts: no
+  become: yes
+  tasks:
+    - name: Kill cassandra processes
+      ansible.builtin.shell: "kill -9 $(pgrep -f  'cassandr1a') || true"
+      ignore_errors: true
+
+    - name: Kill memcached processes
+      ansible.builtin.shell: "kill -9 $(pgrep -f  'memcached') || true"
+      ignore_errors: true
+    
+    - name: Kill uwsgi processes
+      ansible.builtin.shell: "kill -9 $(pgrep -f  'uWSGI') || true"
+      ignore_errors: true
+
+    - name: Remove workspace
+      file:
+        path: "/tmp/django"
+        state: absent
+      ignore_errors: true
+    

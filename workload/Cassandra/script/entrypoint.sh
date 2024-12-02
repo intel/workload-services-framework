@@ -172,8 +172,8 @@ if [ "$DEPLOY_MODE" == "cluster" ]; then
     for ((i = 1; i <= $NODE_NUM; i++)); do
         server_node="${hostname_prefix}$i.${SERVICE_NAME}"
         python3 clean_data_client.py "clean" ${server_node} ${CLEAN_PORT} >> clean_data_client_output.log
-    done
-else
+    done    
+else 
     #standalone mode
     python3 clean_data_client.py "clean" ${NODE} ${CLEAN_PORT} >> clean_data_client_output.log
 fi

@@ -9,11 +9,13 @@ import json
 import yaml
 import sys
 import os
+import socket
 
 
 KUBERNETES_CONFIG = "kubernetes-config.yaml"
 CLUSTER_CONFIG = "cluster-config.yaml"
 COMPOSE_CONFIG = "compose-config.yaml"
+DOCKER_CONFIG = "docker-config.yaml"
 CLUSTER_INFO = "cluster-info.json"
 INVENTORY = "inventory.yaml"
 DEPLOYMENT = "deployment.yaml"
@@ -21,6 +23,18 @@ WORKLOAD_CONFIG = "workload-config.yaml"
 
 tfoutput = json.load(sys.stdin)
 options = tfoutput["values"]["outputs"]["options"]["value"]
+
+with open(CLUSTER_CONFIG) as fd:
+  for doc in yaml.safe_load_all(fd):
+    if doc and "terraform" in doc:
+      for option1 in doc["terraform"]:
+        if option1 not in options:
+          options[option1] = doc["terraform"][option1]
+        elif isinstance(options[option1], dict):
+          tmp = copy.deepcopy(doc["terraform"][option1])
+          tmp.update(options[option1])
+          options[option1] = tmp
+
 for argv in sys.argv:
   if argv.startswith("--"):
     argv = argv[2:]
@@ -49,6 +63,9 @@ with open(WORKLOAD_CONFIG) as fd:
 def _ExtendOptions(updates):
   tmp = options.copy()
   tmp.update(updates)
+  tmp.update({
+    "workload_config": workload_config
+  })
   return tmp
 
 
@@ -165,16 +182,9 @@ if os.path.exists(CLUSTER_INFO):
         elif addr1["type"] == "Hostname":
           hostname = addr1["address"]
       for host in inventories["workload_hosts"]["hosts"]:
-        if private_ip == inventories["workload_hosts"]["hosts"][host]["private_ip"]:
+        if private_ip == socket.gethostbyname(inventories["workload_hosts"]["hosts"][host]["private_ip"]):
           workload_nodes[hostname] = inventories["workload_hosts"]["hosts"][host].get('csp', 'static')
 
-### override options with terraform options defined in cluster-config.yaml
-with open(CLUSTER_CONFIG) as fd:
-  for doc in yaml.safe_load_all(fd):
-    if doc and "terraform" in doc:
-      for option1 in doc["terraform"]:
-        if option1 not in options:
-          options[option1] = doc["terraform"][option1]
 
 playbooks = [{
   "hosts": "localhost",
@@ -200,7 +210,7 @@ if os.path.exists("/opt/workload/template/ansible/custom/deployment.yaml"):
     }),
   })
 
-if ((options.get("docker", False) or options.get("native", False)) and ("docker_image" in workload_config)) or (options.get("compose", False) and os.path.exists(COMPOSE_CONFIG)):
+if (((str(options.get("docker", False)).lower()=='true' or str(options.get("native", False)).lower()=='true') and os.path.exists(DOCKER_CONFIG)) or (str(options.get("compose", False)).lower()=='true' and os.path.exists(COMPOSE_CONFIG))) and str(options.get("kubernetes", False)).lower()=='false':
   playbooks.append({
     "name": "deployment",
     "import_playbook": "./template/ansible/docker/deployment.yaml",

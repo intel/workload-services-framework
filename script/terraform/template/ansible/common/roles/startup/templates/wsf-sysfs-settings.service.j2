@@ -1,5 +1,6 @@
 [Unit]
 Description=WSF workload sysfs settings
+After={{ sut_incompatible_services | split(',') | map('regex_replace','$','.service') | join(' ') }}
 
 [Service]
 ExecStart=/bin/bash -c 'echo {{ sysfs_options_dict.values() | list | zip(sysfs_options_dict.keys() | list) | map("join", " | tee ") | join(";echo ") }};exit 0'

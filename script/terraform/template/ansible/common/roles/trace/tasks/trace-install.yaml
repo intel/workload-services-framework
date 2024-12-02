@@ -1,0 +1,43 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+    - name: Install Linux trace module
+      include_role:
+        name: "{{ trace_module_name }}"
+        tasks_from: install
+      when:
+      - (hostvars[trace_node.1].ansible_connection | default('ssh')) in ['ssh','local']
+      - (playbook_dir+'/../traces/roles/'+trace_module_name+'/tasks/install.yaml') is exists
+      vars:
+        trace_script_path: "{{ trace_tmp_path }}/{{ wl_namespace }}-{{ trace_node.1 }}-trace"
+        trace_script_local_path: "{{ trace_tmp_path }}/{{ wl_namespace }}-{{ trace_node.1 }}-trace"
+        trace_data_path: "{{ trace_tmp_path }}/{{ wl_namespace }}-{{ trace_node.1 }}-{{ trace_module_name }}"
+
+    - name: Install Windows trace module
+      include_role:
+        name: "{{ trace_module_name }}"
+        tasks_from: install-win
+      when:
+      - ((hostvars[trace_node.1].ansible_connection | default('ssh')) == 'winrm')
+      - (playbook_dir+'/../traces/roles/'+trace_module_name+'/tasks/install-win.yaml') is exists
+      vars:
+        trace_script_path: "{{ trace_win_tmp_path }}\\{{ wl_namespace }}-{{ trace_node.1 }}-trace"
+        trace_script_local_path: "{{ trace_tmp_path }}/{{ wl_namespace }}-{{ trace_node.1 }}-trace"
+        trace_data_path: "{{ trace_win_tmp_path }}\\{{ wl_namespace }}-{{ trace_node.1 }}-{{ trace_module_name }}"
+
+    - name: Set flag to prevent from reinstallation
+      set_fact:
+        trace_modules_installed: "{{ (hostvars[trace_node.1].trace_modules_installed|default([])) + [trace_module_name] }}"
+      delegate_facts: true
+
+  when:
+  - not (trace_module_name in (hostvars[trace_node.1].trace_modules_installed|default([])))
+  delegate_to: "{{ trace_node.1 }}" 
+  vars:
+    trace_module_name: "{{ trace_node.0 | split(':') | first }}"
+

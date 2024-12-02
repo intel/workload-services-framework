@@ -1,0 +1,13 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: generate cpu power html page
+  template:
+    src: cpu_power_charts.html.j2
+    dest: "{{ trace_data_path }}/roi-{{ roi_index }}.html"
+  vars:
+    cpu_power_data: "{{ lookup('pipe', 'gawk -f ' + ((role_path + '/scripts/parse_cpumonitor.awk') | quote) + ' ' + ((trace_data_path + '/cpupower-' + (roi_index | string) + '.dat') | quote)) }}"
+  ignore_errors: true

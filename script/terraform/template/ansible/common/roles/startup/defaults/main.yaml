@@ -18,10 +18,32 @@ sut_kernel_args: ""
 sut_kernel_modules: ""
 
 # format: <group>:key=value,...
-sut_sysctl_options: ""
+sut_sysctl_options: "default"
+sut_sysctl_default_options: ""
 
 # format: <group>:key=value,...
-sut_sysfs_options: "workload_hosts:/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor=performance,offcluster_hosts:/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor=performance"
+sut_sysfs_options: "default"
+sut_sysfs_default_options: "workload_hosts:/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor=performance,offcluster_hosts:/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor=performance"
 
-sut_incompatible_services: "tuned,ondemand,unattended-upgrades"
+sut_incompatible_services: "unattended-upgrades"
+sut_sudo: true
+sut_reboot: true
+sut_update_kernel_args: true
+sut_update_kernel_modules: true
+sut_update_sysctls: true
+sut_update_sysfs: true
+sut_update_msr: false
+sut_update_bios: false
+sut_update_tpmi: false
 sut_update_datetime: true
+
+# for parameter validation
+dev_terraform_retries: ""
+dev_terraform_delay: ""
+dev_log_level: ""
+intel_publisher_sut_machine_type: ""
+intel_publisher_sut_metadata: ""
+run_uri: ""
+tags: ""
+pretag: ""
+owner: ""

@@ -1,0 +1,18 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: set no_proxy
+  include_role:
+    name: no-proxy
+    tasks_from: main-win
+  when: (groups.cluster_hosts+groups.off_cluster_hosts)|map('extract',hostvars,['private_ip'])|select('defined')|unique|length>1
+
+- name: set timezone and datetime
+  include_role:
+    name: datetime
+    tasks_from: main-win
+  when: sut_update_datetime | bool
+

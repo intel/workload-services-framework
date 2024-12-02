@@ -4,43 +4,63 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+- block:
+
   - name: check if containerd is installed
     command: containerd --version
-    register: containerd
+    register: containerd_rc
     ignore_errors: true
     become: true
 
-  - name: Detect OS
-    shell:
-      cmd: ". /etc/os-release; echo $ID"
-      executable: /bin/bash
-    register: os
-    when: ((containerd.rc != 0) or containerd_reset)
+  - block:
 
-  - name: install containerd
-    include_tasks:
-      file: "install-{{ (os.stdout == 'rhel' or os.stdout == 'anolis') | ternary('centos', os.stdout) }}.yaml"
-    when: ((containerd.rc != 0) or containerd_reset)
+    - name: Detect OS
+      shell:
+        cmd: ". /etc/os-release; echo $ID"
+        executable: /bin/bash
+      register: os
+
+    - name: install containerd
+      include_tasks:
+        file: "install-{{ (os.stdout in ['ubuntu','debian']) | ternary('debian','centos') }}.yaml"
+
+    when:
+    - (containerd_rc is failed) or containerd_reset
+    - ansible_host not in my_ip_list.split(',')
 
   - name: check containerd configuration
-    command: containerd config dump
-    register: config
+    shell: 
+      cmd: |
+        containerd config dump | grep 'SystemdCgroup = true\|{{ containerd_pause_registry }}\|{{ containerd_certsd_path }}\|{{ containerd_data_root }}'
+      executable: /bin/bash
+    register: containerd_config1
     ignore_errors: true
+    no_log: true
 
-  - name: check if containerd must be reconfigured
+  - name: figure out if reconfiguration is required
     set_fact:
-      reconfigure: "{{ not (('SystemdCgroup = true' in config.stdout) and (containerd_pause_registry in config.stdout) and (containerd_data_root in config.stdout)) or containerd_reset }}"
+      containerd_restart_required:
+      - "{{ containerd_reset | bool }}"
+      - "{{ 'SystemdCgroup = true' not in (containerd_config1.stdout | default('')) }}"
+      - "{{ containerd_pause_registry not in (containerd_config1.stdout | default('')) }}"
+      - "{{ ((containerd_insecure_registries_list + containerd_registry_mirrors_list) | length > 0) and (containerd_certsd_path not in (containerd_config1.stdout | default(''))) }}"
+      - "{{ (containerd_data_root!='') and (containerd_data_root not in (containerd_config1.stdout | default(''))) }}"
 
-  - name: "Ensure {{ containerd_config_toml | dirname }} exists"
-    file:
-      path: "{{ containerd_config_toml | dirname }}"
-      state: directory
-    when: reconfigure
-    become: true
+  - block:
 
-  - name: configure containerd
-    shell: "containerd config default > {{ containerd_config_toml }}"
-    when: reconfigure
+    - name: "Ensure {{ containerd_config_toml | dirname }} exists"
+      file:
+        path: "{{ containerd_config_toml | dirname }}"
+        state: directory
+
+    - name: re-create containerd configuration
+      shell: |
+        containerd config default > {{ containerd_config_toml }}
+        grep 'SystemdCgroup = true\|{{ containerd_pause_registry }}\|{{ containerd_certsd_path }}\|{{ containerd_data_root }}' {{ containerd_config_toml }}
+      register: containerd_config2
+      no_log: true
+
+    when: (true in containerd_restart_required)
     become: true
 
   - name: Configure SystemdCgroup=true
@@ -49,7 +69,7 @@
       regexp: '^(\s*)SystemdCgroup\s*='
       line: '\1SystemdCgroup = true'
       backrefs: true
-    when: reconfigure
+    when: ('SystemdCgroup = true' not in (containerd_config2.stdout | default(containerd_config1.stdout | default(''))))
     become: true
 
   - name: Configure sandbox_image
@@ -58,67 +78,110 @@
       regexp: '^(\s*)sandbox_image\s*=\s*".*(/.*)"'
       line: '\1sandbox_image = "{{ containerd_pause_registry }}\2"'
       backrefs: true
-    when: reconfigure
+    when: containerd_pause_registry not in (containerd_config2.stdout | default(containerd_config1.stdout | default('')))
     become: true
 
-  - name: Configure insecure registry cert
-    shell: |
-      mkdir -p "/etc/containerd/certs.d/{{ item }}"
-      printf "server = \"http://{{ item }}\"\n[host.\"http://{{ item }}\"]\n  capabilities = [\"pull\", \"resolve\"]\n[plugin.\"io.containerd.grpc.v1.cri\".registry.configs.\"{{ item }}\".tls]\n  insecure_skip_verify = true\n" > "/etc/containerd/certs.d/{{ item }}/hosts.toml"
-    loop: "{{ containerd_insecure_registry.split(',') }}"
-    when: containerd_insecure_registry != "" and reconfigure
+  - block:
+
+    - name: Create /etc/containerd/certs.d
+      file:
+        path: "/etc/containerd/certs.d/{{ item }}"
+        state: directory
+        recurse: true
+      loop: "{{ containerd_insecure_registries_list }}"
+
+    - name: Configure insecure registry cert
+      blockinfile:
+        path: "/etc/containerd/certs.d/{{ item }}/hosts.toml"
+        marker: "# {mark} INSECURE {{ item }}"
+        create: true
+        block: |
+          server = "http://{{ item }}"
+          [host."http://{{ item }}"]
+            capabilities = ["pull", "resolve"]
+          [plugin."io.containerd.grpc.v1.cri".registry.configs."{{ item }}".tls]
+            insecure_skip_verify = true
+      loop: "{{ containerd_insecure_registries_list }}"
+
+    - name: "Configure containerd_certsd_path }}"
+      lineinfile:
+        path: "{{ containerd_config_toml }}"
+        regexp: '^(\s*)config_path\s*='
+        line: '\1config_path = "{{ containerd_certsd_path }}"'
+        backrefs: true
+
+    when: 
+    - containerd_insecure_registries_list | length > 0
+    - containerd_certsd_path not in (containerd_config2.stdout | default(containerd_config1.stdout | default('')))
     become: true
 
-  - name: Configure insecure registry
-    lineinfile:
-      path: "{{ containerd_config_toml }}"
-      regexp: '^(\s*)config_path\s*='
-      line: '\1config_path = "/etc/containerd/certs.d"'
-      backrefs: true
-    when: reconfigure
-    become: true
-
-  - name: "Ensure {{ containerd_data_root }} exists"
-    file:
-      path: "{{ containerd_data_root }}"
-      state: directory
-    when: reconfigure
-    become: true
-
-  - name: configure containerd root
-    lineinfile:
-      path: "{{ containerd_config_toml }}"
-      regexp: '^(\s*)root\s*='
-      line: '\1root = "{{ containerd_data_root }}"'
-      backrefs: true
-    when: reconfigure
-    become: true
-
-  - name: check proxy value
-    shell: "echo :$http_proxy$https_proxy$no_proxy:"
-    register: proxy
-
-  - name: check proxy configuration
-    stat:
-      path: "{{ containerd_proxy_conf }}"
-    register: proxy_conf
-
-  - name: configure proxy
-    shell: |
-      mkdir -p {{ containerd_proxy_conf | dirname }}
-      printf "[Service]\nEnvironment=\"HTTP_PROXY=$http_proxy\" \"HTTPS_PROXY=$https_proxy\" \"NO_PROXY=$no_proxy{{ ((k8s_registry_ip is defined) and (k8s_enable_registry | default(true))) | ternary(',' + (k8s_registry_ip | default('')),'') }}\"\n" > {{ containerd_proxy_conf }}
-    when: proxy != "::" and not proxy_conf.stat.exists
-    become: true
+  - block:
     
-  - name: Abort if containerd must be restarted
-    fail:
-      msg: "Failed to restart containerd. Please manually sudo systemctl restart containerd"
+    - name: create /etc/containerd/certs.d
+      file:
+        path: "/etc/containerd/certs.d/{% if item|length==1 %}_default{% else %}{{ item | first | regex_replace('https*://','') | regex_replace('registry-[0-9].docker.io','docker.io') }}{% endif %}"
+        recurse: true
+        state: directory
+      loop: "{{ containerd_registry_mirrors_list | slice([((containerd_registry_mirrors_list | length)/2)|int,1] | max) }}"
+
+    - name: create mirror(s) under /etc/containerd/certs.d
+      blockinfile:
+        path: "/etc/containerd/certs.d/{% if item|length==1 %}_default{% else %}{{ item | first | regex_replace('https*://','') | regex_replace('registry-[0-9].docker.io','docker.io') }}{% endif %}/hosts.toml"
+        marker: "# {mark} MIRROR {{ item|last }}"
+        create: true
+        block: |
+          {% if item|length>1 %}
+          server = "{{ item | first }}"
+          {% endif %}
+          [host."{{ item | last }}"]
+            capabilities = ["pull", "resolve"]
+          {% if 'http://' in (item|last) %}
+            skip_verify = true
+          {% endif %}
+      loop: "{{ containerd_registry_mirrors_list | slice([((containerd_registry_mirrors_list | length)/2)|int,1] | max) }}"
+
+    - name: "Configure containerd_certsd_path }}"
+      lineinfile:
+        path: "{{ containerd_config_toml }}"
+        regexp: '^(\s*)config_path\s*='
+        line: '\1config_path = "{{ containerd_certsd_path }}"'
+        backrefs: true
+
+    when: 
+    - containerd_registry_mirrors_list | length > 0
+    - containerd_certsd_path not in (containerd_config2.stdout | default(containerd_config1.stdout | default('')))
+    become: true
+      
+  - block:
+
+    - name: "Ensure {{ containerd_data_root }} exists"
+      file:
+        path: "{{ containerd_data_root }}"
+        state: directory
+
+    - name: configure containerd root
+      lineinfile:
+        path: "{{ containerd_config_toml }}"
+        regexp: '^(\s*)root\s*='
+        line: '\1root = "{{ containerd_data_root }}"'
+        backrefs: true
+
     when:
-      - ansible_host in my_ip_list.split(",")
-      - reconfigure or containerd.rc != 0 or (proxy != "::" and not proxy_conf.stat.exists)
+    - (containerd_data_root!='')
+    - containerd_data_root not in (containerd_config2.stdout | default(containerd_config1.stdout | default('')))
+    become: true
+
+  - name: check containerd proxy settings
+    include_tasks:
+      file: proxy.yaml
 
   - name: restart containerd
     include_tasks:
       file: 'restart.yaml'
-    when: reconfigure or containerd.rc != 0 or (proxy != "::" and not proxy_conf.stat.exists)
+
+  when: not (containerd_skip_configuration|bool)
+  vars:
+    containerd_registry_mirrors_list: "{% if containerd_registry_mirrors | type_debug == 'list' %}{{ containerd_registry_mirrors }}{% else %}{{ containerd_registry_mirrors | default('',true) | split(',') | reject('==','') }}{% endif %}"
+    containerd_insecure_registries_list: "{% if containerd_insecure_registries | type_debug == 'list' %}{{ containerd_insecure_registries }}{% else %}{{ containerd_insecure_registries | default('',true) | split(',') | reject('==','') }}{% endif %}"
+
 

@@ -1,0 +1,146 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Detect OS
+  shell:
+    cmd: ". /etc/os-release; echo $ID"
+    executable: /bin/bash
+  register: os
+
+- name: Install libvirt packages
+  package:
+    name: "{{ kvm_packages[(os.stdout in ['ubuntu','debian']) | ternary('debian','centos')] }}"
+
+- name: Validate support for QEMU drivers
+  command:
+    cmd: "virt-host-validate qemu"
+  register: health
+  failed_when: ('FAIL' in health.stdout) or ('FAIL' in health.stderr)
+
+- name: Disable security_driver
+  lineinfile:
+    dest: /etc/libvirt/qemu.conf
+    regexp: '^#security_driver'
+    line: 'security_driver = "none"'
+    state: present
+
+- name: Ensure group "libvirt libvirt-qemu kvm" exists
+  group:
+    name: "{{ item }}"
+    state: present
+  with_items:
+  - libvirt
+  - libvirt-qemu
+  - kvm
+
+- name: Add user to group libvirt and libvirt-qemu
+  user:
+    name: "{{ ansible_user }}"
+    groups: libvirt,libvirt-qemu,kvm
+    append: true
+
+- name: enable PCI passthrough
+  set_fact:
+    kernel_args: "intel_iommu_on iommu=pt"
+
+- name: Create hugepage mount point
+  file:
+    path: "{{ kvm_hugepage_paths[item.split('/')[0]]['mount_path'] }}"
+    state: directory
+    mode: a+rwx
+  when: ('/' in item)
+  loop: "{{ kvm_hugepages.split(',') }}"
+
+- name: Add hugepage mount point to /etc/fstab
+  blockinfile:
+    path: /etc/fstab
+    content: "hugetlbfs {{ kvm_hugepage_paths[item.split('/')[0]]['mount_path'] }} hugetlbfs rw,pagesize={{ kvm_hugepage_paths[item.split('/')[0]]['page_size'] }},mode=777,auto 0 0"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK for {{ item.split('/')[0] | upper }} HUGEPAGES"
+  when: ('/' in item)
+  loop: "{{ kvm_hugepages.split(',') }}"
+
+- name: Add to /etc/libvirt/qemu.conf
+  blockinfile:
+    path: /etc/libvirt/qemu.conf
+    marker: "# {mark} HugePage Setup"
+    state: absent
+
+- name: Add to /etc/libvirt/qemu.conf
+  blockinfile:
+    path: /etc/libvirt/qemu.conf
+    marker: "# {mark} HugePage Setup"
+    content: "hugetlbfs_mount = [ \"{{ kvm_hugepages | split(',') | map('split','/') | map('first') | map('extract', kvm_hugepage_paths, ['mount_path']) | join('\", \"') }}\" ]"
+  when: kvm_hugepages | split(',') | reject('==','') | length > 0
+
+- name: try setting huge pages
+  shell:
+    cmd: |
+      [ $(cat {{ hugepage_path }}) -ge {{ hugepage_value }} ] || (
+        echo {{ hugepage_value }} > {{ hugepage_path }}
+        [ $(cat {{ hugepage_path }}) -ge {{ hugepage_value }} ]
+      )
+    executable: /bin/bash
+  register: hugepagerc
+  until: hugepagerc is success
+  retries: 5
+  delay: 1
+  vars:
+    hugepage_path: "{{ kvm_hugepage_paths[item.split('/')[0]]['sysfs_path'] }}"
+    hugepage_value: "{{ item.split('/')[1] | default(1) }}"
+  when: ('/' in item)
+  loop: "{{ kvm_hugepages.split(',') }}"
+  ignore_errors: true
+
+- name: mount hugetlbfs
+  command: mount -a
+
+- name: append to kernel args
+  set_fact:
+    kernel_args: "{{ kernel_args }} hugepagesz={{ kvm_hugepage_paths[item.split('/')[0]]['hugepagesz'] }} hugepages={{ item.split('/')[1] | default(1) }}"
+  when: ('/' in item)
+  loop: "{{ kvm_hugepages.split(',') }}"
+
+- name: set kernel args
+  block:
+    - name: add to grub.conf
+      blockinfile:
+        path: "{{ kvm_grub_actions[(os.stdout in ['ubuntu','debian']) | ternary('debian','centos')]['grub_path'] }}"
+        block: 'GRUB_CMDLINE_LINUX="$GRUB_CMDLINE_LINUX {{ kernel_args }}"'
+        marker: "# {mark} ANSIBLE MANAGED BLOCK for KVM SETUP"
+        create: true
+      register: kargs
+
+    - name: update grub
+      shell: "{{ kvm_grub_actions[(os.stdout in ['ubuntu','debian']) | ternary('debian','centos')]['update_grub_cmd'] }}"
+      when: kargs.msg == "Block inserted" or kargs.msg == "File created"
+
+  when: (kernel_args | trim | length > 0)
+
+- name: enable and start libvirt service
+  service:
+    name: libvirtd
+    enabled: true
+    state: restarted
+
+- name: Create VXLAN bridge
+  include_tasks:
+    file: bridge.yaml
+  when:
+  - (groups['kvm_hosts'] | length) > 1
+  - kvm_vxlan_mode | bool
+
+- name: Activate the default network
+  include_tasks:
+    file: default.yaml
+
+- name: reboot
+  command: "reboot"
+  async: 1
+  poll: 0
+  ignore_errors: yes
+  when:
+  - kvm_reboot | bool
+  - (kernel_args | trim | length > 0)
+

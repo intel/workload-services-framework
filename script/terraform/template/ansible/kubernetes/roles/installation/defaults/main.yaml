@@ -9,4 +9,7 @@ k8s_plugins: []
 k8s_enable_registry: true
 k8s_enable_csp_registry: false
 my_ip_list: ""
-
+k8s_reset: false
+k8s_abort_on_failure: false
+k8s_node_ready_wait: "600s"
+k8s_preload_images: []

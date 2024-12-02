@@ -1,0 +1,61 @@
+# nginx-client-openssl
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+
+FROM ${OS_IMAGE}:${OS_VER} AS build
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y git make gcc g++ autoconf automake libpcre3-dev nasm wget zlib1g-dev libapr*
+
+ARG OPENSSL_VER=3.1.3
+ARG OPENSSL_REPO=https://github.com/openssl/openssl.git
+RUN git clone --depth 1 -b openssl-${OPENSSL_VER} ${OPENSSL_REPO} openssl && \
+    cd openssl && \
+    ./Configure --openssldir=/etc/ssl/ && \
+    make -j && \
+    make install
+
+ARG NGINX_VER="1.22.1"
+ARG NGINX_PACKAGE=https://nginx.org/download/nginx-${NGINX_VER}.tar.gz
+RUN wget ${NGINX_PACKAGE} && tar xf nginx-${NGINX_VER}.tar.gz && \
+    cd nginx-${NGINX_VER} && \
+    ./configure \
+      --prefix=/var/www \
+      --conf-path=/usr/local/share/nginx/conf/nginx.conf \
+      --sbin-path=/usr/local/bin/nginx \
+      --pid-path=/run/nginx.pid \
+      --lock-path=/run/lock/nginx.lock \
+      --modules-path=/var/www/modules/ \
+      --without-http_rewrite_module \
+      --with-http_dav_module \
+      --with-http_ssl_module \
+      --with-pcre \
+      --with-cc-opt="-O3 -I/usr/local/include/openssl \
+	  -Wno-error=deprecated-declarations -Wimplicit-fallthrough=0" \
+      --with-ld-opt="-Wl,-rpath=/usr/local/lib -L/usr/local/lib" && \
+    make -j && \
+    make install
+
+FROM ${OS_IMAGE}:${OS_VER}
+RUN  apt-get update && apt-get install -y curl wget libpcre3 systemd && apt-get clean
+
+COPY --from=build /usr/local/ /usr/local/
+COPY --from=build /etc/ssl /etc/ssl
+COPY --from=build /var/www/ /var/www/
+COPY conf/*.conf /usr/local/share/nginx/conf/
+COPY run_openssl.sh /
+
+ENV  OPENSSL_ENGINES=/usr/local/lib/engines-1.1
+
+RUN rm -rf /usr/share/man/* && \
+echo "/usr/local/lib" >> /etc/ld.so.conf.d/all-libs.conf && ldconfig && \
+strip /usr/bin/*; strip /usr/sbin/*; strip /usr/local/bin/*; strip /usr/local/sbin/* || exit 0;
+
+RUN mkfifo /export-logs
+CMD (/run_openssl.sh; echo $? > status) 2>&1 | tee output.logs && \
+    tar cf /export-logs status output.logs && \
+    sleep infinity

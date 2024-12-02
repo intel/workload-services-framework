@@ -1,0 +1,45 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: reboot
+  command: "reboot"
+  async: 10
+  poll: 0
+  ignore_errors: yes
+  when:
+  - cleanup_reboot_required
+  - sut_reboot | bool
+  - not cleanup_poweroff_required
+
+- block:
+  - name: power off sut
+    ipmi_power:
+      name: "{{ bmc_ip }}"
+      user: "{{ bmc_user }}"
+      password: "{{ bmc_password }}"
+      port: "{{ bmc_port }}"
+      state: 'off'
+    delegate_to: localhost
+    ignore_errors: yes
+
+  - name: sleep
+    shell: "sleep 120s"
+    delegate_to: localhost
+  
+  - name: power on sut
+    ipmi_power:
+      name: "{{ bmc_ip }}"
+      user: "{{ bmc_user }}"
+      password: "{{ bmc_password }}"
+      port: "{{ bmc_port }}"
+      state: 'on'
+    delegate_to: localhost
+    ignore_errors: yes
+  when: 
+  - sut_reboot | bool
+  - cleanup_poweroff_required
+  - cleanup_reboot_required
+  - bmc_ip is defined and bmc_ip != ''
+  - bmc_password is defined and bmc_password != ''

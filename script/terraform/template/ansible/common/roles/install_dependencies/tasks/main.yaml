@@ -1,0 +1,20 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: refresh repository cache
+  apt:
+    update_cache: yes
+  when: ansible_os_family == 'Debian' and (update_cache | default(true) | bool)
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+
+- name: install packages
+  action: "{{ ansible_pkg_mgr }} name={{ install_dependencies[ansible_os_family] }} state=latest"
+  register: pkg_mgr_results
+  until: pkg_mgr_results is success
+  retries: 10
+  delay: 10

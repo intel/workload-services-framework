@@ -1,0 +1,29 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Check if numastat exists
+    command: "numastat -V"
+    register: numastat_rc
+    ignore_errors: true
+
+  - block:
+
+    - name: Detect OS
+      shell:
+        cmd: ". /etc/os-release; echo $ID"
+        executable: /bin/bash
+      register: os
+  
+    - name: Install numactl
+      include_tasks:
+        file: "install-{{ (os.stdout in ['ubuntu','debian']) | ternary('debian','centos') }}.yaml"
+  
+    when: numastat_rc is failed
+
+  delegate_to: "{{ trace_node.1 }}"
+  

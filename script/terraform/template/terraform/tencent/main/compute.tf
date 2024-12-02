@@ -15,7 +15,7 @@ resource "tencentcloud_instance" "default" {
   instance_name = "wsf-${var.job_id}-${each.key}-instance"
   hostname = each.key
   availability_zone = tencentcloud_subnet.default.availability_zone
-  image_id = each.value.os_image!=null?each.value.os_image:data.tencentcloud_images.search[each.value.profile].images.0.image_id
+  image_id = each.value.os_image!=null? (startswith(each.value.os_image, "img-")?each.value.os_image:data.tencentcloud_images.search[each.value.profile].images.0.image_id):data.tencentcloud_images.search[each.value.profile].images.0.image_id
   instance_type = each.value.instance_type
 
   allocate_public_ip = true

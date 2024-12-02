@@ -15,7 +15,11 @@ BEGIN {
     var4v=""
 }
 
-/^#svrinfo: / {
+/^#(bom|timestamp|pdu|pcm|uprof|emon|perfspect)[:-] / {
+    next
+}
+
+/^#sutinfo: / {
     name=gensub("^.*logs-([^/]*)[/].*$","\\1",1,$2)
 }
 
@@ -126,8 +130,8 @@ END {
         print "</Table>"
         print "</Worksheet>"
 
-        if (length(svrinfo_values[ws])>0) 
-            add_svrinfo(ws)
+        if (length(sutinfo_values[ws])>0) 
+            add_sutinfo(ws)
     }
     print "</Workbook>"
 }

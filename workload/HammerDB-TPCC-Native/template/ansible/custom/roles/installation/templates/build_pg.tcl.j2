@@ -1,0 +1,31 @@
+global complete
+proc wait_to_complete {} {
+    global complete
+    set complete [vucomplete]
+    puts "Is it complete ?: $complete"
+    if {!$complete} {
+        after {{ wl_tunables.TPCC_WAIT_COMPLETE_MILLSECONDS }} wait_to_complete
+    } else {
+        puts "BUILD SCHEMA COMPLETE"
+        exit
+    }
+}
+
+puts "SETTING CONFIGURATION"
+dbset db pg
+dbset bm TPC-C
+
+diset connection pg_host {{ hostvars["worker-0"]["private_ip"] }}
+diset connection pg_port 5432
+diset tpcc pg_superuser postgres
+diset tpcc pg_superuserpass Postgres@123
+diset tpcc pg_defaultdbase postgres
+diset tpcc pg_num_vu {{ wl_tunables.TPCC_THREADS_BUILD_SCHEMA }}
+diset tpcc pg_count_ware {{ wl_tunables.TPCC_NUM_WAREHOUSES }}
+diset tpcc pg_raiseerror  true
+diset tpcc pg_storedprocs true
+
+print dict
+buildschema
+wait_to_complete
+vwait forever

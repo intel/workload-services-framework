@@ -1,0 +1,23 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- hosts: localhost
+  become: false
+  gather_facts: no
+  tasks:
+
+    - name: export traces
+      include_role:
+        name: trace
+        tasks_from: trace-export
+      when: 
+      - (trace_data_stop | replace('TRACE_STOP','TRACE_START')) is exists
+      loop: "{{ lookup('pipe','find '+wl_logs_dir+' -mindepth 2 -maxdepth 2 -name TRACE_STOP -print') | split('\n') }}"
+      loop_control:
+        loop_var: trace_data_stop
+      vars:
+        workload_config: "{{ lookup('file',wl_logs_dir+'/workload-config.yaml') | from_yaml }}"
+

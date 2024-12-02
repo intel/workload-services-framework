@@ -1,0 +1,32 @@
+## Intel gpu top usages
+#| intel_gpu_top - Display a top-like summary of Intel GPU usage
+#| Usage: /usr/bin/intel_gpu_top [parameters]
+#|         The following parameters are optional:
+#|         [-h]            Show this help text.
+#|         [-J]            Output JSON formatted data.
+#|         [-l]            List plain text data.
+#|         [-o <file|->]   Output to specified file or '-' for standard out.
+#|         [-s <ms>]       Refresh period in milliseconds (default 1000ms).
+#|         [-L]            List all cards.
+#|         [-d <device>]   Device filter, please check manual page for more details.
+#| Filter types:
+#| ---
+#| filter        syntax
+#| ---
+#| sys           sys:/sys/devices/pci0000:00/0000:00:02.0
+#|               find device by its sysfs path
+#| 
+#| drm           drm:/dev/dri/* path
+#|               find drm device by /dev/dri/* node
+#| 
+#| pci           pci:[vendor=%04x/name][,device=%04x][,card=%d] | [slot=%04x:%02x:%02x.%x]
+#|               vendor is hex number or vendor name
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+igt: false
+igt_options: "-o -"
+#igt_options: "-J -s 500 -o -"

@@ -1,0 +1,78 @@
+# rocksdb-iaa-base
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=8.5
+ARG OS_IMAGE=rockylinux
+FROM ${OS_IMAGE}:${OS_VER}
+
+# install
+RUN yum update -y && \
+    yum install git which python3 make automake gcc gcc-c++ -y && \
+    yum install cmake libuuid-devel llvm lz4-devel -y && \
+    yum install nasm yasm snappy-devel --enablerepo=powertools -y && \
+    yum groupinstall "Development Tools" -y --nobest && \
+    yum install autoconf automake libtool pkgconf rpm-build rpmdevtools -y --nobest && \
+    yum install asciidoc xmlto libuuid-devel json-c-devel zlib-devel wget -y && \
+    yum clean all
+
+# accel-config install
+ARG IDXD_VER=accel-config-v3.4.6.4
+ARG IDXD_REPO=https://github.com/intel/idxd-config.git
+
+RUN git clone -b ${IDXD_VER} ${IDXD_REPO} /idxd-config
+WORKDIR /idxd-config
+RUN ./autogen.sh && \
+    ./configure CFLAGS='-g -O2' --prefix=/usr --sysconfdir=/etc --libdir=/usr/lib64 --enable-test=yes && \
+    make -j20 && \
+    make check && \
+    make install
+
+# qpl
+ARG QPL_VER=v1.1.0
+ARG QPL_REPO=https://github.com/intel/qpl.git
+
+RUN git clone --recursive -b ${QPL_VER} ${QPL_REPO} /qpl_library
+WORKDIR /qpl_library
+RUN cmake -DCMAKE_INSTALL_PREFIX=/qpl -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build . --target install --parallel 20
+
+
+# gflags
+ARG GFLAGS_VER=v2.2.2
+ARG GFLAGS_REPO=https://github.com/gflags/gflags.git
+
+RUN git clone -b ${GFLAGS_VER} ${GFLAGS_REPO} /gflags_library
+WORKDIR /gflags_library
+RUN cmake -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_SHARED_LIBS=ON && \
+    make -j20 && make install && \
+    ldconfig
+
+# zstd
+ARG ZSTD_VER=1.5.2
+ARG ZSTD_REPO=https://github.com/facebook/zstd/archive/v${ZSTD_VER}.tar.gz
+RUN wget -qO- "${ZSTD_REPO}" | tar xfz - -C /
+WORKDIR /zstd-${ZSTD_VER}
+RUN make -j20 && \
+    make install && \
+    rm -rf /usr/lib64/libzstd* && \
+    cp /usr/local/lib/libzstd.so* /usr/lib64 && \
+    ldconfig
+
+# rocksdb with iaa
+ARG ROCKSDB_VER=https://github.com/facebook/rocksdb/pull/6717
+ARG ROCKSDB_REPO=https://github.com/facebook/rocksdb.git
+ARG ROCKSDB_IAA_PLUGIN_REPO=https://github.com/intel/iaa-plugin-rocksdb.git
+ARG ROCKSDB_IAA_PLUGIN_VER=v0.3.0
+
+RUN git clone ${ROCKSDB_REPO} /rocksdb
+WORKDIR /rocksdb
+RUN git fetch origin pull/6717/head && \
+    git checkout -b pullrequest FETCH_HEAD && \
+    git clone -b ${ROCKSDB_IAA_PLUGIN_VER} ${ROCKSDB_IAA_PLUGIN_REPO} plugin/iaa_compressor && \
+    EXTRA_CXXFLAGS="-I/qpl/include -I/usr/local/include -I/usr/include" EXTRA_LDFLAGS="-L/qpl/lib64 -L/usr/local/lib -lzstd" ROCKSDB_CXX_STANDARD="c++17" DISABLE_WARNING_AS_ERROR=1 ROCKSDB_PLUGINS="iaa_compressor" make -j20 release
+
+HEALTHCHECK NONE

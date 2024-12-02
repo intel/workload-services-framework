@@ -22,6 +22,7 @@
   include_role:
     name: "{{ item }}"
     tasks_from: cleanup.yaml
-  when:
+  when: 
   - (playbook_dir + '/roles/' + item + '/tasks/cleanup.yaml') is exists
   loop: "{{ (k8s_plugins | default([])) + [ 'cni-' + (k8s_cni | default('flannel')) ] }}"
+

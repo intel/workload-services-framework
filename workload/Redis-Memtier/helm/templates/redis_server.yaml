@@ -1,0 +1,149 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+{{- $startPort := .Values.REDIS_NATIVE_TRANSPORT_PORT -}}
+{{- $nInstance := .Values.CPU_USED -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-server-pod
+  labels:
+    app: redis-server-pod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-server-pod
+  template:
+    metadata:
+      labels:
+        app: redis-server-pod
+        name: REDIS-SERVER
+    spec:
+{{- if $.Values.HOST_NETWORK_ENABLE }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+{{- end }}
+      containers:
+      - name: redis-server
+        image: {{ $.Values.REGISTRY }}redis-server-ubuntu{{ $.Values.UBUNTU_OS }}{{ $.Values.IMAGE_ARCH }}{{ $.Values.RELEASE }}
+        imagePullPolicy: {{ include "imagepolicy" $.Values }}
+        resources:
+          requests:
+            cpu: "1"
+        securityContext:
+          privileged: true
+        env:
+        - name: RPS_TUNE
+          value: "{{ $.Values.RPS_TUNE }}"
+        - name: RUN_SINGLE_NODE
+          value: "{{ $.Values.RUN_SINGLE_NODE }}"
+        - name: REDIS_SERVER_NUMACTL_OPTIONS
+          value: "{{ $.Values.REDIS_SERVER_NUMACTL_OPTIONS }}"
+        - name: redis_version
+          value: "{{ $.Values.REDIS_VERSION }}"
+        - name: redis_instance_number
+          value: "{{ $nInstance }}"
+        - name: start_numa_node
+          value: "{{ $.Values.START_NUMA_NODE }}"
+        - name: redis_native_transport_port
+          value: "{{ $.Values.REDIS_NATIVE_TRANSPORT_PORT }}"
+        - name: redis_numactl_strategy
+          value: "{{ $.Values.REDIS_NUMACTL_STRATEGY }}"
+        - name: redis_server_io_threads
+          value: "{{ $.Values.REDIS_SERVER_IO_THREADS }}"
+        - name: redis_server_io_threads_do_reads
+          value: "{{ $.Values.REDIS_SERVER_IO_THREADS_DO_READS }}"
+        - name: memtier_data_size
+          value: "{{ $.Values.MEMTIER_DATA_SIZE }}"
+        - name: memtier_requests
+          value: "{{ $.Values.REQUESTS }}"
+        - name: memtier_key_maximum
+          value: "{{ $.Values.KEY_MAXIMUM }}"
+        - name: redis_persistence_policy
+          value: "{{ $.Values.REDIS_PERSISTENCE_POLICY }}"
+        - name: redis_appendfsync_mode
+          value: "{{ $.Values.REDIS_APPENDFSYNC_MODE }}"
+        - name: redis_rdb_seconds
+          value: "{{ $.Values.REDIS_RDB_SECONDS }}"
+        - name: redis_rdb_changes
+          value: "{{ $.Values.REDIS_RDB_CHANGES }}"
+        - name: redis_server_io_threads_cpu_affinity
+          value: "{{ $.Values.REDIS_SERVER_IO_THREADS_CPU_AFFINITY }}"
+        - name: redis_eviction_policy
+          value: "{{ $.Values.REDIS_EVICTION_POLICY }}"
+{{- if not $.Values.RUN_SINGLE_NODE }}
+      {{- $args := dict "anti" "REDIS-MEMTIER" }}
+      {{- include "podAffinity" $args }}
+      {{- $args2 := dict "nkey" "VM-GROUP" "nvalue" "worker" }}
+      {{- include "nodeAffinity" $args2 }}
+{{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Values.REDIS_SERVICE }}
+  labels:
+    app: {{ $.Values.REDIS_SERVICE }}
+spec:
+  ports:
+  {{- range $i, $e := until (int $nInstance) }}
+  - port: {{ add $startPort $i }}
+    name: redis-server-port-{{ add $startPort $i }}
+    protocol: TCP
+  {{- end }}
+  selector:
+    app: redis-server-pod
+  type: ClusterIP
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: redis-config-center
+  name: redis-config-center
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-config-center
+  template:
+    metadata:
+      labels:
+        app: redis-config-center
+    spec:
+      containers:
+      - image: {{ $.Values.REGISTRY }}redis-config-center-ubuntu{{ $.Values.UBUNTU_OS }}{{ $.Values.RELEASE }}
+        imagePullPolicy: {{ include "imagepolicy" $.Values }}
+        name: redis-config-center
+        resources: {}
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+{{- if not $.Values.RUN_SINGLE_NODE }}
+    {{- $args := dict "anti" "REDIS-SERVER" "affi" "REDIS-MEMTIER" }}
+    {{- include "podAffinity" $args }}
+    {{- $args2 := dict "nkey" "VM-GROUP" "nvalue" "client" }}
+    {{- include "nodeAffinity" $args2 }}
+{{- end }}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: redis-config-center
+  name: redis-config-center
+spec:
+  ports:
+  - port: {{ .Values.CONFIG_CENTER_PORT }}
+    protocol: TCP
+    targetPort: 6379
+  selector:
+    app: redis-config-center
+  type: ClusterIP

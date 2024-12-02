@@ -1,0 +1,10 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+simicstrace: false
+simicstrace_start_string: "START-TRACE-CAPTURE"
+simicstrace_stop_string: "STOP-TRACE-CAPTURE"
+simicstrace_serial_device: "/dev/ttyS0"

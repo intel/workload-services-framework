@@ -1,0 +1,38 @@
+# resnet50-pytorch-intel-public-inference-24.04
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+
+FROM ai-common-img${RELEASE} as ai_common
+FROM resnet50-pytorch-inference-dataset-24.04${RELEASE} as inference_data
+FROM resnet50-pytorch-model-24.04${RELEASE} as model
+FROM resnet50-pytorch-benchmark-24.04${RELEASE} as benchmark
+FROM pytorch-intel-public-24.04${RELEASE}
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt -o Acquire::Check-Date=false update && \
+    apt install -y numactl
+
+RUN mkdir -p /root/.cache/torch/hub/checkpoints
+RUN mkdir -p /home/workspace
+WORKDIR /home/workspace
+
+COPY --from=ai_common /home/ai_common /home/workspace/models/ai_common
+COPY --from=inference_data /dataset /home/workspace/dataset
+COPY --from=model /model /root/.cache/torch/hub/checkpoints
+COPY --from=benchmark /models /home/workspace/models
+
+WORKDIR /home/workspace/models
+RUN mkdir -p output
+
+COPY run_test.sh .
+RUN mkfifo /export-logs
+CMD ( ./run_test.sh; \
+    echo $? > status) 2>&1 | tee benchmark_${MODE}_${TOPOLOGY}_${PRECISION}_${FUNCTION}_${DATA_TYPE}_$(date +"%m-%d-%y-%H-%M-%S").log && \
+    if [ `grep -c 'Accuracy\|Throughput\|Training throughput' benchmark_*.log` -eq 0 ];then echo 1 > status; fi && \
+    tar cf /export-logs status $(find . -name "*.log") && \
+    sleep infinity

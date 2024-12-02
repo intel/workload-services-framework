@@ -23,8 +23,10 @@ case $IMAGEARCH in
         ;;
 esac
 
-BUILD_OPTIONS="$BUILD_OPTIONS --build-arg IMAGESUFFIX=${IMAGESUFFIX} --build-arg JDKARCH=${JDKARCH} --build-arg JDKVER=${STACK/*jdk/} "
-FIND_OPTIONS="( ! -name *.m4 $FIND_OPTIONS )"
-
 DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
+
+STACK=$(echo $STACK | sed 's/[^-]*-\(.*\)-.*/\1/')-${STACK/*jdk/} "$DIR"/../JDK/build.sh $@
+
+BUILD_OPTIONS="$BUILD_OPTIONS --build-arg IMAGESUFFIX=${IMAGESUFFIX} --build-arg JDKARCH=${JDKARCH} --build-arg JDKVER=${STACK/*jdk/} --build-arg JDKVENDOR=$(echo $STACK | sed 's/[^-]*-\(.*\)-.*/\1/') "
+
 . "$DIR"/../../script/build.sh

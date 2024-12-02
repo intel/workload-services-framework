@@ -4,12 +4,19 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+- name: Set sysctl default settings
+  set_fact:
+    sysctl_options_dict: "{{ sysctl_options_dict | default({}) | combine(dict((sut_sysctl_options=='default') | ternary(sut_sysctl_default_options,'') | split(',') | map('trim') | select('match',item+':.*') | map('regex_replace','^[^:]*:','') | reject('==','') | map('split','=') | map('map','trim'))) }}"
+  loop: "{{ group_names }}"
+
+- name: overwrite by workload settings
+  set_fact:
+    sysctl_options_dict: "{{ sysctl_options_dict | combine(wl_sysctls) }}"
+
 - name: Set sysctl settings
   set_fact:
-    sysctl_options_dict: "{{ sysctl_options_dict | combine(dict(sut_sysctl_options | split(',') | map('trim') | select('match',item+':.*') | map('regex_replace','^[^:]*:','') | reject('==','') | map('split','=') | map('map','trim'))) }}"
+    sysctl_options_dict: "{{ sysctl_options_dict | combine(dict((sut_sysctl_options=='default') | ternary('',sut_sysctl_options) | split(',') | map('trim') | select('match',item+':.*') | map('regex_replace','^[^:]*:','') | reject('==','') | map('split','=') | map('map','trim'))) }}"
   loop: "{{ group_names }}"
-  vars:
-    sysctl_options_dict: "{{ wl_sysctls }}"
 
 - name: Check if sysctl restore available
   stat:
@@ -27,7 +34,10 @@
   failed_when: false
 
 - name: Save sysctl values
-  shell: "sysctl -e {{ sysctl_options_dict.keys() | list | join(' ') }} > {{ startup_restore_path }}/sysctl"
+  shell:
+    cmd: |
+      sysctl -e {{ sysctl_options_dict.keys() | list | join(' ') }} > {{ startup_restore_path }}/sysctls
+    executable: /bin/bash
   failed_when: false
   when:
   - ((csp | default('static')) == 'static')
@@ -42,8 +52,16 @@
   - sysctl_options_dict.keys() | length > 0
 
 - name: Apply sysctls
-  command: "sysctl -p/etc/sysctl.d/99-wsf-sysctls.conf -q"
+  shell:
+    cmd: |
+      sysctl -p/etc/sysctl.d/99-wsf-sysctls.conf -q
+    executable: /bin/bash
   failed_when: false
   when:
   - sysctl_options_dict.keys() | length > 0
+
+- name: Print out sysctls changes
+  debug:
+    msg: "[{{ inventory_hostname }}]: Host sysctls+ {{ item.key }}={{ item.value }}"
+  loop: "{{ sysctl_options_dict | dict2items }}"
 

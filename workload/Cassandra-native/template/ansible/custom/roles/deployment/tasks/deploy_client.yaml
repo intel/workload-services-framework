@@ -1,0 +1,118 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Set Cassandra Client Parameters
+  set_fact:
+    duration: "{{ wl_tunables['CLIENT_DURATION'] }}"
+    threads: "{{ wl_tunables['CLIENT_THREADS'] }}"
+    insert: "{{ wl_tunables['CLIENT_INSERT'] }}"
+    simple: "{{ wl_tunables['CLIENT_SIMPLE'] }}"
+    cl: "{{ wl_tunables['CLIENT_CL'] }}"
+    client_instance_num: "{{ wl_tunables['INSTANCE_NUM'] }}"
+    stress_number: "{{wl_tunables['STRESS_NUM_PER_INSTANCE'] }}"
+    server_port: "{{ cassandra_native_transport_port }}"
+    pop_min: "{{ wl_tunables['CLIENT_POP_MIN'] }}"
+    pop_max: "{{ wl_tunables['CLIENT_POP_MAX'] }}"
+    pop_performance_div: "{{ wl_tunables['CLIENT_POP_MAX_PERFORMANCE_DIV'] }}"
+    data_compaction: "{{ wl_tunables['DATA_COMPACTION'] }}"
+    data_compression: "{{ wl_tunables['DATA_COMPRESSION'] }}"
+    data_chunk_size: "{{ wl_tunables['DATA_CHUNK_SIZE'] }}"
+    fill_data: "{{ wl_tunables['CASSANDRA_FILL_DATA'] }}"
+    fill_data_only: "{{ wl_tunables['CASSANDRA_FILL_DATA_ONLY'] }}"
+    kernel_tune: "{{ wl_tunables['KERNEL_TUNE_ENABLE'] }}"
+    clean_port: "{{ clean_port }}"
+    cassandra_server_addr: "{{ hostvars['worker-0']['private_ip'] }}"
+    cacheable: yes
+
+- name: Install Template of clean_data_client.py
+  template:
+    src: "clean_data_client.py.j2"
+    dest: "{{ WORKSPACE }}/clean_data_client.py"
+    mode: "0755"
+
+- name: Install Template of Entrypoint
+  template:
+    src: "entrypoint.sh.j2"
+    dest: "{{ WORKSPACE }}/entrypoint.sh"
+    mode: "0755"
+
+- name: Create the Logs Directory
+  file:
+    path: "{{ WORKSPACE }}/itr-{{ itr }}/benchmark"
+    state: directory
+    recurse: yes
+
+- name: Create trace log file
+  file:
+    path: "{{ WORKSPACE }}/entrypoint.log"
+    state: touch
+    mode: "0666"
+
+- name: waitproc to wait for entrypoint complete
+  shell:
+    cmd: |
+      cd {{ WORKSPACE }}
+      nohup bash -c '(./entrypoint.sh) | tee ./entrypoint.log' > /dev/null 2>&1 &      
+      echo $!
+      disown
+    executable: /bin/bash
+  register: waitproc
+
+- name: invoke the trace procedure
+  include_role:
+    name: trace
+  vars:
+    trace_waitproc_pid: "{{ waitproc.stdout }}"
+    trace_logs_scripts: ["cat {{ WORKSPACE }}/entrypoint.log"]
+
+- name: collect trace data
+  include_role:
+    name: trace
+    tasks_from: collect
+  when: wl_trace_modules | default('') | split(',') | reject('==','') | length > 0
+
+- name: Archive Logs
+  archive:
+    path: "{{ WORKSPACE }}/itr-{{ itr }}/"
+    dest: "{{ WORKSPACE }}/itr-{{ itr }}.tar.gz"
+
+- name: Fetch Logs to Localhost
+  fetch:
+    src: "{{ WORKSPACE }}/itr-{{ itr }}.tar.gz"
+    dest: "{{ wl_logs_dir }}/"
+    flat: yes
+    validate_checksum: yes
+
+- name: Create the Logs Directory on Localhost
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}/"
+    state: directory
+    recurse: yes
+    mode: "0777"
+  delegate_to: localhost
+
+- name: UnArchive Logs on Localhost
+  unarchive:
+    src: "{{ wl_logs_dir }}/itr-{{ itr }}.tar.gz"
+    dest: "{{ wl_logs_dir }}/itr-{{ itr }}"
+    mode: "0777"
+  delegate_to: localhost
+
+- name: delete Logs tar file
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}.tar.gz"
+    state: absent
+  delegate_to: localhost
+  ignore_errors: true
+  become: true
+
+- name: copy kpi.sh to the itr directory
+  copy:
+    src: "{{ wl_logs_dir }}/kpi.sh"
+    dest: "{{ wl_logs_dir }}/itr-{{ item }}/"
+    mode: "a+rx"
+  loop: "{{ range(1, run_stage_iterations | default(1) |int+1, 1) | list }}"
+  when: ((wl_logs_dir + '/kpi.sh') is exists)
+  ignore_errors: true

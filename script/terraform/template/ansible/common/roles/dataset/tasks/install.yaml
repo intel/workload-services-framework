@@ -1,0 +1,12 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Install dataset
+  include_tasks:
+    file: "install-{{ dataset_name }}.yaml"
+  when: label_name in (dataset_to_be_installed|default([]))
+  vars:
+    dataset_name: "{{ label_name | split('=') | first | replace('HAS-SETUP-DATASET-','') | lower }}"

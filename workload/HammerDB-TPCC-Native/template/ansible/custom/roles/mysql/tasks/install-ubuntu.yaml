@@ -1,0 +1,131 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Install MySQL dependencies
+  shell:
+    cmd: apt install -y bzip2 gzip openssl zstd findutils libmecab2 libaio1 libsasl2-2 libnuma1 net-tools
+    executable: /bin/bash
+  become: true
+
+- name: Add MySQL group
+  ansible.builtin.group:
+    name: mysql
+  become: true
+
+- name: Add MySQL user
+  ansible.builtin.user:
+    system: true
+    non_unique: true
+    group: mysql
+    home: "{{ MYSQL_DATA_DIR }}"
+    create_home: false
+    name: mysql
+  become: true
+
+- name: Download MySQL server core deb
+  shell:
+    cmd: |
+      mkdir -p {{ MYSQL_WORKSPACE }}
+      cd {{ MYSQL_WORKSPACE }}
+      wget {{ MYSQL_SERVER_CORE_PACKAGE }}
+    executable: /bin/bash
+  register: wget_fetch_mysql_deb
+  until: wget_fetch_mysql_deb is succeeded
+  retries: 10
+  delay: 10
+
+- name: Download MySQL client core deb
+  shell:
+    cmd: |
+      mkdir -p {{ MYSQL_WORKSPACE }}
+      cd {{ MYSQL_WORKSPACE }}
+      wget {{ MYSQL_CLIENT_CORE_PACKAGE }}
+    executable: /bin/bash
+  register: wget_fetch_mysql_deb
+  until: wget_fetch_mysql_deb is succeeded
+  retries: 10
+  delay: 10
+
+- name: Download MySQL client plugins deb
+  shell:
+    cmd: |
+      mkdir -p {{ MYSQL_WORKSPACE }}
+      cd {{ MYSQL_WORKSPACE }}
+      wget {{ MYSQL_CLIENT_PLUGINS_PACKAGE }}
+    executable: /bin/bash
+  register: wget_fetch_mysql_deb
+  until: wget_fetch_mysql_deb is succeeded
+  retries: 10
+  delay: 10
+
+- name: Download MySQL client deb
+  shell:
+    cmd: |
+      mkdir -p {{ MYSQL_WORKSPACE }}
+      cd {{ MYSQL_WORKSPACE }}
+      wget {{ MYSQL_CLIENT_PACKAGE }}
+    executable: /bin/bash
+  register: wget_fetch_mysql_deb
+  until: wget_fetch_mysql_deb is succeeded
+  retries: 10
+  delay: 10
+
+- name: Download MySQL common deb
+  shell:
+    cmd: |
+      mkdir -p {{ MYSQL_WORKSPACE }}
+      cd {{ MYSQL_WORKSPACE }}
+      wget {{ MYSQL_COMMON_PACKAGE }}
+    executable: /bin/bash
+  register: wget_fetch_mysql_deb
+  until: wget_fetch_mysql_deb is succeeded
+  retries: 10
+  delay: 10
+
+- name: Install MySQL server
+  shell:
+    cmd: |
+      cd {{ MYSQL_WORKSPACE }} &&
+      dpkg -i mysql-community-server-core_{{ MYSQL_VERSION }}-1ubuntu22.04_amd64.deb &&
+      dpkg -i mysql-common_{{ MYSQL_VERSION }}-1ubuntu22.04_amd64.deb && 
+      dpkg -i mysql-community-client-plugins_{{ MYSQL_VERSION }}-1ubuntu22.04_amd64.deb && 
+      dpkg -i mysql-community-client-core_{{ MYSQL_VERSION }}-1ubuntu22.04_amd64.deb && 
+      dpkg -i mysql-community-client_{{ MYSQL_VERSION }}-1ubuntu22.04_amd64.deb &&
+      rm -rf *.deb &&
+      systemctl stop apparmor
+    executable: /bin/bash
+  become: true
+
+- name: Set MySQL server Parameters
+  set_fact:
+    mysql_datadir: "{{ MYSQL_DATA_DIR }}"
+
+- name: Create MySQL configurations
+  template:
+    src: "my.cnf.j2"
+    dest: "/etc/my.cnf"
+    mode: "0755"
+  become: true
+
+- name: Check or create the MySQL data dir
+  file:
+    path: "{{ MYSQL_DATA_DIR }}"
+    state: directory
+  become: true
+
+- name: Initialize MySQL server
+  shell:
+    cmd: mysqld --initialize-insecure --user=mysql
+    executable: /bin/bash
+
+- name: Start MySQL server start up
+  shell:
+    cmd: mysqld --user=mysql &
+    executable: /bin/bash
+
+- name: Update MySQL server
+  shell:
+    cmd: while [[ -z $(netstat -nlp4 | grep 3306) ]];  do  echo "wait for server"; sleep 1; done; sleep 10; mysql -u root -S {{ MYSQL_DATA_DIR }}/mysql.sock <<< 'use mysql; update user set host = "%"where user= "root"; flush privileges; ALTER USER "root"@"%" IDENTIFIED WITH mysql_native_password BY "Mysql@123"; flush privileges;'
+    executable: /bin/bash

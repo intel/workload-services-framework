@@ -1,0 +1,8 @@
+
+- hosts: worker-0
+  become: true
+  gather_facts: no
+  tasks:
+  - name: Install HammerDB
+    include_role:
+      name: installation

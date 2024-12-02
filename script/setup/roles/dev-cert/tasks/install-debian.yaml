@@ -1,0 +1,15 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+  - name: copy cert to workers
+    copy:
+      content: "{{ item.content | b64decode }}"
+      dest: "/usr/local/share/ca-certificates/wsf-{{ item.item.path | basename }}"
+    loop: "{{ certs_content.results | default([]) }}"
+
+  - name: update certificates
+    command: update-ca-certificates
+

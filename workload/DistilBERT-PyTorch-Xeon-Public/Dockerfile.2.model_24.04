@@ -1,0 +1,23 @@
+# distilbert-pytorch-xeon-public-model-24.04
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER="24.04"
+ARG OS_IMAGE="ubuntu"
+FROM ${OS_IMAGE}:${OS_VER} as build
+
+RUN apt update && apt install -y wget unzip git git-lfs
+
+ARG MODEL_VER="bfdd146ea2b6807255b73527f1327ca12b6ed5c4"
+ARG MODEL_REPO="https://huggingface.co/distilbert-base-uncased-finetuned-sst-2-english"
+RUN --mount=type=secret,id=.netrc,dst=/root/.netrc \
+    mkdir -p /home/models/ && \
+    git clone ${MODEL_REPO} /home/models/distilbert-base-uncased-finetuned-sst-2-english && \
+    cd /home/models/distilbert-base-uncased-finetuned-sst-2-english && git reset --hard ${MODEL_VER}
+
+# construct the final image
+FROM scratch
+COPY --from=build /home/models /home/models

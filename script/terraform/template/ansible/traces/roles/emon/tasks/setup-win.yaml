@@ -1,0 +1,47 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+    - name: stop any pending emon session
+      ansible.windows.win_shell: |
+        $setvars=(Get-ChildItem -Path "{{ emon_win_bin_path }}\*\sep_vars.ps1")[0].FullName
+        & "${setvars}"
+        emon -stop
+  
+    - name: create the emon start script
+      copy:
+        dest: "{{ trace_script_local_path }}/start-emon.ps1"
+        content: |
+          param($roi)
+          $setvars=(Get-ChildItem -Path "{{ emon_win_bin_path }}\*\sep_vars.ps1")[0].FullName
+          & "${setvars}"
+          emon -collect-edp {{ emon_options | replace('edp_file=','edp_file='+edp_file_path) }} -f "{{ trace_data_path }}\emon-${roi}.dat" 2>&1 > "{{ trace_data_path }}\emon-${roi}.logs"
+      delegate_to: localhost
+      vars:
+        edp_file_path: "{{ trace_script_path }}\\"
+
+    - name: copy emon edp file
+      copy:
+        src: "{{ wl_logs_dir }}/{{ emon_options | regex_replace('^.*edp_file=([^ ]*).*$','\\1') }}"
+        dest: "{{ trace_script_local_path }}/"
+      when: ('edp_file=' in emon_options)
+      delegate_to: localhost
+
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: false
+
+# Set-MpPreference -DisableRealtimeMonitoring $true -Force -ErrorAction SilentlyContinue
+# Set-MpPreference -DisableRealtimeMonitoring $false -Force -ErrorAction SilentlyContinue
+
+- set_fact:
+    trace_module_start_block: |
+        Invoke-WmiMethod -Path win32_process -Name create -ArgumentList "powershell -NonInteractive -ExecutionPolicy Unrestricted -File `"{{ trace_script_path }}\start-emon.ps1`" ${roi}"
+    trace_module_stop_block: |
+        $setvars=(Get-ChildItem -Path "{{ emon_win_bin_path }}\*\sep_vars.ps1")[0].FullName
+        & "${setvars}"
+        emon -stop

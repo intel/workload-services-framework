@@ -16,10 +16,17 @@
   when:
     - (csp | default('static')) == 'static' and (k8s_reset | default('false') | bool) == false
     - ( (k8s_node_labels | default([]) | join(' ')) is match('.*HAS-SETUP-HUGEPAGE-.*') )
+  no_log: true
 
 - name: Customize workers
   include_role:
     name: installation
     tasks_from: customize
   when: (role_path + '/tasks/customize.yaml') is exists
+
+- name: Wait for worker CNI pods ready
+  include_role:
+    name: "cni-{{ k8s_cni }}"
+    tasks_from: wait-complete
+  when: (role_path+'/../cni-'+k8s_cni+'/tasks/wait-complete.yaml') is exists
 

@@ -1,0 +1,53 @@
+# stream_icx_ubuntu24
+ARG OS_VER=24.04
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_IMAGE=ubuntu
+ARG STREAM_VER=5.10
+ARG COMPILER=ICX
+ARG ONEAPI_VER=2024.2.0-1-devel-ubuntu22.04
+ARG ONEAPI_IMAGE=intel/hpckit
+ARG RELEASE
+
+FROM stream-repo-ubuntu24${RELEASE} as repo
+FROM ${ONEAPI_IMAGE}:${ONEAPI_VER} as one-api
+
+ARG STREAM_INSTALL_DIR=/opt/stream
+
+COPY --from=repo /opt/stream_repo/ ${STREAM_INSTALL_DIR}/
+
+WORKDIR ${STREAM_INSTALL_DIR}
+
+COPY stream.patch ${STREAM_INSTALL_DIR}/
+
+# Patch OMP libraries for icx 2024
+RUN patch -u -b stream.c -i stream.patch
+
+
+FROM  ${OS_IMAGE}:${OS_VER}
+
+ARG STREAM_INSTALL_DIR=/opt/stream
+
+RUN apt-get update && apt-get upgrade -y && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    ca-certificates build-essential pkg-config gnupg  wget net-tools bc numactl dmidecode && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+WORKDIR ${STREAM_INSTALL_DIR}
+
+# copy stream libraries and one-api compilers
+COPY --from=one-api ${STREAM_INSTALL_DIR}/ ${STREAM_INSTALL_DIR}/
+COPY --from=one-api /opt/intel/oneapi/compiler/ /opt/intel/oneapi/compiler/
+COPY --from=one-api /opt/intel/oneapi/setvars.sh /opt/intel/oneapi/setvars.sh
+
+COPY *.sh ${STREAM_INSTALL_DIR}/
+
+ENV LD_LIBRARY_PATH=${STREAM_INSTALL_DIR}/:$LD_LIBRARY_PATH
+
+RUN mkfifo /export-logs
+CMD (./run_stream_intel_oneapi2024.sh;echo $? > status) 2>&1 | tee output.logs && \
+    tar cf /export-logs status output.logs && \
+    sleep infinity

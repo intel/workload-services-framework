@@ -1,0 +1,46 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Install Java OpenJDK 1.8 on Debian/Ubuntu
+  ansible.builtin.package:
+    name: openjdk-8-jdk
+    state: present
+  when: ansible_facts['distribution'] in ['Debian', 'Ubuntu']
+
+- name: Install Java OpenJDK 1.8 on CentOS
+  ansible.builtin.package:
+    name: java-1.8.0-openjdk
+    state: present
+  when: ansible_facts['distribution'] in ['CentOS', 'RedHat']
+
+- name: Delete existing directory
+  ansible.builtin.command: "rm -rf {{ CASSANDRA_INSTALL_DIR }}"
+
+- name: Ensure Cassandra working directory exist
+  ansible.builtin.file:
+    path: "{{ CASSANDRA_INSTALL_DIR }}"
+    state: directory
+
+- name: Download Cassandra tarball
+  get_url:
+    url: "{{ CASSANDRA_PKG }}"
+    dest: "{{ CASSANDRA_INSTALL_DIR }}/apache-cassandra-{{ CASSANDRA_VER }}-bin.tar.gz"
+
+- name: Ensure Cassandra extract directory exist
+  ansible.builtin.file:
+    path: "{{ CASSANDRA_INSTALL_DIR }}/cassandra-{{ CASSANDRA_VER }}"
+    state: directory
+
+- name: Extract Cassandra tarball
+  ansible.builtin.command: "tar -xzf {{ CASSANDRA_INSTALL_DIR }}/apache-cassandra-{{ CASSANDRA_VER }}-bin.tar.gz -C {{ CASSANDRA_INSTALL_DIR }} --strip-components=1"
+
+- name: Ensure Cassandra data directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+  loop:
+    - "{{ CASSANDRA_INSTALL_DIR }}/logs"
+    - "{{ CASSANDRA_INSTALL_DIR }}/data"

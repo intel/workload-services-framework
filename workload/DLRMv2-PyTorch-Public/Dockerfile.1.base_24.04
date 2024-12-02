@@ -1,0 +1,52 @@
+# dlrmv2-pytorch-public-24.04
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+ARG BASE_IMG="pytorch-intel-public-24.04${RELEASE}"
+
+FROM ai-common-img${RELEASE} AS ai-common
+
+ARG BASE_IMG
+FROM ${BASE_IMG}
+
+WORKDIR /home/workspace/benchmark
+
+# Git clone from models.git
+ARG INTEL_MODEL_ZOO_REPO="https://github.com/intel/ai-reference-models"
+ARG INTEL_MODEL_ZOO_VER="pytorch-r2.3-models"
+
+RUN --mount=type=secret,id=.netrc,dst=/root/.netrc \
+    git clone -b v3.1.1 ${INTEL_MODEL_ZOO_REPO} && \
+    cd ai-reference-models #&& \
+    git reset --hard ${INTEL_MODEL_ZOO_VER}
+
+SHELL ["/bin/bash", "-c"]
+
+# install dependencies
+RUN cd ai-reference-models/quickstart/recommendation/pytorch/torchrec_dlrm && \
+    pip install --no-deps -r requirements.txt && \
+    pip install pyre_extensions fbgemm_gpu==0.3.2 iopath
+
+ARG OPENVINO_VER="2024.1.0"
+ARG OPENVINO_REPO="pip"
+RUN pip install openvino==${OPENVINO_VER}
+
+WORKDIR /home/workspace/benchmark/ai-reference-models/models/recommendation/pytorch/torchrec_dlrm
+
+COPY dlrm_main.patch .
+RUN git apply dlrm_main.patch
+
+COPY --from=ai-common /home/ai_common ./ai_common
+COPY run_test.sh .
+
+RUN mkfifo /export-logs
+
+CMD ( ./run_test.sh; echo $? > status ) 2>&1 | tee benchmark_${MODE}_${TOPOLOGY}_${PRECISION}_${FUNCTION}_${DATA_TYPE}_$(date +"%m-%d-%y-%H-%M-%S").log \
+&& if [ `grep -c 'Throughput:\|eval_accuracy' benchmark_*.log` -eq 0 ];then echo 1 > status; fi \
+&& tar cPf /export-logs status $(find . -name "*.log") \
+&& sleep infinity
+

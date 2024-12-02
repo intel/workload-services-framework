@@ -1,9 +1,0 @@
-#
-# Apache v2 license
-# Copyright (C) 2023 Intel Corporation
-# SPDX-License-Identifier: Apache-2.0
-#
-dlb_driver_version: "7.8.0"
-dlb_driver_package: "https://downloadmirror.intel.com/744007/dlb_linux_src_release_{{dlb_driver_version}}_2022_09_20.txz"
-dlb_kubernetes_plugin_version: "release-0.27"
-dlb_kubernetes_plugin_package: "https://github.com/intel/intel-device-plugins-for-kubernetes/deployments/dlb_plugin?ref={{ dlb_kubernetes_plugin_version }}"

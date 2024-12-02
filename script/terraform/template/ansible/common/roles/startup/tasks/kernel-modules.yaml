@@ -14,13 +14,24 @@
 - name: "modprobe modules"
   command: "modprobe {{ item }}"
   loop: "{{ kernel_module_list }}"
+  register: modules_orig
   ignore_errors: true
-  when: kernel_module_list | length > 0
+
+- name: "try modprobe lower-case modules"
+  command: "modprobe {{ item }}"
+  loop: "{{ modules_orig.results | rejectattr('rc','==',0) | map(attribute='item') | map('lower') }}"
+  register: modules_lower
+  ignore_errors: true
 
 - name: Update modules.conf
   blockinfile:
     path: "/etc/modules-load.d/99-wsf-settings.conf"
-    block: "{{ kernel_module_list | join('\n') }}"
+    block: "{{ (modules_orig.results+modules_lower.results) | rejectattr('rc','>',0) | map(attribute='item') | unique | join('\n') }}"
     create: yes
+  when: kernel_module_list | length > 0
+
+- name: Print out kernel modules
+  debug:
+    msg: "[{{ inventory_hostname }}]: Host Kernel Modules+ {{ (modules_orig.results+modules_lower.results) | rejectattr('rc','>',0) | map(attribute='item') | unique | join(',') }}"
   when: kernel_module_list | length > 0
 

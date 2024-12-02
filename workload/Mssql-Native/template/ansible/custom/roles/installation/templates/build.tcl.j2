@@ -1,0 +1,35 @@
+global complete
+proc wait_to_complete {} {
+    global complete
+    set complete [vucomplete]
+    puts "Is it complete ?: $complete"
+    if {!$complete} {
+        after {{ wl_tunables.TPCC_WAIT_COMPLETE_MILLSECONDS }} wait_to_complete
+    } else {
+        puts "BUILD SCHEMA COMPLETE"
+        exit
+    }
+}
+
+puts "SETTING CONFIGURATION"
+dbset db mssqls
+dbset bm TPC-C
+diset connection mssqls_server {{ hostvars["worker-0"]["private_ip"] }}
+diset connection mssqls_port 1433
+diset connection mssqls_tcp true
+diset connection mssqls_authentication sql
+diset connection mssqls_uid "sqladmin"
+diset connection mssqls_pass "ABCDegf123"
+diset connection mssqls_encrypt_connection true
+diset connection mssqls_trust_server_cert true
+diset connection mssqls_odbc_driver "ODBC Driver 17 for SQL Server"
+diset tpcc mssqls_count_ware  {{ wl_tunables.TPCC_NUM_WAREHOUSES }}
+diset tpcc mssqls_num_vu {{ wl_tunables.TPCC_THREADS_BUILD_SCHEMA }}
+dict set configmssqlserver tpcc mssqls_dbase tempdb
+dict set configmssqlserver tpcc mssqls_imdb false
+dict set configmssqlserver tpcc mssqls_bucket 1
+dict set configmssqlserver tpcc mssqls_durability SCHEMA_AND_DATA
+print dict
+buildschema
+wait_to_complete
+vwait forever

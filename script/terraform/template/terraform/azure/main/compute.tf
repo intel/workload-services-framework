@@ -21,7 +21,9 @@ resource "azurerm_linux_virtual_machine" "default" {
   eviction_policy     = var.spot_instance?"Delete":null
   max_bid_price       = var.spot_instance?var.spot_price:null
 
-  zone                = each.value.data_disk_spec!=null?each.value.data_disk_spec.disk_type=="UltraSSD_LRS"?local.availability_zone:null:null
+  zone                = each.value.data_disk_spec!=null?contains(local.speed_adjustable_disk_types, each.value.data_disk_spec.disk_type)?local.availability_zone:null:null
+  vtpm_enabled        = (local.os_image_sku_arch[each.key] == "cvm")
+  secure_boot_enabled = (local.os_image_sku_arch[each.key] == "cvm")
 
   network_interface_ids = concat([
     azurerm_network_interface.default[each.key].id,
@@ -39,6 +41,8 @@ resource "azurerm_linux_virtual_machine" "default" {
     caching              = "ReadWrite"
     storage_account_type = each.value.os_disk_type
     disk_size_gb         = each.value.os_disk_size
+    disk_encryption_set_id = var.encrypt_disk?(var.disk_encryption_set_name==null?azurerm_disk_encryption_set.default.0.id:data.azurerm_disk_encryption_set.default.0.id):null
+    security_encryption_type = (local.os_image_sku_arch[each.key] == "cvm")?var.security_encryption_type:null
   }
 
   dynamic "source_image_reference" {
@@ -46,8 +50,8 @@ resource "azurerm_linux_virtual_machine" "default" {
 
     content {
       publisher = local.os_image_publisher[each.value.os_type]
-      offer     = local.os_image_offer[each.value.os_type]
-      sku       = format("%s%s", local.os_image_sku[each.value.os_type], local.os_image_sku_suffixes[each.key]) 
+      offer     = local.os_image_offer[each.value.os_type][local.os_image_sku_arch[each.key]]
+      sku       = local.os_image_sku[each.value.os_type][local.os_image_sku_arch[each.key]]
       version   = "latest"
     }
   }
@@ -56,7 +60,7 @@ resource "azurerm_linux_virtual_machine" "default" {
     for_each = each.value.data_disk_spec!=null?[each.value.data_disk_spec.disk_type]:[]
 
     content {
-      ultra_ssd_enabled = additional_capabilities.value=="UltraSSD_LRS"?true:false
+      ultra_ssd_enabled = contains(local.speed_adjustable_disk_types, additional_capabilities.value)?true:false
     }
   }
 
@@ -72,9 +76,13 @@ resource "random_password" "default" {
     for k,v in local.vms : 1 if replace(v.os_type,"windows","")!=v.os_type
   ])
 
-  length = 16
-  special = true
-  override_special = "!#&*()_=+[]<>?"
+  length            = 16
+  special           = true
+  override_special  = "!#&*()_=+[]?"
+  min_special       = 1
+  min_numeric       = 1
+  min_lower         = 1
+  min_upper         = 1
 }
   
 resource "azurerm_windows_virtual_machine" "default" {
@@ -87,7 +95,9 @@ resource "azurerm_windows_virtual_machine" "default" {
   resource_group_name = local.resource_group_name
   location = local.location
   size = each.value.instance_type
-  zone = each.value.data_disk_spec!=null?each.value.data_disk_spec.disk_type=="UltraSSD_LRS"?local.availability_zone:null:null
+  zone = each.value.data_disk_spec!=null?contains(local.speed_adjustable_disk_types, each.value.data_disk_spec.disk_type)?local.availability_zone:null:null
+  vtpm_enabled        = (local.os_image_sku_arch[each.key] == "cvm")
+  secure_boot_enabled = (local.os_image_sku_arch[each.key] == "cvm")
 
   priority = var.spot_instance?"Spot":"Regular"
   max_bid_price = var.spot_instance?var.spot_price:null
@@ -107,6 +117,8 @@ resource "azurerm_windows_virtual_machine" "default" {
     caching = "ReadWrite"
     storage_account_type = each.value.os_disk_type
     disk_size_gb = each.value.os_disk_size
+    disk_encryption_set_id = var.encrypt_disk?(var.disk_encryption_set_name==null?azurerm_disk_encryption_set.default.0.id:data.azurerm_disk_encryption_set.default.0.id):null
+    security_encryption_type = (local.os_image_sku_arch[each.key] == "cvm")?var.security_encryption_type:null
   }
 
   admin_username = local.os_image_user[each.value.os_type]
@@ -119,8 +131,8 @@ resource "azurerm_windows_virtual_machine" "default" {
 
     content {
       publisher = local.os_image_publisher[each.value.os_type]
-      offer     = local.os_image_offer[each.value.os_type]
-      sku       = format("%s%s", local.os_image_sku[each.value.os_type], local.os_image_sku_suffixes[each.key])
+      offer     = local.os_image_offer[each.value.os_type][local.os_image_sku_arch[each.key]]
+      sku       = local.os_image_sku[each.value.os_type][local.os_image_sku_arch[each.key]]
       version   = "latest"
     }
   }
@@ -129,7 +141,7 @@ resource "azurerm_windows_virtual_machine" "default" {
     for_each = each.value.data_disk_spec!=null?[each.value.data_disk_spec.disk_type]:[]
 
     content {
-      ultra_ssd_enabled = additional_capabilities.value=="UltraSSD_LRS"?true:false
+      ultra_ssd_enabled = contains(local.speed_adjustable_disk_types, additional_capabilities.value)?true:false
     }
   }
 
@@ -141,9 +153,7 @@ resource "azurerm_windows_virtual_machine" "default" {
 }
 
 locals {
-  setup_winrm_script = base64encode(templatefile("${path.module}/templates/setup-winrm.ps1", {
-    winrm_port = var.winrm_port
-  }))
+  setup_winrm_script = "${path.module}/templates/setup-winrm-disks.ps1"
 }
 
 resource "azurerm_virtual_machine_extension" "setup" {
@@ -160,13 +170,16 @@ resource "azurerm_virtual_machine_extension" "setup" {
 
   protected_settings = <<EOF
 {
-  "commandToExecute": "powershell -command \"[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${local.setup_winrm_script}')) | Out-File -filepath postBuild.ps1\" && powershell -ExecutionPolicy Unrestricted -File postBuild.ps1"
+  "commandToExecute": "powershell -command \"[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${base64encode(templatefile(local.setup_winrm_script, {
+    winrm_port = var.winrm_port
+    local_disk = each.value.data_disk_spec!=null?(each.value.data_disk_spec.disk_type!="local"?false:true):false
+  }))}')) | Out-File -filepath postBuild.ps1\" && powershell -ExecutionPolicy Unrestricted -File postBuild.ps1"
 }
 EOF
 
   depends_on = [
-    azurerm_windows_virtual_machine.default
-  ]
+    azurerm_windows_virtual_machine.default,
+    azurerm_virtual_machine_data_disk_attachment.default]
 
   tags = var.common_tags
 }

@@ -1,0 +1,25 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Remove VXLAN devices
+  systemd:
+    name: wsf-vxlan
+    state: stopped
+  ignore_errors: true
+  no_log: true
+
+- name: Destroy VXLAN bridge
+  virt_net:
+    name: "{{ kvm_bridge_name }}"
+    command: destroy
+  ignore_errors: true
+
+- name: Undefine VXLAN bridge
+  virt_net:
+    name: "{{ kvm_bridge_name }}"
+    command: undefine
+  ignore_errors: true
+

@@ -1,0 +1,25 @@
+# distilbert-pytorch-xeon-public-dataset-24.04
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER="24.04"
+ARG OS_IMAGE="ubuntu"
+FROM ${OS_IMAGE}:${OS_VER} as build
+
+RUN apt update && apt install -y wget unzip
+
+ARG DATASET__VER="9f81648d4199384278b86e315dac217c"
+ARG DATASET_REPO="https://dl.fbaipublicfiles.com/glue/data/SST-2.zip"
+RUN mkdir -p /home/dataset && \
+    cd /home/dataset && \
+    wget -T 5 --tries=inf ${DATASET_REPO} && \
+    unzip SST-2.zip && rm -f SST-2.zip
+
+ENV DATASET_DIR="/home/dataset/SST-2"
+
+# construct the final image
+FROM scratch
+COPY --from=build /home/dataset /home/dataset

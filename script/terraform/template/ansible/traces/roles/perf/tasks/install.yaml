@@ -6,53 +6,22 @@
 
 - block:
 
+  - name: Check if perf exists
+    command: perf -v
+    register: perf_rc
+    ignore_errors: true
+
   - name: Detect OS
     shell:
       cmd: ". /etc/os-release; echo $ID"
       executable: /bin/bash
     register: os
-
+    when: perf_rc is failed
+  
   - name: Install perf
     include_tasks:
-      file: "install-{{ (os.stdout == 'rhel' or os.stdout =='anolis') | ternary('centos', os.stdout) }}.yaml"
-
-  - name: Append the start script
-    blockinfile:
-      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-start-trace.sh"
-      marker: "# perf {mark}"
-      insertbefore: "^wait"
-      block: |
-        (
-          mkdir -p /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf
-          cd /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf
-          if is_roi "{{ trace_node.0 }}"; then
-            date -Ins >> TRACE_START
-            nohup perf {{ perf_action }} {{ perf_options }} --output perf-$roi.record > perf-$roi.logs 2>&1 &
-            echo $! > perf.pid
-            disown
-          else
-            echo "---" >> TRACE_START
-          fi
-        ) &
-
-  - name: Append the stop script
-    blockinfile:
-      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-stop-trace.sh"
-      marker: "# perf {mark}"
-      insertbefore: "^wait"
-      block: |
-        (
-          cd /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-perf
-          if is_roi "{{ trace_node.0 }}"; then
-            date -Ins >> TRACE_STOP
-            kill $(cat perf.pid)
-            while [ $(ps aux | grep -F "perf {{ perf_action }}" | wc -l) -gt 1 ]; do
-              sleep 1s
-            done
-            chmod a+r *.record
-          else
-            echo "---" >> TRACE_STOP
-          fi
-        ) &
-
+      file: "install-{{ (os.stdout in ['ubuntu','debian']) | ternary('debian','centos') }}.yaml"
+    when: perf_rc is failed
+  
   delegate_to: "{{ trace_node.1 }}"
+  become: false

@@ -15,7 +15,7 @@
     key: "https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ os.stdout_lines | last | join('.') | first }}"
     state: present
   become: true
-  when: ((os.stdout_lines | first) in ['centos','rhel'])
+  when: ((os.stdout_lines | first) not in ['ubuntu','debian'])
 
 - name: Install epel-release
   yum:
@@ -25,7 +25,7 @@
   until: yumrc is success
   retries: 10
   delay: 10
-  when: ((os.stdout_lines | first) in ['centos','rhel'])
+  when: ((os.stdout_lines | first) not in ['ubuntu','debian'])
 
 - name: Install cmake, make, m4, gawk
   package:
@@ -51,6 +51,7 @@
       until: pkgrc is success
       retries: 10
       delay: 10
+      when: daemonize | default(true) | bool
 
   rescue:
 

@@ -126,12 +126,12 @@ set_instance_param() {
     #cdc_raw_directory
     cdc_line=`sed -n '/'"cdc_raw_directory:"'/=' $conf_path/cassandra.yaml`
     cdc_raw_directory="cdc_raw_directory: /$base_path/current_data/cdc_raw_directory"
-    sed -i "${cdc_line}c $cdc_raw_directory" $conf_path/cassandra.yaml
+    sed -i "${cdc_line}c $cdc_raw_directory" $conf_path/cassandra.yaml    
 
     #hints_directory
     hints_line=`sed -n '/'"hints_directory:"'/=' $conf_path/cassandra.yaml`
     hints_directory="hints_directory: /$base_path/current_data/hints"
-    sed -i "${hints_line}c $hints_directory" $conf_path/cassandra.yaml
+    sed -i "${hints_line}c $hints_directory" $conf_path/cassandra.yaml    
 
     #native_transport_port
     native_transport_port=$(($cassandra_native_transport_port+$index))
@@ -160,10 +160,10 @@ done
 pinned_list_inx=0
 
 get_vcores_list() {
-    instance_num=${cassandra_server_instance_num}
-	get_numa_node_num
+    instance_num=${cassandra_server_instance_num}   	
+	get_numa_node_num	
     div=$(( (instance_num + numa_node_num - 1) / numa_node_num)) #ceil
-
+	
     # NUMA node0 CPU(s):     0-31,128-159
     # NUMA node1 CPU(s):     32-63,160-191
     # NUMA node2 CPU(s):     64-95,192-223
@@ -208,7 +208,7 @@ start_cassandra_instance() {
 
     #copy all cassandra files,real files no softlink
     cp -RL ${cassandra_home}*  $user_home
-    chown -R $user_name:$user_name ${user_home}
+    chown -R $user_name:$user_name ${user_home} 
 
     
     #configure each instance
@@ -225,11 +225,11 @@ start_cassandra_instance() {
         export NUMACTL_ARGS=$numa_options
     fi
     #if set numactl_vcores_enable, pinned each instance to half physical vcores and half virtual vcores.
-    #This pinned method can improve the throughput
+    #This pinned method can improve the throughput    
     vcores=${pinned_vcores_list[$index]}
     numa_node=${pinned_numa_list[$index]}
     if  ${cassandra_numactl_vcores_enable:-true}; then
-        export NUMACTL_ARGS="-m $numa_node -C ${vcores}"
+        export NUMACTL_ARGS="-m $numa_node -C ${vcores}"        
     fi
     echo "DEBUG:Instance $index: NUMACTL_ARGS=$NUMACTL_ARGS"
 
@@ -284,7 +284,7 @@ get_numa_node_num
 get_vcores_list
 #set instance parameters and start cassandra instance on each numa node
 for(( inx=0; inx < $cassandra_server_instance_num; inx++ )); do
-    start_cassandra_instance ${inx}
+    start_cassandra_instance ${inx} 
 done
 
 #start DB data clean process, two parameters

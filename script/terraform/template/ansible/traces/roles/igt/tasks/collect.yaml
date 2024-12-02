@@ -1,0 +1,26 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Get igt files
+    shell:
+      cmd: ls -1
+      chdir: "{{ trace_data_path }}"
+      executable: /bin/bash
+    register: igt_files
+    
+  - name: Fetch igt files
+    fetch:
+      src: "{{ trace_data_path }}/{{ item }}"
+      dest: "{{ trace_data_local_path }}/"
+      flat: true
+    loop: "{{ igt_files.stdout_lines | reject('==','igt.pid') }}"
+  
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: yes
+  become: no
+

@@ -38,7 +38,7 @@ fi
         parted -s $device \
           mklabel gpt \
           mkpart primary ${disk_format} 0% 100%
-        sync
+        sync        
         devpart="$(lsblk -l -p $device | tail -n1 | cut -f1 -d' ')"
         devuuid="$(uuidgen)"
         if [ "${disk_format}" == "xfs" ]; then

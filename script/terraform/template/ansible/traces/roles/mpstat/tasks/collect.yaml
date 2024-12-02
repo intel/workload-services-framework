@@ -1,0 +1,26 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Get mpstat files
+    shell:
+      cmd: ls -1
+      chdir: "{{ trace_data_path }}"
+      executable: /bin/bash
+    register: mpstat_files
+  
+  - name: Fetch mpstat files
+    fetch:
+      src: "{{ trace_data_path }}/{{ item }}"
+      dest: "{{ trace_data_local_path }}/"
+      flat: yes
+    loop: "{{ mpstat_files.stdout_lines | reject('==', 'mpstat.pid') }}"
+  
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: false
+

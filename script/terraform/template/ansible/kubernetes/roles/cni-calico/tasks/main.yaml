@@ -4,26 +4,26 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: Install calicoctl as a Kubernetes pod
-  shell: "kubectl create -f {{ k8s_calicoctl_rep }}"
-
-- name: Add calicoctl alias
-  lineinfile:
-    path=/home/{{ ansible_user }}/.bashrc
-    line='alias calicoctl="kubectl exec -i -n kube-system calicoctl -- /calicoctl"'
-    state=present
-    insertafter=EOF
+- name: Copy from local
+  delegate_to: localhost
+  copy:
+    src: "{{ role_path }}/scripts/{{ (k8s_calico_encapsulation | lower == 'vxlan') | ternary('calico-vxlan','calico') }}.yaml"
+    dest: "/tmp/{{ wl_namespace }}-calico.yaml"
+  when:
+  - k8s_calico_version == k8s_calico_local_version
+  - (role_path+'/scripts/'+((k8s_calico_encapsulation | lower == 'vxlan') | ternary('calico-vxlan.yaml','calico.yaml'))) is exists
 
 - name: Download calico.yaml to local
   delegate_to: localhost
   get_url:
-    url: "{{ k8s_calico_vxlan_repo if ( k8s_calico_encapsulation | lower == 'vxlan' ) else k8s_calico_ipinip_repo }}"
+    url: "{{ k8s_calico_vxlan_yaml if ( k8s_calico_encapsulation | lower == 'vxlan' ) else k8s_calico_ipinip_yaml }}"
     dest: "/tmp/{{ wl_namespace }}-calico.yaml"
-    mode: +rx
+    mode: +r
   register: getrc
   until: getrc is success
   retries: 10
   delay: 5
+  when: (k8s_calico_version != k8s_calico_local_version) or ((role_path+'/scripts/'+((k8s_calico_encapsulation | lower == 'vxlan') | ternary('calico-vxlan.yaml','calico.yaml'))) is not exists)
 
 - name: Replace calico.yaml with custom cidr
   delegate_to: localhost
@@ -46,7 +46,9 @@
     block: "{{ ip_detection_lines | indent(width=12, first=True) }}"
   when: k8s_calico_iface != ''
   vars:
-    ip_detection_lines: "- name: IP_AUTODETECTION_METHOD\n  value: 'interface={{ k8s_calico_iface }}'"
+    addr: "{{ k8s_apiserver_ip|default(private_ip,true) }}"
+    ip: "{% if (addr|ipaddr) %}{{ addr }}{% else %}{{ query('dig',addr)|first }}{% endif %}"
+    ip_detection_lines: "- name: IP_AUTODETECTION_METHOD\n  value: '{{ (k8s_calico_iface=='can-reach') | ternary('can-reach='+ip,((k8s_calico_iface in ['first-round','kubernetes-internal-ip']) or ('=' in k8s_calico_iface))|ternary(k8s_calico_iface,'interface='+k8s_calico_iface)) }}'"
 
 - name: Replace calico.yaml CrossSubnet with Always if vxlan enabled
   delegate_to: localhost
@@ -55,6 +57,13 @@
     regexp: '(\s+)value: "CrossSubnet"(\s+.*)?$'
     replace: '\1value: "Always"\2'
   when: (k8s_calico_encapsulation | lower) == 'vxlan'
+
+- name: Change the CNI repo
+  delegate_to: localhost
+  replace:
+    path: "/tmp/{{ wl_namespace }}-calico.yaml"
+    regexp: '^(\s*image:\s*)docker.io/calico(/.*)$'
+    replace: '\1{{ k8s_calico_cni_repo }}\2'
 
 - name: Copy replaced calico.yaml to remote
   ansible.builtin.copy:
@@ -72,6 +81,6 @@
   async: 30
   poll: 0
 
-- name: Wait for calico ready
-  shell: |
-    timeout 300s bash -c "while ! kubectl wait --namespace=kube-system pod --for=condition=Ready -l k8s-app=calico-node --timeout=30s; do sleep 1s; done"
+- name: Wait for the controller calico ready
+  include_tasks:
+    file: wait-complete.yaml

@@ -1,0 +1,53 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Check if pcm-tpmi exists
+  command: "/usr/local/sbin/pcm-tpmi --version"
+  register: tpmi_rc
+  ignore_errors: true
+
+- block:
+  - name: Install dependence
+    package:
+      name:
+      - git
+      - cmake
+      - make
+      - g++
+      - gcc
+      state: present
+    register: pkgrc
+    until: pkgrc is success
+    retries: 10
+    delay: 10
+      
+  - name: Download pcm source code
+    git:
+      repo: "{{ tpmi_package }}"
+      dest: '/tmp/{{ wl_namespace }}-tpmi/pcm'
+      version: "{{ tpmi_version }}"
+      force: yes
+
+  - name: Update submodules
+    command: "git submodule update --init --recursive"
+    args:
+      chdir: '/tmp/{{ wl_namespace }}-tpmi/pcm'
+
+  - name: Compile pcm-tpmi
+    shell:
+      cmd: |
+        mkdir build
+        cd build
+        cmake ..
+        cmake --build . --parallel
+      executable: /bin/bash
+      chdir: "/tmp/{{ wl_namespace }}-tpmi/pcm"
+
+  - name: Install pcm-tpmi
+    command: "make install"
+    args:
+      chdir: '/tmp/{{ wl_namespace }}-tpmi/pcm/build'
+    become: true
+  when: tpmi_rc is failed

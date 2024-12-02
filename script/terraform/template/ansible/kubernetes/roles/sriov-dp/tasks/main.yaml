@@ -1,0 +1,36 @@
+# install go and compile sriov-cni
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Install sriov-cni
+  include_role: 
+    name: sriov-cni
+    apply:
+      delegate_to: "{{ worker_host }}"
+  ignore_errors: yes
+  with_items: "{{ groups.worker }}"
+  loop_control:
+    loop_var: worker_host
+
+- name: check sriov device plugin installed or not
+  shell: "kubectl get pods --all-namespaces | grep -i sriov-device-plugin"
+  register: sriov_dp_installed
+
+- name: install sriov device plugin if it is not installed
+  block:
+    - name: Install sriov-dp config map
+      command: "kubectl apply -f {{ sriov_dp_configmap_url }}"
+
+    - name: Install sriov-dp daemonset
+      command: "kubectl apply -f {{ sriov_dp_daemonset_url }}"
+
+    - name: Wait for sriov-dp pod ready
+      shell: "kubectl wait --namespace=kube-system pod --for=condition=Ready -l app=sriovdp --timeout=600s"
+      register: wait_ready
+      retries: 10
+      delay: 3
+      until: wait_ready.rc == 0
+  ignore_errors: yes
+  when: sriov_dp_installed.rc != 0

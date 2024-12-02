@@ -11,7 +11,7 @@ The terraform backend can be used to validate workloads on a remote cluster, On-
 
 If this is your first time, run the terraform build command:   
 
-> Note: mentioned below commands should be executed from a build folder such as ~/applications.benchmarking.benchmark.platform-hero-features/build# make build_terraform
+> Note: mentioned below commands should be executed from a build folder such as ~/workload-services-framework/build# make build_terraform
 
 ```
 make build_terraform
@@ -71,7 +71,7 @@ make
 
 If your terraform validation is interrupted for any reason, the Cloud resource may remain active. You can explicitly cleanup any Cloud resources as follows:
 
-> Note: mentioned below commands should be executed from the required workload folder such as ~/applications.benchmarking.benchmark.platform-hero-features/build/workload/OpenSSL3-RSAMB# make -C ../.. azure
+> Note: mentioned below commands should be executed from the required workload folder such as ~/workload-services-framework/build/workload/OpenSSL3-RSAMB# make -C ../.. azure
 
 ```shell
 make -C ../.. [aws|gcp|azure|tencent|alicloud]
@@ -95,7 +95,20 @@ make
 ./ctest.sh -N
 ```
 
-## Telemetry Trace
+## Setup Terraform for KVM Validation
+
+- Follow the instructions in the [WSF KVM Setup][WSF KVM Setup] to setup the KVM environment.   
+- Customize [`terraform-config.kvm.tf`][terraform-config.kvm.tf] to specify your KVM host information.  
+
+Now you can run any workload as follows:    
+
+```shell
+cd workload/<workload>
+make
+./ctest.sh -N
+```
+
+## Telemetry Trace and Publishing Options
 
 See [Trace Module][Trace Module] for available trace options. You can enable telemetry trace modules during the workload validation as follows:  
 
@@ -113,6 +126,8 @@ cmake -DTERRAFORM_OPTIONS=--svrinfo ..
 cd workload/<workload>
 ./ctest.sh -N
 ```
+
+See also: [Publishing Module Options][Publishing Module Options].  
 
 ## Debugging
 
@@ -180,4 +195,7 @@ $ exit
 [WSF Cloud Setup]: setup-wsf.md#cloud-development-setup
 [WSF On-Premises Setup]: setup-wsf.md#on-premises-development-setup
 [terraform-config.static.tf]: ../../../script/terraform/terraform-config.static.tf
+[WSF KVM Setup]: setup-wsf.md#kvm-development-setup
+[terraform-config.kvm.tf]: ../../../script/terraform/terraform-config.kvm.tf
 [Trace Module]: ../executing-workload/terraform-options.md#trace-module-parameters
+[Publishing Module Options]: ../executing-workload/terraform-options.md#publishing-module-parameters

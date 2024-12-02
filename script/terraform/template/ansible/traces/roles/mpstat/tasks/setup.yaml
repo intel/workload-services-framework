@@ -1,0 +1,15 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- set_fact:
+    trace_module_start_block: |
+        export S_TIME_FORMAT=ISO
+        nohup mpstat {{ mpstat_options }} {{ mpstat_interval }} > mpstat-$roi.logs 2>&1 &
+        echo $! > mpstat.pid
+        disown
+    trace_module_stop_block: |
+        kill $(cat mpstat.pid)
+        tail -f --pid=$(cat mpstat.pid) /dev/null

@@ -104,3 +104,9 @@ variable "cpu_model_timeout" {
   type = string
   default = "10m"
 }
+
+variable "credit_specification" {
+  type = string
+  default = "Unlimited"
+}
+

@@ -1,0 +1,36 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Install helm
+  include_role:
+    name: helm
+
+- name: Create NRI repo directory
+  file:
+    path: "/tmp/{{ wl_namespace }}-nri"
+    state: directory
+
+- name: git clone NRI
+  git:
+    repo: "{{ nri_repository }}"
+    dest: "/tmp/{{ wl_namespace }}-nri"
+    version: "{{ nri_version }}"
+    depth: 1
+
+- name: Install NRI
+  command:
+    cmd: "helm install {{ nri_resource_policy }} --namespace kube-system deployment/helm/{{ nri_resource_policy }}/ {{ nri_installer_options }}"
+    chdir: "/tmp/{{ wl_namespace }}-nri"
+
+- name: wait until NRI is installed
+  shell:
+    cmd: "timeout 5m kubectl rollout status -n kube-system daemonset nri-resource-policy-{{ nri_resource_policy }}" 
+
+- name: Remove NRI repo directory
+  file:
+    path: "/tmp/{{ wl_namespace }}-nri"
+    state: absent
+

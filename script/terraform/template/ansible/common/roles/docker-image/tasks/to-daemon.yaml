@@ -1,0 +1,107 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- set_fact:
+    local_daemon_url: "localhost:{{ (local_daemon_port|int) + (play_hosts|ansible.utils.index_of('eq',inventory_hostname,wantlist=true)|first) }}"
+
+- block:
+
+    - name: setup port forwarding
+      shell:
+        cmd: |
+          nohup ssh -4 -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -fNL {{ local_daemon_url }}:/var/run/docker.sock -i {{ ansible_private_key_file }} >> /tmp/{{ wl_namespace }}-ssh.logs 2>&1 &
+          disown
+        executable: /bin/bash
+      delegate_to: localhost
+      become: false
+
+    - name: inspect local images
+      command: "docker image inspect {{ item.key }}"
+      register: inspect_l
+      loop: "{{ wl_docker_images | dict2items | rejectattr('key','match',(skopeo_sut_accessible_registries|split(',')|reject('==','')|default(['NO-REGISTRY'],true)|map('regex_replace','^(.*)$','^\\1.*$')|join('|'))) }}"
+      loop_control:
+        label: "{{ item.key }}"
+      become: true
+      delegate_to: localhost
+      ignore_errors: true
+      no_log: true
+
+    - name: inspect remote images
+      command: "docker image inspect {{ item.item.key }}"
+      environment:
+        ALL_PROXY: ""
+        all_proxy: ""
+      register: inspect_r
+      loop: "{{ inspect_l.results }}"
+      loop_control:
+        label: "{{ item.item.key }}"
+      ignore_errors: true
+      no_log: true
+
+    - name: copy daemon images to daemon
+      include_tasks:
+        file: to-daemon-copy.yaml
+      when:
+      - inspect.rc == 0
+      - inspect.stdout | from_json | map(attribute='Config') | map(attribute='Labels') | map(attribute='BUILD_ID') | map('default','NB',true) | difference(inspect_r.results[inspect_idx].stdout | default('[{"Config":{"Labels":{}}}]',true) | from_json | map(attribute='Config') | map(attribute='Labels') | map(attribute='BUILD_ID') | map('default','NC',true)) | length > 0
+      loop: "{{ inspect_l.results }}"
+      loop_control:
+        loop_var: inspect
+        index_var: inspect_idx
+        label: "{{ inspect.item.key }}"
+      no_log: true
+
+    - name: Inspect registry images
+      command: "skopeo inspect {{ skopeo_inspect_options }} --tls-verify={{ ((item.item.value|bool) and (item.item.key is not match('^'+(skopeo_insecure_registries|split(',')|reject('==','')|default(['NO-REGISTRY'],true)|join('|'))+'.*$'))) | ternary('true','false') }} docker://{{ item.item.key }}"
+      environment:
+        ALL_PROXY: ""
+        all_proxy: ""
+      register: inspect_lreg
+      when: item.rc != 0
+      loop: "{{ inspect_l.results }}"
+      loop_control:
+        label: "{{ item.item.key }}"
+      delegate_to: localhost
+      become: true
+      ignore_errors: true
+      no_log: true
+
+    - name: copy registry images to daemon
+      include_tasks:
+        file: to-daemon-copy.yaml
+      when:
+      - inspect.rc != 0
+      - ('BUILD_ID' | extract('Labels' | extract(inspect_lreg.results[inspect_idx].stdout | default('{"Labels":{}}',true) | from_json)) | default('NB',true)) not in (inspect_r.results[inspect_idx].stdout | default('[{"Config":{"Labels":{}}}]',true) | from_json | map(attribute='Config') | map(attribute='Labels') | map(attribute='BUILD_ID') | map('default','NC',true))
+      loop: "{{ inspect_l.results }}"
+      loop_control:
+        loop_var: inspect
+        index_var: inspect_idx
+        label: "{{ inspect.item.key }}"
+      no_log: true
+
+    - name: wait for docker images to be ready
+      shell:
+        cmd: |
+          timeout {{ skopeo_wait_ready }} bash -c '
+            {% for image in (inspect_l.results | map(attribute='item') | map(attribute='key')) %}
+              while ! docker inspect {{ image }} > /dev/null 2>&1; do sleep 1s; done &
+            {% endfor %}
+            wait
+          '
+        executable: /bin/bash
+      ignore_errors: true
+      become: false
+
+  always:
+
+    - name: cancel port forwarding
+      shell:
+        cmd: |
+          ssh -4 -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -i {{ ansible_private_key_file }} -O cancel -L {{ local_daemon_url }}:/var/run/docker.sock > /dev/null 2>&1
+        executable: /bin/bash
+      delegate_to: localhost
+      become: false
+

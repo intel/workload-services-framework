@@ -1,0 +1,22 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+MYSQL_PACKAGE_WIN: "https://cdn.mysql.com/archives/mysql-8.0/mysql-8.0.33-winx64.zip"
+
+MYSQL_VERSION: "8.0.33"
+MYSQL_REPO: "https://repo.mysql.com/apt/ubuntu/pool/mysql-8.0/m/mysql-community"
+MYSQL_SERVER_CORE_VERSION: "8.0.33"
+MYSQL_SERVER_CORE_PACKAGE: "{{ MYSQL_REPO }}/mysql-community-server-core_{{ MYSQL_SERVER_CORE_VERSION }}-1ubuntu22.04_amd64.deb"
+MYSQL_CLIENT_CORE_VERSION: "8.0.33"
+MYSQL_CLIENT_CORE_PACKAGE: "{{ MYSQL_REPO }}/mysql-community-client-core_{{ MYSQL_CLIENT_CORE_VERSION }}-1ubuntu22.04_amd64.deb"
+MYSQL_CLIENT_PLUGINS_VERSION: "8.0.33"
+MYSQL_CLIENT_PLUGINS_PACKAGE: "{{ MYSQL_REPO }}/mysql-community-client-plugins_{{ MYSQL_CLIENT_PLUGINS_VERSION }}-1ubuntu22.04_amd64.deb"
+MYSQL_CLIENT_VERSION: "8.0.33"
+MYSQL_CLIENT_PACKAGE: "{{ MYSQL_REPO }}/mysql-community-client_{{ MYSQL_CLIENT_VERSION }}-1ubuntu22.04_amd64.deb"
+MYSQL_COMMON_VERSION: "8.0.33"
+MYSQL_COMMON_PACKAGE: "{{ MYSQL_REPO }}/mysql-common_{{ MYSQL_COMMON_VERSION }}-1ubuntu22.04_amd64.deb"
+
+MYSQL_WORKSPACE: "/tmp/mysql"
+MYSQL_DATA_DIR: "/mnt/disk1"

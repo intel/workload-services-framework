@@ -26,7 +26,8 @@
   become: yes
 
 - name: create self-generated certificates
-  shell: "openssl req -newkey rsa:4096 -nodes -sha256 -keyout /tmp/{{ wl_namespace }}-registry-cert-{{ k8s_registry_ip }}:{{ k8s_registry_port }}.key --addext 'subjectAltName = IP:{{ k8s_registry_ip }}' -x509 -days 365 -out /tmp/{{ wl_namespace }}-registry-cert-{{ k8s_registry_ip }}:{{ k8s_registry_port }}.crt -subj /CN={{ k8s_registry_ip }}"
+  shell: |
+    openssl req -newkey rsa:4096 -nodes -sha256 -keyout /tmp/{{ wl_namespace }}-registry-cert-{{ k8s_registry_ip }}:{{ k8s_registry_port }}.key --addext 'subjectAltName = {% if (k8s_registry_ip|ipaddr) %}IP{% else %}DNS{% endif %}:{{ k8s_registry_ip }}' -x509 -days 365 -out /tmp/{{ wl_namespace }}-registry-cert-{{ k8s_registry_ip }}:{{ k8s_registry_port }}.crt -subj /CN={{ k8s_registry_ip }}
   delegate_to: localhost
   when: not cert.stat.exists
 
@@ -77,7 +78,7 @@
  
 - name: upload docker auth
   include_role:
-    name: docker_auth
+    name: docker-auth
   vars:
     namespace: "{{ k8s_registry_namespace }}"
 

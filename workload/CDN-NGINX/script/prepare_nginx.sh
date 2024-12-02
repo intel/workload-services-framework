@@ -25,7 +25,7 @@ NGINX_EXE="/home/cdn/sbin/nginx"
 function parse_input_cpu() {
     input_cpu=${1// /}
     IFS_BAK="$IFS"
-    IFS=","
+    IFS="_"
     input_cpu=($input_cpu)
     input_cpu_len=${#input_cpu[@]}
 
@@ -69,7 +69,7 @@ fi
 if [[ "$SINGLE_SOCKET" == "true" ]]; then
   sed -i 's/25% "nginx-cache0";/50% "nginx-cache0";/' $NGINXCONF
   sed -i 's/25% "nginx-cache1";/50% "nginx-cache1";/' $NGINXCONF
-  sed -i '/cache2\|cache3/d' $NGINXCONF
+  sed -i '/cache2\|cache3/d' $NGINXCONF 
 fi
 
 ulimit -a
@@ -93,7 +93,7 @@ mkdir -p certs
 mkdir -p keys
 # cert and key
 if [[ "$CERT" == "secp384r1" ]]; then
-    openssl ecparam -genkey -out keys/key_secp384r1.pem -name secp384r1
+    openssl ecparam -genkey -out keys/key_secp384r1.pem -name secp384r1 
     openssl req -x509 -new -key keys/key_secp384r1.pem -out certs/cert_secp384r1.pem -batch
     CERT=/certs/cert_secp384r1.pem
     CERTKEY=/keys/key_secp384r1.pem
@@ -116,7 +116,7 @@ elif [[ "$CERT" == "rsa4096" ]];then
     CERTKEY=/keys/key_rsa4096.key
 elif [[ "$CERT" == "ecdhersa" ]];then
     openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -keyout keys/key_rsa2048.key -batch #RSA Key
-    openssl req -x509 -new -key keys/key_rsa2048.key -out certs/cert_ecrsa2048.pem -batch
+    openssl req -x509 -new -key keys/key_rsa2048.key -out certs/cert_ecrsa2048.pem -batch 
     CERT=/certs/cert_ecrsa2048.pem
     CERTKEY=/keys/key_rsa2048.key
 elif [[ "$CERT" == "ecdheecdsa" ]];then
@@ -161,8 +161,8 @@ if [ "$CPU_AFFI" == "true" ]; then
   echo Bind NGINX to NGINX_CPU_LISTS: $NGINX_CPU_LISTS
   input_cpu=($(parse_input_cpu "${NGINX_CPU_LISTS[@]}"))
   input_cpu_len=${#input_cpu[@]}
-
-  taskset -c $NGINX_CPU_LISTS ${NGINX_EXE} -c ${NGINXCONF} &
+  
+  taskset -c ${NGINX_CPU_LISTS/_/,} ${NGINX_EXE} -c ${NGINXCONF} &
   sleep 10
 
   # Bind each Nginx worker to dedicate core
@@ -180,3 +180,4 @@ else
   echo Run NGINX without core bind.
   ${NGINX_EXE} -c ${NGINXCONF}
 fi
+

@@ -1,0 +1,57 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Set Cassandra Server Parameters
+  set_fact:
+    deploy_mode: "{{ wl_tunables['DEPLOY_MODE'] }}"
+    cassandra_server_addr: "{{ hostvars['worker-0']['private_ip'] }}"
+    cassandra_rpc_address: "{{ hostvars['worker-0']['private_ip'] }}"
+    cassandra_broadcast_address: "{{ hostvars['worker-0']['private_ip'] }}"
+    cassandra_broadcast_rpc_address: "{{ hostvars['worker-0']['private_ip'] }}"
+    cassandra_seeds: "{{ hostvars['worker-0']['private_ip'] }}"
+    cassandra_concurrent_reads: "{{ wl_tunables['CASSANDRA_CONCURENT_READS'] }}"
+    cassandra_concurrent_writes: "{{ wl_tunables['CASSANDRA_CONCURENT_WRITES'] }}"
+    cassandra_server_instance_num: "{{ wl_tunables['INSTANCE_NUM'] }}"
+    cassandra_numactl_enable: "{{ wl_tunables['CASSANDRA_NUMACTL_ENABLE'] }}"
+    cassandra_numactl_vcores_enable: "{{ wl_tunables['CASSANDRA_NUMACTL_VCORES_ENABLE'] }}"
+    numa_options: "{{ wl_tunables['NUMA_OPTIONS'] }}"
+    CASSANDRA_JVM_HEAP_SIZE: "{{ wl_tunables['JVM_HEAP_SIZE'] }}"
+    CASSANDRA_JVM_GC_TYPE: "{{ wl_tunables['JVM_GC_TYPE'] }}"
+    KERNEL_TUNE: "{{ wl_tunables['KERNEL_TUNE_ENABLE'] }}"
+    RAM_DISK_EANBLE: "{{ wl_tunables['RAM_DISK_EANBLE'] }}"
+    cacheable: yes
+    clean_port: "{{ clean_port }}"
+    disks_path: "{{ wl_tunables['DISKS_PATH'] }}"
+    cassandra_fill_data_only: "{{ wl_tunables['CASSANDRA_FILL_DATA_ONLY'] }}"
+
+- name: Create Cassandra User Group
+  group:
+    name: cassandra
+    state: present
+
+- name: Install JVM Server Options
+  template:
+    src: "jvm11-server.options.new.j2"
+    dest: "{{ CASSANDRA_HOME }}/conf/jvm11-server.options"
+    mode: "0755"
+
+- name: Install Template of clean_data_server.py
+  template:
+    src: "clean_data_server.py.j2"
+    dest: "{{ WORKSPACE }}/clean_data_server.py"
+    mode: "0755"
+
+- name: Install Template of Standalone
+  template:
+    src: "standalone.sh.j2"
+    dest: "{{ WORKSPACE }}/standalone.sh"
+    mode: "0755"
+
+- name: Running Template of Standalone
+  shell: "cd {{ WORKSPACE }}; ./standalone.sh > standalone.log"
+  register: client_results
+  become: true
+  async: 3600
+  poll: 0

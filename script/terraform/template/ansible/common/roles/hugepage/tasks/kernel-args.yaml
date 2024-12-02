@@ -4,15 +4,38 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+- name: get physical memory
+  shell:
+    cmd: |
+      sed -n '/^MemTotal:/{s/^MemTotal: *\([0-9]*\).*$/\1/;p}' /proc/meminfo
+    executable: /bin/bash
+  register: total_memory_kb
+
+- name: check if the requested hugepage size is more than physical memory size
+  fail:
+    msg: "The requested hugepage {{ hugepage_requested }}kB is more than physical memory {{ total_memory_kb.stdout }}kB."
+  when: (total_memory_kb.stdout|int) <= (hugepage_requested|int)
+  vars:
+    hugepage_fields: "{{ label_name.split('=')[0].split('-') }}"
+    hugepage_requested: "{{ (hugepage_fields[4]|int) * (hugepage_fields[3].replace('kB','')|int) }}"
+
 - name: try setting huge pages
   shell:
     cmd: |
-      [ $(cat {{ hugepage_path }}) -ge {{ hugepage_value }} ] || (
-        echo {{ hugepage_value }} > {{ hugepage_path }}
-        [ $(cat {{ hugepage_path }}) -ge {{ hugepage_value }} ]
-      )
+      {% if sut_hugepage_mode == 'fit' %}
+        [ $(cat {{ hugepage_path }}) -ge {{ hugepage_value }} ] || (
+          echo {{ hugepage_value }} > {{ hugepage_path }}
+          [ $(cat {{ hugepage_path }}) -ge {{ hugepage_value }} ]
+        )
+      {% elif sut_hugepage_mode == 'exact' %}
+        [ $(cat {{ hugepage_path }}) -eq {{ hugepage_value }} ] || (
+          echo {{ hugepage_value }} > {{ hugepage_path }}
+          [ $(cat {{ hugepage_path }}) -eq {{ hugepage_value }} ]
+        )
+      {% endif %}
     executable: /bin/bash
   register: hugepagerc
+  when: sut_hugepage_mode in ['fit','exact']
   until: hugepagerc is success
   retries: 5
   delay: 1
@@ -25,15 +48,29 @@
   set_fact:
     wl_kernel_args: "{{ wl_kernel_args | combine((hugepagerc is success) | ternary({}, hugepage_dict)) }}"
     wl_kernel_args_optional: "{{ wl_kernel_args_optional | combine((hugepagerc is success) | ternary(hugepage_dict,{})) }}"
+  when: ('=required' in label_name)
   vars:
     hugepage_dict: "{{ { 'hugepagesz=' + (label_name.split('-')[3]): 'hugepagesz=' + (label_name.split('-')[3].replace('B','')) + ' hugepages=' + (label_name.split('=')[0].split('-')[4]) } }}"
 
+- name: get existing kernel args
+  command: cat /proc/cmdline
+  register: kernel_cmdline
+  when: ('-DEFAULTSZ' in label_name)
+
 - name: set defaulthugepagesz
   set_fact:
-    wl_kernel_args: "{{ wl_kernel_args | combine((hugepagerc is success) | ternary({}, hugepage_dict)) }}"
-    wl_kernel_args_optional: "{{ wl_kernel_args_optional | combine((hugepagerc is success) | ternary(hugepage_dict,{})) }}"
+    wl_kernel_args: "{{ wl_kernel_args | combine(((hugepage_dict.default_hugepagesz in kernel_cmdline_list) or ((kernel_cmdline_list | select('match','^default_hugepagesz=.*') | length == 0) and (hugepage_dict.default_hugepagesz == 'default_hugepagesz=2048k'))) | ternary({}, hugepage_dict)) }}"
   when:
-  - sut_default_hugepagesz | default(false) | bool
+  - ('-DEFAULTSZ' in label_name)
+  - ('=required' in label_name)
   vars:
+    kernel_cmdline_list: "{{ kernel_cmdline.stdout | split(' ') }}"
     hugepage_dict: "{{ { 'default_hugepagesz': 'default_hugepagesz=' + (label_name.split('-')[3].replace('B','')) } }}"
 
+- name: Print out Hugepage changes
+  debug:
+    msg: "[{{ inventory_hostname }}]: Host sysfs+ {{ hugepage_path }}={{ hugepage_value }}"
+  when: ('=required' in label_name) or (hugepagerc is success)
+  vars:
+    hugepage_path: "/sys/kernel/mm/hugepages/hugepages-{{ label_name.split('-')[3] }}/nr_hugepages"
+    hugepage_value: "{{ label_name.split('=')[0].split('-')[4] }}"

@@ -1,0 +1,35 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Install unzip
+  package:
+    name: unzip
+    state: present
+  register: pkgrc
+  until: pkgrc is success
+  retries: 10
+  delay: 10
+
+- name: Create folder
+  file:
+    path: "/tmp/{{ wl_namespace }}-bios"
+    state: directory
+
+- name: Unzip syscfg
+  unarchive:
+    src: "{{ syscfg_package }}"
+    dest: "/tmp/{{ wl_namespace }}-bios"
+    remote_src: true
+  environment:
+    no_proxy: ''
+    NO_PROXY: ''
+
+- name: Install syscfg
+  shell:
+    cmd: bash ./install.sh
+    executable: /bin/bash
+    chdir: "/tmp/{{ wl_namespace }}-bios/Linux_x64"
+

@@ -1,0 +1,36 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Install cpupower
+    apt:
+      name:
+        - linux-tools-common
+      update_cache: true
+    become: yes
+    register: aptrc
+    until: aptrc is success
+    retries: 10
+    delay: 10
+  
+  - name: uname -r
+    command: uname -r
+    register: unamer
+  
+  - name: Install linux-tools
+    apt:
+      name:
+        - linux-tools-{{ unamer.stdout }}
+    become: true
+    register: aptrc
+    until: aptrc is success
+    retries: 10
+    delay: 10
+    ignore_errors: true
+  
+  delegate_to: "{{ trace_node.1 }}"
+

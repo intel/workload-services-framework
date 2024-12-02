@@ -1,0 +1,36 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+*ubuntu2204*:
+    AZURE_WORKER_INSTANCE_TYPE: Standard_D8s_v5
+    AZURE_CLIENT_INSTANCE_TYPE: Standard_D8s_v5
+    AZURE_WORKER_OS_TYPE: ubuntu2204
+    AZURE_CLIENT_OS_TYPE: ubuntu2204
+    AZURE_DISK_COUNT: 1
+    AZURE_DISK_SIZE: 200
+
+*postgresql*:
+    PG_SHARED_BUFFERS: 8
+
+*:
+    TPCC_THREADS_BUILD_SCHEMA: 8
+    TPCC_NUM_WAREHOUSES: 100
+    TPCC_HAMMER_NUM_VIRTUAL_USERS: "16"
+
+# *windows*mysql*:
+#     AZURE_WORKER_INSTANCE_TYPE: m6i.xlarge
+#     AZURE_CLIENT_INSTANCE_TYPE: m6i.xlarge
+#     AZURE_WORKER_OS_TYPE: windows2019
+#     AZURE_CLIENT_OS_TYPE: windows2019
+#     AZURE_DISK_COUNT: 1
+#     AZURE_DISK_SIZE: 200
+
+# *windows*postgresql*:
+#     AZURE_WORKER_INSTANCE_TYPE: m6i.xlarge
+#     AZURE_CLIENT_INSTANCE_TYPE: m6i.xlarge
+#     AZURE_WORKER_OS_TYPE: windows2016
+#     AZURE_CLIENT_OS_TYPE: windows2016
+#     AZURE_DISK_COUNT: 1
+#     AZURE_DISK_SIZE: 200

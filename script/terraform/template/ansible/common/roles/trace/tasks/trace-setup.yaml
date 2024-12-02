@@ -1,0 +1,117 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+    - block:
+
+        - name: Setup Linux trace module
+          include_role:
+            name: "{{ trace_module_name }}"
+            tasks_from: setup
+
+        - name: Append the start script
+          blockinfile:
+            path: "{{ trace_script_local_path }}/start-trace.sh"
+            marker: "# {{ trace_module_name }} {mark}"
+            insertbefore: "^wait"
+            block: |
+              (
+                mkdir -p {{ trace_data_path }}
+                cd {{ trace_data_path }}
+                if is_roi "{{ trace_node.0 }}"; then
+                  {{ trace_module_start_block }}
+                fi
+              ) &
+          delegate_to: localhost
+          become: false
+
+        - name: Append the stop script
+          blockinfile:
+            path: "{{ trace_script_local_path }}/stop-trace.sh"
+            marker: "# {{ trace_module_name }} {mark}"
+            insertbefore: "^wait"
+            block: |
+              (
+                cd {{ trace_data_path }}
+                if is_roi "{{ trace_node.0 }}"; then
+                  {{ trace_module_stop_block }}
+                fi
+              ) &
+          delegate_to: localhost
+          become: false
+
+      when:
+      - (hostvars[trace_node.1].ansible_connection | default('ssh')) in ['ssh','local']
+      - (playbook_dir+'/../traces/roles/'+trace_module_name+'/tasks/setup.yaml') is exists
+      vars:
+        trace_script_path: "{{ trace_tmp_path }}/{{ wl_namespace }}-{{ trace_node.1 }}-trace"
+        trace_script_local_path: "{{ trace_tmp_path }}/{{ wl_namespace }}-{{ trace_node.1 }}-trace"
+        trace_script_localhost_path: "{{ trace_tmp_path }}/{{ wl_namespace }}-localhost-trace"
+        trace_data_path: "{{ trace_tmp_path }}/{{ wl_namespace }}-{{ trace_node.1 }}-{{ trace_module_name }}"
+
+    - block:
+
+        - name: Setup Windows trace module
+          include_role:
+            name: "{{ trace_module_name }}"
+            tasks_from: setup-win
+
+        - name: Append the start script
+          blockinfile:
+            path: "{{ trace_script_local_path }}/start-trace.ps1"
+            marker: "# {{ trace_module_name }} {mark}"
+            insertbefore: "^ *Get-Job"
+            block: |
+              mkdir "{{ trace_data_path }}" -Force
+              cd "{{ trace_data_path }}"
+              if (Is-ROI "{{ trace_node.0 }}") {
+                Start-Job -ScriptBlock {
+                  param($roi,$itr)
+                  cd "{{ trace_data_path }}"
+                  {{ trace_module_start_block }}
+                } -ArgumentList $roi,$itr
+              }
+          delegate_to: localhost
+          become: false
+
+        - name: Append the stop script
+          blockinfile:
+            path: "{{ trace_script_local_path }}/stop-trace.ps1"
+            marker: "# {{ trace_module_name }} {mark}"
+            insertbefore: "^ *Get-Job"
+            block: |
+              cd "{{ trace_data_path }}"
+              if (Is-ROI "{{ trace_node.0 }}") {
+                Start-Job -ScriptBlock {
+                  param($roi,$itr)
+                  cd "{{ trace_data_path }}"
+                  {{ trace_module_stop_block }}
+                } -ArgumentList $roi,$itr
+              }
+          delegate_to: localhost
+          become: false
+
+      when:
+      - ((hostvars[trace_node.1].ansible_connection | default('ssh')) == 'winrm')
+      - (playbook_dir+'/../traces/roles/'+trace_module_name+'/tasks/setup-win.yaml') is exists
+      vars:
+        trace_script_path: "{{ trace_win_tmp_path }}\\{{ wl_namespace }}-{{ trace_node.1 }}-trace"
+        trace_script_local_path: "{{ trace_tmp_path }}/{{ wl_namespace }}-{{ trace_node.1 }}-trace"
+        trace_script_localhost_path: "{{ trace_tmp_path }}/{{ wl_namespace }}-localhost-trace"
+        trace_data_path: "{{ trace_win_tmp_path }}\\{{ wl_namespace }}-{{ trace_node.1 }}-{{ trace_module_name }}"
+
+    - name: Set flag to prevent from re-setup
+      set_fact:
+        trace_modules_setup: "{{ (hostvars[trace_node.1].trace_modules_setup|default([])) + [trace_module_name] }}"
+      delegate_facts: true
+
+  when:
+  - not (trace_module_name in (hostvars[trace_node.1].trace_modules_setup|default([])))
+  delegate_to: "{{ trace_node.1 }}" 
+  vars:
+    trace_module_name: "{{ trace_node.0 | split(':') | first }}"
+

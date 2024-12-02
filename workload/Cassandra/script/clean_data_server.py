@@ -38,7 +38,7 @@ def delete_db_data():
         i = i + 1
     return message
 
-def check_compaction_status():
+def check_compaction_status():    
     i = 0
     message = ""
     while i < int(instance_num):
@@ -60,14 +60,15 @@ def handle_client_connection(client_socket):
     print(f"Received message from client: {message}")
 
     #check operation code
+    response = ""
     if OP_COMPACT_WAIT == message:
         response = check_compaction_status()
     if OP_CLEAN == message:
         response = delete_db_data()
-
+  
     # Send the response back to the client
     client_socket.send(response.encode())
-
+    
     # Close the connection
     client_socket.close()
 
@@ -100,5 +101,5 @@ if __name__ == '__main__':
         instance_num = int(sys.argv[2])
     if sys.argv[3] is not None and sys.argv[3] != "":
         install_base_path = sys.argv[3]
-
+    
     start_server()

@@ -14,4 +14,3 @@ Host *
     ServerAliveInterval 30
     ServerAliveCountMax 10
 
-Include /opt/workspace/ssh_config*

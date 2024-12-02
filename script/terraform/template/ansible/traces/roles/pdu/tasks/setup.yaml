@@ -1,0 +1,121 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+    - block:
+
+        - name: Check if pdu is accessible
+          shell:
+            cmd: |
+              curl --netrc-optional --noproxy '*' -x '' -sSf -k -u '{{ pdu_user1 }}:{{ pdu_password1 }}' -w 'http_code=%{http_code}' "https://{{ pdu_ip1 }}/model/outlet" | grep -q -F http_code=200
+            executable: /bin/bash
+          register: pdu_check
+          when: (hostvars[trace_node.1].ansible_connection | default('ssh')) in ['ssh']
+          delegate_to: "{{ pdu_local | bool | ternary('localhost',trace_node.1) }}"
+          no_log: true
+
+      rescue:
+
+        - name: Create the pdu logs directory
+          file:
+            path: "{{ wl_logs_dir }}/{{ trace_node.1 }}-1-{{ trace_module_name }}"
+            state: directory
+          delegate_to: localhost
+          ignore_errors: true
+
+        - name: Write down pdu_check results
+          copy:
+            content: |
+              url: 
+              https://{{ pdu_ip1 }}/model/outlet
+
+              stdout:
+              {{ pdu_check.stdout | default('') }}
+
+              stderr:
+              {{ pdu_check.stderr | default('') }}
+            dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-1-{{ trace_module_name }}/pdu_check.logs"
+          delegate_to: localhost
+          ignore_errors: true
+
+    - name: Create start/stop scripts
+      block:
+
+        - set_fact:
+            trace_module_start_block: |
+              {% if (pdu_check is success) and (not (pdu_local | bool)) %}
+                {{ pdu_start_script }}
+              {% endif %}
+            trace_module_stop_block: |
+              {% if (pdu_check is success) and (not (pdu_local | bool)) %}
+                {{ pdu_stop_script }}
+              {% endif %}
+          no_log: true
+
+        - blockinfile:
+            path: "{{ trace_script_localhost_path }}/start-trace.sh"
+            marker: "# {{ trace_module_name }} {{ trace_node.1 }} {mark}"
+            insertbefore: "^wait"
+            block: |
+              (
+                mkdir -p {{ wl_logs_dir }}/{{ trace_node.1 }}-$itr-{{ trace_module_name }}
+                cd {{ wl_logs_dir }}/{{ trace_node.1 }}-$itr-{{ trace_module_name }}
+                if is_roi "{{ trace_node.0 }}"; then
+                  {{ pdu_start_script }}
+                fi
+              ) &
+          delegate_to: localhost
+          when:
+          - pdu_check is success
+          - pdu_local | bool
+
+        - blockinfile:
+            path: "{{ trace_script_localhost_path }}/stop-trace.sh"
+            marker: "# {{ trace_module_name }} {{ trace_node.1 }} {mark}"
+            insertbefore: "^wait"
+            block: |
+              (
+                cd {{ wl_logs_dir }}/{{ trace_node.1 }}-$itr-{{ trace_module_name }}
+                if is_roi "{{ trace_node.0 }}"; then
+                  {{ pdu_stop_script }}
+                fi
+              ) &
+          delegate_to: localhost
+          when:
+          - pdu_check is success
+          - pdu_local | bool
+                
+      vars:
+        pdu_start_script: |
+            echo "Time,Power (W),Energy (Wh)" > pdu-$roi.logs
+            {% if pdu_port1 | length > 0 %}
+              pdu_rest_url="https://{{ pdu_ip1 }}/model/pdu/0/outlet/{{ pdu_port1 }}"
+            {% elif pdu_group1 | length > 0 %}
+              pdu_rest_url="https://{{ pdu_ip1 }}/model/outletgroup/{{ pdu_group1 }}"
+            {% endif %}
+            nohup bash -c "
+              get_reading () {
+                curl --netrc-optional --noproxy '*' -x '' -sS -k -u '{{ pdu_user1 }}:{{ pdu_password1 }}' -d \"{'jsonrpc':'2.0','method':'getReading'}\" $pdu_rest_url/\$1 | sed -n '/\"result\":/{s|^.*\"result\":.*\"_ret_\":.*\"value\": *\\([0-9.+-]*\\).*|\\1|;p;q}'
+              }
+              while true; do 
+                echo \"\$(awk -v str=\"\$(date -u +%s)\" 'BEGIN {print str*1000}'),\$(get_reading activePower),\$(get_reading activeEnergy)\" >> pdu-$roi.logs
+                sleep {{ pdu_interval }}
+              done
+            " > /dev/null 2>&1 &
+            echo $! > pdu-$roi.pid
+            disown
+        pdu_stop_script: |
+            kill $(cat pdu-$roi.pid)
+
+  become: false
+  vars:
+    pdu_ip1: "{{ hostvars[trace_node.1]['pdu_ip'] | default('') }}"
+    pdu_port1: "{{ hostvars[trace_node.1]['pdu_port'] | default('') }}"
+    pdu_user1: "{{ hostvars[trace_node.1]['pdu_user'] | default('') }}"
+    pdu_password1: "{{ hostvars[trace_node.1]['pdu_password'] | default('') | regex_escape() }}"
+    pdu_group1: "{{ hostvars[trace_node.1]['pdu_group'] | default('') }}"
+

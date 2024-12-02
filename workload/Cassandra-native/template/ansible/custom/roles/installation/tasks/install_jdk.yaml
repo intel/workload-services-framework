@@ -1,0 +1,51 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Create Directory
+  file:
+    path: "{{ WORKSPACE }}"
+    state: directory
+
+- name: Wget jdk
+  shell:
+    cmd: |
+      cd "{{ WORKSPACE }}"
+      wget {{OPENJDK_PKG}} -O openjdk.tgz
+    executable: /bin/bash
+  register: wget_fetch_jdk
+  until: wget_fetch_jdk is succeeded
+  retries: 10
+  delay: 10
+
+- name: Create jdk folder
+  vars:
+    JAVA_HOME: "{{ WORKSPACE }}/{{ OPENJDK_VER }}"
+  file:
+    path: "{{ JAVA_HOME }}"
+    state: directory
+
+- name: Install jdk
+  vars:
+    JAVA_HOME: "{{ WORKSPACE }}/{{ OPENJDK_VER }}"
+  shell:
+    cmd: |
+      cd "{{ WORKSPACE }}"
+      tar -zxvf openjdk.tgz -C {{ JAVA_HOME }} --strip-components 1
+    executable: /bin/bash
+
+- name: Remove Existing Java Symbolic Link
+  file:
+    path: /usr/bin/java
+    state: absent
+  register: removed_link
+  ignore_errors: yes
+
+- name: Link New java to /usr/local/bin
+  become: true
+  file:
+    src: "{{ WORKSPACE }}/{{ OPENJDK_VER }}/bin/java"
+    dest: '/usr/bin/java'
+    state: link
+  when: removed_link.stat.islnk is not defined

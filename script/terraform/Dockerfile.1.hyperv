@@ -1,0 +1,19 @@
+# terraform-hyperv
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+FROM terraform-csp-base${RELEASE}
+RUN  apt-get update && apt-get install -y --no-install-recommends genisoimage && \
+     apt-get clean && \
+     rm -rf /var/lib/apt/lists/*
+
+# Preload terraform plugins
+RUN mkdir -p /usr/local/share/terraform/plugins; \
+    for dir in /opt/terraform/template/terraform/hyperv/*; do \
+      (cd $dir; terraform providers mirror /usr/local/share/terraform/plugins) \
+    done
+

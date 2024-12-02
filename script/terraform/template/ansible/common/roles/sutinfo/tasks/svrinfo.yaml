@@ -1,0 +1,47 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+    - name: Uncompress the svrinfo package
+      unarchive:
+        src: "{{ svrinfo_private_package | default(svrinfo_public_package) }}"
+        dest: /tmp/
+        remote_src: true
+
+  rescue:
+
+    - name: Uncompress the svrinfo package
+      unarchive:
+        src: "{{ svrinfo_public_package }}"
+        dest: /tmp/
+        remote_src: true
+      register: svrinfo_get_rc
+      until: svrinfo_get_rc is success
+      retries: 2
+      delay: 10
+      ignore_errors: true
+
+  become: false
+  delegate_to: localhost
+  run_once: true
+
+- name: Create the svrinfo directory
+  file:
+    path: "{{ wl_logs_dir }}/{{ inventory_hostname }}-sutinfo"
+    state: directory
+  delegate_to: localhost
+  ignore_errors: yes
+
+- name: Run svrinfo
+  command: "/tmp/svr-info/svr-info {{ svrinfo_options }} {% if ansible_host!='127.0.0.1' %} -ip {{ ansible_host }} -port {{ ansible_port | default(22) }} -user {{ ansible_user }} -key {{ ansible_ssh_private_key_file }} {% endif %} -output {{ wl_logs_dir }}/{{ inventory_hostname }}-sutinfo"
+  register: svrinfo_rc
+  until: svrinfo_rc is success
+  retries: 2
+  delay: 10
+  delegate_to: localhost
+  ignore_errors: yes
+

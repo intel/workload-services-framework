@@ -68,9 +68,9 @@ memory:
 huge:
   filters:
     metrics:
-      Huge page memory (KB):
+      Huge page memory (KB): 
         metric_name: 'kbhugused'
-      Huge page memory (%):
+      Huge page memory (%): 
         metric_name: '%hugused'
   sar_options: -H
 

@@ -116,9 +116,9 @@ spec:
         - name: hook-folder
           hostPath:
             path: /opt/pkb 
-      restartPolicy: Never
+      restartPolicy: Never   
       {{- $args1 := dict "key" "deployPolicy" "value" "standalone" }}
-        {{- include "podAntiAffinity" $args1 }}
+        {{- include "podAntiAffinity" $args1 }}      
       {{- $args2 := dict "nkey" "VM-GROUP" "nvalue" "client" }}
         {{- include "nodeAffinity" $args2 }}
 {{- end }} #end for standalone

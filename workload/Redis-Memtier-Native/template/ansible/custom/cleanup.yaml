@@ -1,0 +1,102 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Create Client Group
+      set_fact:
+        dynamic_hosts: "{{ ['worker-0'] if wl_tunables['RUN_SINGLE_NODE'] | bool else range(0, wl_tunables['CLIENT_COUNT']|int) | map('string') | map('regex_replace', '^(.*)$', 'client-\\1') | list }}"
+    - name: Add Dynamic Hosts to Group
+      add_host:
+        name: "{{ item }}"
+        groups: dynamic_clients
+      loop: "{{ dynamic_hosts }}"
+
+- hosts: dynamic_clients
+  gather_facts: no
+  become: yes
+  tasks:
+    - name: Find Redis Processes
+      shell: ps aux | grep redis-server | grep -v grep | awk '{ print $2 }'
+      register: redis_process_ids
+      changed_when: false # Mark task as unchanged even if the output changes
+      
+    - name: Terminate Redis processes
+      shell: "kill -9 {{ item }}"
+      loop: "{{ redis_process_ids.stdout_lines }}"
+      when: redis_process_ids.stdout_lines | length > 0
+      changed_when: true    
+    
+    - name: Detect OS
+      shell:
+        cmd: ". /etc/os-release; echo $ID"
+        executable: /bin/bash
+      register: os
+
+    - name: Read the installed libraries list
+      command: cat /tmp/redis/install_list 
+      register: installed_list
+
+    - name: Remove libraries using apt
+      apt:
+        name: "{{ item }}"
+        state: absent
+      loop: "{{ installed_list.stdout_lines }}"
+      when: 
+        - installed_list.stdout_lines is defined 
+        - (os.stdout == 'rhel' or os.stdout =='anolis' or os.stdout == 'openEuler') | ternary('centos', os.stdout) == 'ubuntu'
+
+    - name: Remove libraries using yum
+      yum:
+        name: "{{ item }}"
+        state: absent
+      loop: "{{ installed_list.stdout_lines }}"
+      when: 
+        - installed_list.stdout_lines is defined 
+        - (os.stdout == 'rhel' or os.stdout =='anolis' or os.stdout == 'openEuler') | ternary('centos', os.stdout) == 'centos'
+
+    - name: Remove Workspace
+      file:
+        path: "/tmp/redis"
+        state: absent
+
+- hosts: worker-0
+  gather_facts: no
+  become: yes
+  tasks:
+    - name: Detect OS
+      shell:
+        cmd: ". /etc/os-release; echo $ID"
+        executable: /bin/bash
+      register: os
+
+    - name: Read the installed libraries list
+      command: cat /tmp/redis/install_list 
+      register: installed_list
+
+    - name: Remove libraries using apt
+      apt:
+        name: "{{ item }}"
+        state: absent
+      loop: "{{ installed_list.stdout_lines }}"
+      when: 
+        - installed_list.stdout_lines is defined 
+        - (os.stdout == 'rhel' or os.stdout =='anolis' or os.stdout == 'openEuler') | ternary('centos', os.stdout) == 'ubuntu'
+
+    - name: Remove libraries using yum
+      yum:
+        name: "{{ item }}"
+        state: absent
+      loop: "{{ installed_list.stdout_lines }}"
+      when: 
+        - installed_list.stdout_lines is defined 
+        - (os.stdout == 'rhel' or os.stdout =='anolis' or os.stdout == 'openEuler') | ternary('centos', os.stdout) == 'centos'
+
+    - name: Remove Workspace
+      file:
+        path: "/tmp/redis"
+        state: absent
+

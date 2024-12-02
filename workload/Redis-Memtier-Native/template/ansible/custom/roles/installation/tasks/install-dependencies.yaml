@@ -1,0 +1,14 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Detect OS
+  shell:
+    cmd: ". /etc/os-release; echo $ID"
+    executable: /bin/bash
+  register: os
+
+- name: Install dependencies on distribution
+  include_tasks:
+    file: "install-depend-{{ (os.stdout in ['ubuntu','debian']) | ternary('ubuntu','centos') }}.yaml"

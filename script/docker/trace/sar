@@ -1,0 +1,39 @@
+#!/bin/bash -e
+
+sar_interval="5"
+sar_options="-B -b -d -p -H -I ALL -m ALL -n ALL -q -r -u ALL -P ALL -v -W -w -F"
+
+# args: itr roi
+sar_start () {
+    mkdir -p "$1-sar"
+    cd "$1-sar"
+    if is_roi sar $2 ${1##*-} TRACE_START; then
+        S_TIME_FORMAT=ISO S_TIME_DEF_TIME=UTC sar $sar_options $sar_interval -o sar-$2.logs > /dev/null & 
+        echo $! > sar-$2.pid
+        echo "sar started"
+    fi
+}
+
+# args: itr roi
+sar_stop () {
+    if [ -d "$1-sar" ]; then
+        cd "$1-sar"
+        if is_roi sar $2 ${1##*-} TRACE_STOP; then
+            kill $(cat sar-$2.pid) || true
+            tail -f --pid=$(cat sar-$2.pid) /dev/null || true
+            rm -f sar-$2.pid
+            echo "sar stopped"
+        fi
+    fi
+}
+
+# args: itr
+sar_collect () {
+    if [ -d "$1-sar" ]; then
+        cd "$1-sar"
+        for logs in sar-*.logs; do
+            [ ! -r "$logs" ] || S_TIME_FORMAT=ISO S_TIME_DEF_TIME=UTC sar $sar_options -f "$logs" > "$logs".txt
+        done
+    fi
+}
+

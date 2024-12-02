@@ -11,11 +11,19 @@
 - name: force hugepage allocation
   shell:
     cmd: |
-      [ $(cat {{ hugepage_path }}) -ge {{ hugepage_value }} ] || (
-        echo {{ hugepage_value }} > {{ hugepage_path }}
-        [ $(cat {{ hugepage_path }}) -ge {{ hugepage_value }} ]
-      )
+      {% if sut_hugepage_mode == 'fit' %}
+        [ $(cat {{ hugepage_path }}) -ge {{ hugepage_value }} ] || (
+          echo {{ hugepage_value }} > {{ hugepage_path }}
+          [ $(cat {{ hugepage_path }}) -ge {{ hugepage_value }} ]
+        )
+      {% elif sut_hugepage_mode == 'exact' %}
+        [ $(cat {{ hugepage_path }}) -eq {{ hugepage_value }} ] || (
+          echo {{ hugepage_value }} > {{ hugepage_path }}
+          [ $(cat {{ hugepage_path }}) -eq {{ hugepage_value }} ]
+        )
+      {% endif %}
     executable: /bin/bash
+  when: sut_hugepage_mode in ['fit','exact']
   register: hugepagerc
   until: hugepagerc is success
   retries: 5
@@ -23,3 +31,4 @@
   vars:
     hugepage_path: "/sys/kernel/mm/hugepages/hugepages-{{ label_name.split('-')[3] }}/nr_hugepages"
     hugepage_value: "{{ label_name.split('=')[0].split('-')[4] }}"
+

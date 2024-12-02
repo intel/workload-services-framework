@@ -1,0 +1,27 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- hosts: cluster_hosts:off_cluster_hosts:vmhost_hosts
+  any_errors_fatal: true
+  gather_facts: no
+  become: false
+  tasks:
+
+    - name: Invoke sutinfo (Linux)
+      include_role:
+        name: sutinfo
+        tasks_from: "{{ sutinfo_tool | default('perfspect') }}"
+      when:
+      - (ansible_connection|default('ssh')) in ['ssh','local']
+
+    - name: Invoke sutinfo (Windows)
+      include_role:
+        name: sutinfo
+        tasks_from: "{{ sutinfo_tool | default('perfspect') }}-win"
+      when:
+      - ((ansible_connection|default('ssh')) == 'winrm')
+      - (playbook_dir+'/roles/sutinfo/tasks/'+(sutinfo_tool | default('perfspect'))+'-win.yaml') is exists
+

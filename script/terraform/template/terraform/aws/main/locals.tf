@@ -54,11 +54,13 @@ locals {
   ondemand_instances = {
     for k,v in local.instances : k => v if !var.spot_instance
   }
-}
 
-locals {
   profile_map = {
     for profile in var.instance_profiles: profile.name => profile
+  }
+
+  is_windows = {
+    for k,v in local.instances : k => strcontains(v.os_type,"windows")
   }
 }
 

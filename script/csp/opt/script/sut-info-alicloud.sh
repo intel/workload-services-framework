@@ -18,5 +18,5 @@ for instance in $@; do
   vcpus="$(echo "$lines" | tac | sed -n "/\"InstanceTypeId\":\s*\"$instance\"/,/\"InstanceTypeId\":/{/\"CpuCoreCount\":/{s/.*:\s*\([0-9]*\).*/\\1/;p;q}}")"
   memory="$(echo "$lines" | sed -n "/\"InstanceTypeId\":\s*\"$instance\"/,/\"InstanceTypeId\":/{/\"MemorySize\":/{s/.*:\s*\([0-9]*\).*/\\1/;p;q}}")"
   echo "${vm_group^^}_VCPUS=$vcpus"
-  echo "${vm_group^^}_MEMORY=$memory"
+  echo "${vm_group^^}_MEMORY=$(( memory * 1024 ))"
 done

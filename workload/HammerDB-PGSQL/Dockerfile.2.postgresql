@@ -1,0 +1,25 @@
+# pgsql
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=17.2
+ARG OS_IMAGE=postgres
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+RUN apt-get update -y && \
+    apt-get install -y numactl vim
+
+COPY config/postgresql.conf /etc/postgresql.conf
+COPY script/start_pgsql.sh /
+COPY script/create_mapping.sh /
+
+RUN chmod +x /start_pgsql.sh \
+     && chmod +x /create_mapping.sh
+
+CMD  (/start_pgsql.sh; echo $? > status) 2>&1 | tee server.logs && \
+     sleep infinity
+

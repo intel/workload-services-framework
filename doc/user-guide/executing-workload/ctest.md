@@ -58,9 +58,9 @@ A set of utility scripts are linked under your workload build directory to make 
 
 ```text
 Usage: [options]
---nohup          Run the test case(s) in the daemon mode for long benchmark
---daemon         Run the test case(s) with daemonize for long benchmark with cleaning of environments before workload execution.
---noenv          Clean any external environment variables before proceeding with the tests.
+--nohup          Run the test case(s) in the daemon mode for long benchmark 
+--daemon         Run the test case(s) with daemonize for long benchmark with cleaning of environments before workload execution.  
+--noenv          Clean any external environment variables before proceeding with the tests.    
 --loop           Run the benchmark multiple times sequentially.
 --run            Run the benchmark multiple times on the same SUT(s).  
 --burst          Run the benchmark multiple times simultaneously.
@@ -74,8 +74,11 @@ Usage: [options]
 --cleanup-sut    Cleanup cloud SUT instances. 
 --dry-run        Generate the testcase configurations and then exit.  
 --testcase       Specify the exact testcase name to be executed.  
---check-docker-image    Check image availability before running the workload.
---push-docker-image <registry>   Push the workload image(s) to the mirror registry.
+--attach <file>  Specify a file to be attached under the logs directory.  
+--check-docker-image             Check image availability before running the workload.  
+--push-docker-image <registry>   Push the workload image(s) to the mirror registry.   
+--testset                        Specify a testset yaml file.
+--describe-params                Show workload parameter descriptions.  
 ```
 
 #### Examples
@@ -125,7 +128,7 @@ Usage: [options]
     > `...` uses three previous values to deduce the multiplication factor
 
     ```shell
-    ./ctest.sh -R aws --set "SCALE=1000 2000 4000 ...10000" --burst=4 --nohup
+    ./ctest.sh -R aws --set "SCALE=1000 2000 4000 ...10000" --burst=4 --nohup  
     ```
 
 7. Run `aws` test cases `6` times simultaneously with the `SCALE` value enumerated repeatedly as `1000`, `1500`, `1700`, `1000`, `1500`, `1700` in each iteration:
@@ -213,8 +216,41 @@ After using the Cloud instances, please clean them up.
 --- 
 
 
-[validate.sh]: ../../developer-guide/component-design/validate.md
+## Running Testcases using Testset YAML 
 
+You can specify a testset configuration file to sequentially run a few test cases with `ctest.sh`:
+
+```
+PLATFORM: SPR
+BENCHMARK: dummy
+TERRAFORM_OPTIONS: "--docker"
+TERRAFORM_SUT: kvm
+testcase: "test_kvm_dummy_pi_pkm"
+options: "--sutinfo --intel_publish"
+#test-config: "test-config.yaml"
+SCALE: 2000
+
+---
+
+PLATFORM: ICX
+BENCHMARK: dummy
+TERRAFORM_OPTIONS: "--docker"
+TERRAFORM_SUT: kvm
+testcase: "test_kvm_dummy_pi_pkm"
+options: "--sutinfo --intel_publish"
+#test-config: "test-config.yaml"
+SCALE: 2000
+```
+
+where two testcases are executed:
+- Supported cmake options: `PLATFORM`, `BENCHMARK`, `REGISTERY`,  `REGISTRY_AUTH`, `TIMEOUT`, `SPOT_INSTANCE`, `TERRAFORM_OPTIONS`, and `TERRAFORM_SUT`.  
+- Supported ctest options: `testcase`, `test-config`, `config`, `loop`, `burst`, `run`, and `options`.
+  - `testcase` and `options` can be either a string or a list of strings.  
+  - If `testcase` starts with and ends with `/`, the testcase name is a regular expression. If `testcase` starts with `!/` and ends with `/`, the testcase name is an anti regular expression. Otherwise, the testcase name is the exact name.   
+- Any other specified parameters are passed to `ctest.sh` via `--set`.  
+
+[validate.sh]: ../../developer-guide/component-design/validate.md
 [image-ss-ai]: ../../image/ss-ai.png
 [image-ss-inst]: ../../image/ss-inst.png
 [image-ss-table]: ../../image/ss-table.png
+

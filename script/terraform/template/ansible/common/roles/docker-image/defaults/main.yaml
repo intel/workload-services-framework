@@ -1,0 +1,17 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+local_daemon_port: "12222"
+local_registry_url: "localhost:16666"
+k8s_remote_registry_url: ""
+k8s_enable_registry: true
+k8s_enable_csp_registry: false
+skopeo_sut_accessible_registries: ""
+skopeo_insecure_registries: ""
+skopeo_inspect_options: ""
+skopeo_copy_options: "--preserve-digests"
+skopeo_copy_retries: "5"
+skopeo_copy_delay: "5s"
+skopeo_wait_ready: "300s"

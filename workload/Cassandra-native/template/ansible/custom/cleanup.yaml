@@ -1,0 +1,31 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- hosts: worker-0
+  gather_facts: no
+  become: yes
+  tasks:
+    - name: Find Cassandra Processes
+      shell: ps aux | grep cassandra | grep -v grep | awk '{ print $2 }'
+      register: cassandra_process_ids
+      changed_when: false # Mark task as unchanged even if the output changes
+    - name: Terminate Cassandra processes
+      shell: "kill -9 {{ item }}"
+      loop: "{{ cassandra_process_ids.stdout_lines }}"
+      when: cassandra_process_ids.stdout_lines | length > 0
+      changed_when: true    
+    - name: Remove Workspace
+      file:
+        path: "/tmp/cassandra"
+        state: absent
+
+- hosts: client-0
+  gather_facts: no
+  become: yes
+  tasks:
+    - name: Remove Workspace
+      file:
+        path: "/tmp/cassandra"
+        state: absent

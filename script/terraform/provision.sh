@@ -59,7 +59,7 @@ replace_if () {
 
 # adjust vm_count and data_disk_spec
 DIR="$(dirname "$(readlink -f "$0")")"
-awk -v cvc=$3 -f "$DIR/script/update-tfconfig.awk" "$1" "${TERRAFORM_CONFIG_TF:-$TERRAFORM_CONFIG_IN}" > "$terraform_config_tf"
+awk -v cvc=$3 -f "$DIR/script/update-tfconfig.awk" "$1" "${TERRAFORM_CONFIG_IN:-$PROJECTROOT/script/terraform/terraform-config.$TERRAFORM_SUT.tf}" > "$terraform_config_tf"
 
 case "$PLATFORM" in
 ARMv8)

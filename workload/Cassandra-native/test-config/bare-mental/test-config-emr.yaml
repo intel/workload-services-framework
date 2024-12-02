@@ -1,0 +1,42 @@
+# test-config-emr.yaml
+# Overwrite the test cases for performance tunning on EMR.
+######################### BKM for Workload Performance#######################
+# INSTANCE_NUM: The nummer of Cassandra server and client instance to run concurrently.
+#
+# JVM_HEAP_SIZE: JVM configure for '-Xms' and '-Xmx'. Here set min (-Xms) and max (-Xmx)
+#                heap sizes to the same value to avoid stop-the-world GC pauses during resize.
+#
+# NUMA Node : Use SNC-2.
+#
+# Turbo : should enable in BIOS
+#
+# Network bandwidth : >= 10Gb
+#
+# DISK :
+#        Type: 8 * NVME disk. mounted on /mnt/disk1, /mnt/disk2, ... /mnt/disk8
+#        Each disk Size: > 300GB
+#
+#Memory: 512GB
+#
+############################################################################
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+  DEPLOY_MODE: standalone
+  CLIENT_DURATION: 15m
+  INSTANCE_NUM: 8
+  JVM_HEAP_SIZE: 31
+  CASSANDRA_DISK_MOUNT: true
+  CLIENT_POP_MAX: 360000000
+  CLIENT_THREADS: 280
+  CASSANDRA_CONCURENT_READS: 96
+  CASSANDRA_CONCURENT_WRITES: 32
+  KERNEL_TUNE_ENABLE: true
+  JDK_VERSION: JDK14
+  CASSANDRA_NUMACTL_VCORES_ENABLE: true
+  CASSANDRA_FILL_DATA: true
+  CASSANDRA_FILL_DATA_ONLY: false
+  DISKS_PATH: "/mnt/cassandra/disk0%20/mnt/cassandra/disk1%20/mnt/cassandra/disk2%20/mnt/cassandra/disk3%20/mnt/cassandra/disk4%20/mnt/cassandra/disk5%20/mnt/cassandra/disk6%20/mnt/cassandra/disk7"

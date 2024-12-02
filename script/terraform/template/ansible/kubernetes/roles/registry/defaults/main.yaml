@@ -10,4 +10,6 @@ k8s_registry_storage: "filesystem"
 k8s_registry_namespace: "wsf-registry"
 k8s_registry_service: "wsf-registry-service"
 k8s_registry_cert: "wsf-registry-cert"
-
+k8s_registry_version: "2"
+k8s_registry_image: "docker.io/library/registry:{{ k8s_registry_version }}"
+k8s_enable_registry: true

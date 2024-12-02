@@ -1,6 +1,9 @@
 >
 > **Note: The Workload Services Framework is a benchmarking framework and is not intended to be used for the deployment of workloads in production environments. It is recommended that users consider any adjustments which may be necessary for the deployment of these workloads in a production environment including those necessary for implementing software best practices for workload scalability and security.**
 >
+>
+> **Note: The Workload Services Framework is a benchmarking framework and is not intended to be used for the deployment of workloads in production environments. It is recommended that users consider any adjustments which may be necessary for the deployment of these workloads in a production environment including those necessary for implementing software best practices for workload scalability and security.**
+>
 ### Introduction
 
 Nginx* is a high-performance HTTP/HTTPS and reverse proxy web server based on a BSD-like license. Nginx uses SSL/TLS to enhance web access security. Intel has introduced the Crypto-NI software solution which is based on 3rd generation Intel® Xeon® Scalable Processors (Codename Ice Lake/Whitley). It can effectively improve the security of web access. Intel_Asynch_Nginx is an Intel optimized version Nginx, used by Intel to support Async hardware and software acceleration for https.
@@ -39,7 +42,7 @@ The workload provides test cases that are combination of the following aspects/c
 
 - **`1node`/`2node`/`3node`**:
   1node means one Nginx Server POD and one client Stress POD running on one Kubernetes worker node to save physical machine number. But this requires this Kubernetes worker node has at least $NGINX_WORKERS(default value 4) lcores to run Nginx Server POD, and plus additional $CLIENT_CPU_NUM(default it equals to $NGINX_WORKERS) lcores to run client POD on single kubernetes worker node.
-  2node means one Nginx Server POD and one client stress POD running on two separate Kubernetes worker nodes. This requires each Kubernetes worker node has at least $NGINX_WORKERS(default value 4) lcores, because client POD $CLIENT_CPU_NUM by default equals to Nginx server POD $NGINX_WORKERS lcore number.  
+  2node means one Nginx Server POD and one client stress POD running on two separate Kubernetes worker nodes. This requires each Kubernetes worker node has at least $NGINX_WORKERS(default value 4) lcores, because client POD $CLIENT_CPU_NUM by default equals to Nginx server POD $NGINX_WORKERS lcore number.
   3node means one Nginx Server POD and two client stress PODs running on three separate Kubernetes worker nodes. This requires each Kubernetes worker node has at least $NGINX_WORKERS(default value 4) lcores, because client PODs $CLIENT_CPU_NUM by default equals to Nginx server POD $NGINX_WORKERS lcore number. 3node test cases is designed for some special https ciphers, eg ECDHE-ECDSA-AES128-SHA, those https ciphers single client POD running is  slower than Nginx server side with same lcore number, it cannot stress Nginx Server POD lcore too 100% usage, so we can add another client POD to two client PODs stress one server POD.
    Note:
     Nginx Server POD each lcore will bind to run one Nginx Worker process via taskset.
@@ -61,17 +64,17 @@ Besides upper 11 test cases basic description, there are two very important envi
 - **`CURVE`**:  Specify ecdh curve in for Nginx [`ssl_ecdh_curve`](https://nginx.org/en/docs/http/ngx_http_ssl_module.html#ssl_ecdh_curve). Default is `auto`.
 
 - **`NGINX_WORKERS`**: By default, nginx worker number is 4. This means Nginx server POD will use 4 lcores(lcore 0-3) to run worker process;  You can configure NGINX_WORKERS as 1/2/4/8/16/32/64, Nginx Server POD will use lcore 0-N run Nginx worker processes.
-   eg, you can test a different https Nginx worker number server POD performance for all test cases by this: export NGINX_WORKERS=8; ./ctest.sh -V; 
+   eg, you can test a different https Nginx worker number server POD performance for all test cases by this: export NGINX_WORKERS=8; ./ctest.sh -V;
 
    you can configure $CIPHER and $NGINX_WORKERS at the same time. eg.
      export CIPHER=AES128-SHA;
      export NGINX_WORKERS=16;
      ./ctest.sh -V;
-	
+
    *NOTICE HERE*: Very Important Info for how to calculate Kubernetes node(s) CPU lcores needed for test cases:
-   
-      If you run 1node test cases on single Kubernetes worker node, this Kubernetes worker node need 2x$NGINX_WORKERS CPU lcores as minimum. 
-	   Nginx Server POD will use $NGINX_WORKERS lcores as Nginx workers processes; 
+
+      If you run 1node test cases on single Kubernetes worker node, this Kubernetes worker node need 2x$NGINX_WORKERS CPU lcores as minimum.
+	   Nginx Server POD will use $NGINX_WORKERS lcores as Nginx workers processes;
 	   Client Stress POD will also use $CLIENT_CPU_NUM(by default equals to $NGINX_WORKERS) number lcores on the same Kubernetes node to stress Nginx Server POD.
 
   - If you run 2node or 3node test cases on two Kubernetes nodes, make sure each Kubernetes node CPU lcores number equal to or bigger than $NGINX_WORKERS number;
@@ -118,7 +121,7 @@ The workload contains these docker images: `nginx-original`, `async-nginx-qatsw`
   - Test #25: test_intel_async_nginx_qathw_async_3node_https
 
 - nginx-client-openssl: client stress docker image which will run a lot of `openssl s_time -connect server_ip:port -new -cipher $CIPHER –time 60s` instances to simulate virtual clients simultaneously.
-- nginx-client-ab & nginx-client-wrk used Apache Bench & wrk respectively to collect benchmark results. 
+- nginx-client-ab & nginx-client-wrk used Apache Bench & wrk respectively to collect benchmark results.
 
 This Workload currently cannot support Docker running via `docker run ...`.
 This Workload can also support Kubernetes, Cumulus and Terraform running.

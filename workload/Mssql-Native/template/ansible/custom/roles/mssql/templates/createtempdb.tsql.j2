@@ -1,0 +1,40 @@
+USE master;
+GO
+ 
+ALTER DATABASE tempdb
+MODIFY FILE (NAME = tempdev, FILENAME = 'H:\MSSQL\DATA\tempdb.mdf');
+GO
+ 
+ALTER DATABASE tempdb
+MODIFY FILE (NAME = templog, FILENAME = 'H:\MSSQL\DATA\templog.ldf');
+GO
+ 
+ALTER DATABASE tempdb
+MODIFY FILE (NAME = temp2, FILENAME = 'H:\MSSQL\DATA\tempdb_mssql_2.ndf');
+GO
+ 
+ALTER DATABASE tempdb
+MODIFY FILE (NAME = temp3, FILENAME = 'H:\MSSQL\DATA\tempdb_mssql_3.ndf');
+GO
+ 
+ALTER DATABASE tempdb
+MODIFY FILE (NAME = temp4, FILENAME = 'H:\MSSQL\DATA\tempdb_mssql_4.ndf');
+GO
+ 
+USE [master];
+GO
+ALTER DATABASE [tempdb] ADD FILE 
+   (NAME = N'tempdev2', FILENAME = N'H:\MSSQL\DATA\tempdev2.ndf' , SIZE = 1GB , FILEGROWTH = 0);
+ALTER DATABASE [tempdb] ADD FILE         
+   (NAME = N'tempdev3', FILENAME = N'H:\MSSQL\DATA\tempdev3.ndf' , SIZE = 1GB , FILEGROWTH = 0);
+ALTER DATABASE [tempdb] ADD FILE         
+   (NAME = N'tempdev4', FILENAME = N'H:\MSSQL\DATA\tempdev4.ndf' , SIZE = 1GB , FILEGROWTH = 0);
+ALTER DATABASE [tempdb] ADD FILE         
+   (NAME = N'tempdev5', FILENAME = N'H:\MSSQL\DATA\tempdev5.ndf' , SIZE = 1GB , FILEGROWTH = 0);
+ALTER DATABASE [tempdb] ADD FILE         
+   (NAME = N'tempdev6', FILENAME = N'H:\MSSQL\DATA\tempdev6.ndf' , SIZE = 1GB , FILEGROWTH = 0);
+ALTER DATABASE [tempdb] ADD FILE         
+   (NAME = N'tempdev7', FILENAME = N'H:\MSSQL\DATA\tempdev7.ndf' , SIZE = 1GB , FILEGROWTH = 0);
+ALTER DATABASE [tempdb] ADD FILE         
+   (NAME = N'tempdev8', FILENAME = N'H:\MSSQL\DATA\tempdev8.ndf' , SIZE = 1GB , FILEGROWTH = 0);
+GO

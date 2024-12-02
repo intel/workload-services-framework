@@ -29,7 +29,7 @@
 
 - name: remove legacy marker
   blockinfile:
-    path: "{{ startup_kernel_args_actions[os.stdout]['grub_path'] }}"
+    path: "{{ startup_kernel_args_actions[(os.stdout in ['ubuntu','debian']) | ternary('debian','centos')]['grub_path'] }}"
     state: absent
   ignore_errors: yes
   when:
@@ -39,7 +39,7 @@
 - name: add kernel parameters
   blockinfile:
     marker: "# {mark} WSF Setup"
-    path: "{{ startup_kernel_args_actions[os.stdout]['grub_path'] }}"
+    path: "{{ startup_kernel_args_actions[(os.stdout in ['ubuntu','debian']) | ternary('debian','centos')]['grub_path'] }}"
     create: yes
     block: |
       GRUB_CMDLINE_LINUX_DEFAULT="${GRUB_CMDLINE_LINUX_DEFAULT} {{ kernel_args_list_all | join(' ') }}"
@@ -50,7 +50,7 @@
   - kernel_args_list_all is not subset(kernel_cmdline.stdout | split(' '))
 
 - name: update grub
-  shell: "{{ startup_kernel_args_actions[os.stdout]['update_grub_cmd'] }}"
+  shell: "{{ startup_kernel_args_actions[(os.stdout in ['ubuntu','debian']) | ternary('debian','centos')]['update_grub_cmd'] }}"
   when:
   - kernel_args_list_all | length > 0
   - kernel_args_list_all is not subset(kernel_cmdline.stdout | split(' '))
@@ -63,4 +63,12 @@
   when:
   - kernel_args_list_min | length > 0
   - kernel_args_list_min is not subset(kernel_cmdline.stdout | split(' '))
+
+- name: print out kernel args changes
+  debug:
+    msg: "[{{ inventory_hostname }}]: Host Kernel Args+ {{ kernel_args_list_all | join(' ') }}"
+  when:
+  - kernel_args_list_all | length > 0
+  - kernel_args_list_all is not subset(kernel_cmdline.stdout | split(' '))
+  - (kargs.msg == 'Block inserted') or (kargs.msg == 'File created')
 

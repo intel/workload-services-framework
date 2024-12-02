@@ -12,18 +12,19 @@
   - name: install git
     package:
       name: git
+    become: true
 
   - name: delete qat-plugin namespace
     ignore_errors: true
     shell: |
       kubectl delete namespace {{ qatplugin_namespace }}
-    args:
+    args:  
       executable: /bin/bash
 
   - name: create qat-plugin namespace
     shell: |
       kubectl create namespace {{ qatplugin_namespace }}
-    args:
+    args:  
       executable: /bin/bash
 
   - name: Install qat-plugin
@@ -32,7 +33,7 @@
       cd /tmp/{{ wl_namespace }}-qatplugin
       sed -i '/imagePullPolicy: IfNotPresent/a \\        args: ["-allocation-policy", "balanced", "-max-num-devices", "{{ qatplugin_max_qat_devices }}"]' ./deployments/qat_plugin/base/intel-qat-plugin.yaml
       kubectl create -k deployments/qat_plugin/overlays/apparmor_unconfined -n {{ qatplugin_namespace }}
-    args:
+    args:  
       executable: /bin/bash
     run_once: true
 
@@ -44,4 +45,4 @@
 
   - name: check qat-plugin status on worker
     command: "kubectl wait --for=condition=Ready pod --all -n {{ qatplugin_namespace }} --timeout 30s"
-
+    ignore_errors: true

@@ -7,7 +7,7 @@ Declare `HAS-SETUP-DISK-SPEC-1` to allocate disk storage to the SUT(s), and spec
 cluster:
 - labels:
     HAS-SETUP-DISK-SPEC-1: required
-
+  
 terraform:
   k8s_plugins:
   - local-static-provisioner
@@ -15,7 +15,7 @@ terraform:
 
 ### Use Persistent Volumes
 
-Use the storage class name `local-static-storage` to request persistent volume allocation.
+Use the storage class name `local-static-storage` to request persistent volume allocation.  
 
 ```
 kind: PersistentVolumeClaim
@@ -30,3 +30,4 @@ spec:
       storage: 5Gi
   storageClassName: local-static-storage
 ```
+

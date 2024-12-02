@@ -1,0 +1,11 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+sriov_cni_url: "https://github.com/k8snetworkplumbingwg/sriov-cni.git"
+sriov_cni_version: "v2.7.0"
+sriov_cni_dir: "/tmp/sriov-cni"
+
+golang_version: "1.19.3"
+golang_download_url: "https://dl.google.com/go/go{{ golang_version }}.linux-amd64.tar.gz"

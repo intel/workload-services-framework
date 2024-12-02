@@ -1,0 +1,24 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+*aws*mssql*:
+    AWS_WORKER_INSTANCE_TYPE: m7i.4xlarge
+    AWS_CLIENT_INSTANCE_TYPE: m7i.4xlarge
+    AWS_DISK_COUNT: 2
+    AWS_DISK_SIZE: 2048
+    MAX_SER: 58980
+    AWS_DISK_TYPE: io2
+    TPCC_NUM_WAREHOUSES: 200
+    TPCC_HAMMER_NUM_VIRTUAL_USERS: "27_28_29_30_31_32_33_34_35_36_37"
+    TPCC_THREADS_BUILD_SCHEMA: 16
+    AWS_DISK_IOPS: 16000
+
+*aws*mssql*windows2019*:
+    AWS_WORKER_OS_TYPE: windows2019
+    AWS_CLIENT_OS_TYPE: windows2019
+
+*aws*mssql*windows2016*:
+    AWS_WORKER_OS_TYPE: windows2016
+    AWS_CLIENT_OS_TYPE: windows2016

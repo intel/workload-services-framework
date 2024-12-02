@@ -1,0 +1,43 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Detect perl-modules
+  shell:
+    cmd: |
+      dpkg -l | grep -F perl-modules || true
+    executable: /bin/bash
+  register: perl_modules
+  become: true
+
+- name: Install perl modules
+  apt:
+    name: perl-modules
+    update_cache: true
+  become: true
+  ignore_errors: true
+  when: ('perl-modules' not in perl_modules.stdout)
+
+- name: Create FlameGraph
+  template:
+    src: gprofiler-charts.html.j2
+    dest: "{{ trace_data_path }}/roi-{{ roi_index }}.html"
+  ignore_errors: true
+  vars:
+    start_timestamp: "{{ lookup('pipe', 'date --utc -d' + (roi[0] | quote) + ' +%s') }}"
+    stop_timestamp: "{{ lookup('pipe', 'date --utc -d' + (roi[1] | quote) + ' +%s') }}"
+    svg_cmds: |
+      cd {{ trace_data_path }}
+      for col in profile_*.col; do
+        if [ -e "$col" ]; then
+          this="${col#profile_}"
+          this="$(date --utc -d "${this%.col}" +%s)"
+          if [ "$this" -ge "{{ start_timestamp }}" ] && [ "$this" -le "{{ stop_timestamp }}" ]; then
+            cat "$col"
+            echo ""
+          fi
+        fi
+      done | {{ role_path }}/scripts/merge-co.py | /usr/local/bin/flamegraph.pl --inverted --title "Icicle Graph: {{ trace_data_path | basename }}/roi-{{ roi_index }}"
+

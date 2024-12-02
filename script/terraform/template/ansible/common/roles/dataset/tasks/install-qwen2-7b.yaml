@@ -1,0 +1,14 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- include_role:
+    name: hf-dataset
+  vars:
+    DEST_DIR: "/opt/dataset/qwen2/7b"
+    MODEL_ID: "Qwen/Qwen2-7B"
+    DATASET_SIZE: 25
+    exclude: []
+    revision: []
+    HF_LOGIN: false

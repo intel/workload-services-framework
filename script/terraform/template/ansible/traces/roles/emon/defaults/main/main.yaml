@@ -1,0 +1,19 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+emon: false
+emon_src_path: "/usr/local/src/sep"
+emon_bin_path: "/usr/local/emon"
+emon_pyedp_path: "config/edp/pyedp"
+emon_group: "vtune"
+emon_options: ""
+emon_skip_edp: false
+emon_pyedp_options: "--socket-view --core-view --thread-view"
+emon_sep_package:
+  GenuineIntel: sep_intel.tar.bz2
+  AuthenticAMD: sep_amd.tar.bz2
+emon_reset: false
+

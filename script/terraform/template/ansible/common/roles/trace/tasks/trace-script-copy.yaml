@@ -1,0 +1,26 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: "Create the trace directory on {{ trace_host }}"
+    file:
+      path: "{{ trace_script_path }}"
+      state: directory
+
+  - name: "Copy trace scripts to {{ trace_host }}"
+    copy:
+      src: "{{ item }}"
+      dest: "{{ trace_script_path }}/"
+      mode: preserve
+    loop: "{{ lookup('pipe','find '+trace_script_local_path+' -maxdepth 1 -type f') | split('\n') | reject('match','^ *$') }}"
+
+  delegate_to: "{{ trace_host }}"
+  become: false
+  vars:
+    trace_script_path: "{{ trace_tmp_path }}/{{ wl_namespace }}-{{ trace_host }}-trace"
+    trace_script_local_path: "{{ trace_tmp_path }}/{{ wl_namespace }}-{{ trace_host }}-trace"
+

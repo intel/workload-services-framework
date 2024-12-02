@@ -1,0 +1,31 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- hosts: worker-0
+  gather_facts: yes
+  become: yes
+  tasks:
+    - name: Running Cassandra
+      include_role:
+        name: deployment
+        tasks_from: deploy_cassandra.yaml
+    - name: Running Memcached
+      include_role:
+        name: deployment
+        tasks_from: deploy_memcached.yaml
+    - name: Running Application
+      include_role:
+        name: deployment
+        tasks_from: deploy_app.yaml
+    - name: Running Iterations Benchmark
+      include_role:
+        name: deployment
+        tasks_from: deploy_siege.yaml
+      loop: "{{ range(1, run_stage_iterations | default(1) | int+1) }}"
+      loop_control:
+        loop_var: itr
+    
+  
+

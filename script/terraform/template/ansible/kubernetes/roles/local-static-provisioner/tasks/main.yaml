@@ -11,7 +11,7 @@
   failed_when: false
 
 - name: detect if local provisioner already be installed or not
-  shell:
+  shell: 
     cmd: "kubectl get pods -A -n {{ k8s_local_static_provisioner_namespace }}  | grep -q -F local-volume-provisioner"
     executable: /bin/bash
   ignore_errors: true
@@ -24,7 +24,7 @@
   when:
     - lsp_installed.rc != 0
     - install_lsp.rc == 0
-
+    
 - name: Apply the deployment script
   command: "kubectl apply -f /tmp/{{ wl_namespace }}-lsp-yaml"
   when:
@@ -40,7 +40,7 @@
     - install_lsp.rc == 0
 
 - name: Wait for the daemonset to be ready
-  command: "kubectl wait --namespace={{ k8s_local_static_provisioner_namespace }} pod --for=condition=Ready -l app={{ k8s_local_static_provisioner_app_label }} --timeout=60s"
+  command: "timeout 60s kubectl wait --namespace={{ k8s_local_static_provisioner_namespace }} pod --for=condition=Ready -l app={{ k8s_local_static_provisioner_app_label }}"
   register: wait_ready
   retries: 10
   delay: 10
@@ -48,3 +48,4 @@
   when:
     - lsp_installed.rc != 0
     - install_lsp.rc == 0
+

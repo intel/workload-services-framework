@@ -1,0 +1,33 @@
+# stream-arm-ubutu24
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+ARG RELEASE
+
+FROM stream-repo-ubuntu24-arm64${RELEASE} as repo
+FROM ${OS_IMAGE}:${OS_VER}
+
+RUN apt-get update && \
+      apt-get install -y --no-install-recommends \
+      libnsl2 dmidecode numactl libgomp1 gcc-12 gfortran-11 && \
+      bc && apt-get clean && rm -rf /var/lib/apt/lists/* && \
+      mkdir -p /opt/stream
+
+ARG STREAM_INSTALL_DIR=/opt/stream
+WORKDIR ${STREAM_INSTALL_DIR}
+
+# STREAM repo
+COPY --from=repo /opt/stream_repo/ ${STREAM_INSTALL_DIR}/
+
+COPY  run_stream_arm.sh ${STREAM_INSTALL_DIR}/
+
+# run stream
+RUN mkfifo /export-logs
+CMD (./run_stream_arm.sh;echo $? > status) 2>&1 | tee output.logs && \
+      tar cf /export-logs status output.logs && \
+      sleep infinity

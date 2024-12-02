@@ -19,7 +19,7 @@
   register: os_ver
 
 - name: check qat 4xx device
-  shell: lspci | grep 4940
+  shell: lspci | grep '4940\|4xxx'
   ignore_errors: true
   register: qat4xx_supported
 
@@ -58,7 +58,7 @@
 - name: Install dependencies on RedHat.
   dnf:
     name:
-      - gcc
+      - "@Development Tools"
       - systemd-devel
       - automake
       - autoconf
@@ -103,6 +103,7 @@
       - libtool 
       - tar 
       - git
+      - dracut-core
     update_cache: true
     state: present
   register: aptrc
@@ -112,6 +113,34 @@
   ignore_errors: true
   become: true
   when: os.stdout in ['ubuntu', 'debian'] and ('running' not in qat_status.stdout)
+
+- block:
+  - name: confiure memory on ubuntu
+    include_tasks: tasks/configure_mem.yaml
+  become: true
+  when: os.stdout in ['ubuntu', 'debian'] and ('running' not in qat_status.stdout)
+
+- name: Detect kernel
+  shell:
+    cmd: "echo linux-modules-extra-$(uname -r)"
+    executable: /bin/bash
+  register: aws_ubuntu_kernel
+
+- name: install dependencies for AWS.
+  apt:
+    name:
+      - "{{ aws_ubuntu_kernel.stdout }}"
+    update_cache: true
+    state: present
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+  ignore_errors: true
+  become: true
+  when: 
+    - os.stdout in ['ubuntu', 'debian'] and ('running' not in qat_status.stdout)
+    - aws_ubuntu_kernel is search("aws")
 
 - name: check firmware1
   stat:
@@ -142,9 +171,11 @@
         rmmod qat_4xxx
         modprobe qat_4xxx
       executable: /bin/bash
+
   - name: permanently enable kernel mod
     shell: dracut --force
     ignore_errors: true
+
   become: true
   when: 
     - firm1.stat.exists == false or firm2.stat.exists == false
@@ -220,6 +251,12 @@
       become: true
   when: os.stdout in ['centos', 'rhel']
 
-- name: confiure qat
+- name: configure qat
   include_tasks: tasks/configure_qat.yaml
 
+- name: Change permission
+  shell:
+    cmd: "chmod a+wr /dev/vfio/*"
+    executable: /bin/bash
+  ignore_errors: true
+  become: true

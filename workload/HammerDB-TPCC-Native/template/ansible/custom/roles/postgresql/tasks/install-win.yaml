@@ -1,0 +1,27 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Download Postgresql installation exe
+  ansible.windows.win_get_url:
+    url: "{{ PG_PACKAGE_WIN }}"
+    dest: "C:\\"
+
+- name: Install Postgresql
+  win_shell: |
+    Start-Process -Wait -FilePath "C:\postgresql-14.12-1-windows-x64.exe" -ArgumentList "--mode unattended --install_runtimes 0 --superpassword Postgres@123 --datadir H:\\data"
+
+- name: Copy pg.ini
+  template:
+    src: "pg.ini.j2"
+    dest: "H:\\data\\postgresql.conf"
+
+- name: Update pg_hba
+  win_shell: |
+    Add-Content H:\\data\\pg_hba.conf "host all all all password"
+
+- name: Restart postgres
+  win_shell: |
+    net stop postgresql-x64-14
+    net start postgresql-x64-14

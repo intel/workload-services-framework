@@ -1,0 +1,93 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "nighthawk-test-client.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    benchmark: mustSucceed
+    job-name: benchmark
+    {{- include "nighthawk-test-client.labels" . | nindent 4 }}
+spec:
+    serviceAccountName: {{ include "nighthawk-test-client.serviceAccountName" . }}
+    restartPolicy: Never
+    affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: name
+                  operator: In
+                  values:
+                  - nhts
+              topologyKey: "kubernetes.io/hostname"
+    initContainers:
+      - name: wait-for-nhts-server
+        image: "{{ .Values.REGISTRY }}{{ .Values.image.name }}{{ .Values.RELEASE }}"
+        imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+        command:
+          - "/bin/bash"
+          - "-c"
+        args:
+          - |
+            WAIT_TIME=0
+            TIMEO=60
+            until [[ $WAIT_TIME -eq $TIMEO ]] || nc -w 1 -z nhts 10000; do
+                    echo "Waiting for server..." && (( WAIT_TIME++ ))
+                    sleep 1
+            done
+            [[ $WAIT_TIME -lt $TIMEO ]]
+
+    containers:
+      - name: benchmark
+        image: "{{ .Values.REGISTRY }}{{ .Values.image.name }}{{ .Values.RELEASE }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+          - "/bin/bash"
+          - "-c"
+        args:
+          - |
+              nighthawk_client \
+                --duration "{{ .Values.NIGHTHAWK_CLIENT_DURATION }}" \
+                --connections "{{ .Values.NIGHTHAWK_CLIENT_CONNECTIONS }}" \
+                --concurrency "{{ .Values.NIGHTHAWK_CLIENT_CONCURRENCY }}" \
+                --rps "{{ .Values.NIGHTHAWK_CLIENT_RPS }}" \
+                --open-loop \
+                nhts:10000 > output.logs;
+              echo $? > status;
+
+              # Entries in output file don't have the same format.
+              # Some are: "key: value", others are "key:value"
+              # Normalize that with sed.
+              #sed -i "s/:[^\s]/: /g" output.logs;
+
+              tar cf /export-logs status output.logs;
+              sleep infinity;
+
+        resources:
+          limits:
+            cpu: {{ .Values.NIGHTHAWK_CLIENT_LIMITS_CPU }}
+            memory: 10Gi
+          requests:
+            cpu: {{ .Values.NIGHTHAWK_CLIENT_REQUEST_CPU }}
+            memory: 10Gi
+
+        volumeMounts:
+          - name: data
+            mountPath: {{ .Values.results.mount_point }}
+
+    nodeSelector:
+      {{- toYaml .Values.nodeSelector | nindent 6 }}
+
+    volumes:
+      - name: data
+        hostPath:
+          path: /tmp/{{ .Release.Namespace }}
+          type: DirectoryOrCreate

@@ -1,0 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+svrinfo_public_package: "https://github.com/intel/svr-info/releases/download/v{{ svrinfo_version }}/svr-info.tgz"
+
