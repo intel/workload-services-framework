@@ -1,0 +1,23 @@
+# llms-ipex-public-inference-lite-24.04
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+
+FROM llms-ipex-public-base-24.04${RELEASE}
+
+COPY --from=ai-common-img /home/ai_common ./ai_common
+COPY patches/run_gptq.py .
+COPY patches/mosaicml_mpt-30b_config.json ./utils/model_config/
+COPY run_test_deepspeed.sh .
+COPY run_test_general.sh .
+COPY run_test.sh .
+
+RUN mkfifo /export-logs
+CMD ( ./run_test.sh; echo $? > status) 2>&1 | tee benchmark_${MODE}_${TOPOLOGY}_${PRECISION}_${FUNCTION}_${DATA_TYPE}_$(date +"%m-%d-%y-%H-%M-%S").log && \
+    if [ `grep -c 'Average 2... latency:\||acc' benchmark_*.log` -eq 0 ];then echo 1 > status; fi && \
+    tar cf /export-logs status $(find . -name "*.log") && \
+    sleep infinity

@@ -69,6 +69,8 @@ variable "instance_profiles" {
     os_type = string
     os_disk_type = string
     os_disk_size = string
+    os_disk_iops = number
+    os_disk_throughput = number
     os_image = string
 
     data_disk_spec = list(object({
@@ -77,6 +79,7 @@ variable "instance_profiles" {
       disk_size = number
       disk_format = string
       disk_iops = number
+      disk_throughput = number
     }))
 
     network_spec = list(object({
@@ -105,3 +108,4 @@ variable "cpu_model_timeout" {
   type = string
   default = "10m"
 }
+

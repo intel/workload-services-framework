@@ -1,0 +1,7 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+hlprof: false
+hlprof_options: "--hw-trace on --host-perf-mode on -g 1-2 -b 250"

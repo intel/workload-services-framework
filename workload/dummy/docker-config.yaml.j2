@@ -1,0 +1,26 @@
+# 
+# This is a docker configuration that supports simple dockerized workload 
+# execution on multiple SUTs. The top level keys are the SUT names. The 
+# values are a list of containers running on the SUTs. 
+#
+# Each container configuration defines the docker image name, the docker 
+# runtime options (either a string or a list), and whether logs should be 
+# collected after the workload execution. 
+#
+# The container execution order is not enforced. The workload must implement
+# alternative means to enforce the execution order, if required. 
+# 
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+worker-0:
+- image: "{{ REGISTRY }}dummy{{ IMAGESUFFIX }}{{ RELEASE }}"
+  options:
+  - -e SCALE={{ SCALE }}
+  - -e RETURN_VALUE={{ RETURN_VALUE }}
+  - -e SLEEP_TIME={{ SLEEP_TIME }}
+  - -e ROI={{ ROI }}
+  export-logs: true
+

@@ -1,0 +1,50 @@
+proc runtimer { seconds } {
+    set x 0
+    set timerstop 0
+    while {!$timerstop} {
+        incr x
+        after 1000
+        if { ![ expr {$x % 60} ] } {
+            set y [ expr $x / 60 ]
+            puts "Timer: $y minutes elapsed"
+        }
+        update
+        if {  [ vucomplete ] || $x eq $seconds } {
+            set timerstop 1
+        }
+    }
+    return
+}
+
+puts "SETTING CONFIGURATION"
+dbset db mysql
+dbset bm TPC-C
+diset connection mysql_host {{ hostvars["worker-0"]["private_ip"] }}
+diset connection mysql_port 3306
+diset tpcc mysql_user root
+diset tpcc mysql_pass Mysql@123
+diset tpcc mysql_driver timed
+diset tpcc mysql_rampup {{ wl_tunables.TPCC_MINUTES_OF_RAMPUP }}
+diset tpcc mysql_duration {{ wl_tunables.TPCC_MINUTES_OF_DURATION }}
+diset tpcc mysql_total_iterations {{ wl_tunables.TPCC_TOTAL_ITERATIONS }}
+diset tpcc mysql_async_scale false
+diset tpcc mysql_connect_pool false
+diset tpcc mysql_timeprofile true
+diset tpcc mysql_allwarehouse true
+
+vuset logtotemp 1
+vuset unique 1
+vuset timestamps 1
+loadscript
+puts "SEQUENCE STARTED"
+foreach z [ split "{{ wl_tunables.TPCC_HAMMER_NUM_VIRTUAL_USERS }}" "_" ] {
+    puts "$z VU TEST"
+    vuset vu $z
+    vucreate
+    vurun
+    runtimer {{ wl_tunables.TPCC_RUNTIMER_SECONDS }}
+    vudestroy
+    after {{ wl_tunables.TPCC_WAIT_COMPLETE_MILLSECONDS }}
+}
+puts "TEST SEQUENCE COMPLETE"
+exit

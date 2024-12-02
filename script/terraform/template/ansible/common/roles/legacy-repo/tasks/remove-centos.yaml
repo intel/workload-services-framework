@@ -1,0 +1,19 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: remove legacy yum entries
+  shell:
+    cmd: |
+      for r in "{{ conflict_repos | join('" "') }}"; do
+        for s in $(grep -E '^\s*baseurl\s*=\s*'"$r" -B 3 /etc/yum.repos.d/*.repo 2> /dev/null | sed -n '/\[.*\]/{s/.\[\(.*\)\].*/,\1/;p}'); do
+          [ -r "${s%,*}" ] && sed -i '/^\['"${s#*,}"'\]/,/^ *$/{s/\(.*\)/#\1/}' "${s%,*}" || true
+        done
+      done
+    executable: /bin/bash
+  when: conflict_repos | length > 0
+  ignore_errors: true
+  become: true
+

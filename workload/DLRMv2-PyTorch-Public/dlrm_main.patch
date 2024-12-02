@@ -1,0 +1,64 @@
+diff --git a/models/recommendation/pytorch/torchrec_dlrm/dlrm_main.py b/models/recommendation/pytorch/torchrec_dlrm/dlrm_main.py
+index ddf116c3..9865b5fc 100644
+--- a/models/recommendation/pytorch/torchrec_dlrm/dlrm_main.py
++++ b/models/recommendation/pytorch/torchrec_dlrm/dlrm_main.py
+@@ -82,6 +82,7 @@ ADAGRAD_EPS = 1e-8
+ WEIGHT_DECAY = 0
+ 
+ import logging
++logging.basicConfig(level=logging.INFO)
+ logger: logging.Logger = logging.getLogger(__name__)
+ logger.setLevel(1)
+ 
+@@ -273,6 +274,22 @@ def stock_pt_optimize(args, model, optimizer, dataloader):
+     example_batch.sparse_features = unpack(example_batch.sparse_features)
+     dense, sparse = example_batch.dense_features, example_batch.sparse_features
+     autocast, dtype = parse_autocast(args.dtype)
++    if args.openvino:
++        model.eval()
++        from torch._inductor import config as inductor_config
++        from torch._dynamo import config
++        config.error_on_recompile = True
++        inductor_config.cpp_wrapper = True
++        inductor_config.cpp.enable_kernel_profile = True
++        if args.inference_only:
++            inductor_config.freezing = True
++        import openvino.torch
++        with torch.no_grad(), torch.cpu.amp.autocast(enabled=autocast, dtype=dtype):
++            print('[Info] Running torch.compile() with openvino backend')
++            model(dense, sparse)
++            model = torch.compile(model, backend="openvino")
++            model(dense, sparse)
++            model(dense, sparse)
+     if args.inductor:
+         from torch._inductor import config as inductor_config
+         from torch._dynamo import config
+@@ -663,6 +680,11 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
+         action="store_true",
+         help="whether use torch.compile()",
+     )
++    parser.add_argument(
++        "--openvino",
++        action="store_true",
++        help="whether use torch.compile() with openvino backend",
++    )
+     parser.add_argument(
+         "--distributed-training",
+         action="store_true",
+@@ -1285,6 +1307,7 @@ def construct_model(args):
+         lr_scheduler = LRPolicyScheduler(
+             optimizer, args.lr_warmup_steps, args.lr_decay_start, args.lr_decay_steps
+         )
++    return model, optimizer, lr_scheduler
+ 
+ def main(argv: List[str]) -> None:
+     """
+@@ -1463,7 +1486,7 @@ def main(argv: List[str]) -> None:
+         model.model.inter_arch = DDP(model.model.inter_arch, gradient_as_bucket_view=True, broadcast_buffers=False, find_unused_parameters=True)
+         model.model.over_arch = DDP(model.model.over_arch, gradient_as_bucket_view=True, broadcast_buffers=False, find_unused_parameters=True)
+ 
+-    if args.inductor:
++    if args.inductor or args.openvino:
+         def randomrize_crossnet_bias(bias):
+             r"""
+             the bias is initialized as all zeros and in inductor will create 1 bias for all 3 bias since they are same:

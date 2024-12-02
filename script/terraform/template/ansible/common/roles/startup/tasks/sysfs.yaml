@@ -4,12 +4,19 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+- name: Set sysfs default settings
+  set_fact:
+    sysfs_options_dict: "{{ sysfs_options_dict | default({}) | combine(dict((sut_sysfs_options=='default') | ternary(sut_sysfs_default_options,'') | split(',') | map('trim') | select('match',item+':.*') | map('regex_replace','^[^:]*:','') | reject('==','') | map('split','=') | map('map','trim'))) }}"
+  loop: "{{ group_names }}"
+
+- name: Overwrite by workload settings
+  set_fact:
+    sysfs_options_dict: "{{ sysfs_options_dict | combine(wl_sysfs) }}"
+
 - name: Set sysfs settings
   set_fact:
-    sysfs_options_dict: "{{ sysfs_options_dict | combine(dict(sut_sysfs_options | split(',') | map('trim') | select('match',item+':.*') | map('regex_replace','^[^:]*:','') | reject('==','') | map('split','=') | map('map','trim'))) }}"
+    sysfs_options_dict: "{{ sysfs_options_dict | combine(dict((sut_sysfs_options=='default') | ternary('',sut_sysfs_options) | split(',') | map('trim') | select('match',item+':.*') | map('regex_replace','^[^:]*:','') | reject('==','') | map('split','=') | map('map','trim'))) }}"
   loop: "{{ group_names }}"
-  vars:
-    sysfs_options_dict: "{{ wl_sysfs }}"
 
 - name: Check if sysfs restore available
   stat:
@@ -30,7 +37,7 @@
     cmd: |
       for p in {{ sysfs_options_dict.keys() | list | join(' ') }}; do 
         if [ -e $p ]; then
-            echo "echo $(cat $p) > $p"
+            echo "echo \"$(sed 's/.*\[\(.*\)\].*/\1/' $p)\" > $p"
         fi
       done > {{ startup_restore_path }}/sysfs
     executable: /bin/bash
@@ -44,14 +51,38 @@
     src: wsf-sysfs-settings.service.j2
     dest: /etc/systemd/system/wsf-sysfs-settings.service
   failed_when: false
-  when: sysfs_options_dict.keys() | length > 0
+  when:
+  - (ansible_connection | default('ssh')) in ['ssh']
+  - sysfs_options_dict.keys() | length > 0
 
-- name: Apply sysfs
+- name: Apply sysfs on remote
   systemd:
     name: wsf-sysfs-settings
     enabled: yes
     daemon_reload: yes
     state: restarted
   failed_when: false
-  when: sysfs_options_dict.keys() | length > 0
+  when:
+  - (ansible_connection | default('ssh')) in ['ssh']
+  - sysfs_options_dict.keys() | length > 0
+  no_log: true
+
+- name: Apply sysfs on local
+  shell:
+    cmd: |
+      {% for k in sysfs_options_dict.keys() %}
+        {% if k is exists %}
+          echo "{{ sysfs_options_dict[k] }}" > {{ k }}
+        {% endif %}
+      {% endfor %}
+    executable: /bin/bash
+  failed_when: false
+  when:
+  - (ansible_connection | default('ssh')) in ['local']
+  - sysfs_options_dict.keys() | length > 0
+
+- name: Print out sysfs changes
+  debug:
+    msg: "[{{ inventory_hostname }}]: Host sysfs+ {{ item.key }}={{ item.value }}"
+  loop: "{{ sysfs_options_dict | dict2items }}"
 

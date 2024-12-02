@@ -5,11 +5,6 @@
 # workload features at commit time. The gated test case should be short to improve
 # validation efficiency. It is recomended that you define as many commonly used
 # test cases as needed.
-#
-# Apache v2 license
-# Copyright (C) 2023 Intel Corporation
-# SPDX-License-Identifier: Apache-2.0
-#
 
 # As a prerequisite to the workload build and test. You can test certain conditions
 # such as repository access permissions and license agreement. See doc/cmakelists.txt

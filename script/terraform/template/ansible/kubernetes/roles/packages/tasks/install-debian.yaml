@@ -28,25 +28,33 @@
   delay: 5
   become: true
 
-- name: add k8s GPG key
-  get_url:
-    url: "{{ k8s_repo_key_url['debian'] }}"
-    dest: /usr/share/keyrings/k8s.gpg.origin
-    mode: '0644'
-    force: true
-  become: true
-  register: getrc
-  until: getrc is success
-  retries: 10
-  delay: 10
+- name: get the k8s GPG key
+  shell:
+    cmd: |
+      curl --netrc-optional -fsSL {{ k8s_repo_key_url.debian }} | gpg --yes --dearmor -o /tmp/{{ wl_namespace }}-k8s.gpg
+    executable: /bin/bash
+  delegate_to: localhost
+  run_once: true
+  become: false
 
-- name: deamor the k8s GPG key
-  command: gpg --yes --dearmor -o /usr/share/keyrings/k8s.gpg /usr/share/keyrings/k8s.gpg.origin
+- name: copy the k8s GPG key to remote
+  copy:
+    src: "/tmp/{{ wl_namespace }}-k8s.gpg"
+    dest: /usr/share/keyrings/kubernetes.gpg
   become: true
+
+- name: remove legacy Kubernetes entries
+  include_role:
+    name: legacy-repo
+    tasks_from: remove-debian
+  vars:
+    conflict_repos:
+    - "{{ k8s_repo_url.debian }}"
 
 - name: add k8s repository to apt
   apt_repository:
-    repo: "deb [signed-by=/usr/share/keyrings/k8s.gpg] {{ k8s_repo_url['debian'] }} kubernetes-xenial main"
+    filename: kubernetes
+    repo: "deb [signed-by=/usr/share/keyrings/kubernetes.gpg] {{ k8s_repo_url.debian }}"
     state: present
     update_cache: false
   become: true
@@ -60,6 +68,12 @@
   retries: 10
   delay: 10
 
+- name: apt-mark unhold kubeadm kubelet kubectl
+  command: |
+    apt-mark unhold kubeadm kubectl kubelet
+  ignore_errors: true
+  become: true
+
 - name: install kubeadm, kubelet, and kubectl
   apt:
     name:
@@ -72,5 +86,3 @@
   until: aptrc is success
   retries: 10
   delay: 10
-
-

@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CPU Power Monitor</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-4bw+/aepP/YC94hEpVNVgiZdgIC5+VKNBQNGCHeKRQN+PtmoHDEXuppvnDJzQIu9" crossorigin="anonymous">
+
+  <style>
+    body {
+      padding-top: 20px;
+      padding-bottom: 20px;
+    }
+
+    .header {
+      padding-bottom: 20px;
+      padding-right: 15px;
+      padding-left: 15px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .header h3 {
+      margin-top: 0;
+      margin-bottom: 0;
+      line-height: 40px;
+    }
+
+    .container {}
+
+    .wrapper {
+      display: flex;
+      box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
+      margin: 2rem;
+    }
+
+    .handle {
+      height: 70px;
+      width: 5px;
+      background-color: DodgerBlue;
+    }
+
+    .content {
+      flex-grow: 1;
+    }
+
+    .tab {
+      overflow: hidden;
+      border: 1px solid #ccc;
+      background-color: #f1f1f1;
+    }
+
+    /* Style the buttons that are used to open the tab content */
+    .tab button {
+      background-color: inherit;
+      float: left;
+      border: 1px solid lightgray;
+      outline: none;
+      cursor: pointer;
+      padding: 8px 10px;
+      transition: 0.3s;
+      font-weight: 600;
+      font-size: 0.8rem;
+    }
+
+    /* Change background color of buttons on hover */
+    .tab button:hover {
+      background-color: #ddd;
+    }
+
+    /* Create an active/current tablink class */
+    .tab button.active {
+      background-color: #00aeef;
+      font-size: bold !important;
+      color: white !important;
+    }
+
+    /* Style the tab content */
+    .tabcontent {
+      display: block;
+      padding: 6px 12px;
+      border: 1px solid #ccc;
+      border-top: none;
+    }
+
+    @media print {
+      .printable {
+        zoom: 50%;
+      }
+    }
+  </style>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/apexcharts/3.42.0/apexcharts.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-HwwvtgBNo3bZJJLYd8oVXjrBZt8cqVSpeBNS5n7C8IVInixGAoxmnlMuBnhbgrkm"
+    crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/apexcharts/3.42.0/apexcharts.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+</head>
+
+<body>
+
+  <div class="card shadow py-2 px-2">
+    <div id="CPUPower" class="tabcontent px-0 py-2">
+      <div class="card-header">
+        <span style="font-weight: 500;">CPU Power Trend</span>
+        <button class="btn btn-success btn-sm" style="float:right;" onClick="window.print()"><i class="fa fa-print"
+            aria-hidden="true"></i>Save as PDF</button>
+        <div class="row d-flex"></div>
+      </div>
+      <div class="row" id="sortable_cpu_power">
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="cpu-c3-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="cpu-c6-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="cpu-pc3-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="cpu-pc6-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="cpu-c0-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="cpu-cx-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="cpu-freq-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="cpu-poll-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="cpu-c1-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="cpu-c2-id" style="height: 400px;"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+  {{ cpu_power_data }}
+  </script>
+
+  <script type="text/javascript">
+    function hide_chart(id) {
+      const el = document.getElementById(id);
+      el.parentNode.style.display = 'none';
+    }
+
+    function create_line_chart(id, options) {
+      const el = document.getElementById(id);
+      const chart = new ApexCharts(el, _.merge(options, {
+        chart: {
+          id: id,
+          type: 'line',
+          height: '350px',
+          redrawOnParentResize: true,
+          redrawOnWindowResize: true,
+          group: 'synchronized',
+          zoom: {
+            enabled: true
+          },
+          toolbar: {
+            show: true,
+            offsetX: 0,
+            offsetY: 0,
+            tools: {
+              download: true,
+              selection: true,
+              zoom: true,
+              zoomin: true,
+              zoomout: true,
+              pan: true,
+              reset: true | '<img src="/static/icons/reset.png" width="20">',
+              customIcons: []
+            },
+            export: {
+              csv: {
+                filename: undefined,
+                columnDelimiter: ',',
+                headerCategory: 'category',
+                headerValue: 'value',
+                dateFormatter(timestamp) {
+                  return new Date(timestamp).toDateString()
+                }
+              },
+              svg: {
+                filename: undefined,
+              },
+              png: {
+                filename: undefined,
+              }
+            },
+            autoSelected: 'zoom'
+          },
+        },
+        stroke: {
+          width: 1.5,
+          opacity: 1
+        },
+        xaxis: {
+          type: 'datetime',
+          labels: {
+            datetimeUTC: true,
+          },
+          min: min_time,
+          max: max_time,
+        },
+        yaxis: {
+          labels: {
+            minWidth: 20,
+          },
+        },
+        tooltip: {
+          shared: false,
+          x: {
+            format: 'MMM dd HH:mm:ss',
+          },
+        },
+        legend: {
+          show: true,
+          position: 'bottom',
+          horizontalAlign: 'center',
+          onItemClick: {
+            toggleDataSeries: true
+          },
+          onItemHover: {
+            highlightDataSeries: true
+          },
+        },
+      }));
+      chart.render();
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      function create_per_cpu_chart(id, title, data, min=0, max=100) {
+        try {
+          var series = [];
+          for (let k in data) {
+            if (k != 'all') series.push({
+              name: "cpu-" + k,
+              data: data[k],
+            });
+          }
+          create_line_chart(id, {
+            chart: {
+              animations: {
+                enabled: false,
+              },
+            },
+            title: {
+              text: title,
+            },
+            yaxis: {
+              min: min,
+              max: max,
+              decimalsInFloat: 2,
+            },
+            series: series,
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+      }
+
+      create_per_cpu_chart("cpu-c3-id", "CPU-C3 (%)", data_c3);
+      create_per_cpu_chart("cpu-c6-id", "CPU-C6 (%)", data_c6);
+      create_per_cpu_chart("cpu-pc3-id", "CPU-PC3 (%)", data_pc3);
+      create_per_cpu_chart("cpu-pc6-id", "CPU-PC6 (%)", data_pc6);
+      create_per_cpu_chart("cpu-c0-id", "CPU-C0 (%)", data_c0);
+      create_per_cpu_chart("cpu-cx-id", "CPU-CX (%)", data_cx);
+      create_per_cpu_chart("cpu-freq-id", "CPU-Freq (mHz)", data_freq, 1000,4000);
+      create_per_cpu_chart("cpu-poll-id", "CPU-Poll (%)", data_poll);
+      create_per_cpu_chart("cpu-c1-id", "CPU-C1 (%)", data_c1);
+      create_per_cpu_chart("cpu-c2-id", "CPU-C2 (%)", data_c1e);
+
+      function createSortable(div_id) {
+        Sortable.create(document.getElementById(div_id), {
+          group: {
+            name: 'shared',
+            pull: 'clone' // To clone: set pull to 'clone'
+          },
+          ghostClass: 'blue-background-class',
+          animation: 150
+        });
+      }
+      createSortable('sortable_cpu_power');
+
+    });
+  </script>
+  <script type="text/javascript">
+    function openTabContent(evt, tabContentName) {
+      // Declare all variables
+      var i, tabcontent, tablinks;
+
+      // Get all elements with class="tabcontent" and hide them
+      tabcontent = document.getElementsByClassName("tabcontent");
+      for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+      }
+
+      // Get all elements with class="tablinks" and remove the class "active"
+      tablinks = document.getElementsByClassName("tablinks");
+      for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+      }
+
+      // Show the current tab, and add an "active" class to the button that opened the tab
+      document.getElementById(tabContentName).style.display = "block";
+      evt.currentTarget.className += " active";
+    }
+  </script>
+</body>
+
+</html>

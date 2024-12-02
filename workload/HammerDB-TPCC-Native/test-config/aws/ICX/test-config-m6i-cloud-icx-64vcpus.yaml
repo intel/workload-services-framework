@@ -1,0 +1,43 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+*:
+    TPCC_THREADS_BUILD_SCHEMA: 64
+    TPCC_NUM_WAREHOUSES: 800
+    TPCC_HAMMER_NUM_VIRTUAL_USERS: "96_104_112_120_128"
+
+*mysql*:
+    MYSQL_INNODB_BUFFER_POOL_SIZE: 64
+    TPCC_HAMMER_NUM_VIRTUAL_USERS: "512"
+
+*postgresql*:
+    PG_SHARED_BUFFERS: 64
+
+*windows*postgres*:
+    TPCC_HAMMER_NUM_VIRTUAL_USERS: "80_88_96"
+
+*aws*:
+    AWS_WORKER_INSTANCE_TYPE: m6i.16xlarge
+    AWS_CLIENT_INSTANCE_TYPE: m6i.4xlarge
+    AWS_DISK_COUNT: 1
+    AWS_DISK_TYPE: io2
+    AWS_DISK_SIZE: 500
+    AWS_DISK_IOPS: 32000
+
+*windows2016*:
+    AWS_WORKER_OS_TYPE: windows2016
+    AWS_CLIENT_OS_TYPE: windows2016
+
+*windows2019*:
+    AWS_WORKER_OS_TYPE: windows2019
+    AWS_CLIENT_OS_TYPE: windows2019
+
+*centos7*:
+    AWS_WORKER_OS_TYPE: centos7
+    AWS_CLIENT_OS_TYPE: centos7
+
+*centos9*:
+    AWS_WORKER_OS_TYPE: centos9
+    AWS_CLIENT_OS_TYPE: centos9

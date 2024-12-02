@@ -1,0 +1,26 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Get perfspect files
+    shell:
+      cmd: find . -type f
+      chdir: "{{ trace_data_path }}"
+      executable: /bin/bash
+    register: perfspect_files
+  
+  - name: Fetch perfspect files
+    fetch:
+      src: "{{ trace_data_path }}/{{ item }}"
+      dest: "{{ trace_data_local_path }}/{{ item }}"
+      flat: yes
+    loop: "{{ perfspect_files.stdout_lines | reject('match', '.*.pid$') }}"
+  
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: false
+

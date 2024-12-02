@@ -26,7 +26,7 @@
         name: breakpoint
       vars:
         breakpoint: PrepareStage
-
+    
 - hosts: cluster_hosts:off_cluster_hosts
   become: "{{ sut_sudo | default(true) | bool }}"
   any_errors_fatal: true
@@ -38,7 +38,7 @@
         name: startup
         tasks_from: probe
       when:
-      - ((ansible_connection|default('ssh')) == 'ssh')
+      - (ansible_connection|default('ssh')) in ['ssh','local']
 
     - name: Probe host features (Windows)
       include_role:
@@ -55,7 +55,7 @@
           name: startup
           tasks_from: main
         when:
-        - ((ansible_connection|default('ssh')) == 'ssh')
+        - ((ansible_connection|default('ssh')) in ['ssh','local'])
 
       - name: Startup sequence (Windows)
         include_role:
@@ -70,11 +70,11 @@
 
     - name: Prepare Docker Auth
       include_role:
-        name: docker_auth
+        name: docker-auth
         tasks_from: main
       when:
       - ((ansible_connection|default('ssh')) == 'ssh')
-      - docker_auth_reuse | default(False) | bool
+      - docker_auth_reuse | default(false) | bool
 
     - name: Install instance watch
       include_role:

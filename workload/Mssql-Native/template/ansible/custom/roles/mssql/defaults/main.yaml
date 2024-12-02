@@ -1,0 +1,11 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+workspace:
+  aws: "C:\\SQLServerSetup"
+  azure: "C:\\SQLServerFull"
+
+MSSQL_VER: "sql2016"
+MSSQL_REPO: "azure/windowos/provides/installation/scripts"

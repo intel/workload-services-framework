@@ -1,0 +1,75 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Copy Install mssql script
+  template:
+    src: "mssql-{{ workload_config.terraform_sut }}.ps1"
+    dest: "{{ workspace[workload_config.terraform_sut] }}\\mssql.ps1"
+
+- name: RUN Install mssql script
+  win_shell:
+    powershell .\mssql.ps1
+  args:
+    chdir: "{{ workspace[workload_config.terraform_sut] }}"
+
+- name: Copy Create user Script to Host
+  template:
+    src: "createuser.tsql.j2"
+    dest: "{{ workspace[workload_config.terraform_sut] }}\\createuser.tsql"
+
+- name: Run Create user Script on Host
+  win_shell:
+    sqlcmd -i .\createuser.tsql
+  args:
+    chdir: "{{ workspace[workload_config.terraform_sut] }}"
+
+- name: Stop Net
+  win_shell: |
+    net stop MSSQLSERVER /y
+    net start MSSQLSERVER /y
+
+- name: Copy Config mssql args script to Host
+  template:
+    src: "setmssqlArg.tsql.j2"
+    dest: "{{ workspace[workload_config.terraform_sut] }}\\setmssqlArg.tsql"
+
+- name: Run Config mssql args Script on Host
+  win_shell:
+    sqlcmd -i .\setmssqlArg.tsql
+  args:
+    chdir: "{{ workspace[workload_config.terraform_sut] }}"
+
+- name: Make Data folder
+  win_shell:
+    mkdir H:\\MSSQL\\DATA
+
+- name: Copy Config tempDB script to Host
+  template:
+    src: "createtempdb.tsql.j2"
+    dest: "{{ workspace[workload_config.terraform_sut] }}\\createtempdb.tsql"
+
+- name: Run Config tempDB Script on Host
+  win_shell:
+    sqlcmd -i .\createtempdb.tsql
+  args:
+    chdir: "{{ workspace[workload_config.terraform_sut] }}"
+
+- name: Stop net
+  win_shell: |
+    net stop MSSQLSERVER /y
+    net start MSSQLSERVER /y
+
+- name: Copy Config datapath script to Host
+  template:
+    src: "createdbdatapath.tsql.j2"
+    dest: "{{ workspace[workload_config.terraform_sut] }}\\createdbdatapath.tsql"
+
+- name: Run Config datapath Script on Host
+  win_shell:
+    sqlcmd -i .\createdbdatapath.tsql
+  args:
+    chdir: "{{ workspace[workload_config.terraform_sut] }}"
+

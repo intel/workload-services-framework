@@ -12,13 +12,14 @@
 
 - name: Install k8s
   include_tasks:
-    file: "install-{{ (os.stdout == 'rhel' or os.stdout =='anolis') | ternary('centos', os.stdout) }}.yaml"
+    file: "install-{{ (os.stdout in ['ubuntu', 'debian']) | ternary('debian','centos') }}.yaml"
 
 - name: Start kubelet
   systemd:
     name: kubelet
-    daemon_reload: yes
-    enabled: yes
-    state: started
-  become: yes
+    daemon_reload: true
+    masked: false
+    enabled: true
+  become: true
+  no_log: true
 

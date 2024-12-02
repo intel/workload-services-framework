@@ -102,8 +102,8 @@ resource "azurerm_public_ip" "default" {
   location            = local.location
   resource_group_name = local.resource_group_name
   allocation_method   = "Static"
-  sku                 = each.value.data_disk_spec!=null?each.value.data_disk_spec.disk_type=="UltraSSD_LRS"?"Standard":null:null
-  zones               = each.value.data_disk_spec!=null?each.value.data_disk_spec.disk_type=="UltraSSD_LRS"?[local.availability_zone]:null:null
+  sku                 = each.value.data_disk_spec!=null?contains(local.speed_adjustable_disk_types, each.value.data_disk_spec.disk_type)?"Standard":null:null
+  zones               = each.value.data_disk_spec!=null?contains(local.speed_adjustable_disk_types, each.value.data_disk_spec.disk_type)?[local.availability_zone]:null:null
 }
 
 resource "azurerm_network_interface" "default" {

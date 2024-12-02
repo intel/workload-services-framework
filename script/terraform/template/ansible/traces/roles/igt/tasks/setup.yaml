@@ -1,0 +1,15 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- set_fact:
+    trace_module_start_block: |
+        (lspci -k | egrep "VGA compatible|Display") && (lsmod | grep i915) && (
+          nohup bash -c '/usr/bin/intel_gpu_top {{ igt_options }} | TZ=UTC ts "%Y-%m-%d %H:%M:%S"' > igt-$roi.logs 2>&1 &
+          echo $! > igt.pid
+          disown
+        )
+    trace_module_stop_block: |
+        kill $(cat igt.pid)

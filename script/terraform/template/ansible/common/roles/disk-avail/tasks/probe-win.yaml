@@ -1,0 +1,26 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# HAS-SETUP-DISK-AVAIL-150
+# HAS-SETUP-DISK-AVAIL-150-D
+
+- block:
+
+    - name: Check disk size
+      ansible.windows.win_shell: |
+        (Get-PSDrive {{ drive_letter }}).free
+      register: disk_avail
+      become: false
+
+    - fail:
+        msg: "disk available {{ ((disk_avail.stdout|int) / 1000000000)|int }}GB under {{ drive_letter }}: is less than {{ size_threshold }}GB."
+      when: (disk_avail.stdout|int) < ((size_threshold|int)*1000000000)
+        
+  when: ('=required' in label_name)
+  vars:
+    drive_letter: "{{ (5 | extract(label_name | split('=') | first | split('-'))) | default('C',true) }}"
+    size_threshold: "{{ 4 | extract(label_name | split('=') | first | split('-')) | int }}"
+

@@ -1,0 +1,14 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Remove Cassandra
+  file:
+    path: "{{ WORKSPACE }}"
+    state: absent
+- name: Remove Java Symbolic Link
+  file:
+    path: /usr/bin/java
+    state: absent
+  ignore_errors: yes

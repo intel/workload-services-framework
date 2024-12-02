@@ -1,0 +1,10 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+REDIS_VER: 7.0.5
+REDIS_PACKAGE: "https://download.redis.io/releases/redis-{{REDIS_VER}}.tar.gz"
+MEMTIER_VER: 1.4.0
+MEMTIER_PACKAGE: "https://github.com/RedisLabs/memtier_benchmark/archive/refs/tags/{{MEMTIER_VER}}.tar.gz"
+WORKSPACE: "/tmp/redis"

@@ -1,0 +1,12 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+perfspect: false
+perfspect_reset: false
+perfspect_metrics_interval: "1"
+perfspect_metrics_options: ""
+perfspect_version: "3.0.0"
+

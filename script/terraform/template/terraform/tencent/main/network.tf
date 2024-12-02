@@ -11,10 +11,17 @@ locals {
   ]
 }
 
+locals {
+  support_multicast = ["ap-beijing", "ap-shanghai", "ap-guangzhou", "ap-chengdu", "ap-chongqing",
+  "ap-nanjing", "ap-hongkong", "ap-singapore", "ap-seoul", "ap-tokyo", "ap-bangkok", "na-toronto",
+  "na-siliconvalley", "na-ashburn", "eu-frankfurt"]
+}
+
 resource "tencentcloud_vpc" "default" {
-  name = "wsf-${var.job_id}-vpc"
-  cidr_block           = var.vpc_cidr_block
-  tags = var.common_tags
+  name         = "wsf-${var.job_id}-vpc"
+  cidr_block   = var.vpc_cidr_block
+  is_multicast = contains(local.support_multicast, local.region) ? true : false
+  tags         = var.common_tags
 }
 
 resource "tencentcloud_subnet" "default" {
@@ -23,7 +30,7 @@ resource "tencentcloud_subnet" "default" {
   availability_zone       = var.zone
   vpc_id                  = tencentcloud_vpc.default.id
   route_table_id          = tencentcloud_vpc.default.default_route_table_id
-
+  is_multicast            = contains(local.support_multicast, local.region) ? true : false
   tags = var.common_tags
 }
 
@@ -37,31 +44,27 @@ resource "tencentcloud_address_template" "default" {
   addresses = local.sg_whitelist_cidr_blocks
 }
 
-resource "tencentcloud_security_group_rule" "ssh" {
+resource "tencentcloud_security_group_rule_set" "default" {
   security_group_id = tencentcloud_security_group.default.id
-  type               = "ingress"
-  ip_protocol        = "tcp"
-  port_range         = "22"
-  policy             = "accept"
 
-  address_template {
-    template_id = tencentcloud_address_template.default.id
+  ingress {
+    action = "ACCEPT"
+    address_template_id = tencentcloud_address_template.default.id
   }
-}
 
-resource "tencentcloud_security_group_rule" "infranet_ingress" {
-  security_group_id = tencentcloud_security_group.default.id
+  ingress {
+    action = "ACCEPT"
+    cidr_block = var.vpc_cidr_block
+  }
 
-  type        = "ingress"
-  cidr_ip     = var.vpc_cidr_block
-  policy      = "accept"
-}
+  ingress {
+    action = "DROP"
+    cidr_block = "0.0.0.0/0"
+  }
 
-resource "tencentcloud_security_group_rule" "outward_traffic" {
-  security_group_id = tencentcloud_security_group.default.id
-
-  type        = "egress"
-  cidr_ip     = "0.0.0.0/0"
-  policy      = "accept"
+  egress {
+    action = "ACCEPT"
+    cidr_block = "0.0.0.0/0"
+  }
 }
 

@@ -1,0 +1,43 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Ensure data directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+  loop:
+    - "{{ DJANGO_APP_INSTALL_DIR }}"
+
+- name: Check distribution
+  set_fact:
+    ansible_pkg_mgr: "{{ 'apt' if ansible_os_family == 'Debian' else 'yum' }}"
+
+- name: Clone code from GitHub
+  ansible.builtin.git:
+    repo: https://github.com/facebookarchive/django-workload.git
+    dest: "{{ DJANGO_APP_INSTALL_DIR }}"
+    version: v1.0rc1
+    force: yes
+
+- name: Upgrade pip
+  pip:
+    virtualenv: "{{ PYTHON_VENV_DIR }}"
+    name: pip
+    state: latest
+
+- name: Update requirements.txt
+  ansible.builtin.lineinfile:
+    path: "{{ DJANGO_APP_INSTALL_DIR }}/django-workload/requirements.txt"
+    regexp: '^Cython<0.25,>=0.20'
+    line: 'Cython'
+    state: present
+
+- name: Install dependencies
+  ansible.builtin.pip:
+    requirements: "{{ DJANGO_APP_INSTALL_DIR }}/django-workload/requirements.txt"
+    virtualenv: "{{ PYTHON_VENV_DIR }}"
+  args:
+    chdir: "{{ DJANGO_APP_INSTALL_DIR }}/django-workload"

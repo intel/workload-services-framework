@@ -1,0 +1,42 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Get network interface device ids bound by dpdk driver
+  shell: |
+    {{ dpdk_devbind }} --status-dev net \
+    | awk '/^Network devices using DPDK-compatible driver/,/^Network devices using kernel driver/{print $0}' \
+    |tail -n +3 \
+    |head -n -2 \
+    |awk '{print $1}'
+  register: get_network_device_ids
+
+- name: Unbind and bind back to kernel driver by device ids
+  become: true
+  shell: |
+    {{ dpdk_devbind }} -b {{ network_kernel_driver | default('ice') }} {{ get_network_device_ids.stdout_lines | join(' ') }} --force
+  ignore_errors: true
+  when:
+  - get_network_device_ids.rc == 0
+  - get_network_device_ids.stdout_lines | length > 0
+
+- block:
+  - name: Get all network interfaces with kernel driver
+    become: true
+    shell: |
+      dpdk-devbind.py --status-dev net \
+      | awk '/^Network devices using kernel driver/,/Other Network devices/{print $0}' \
+      |sed -n 's/.*if=\(.*\) drv=.*/\1/p'
+    register: get_all_interfaces
+
+  - name: Bring up all network interfaces with kernel driver
+    become: true
+    shell: |
+      ifconfig {{ item }} up
+    with_items: "{{ get_all_interfaces.stdout_lines }}"
+    ignore_errors: true
+    when:
+    - get_all_interfaces.rc == 0
+    - get_all_interfaces.stdout_lines | length > 0

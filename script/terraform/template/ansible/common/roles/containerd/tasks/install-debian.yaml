@@ -26,17 +26,20 @@
   delay: 5
   become: true
 
-- name: add docker GPG key
+- name: get the docker GPG key
   get_url:
-    url: "{{ docker_dist_repo }}/linux/debian/gpg"
-    dest: /usr/share/keyrings/docker.asc
-    mode: '0644'
+    url: "{{ docker_dist_repo }}/linux/{{ os.stdout }}/gpg"
+    dest: "/tmp/{{ wl_namespace }}-docker.asc"
     force: true
+  delegate_to: localhost
+  run_once: true
+  become: false
+
+- name: copy the docker GPG key to remote
+  copy:
+    src: "/tmp/{{ wl_namespace }}-docker.asc"
+    dest: /usr/share/keyrings/docker.asc
   become: true
-  register: getrc
-  until: getrc is success
-  retries: 10
-  delay: 5
 
 - name: get os codename
   shell:
@@ -44,29 +47,61 @@
     executable: /bin/bash
   register: codename
 
+- name: remove legacy docker entries
+  include_role:
+    name: legacy-repo
+    tasks_from: remove-debian
+  vars:
+    conflict_repos:
+    - "{{ docker_dist_repo }}/linux/{{ os.stdout }}/"
+
 - name: add docker repository to apt
   apt_repository:
-    repo: "deb [signed-by=/usr/share/keyrings/docker.asc] {{ docker_dist_repo }}/linux/debian {{ codename.stdout | lower }} stable"
+    filename: docker
+    repo: "deb [signed-by=/usr/share/keyrings/docker.asc] {{ docker_dist_repo }}/linux/{{ os.stdout }} {{ codename.stdout | lower }} stable"
     state: present
-    update_cache: false
-  become: true
-
-- name: apt update
-  apt:
     update_cache: true
-  register: aptrc
   become: true
-  until: aptrc is success
-  retries: 10
-  delay: 10
 
-- name: "install {{ containerd_package_name }}"
-  apt:
-    name:
-    - "{{ containerd_package_name }}={{ containerd_version | default(containerd_default_version.debian) }}*"
-    update_cache: false
-  register: aptrc
+- name: "get {{ containerd_package_name }} versions"
+  shell:
+    cmd: "apt-cache madison {{ containerd_package_name }}"
+    executable: /bin/bash
+  register: versions
   become: true
-  until: aptrc is success
-  retries: 10
-  delay: 10
+
+- block:
+
+    - name: "install {{ containerd_package_name }}"
+      apt:
+        name:
+        - "{{ containerd_package_name }}={{ package_version }}"
+        update_cache: false
+      register: aptrc
+      become: true
+      until: aptrc is success
+      retries: 10
+      delay: 10
+
+  rescue:
+
+    - name: "apt-mark unhold {{ containerd_package_name }}"
+      command: |
+        apt-mark unhold {{ containerd_package_name }}
+      ignore_errors: true
+      become: true
+
+    - name: "install {{ containerd_package_name }}"
+      apt:
+        name:
+        - "{{ containerd_package_name }}={{ package_version }}"
+        update_cache: false
+      register: aptrc
+      become: true
+      until: aptrc is success
+      retries: 10
+      delay: 10
+
+  vars:
+    package_version: "{{ 1 | extract(versions.stdout_lines | select('match','.* '+(containerd_version|replace('.','[.]'))+'[-].*') | default(versions.stdout_lines,true) | first | split('|')) | trim }}"
+

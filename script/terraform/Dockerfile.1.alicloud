@@ -6,12 +6,18 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 ARG RELEASE
-FROM terraform-static${RELEASE}
+FROM terraform-csp-base${RELEASE}
 
 ARG ALIYUN_CLI_VER=3.0.177
 ARG ALIYUN_CLI_PACKAGE=https://github.com/aliyun/aliyun-cli/releases/download/v${ALIYUN_CLI_VER}/aliyun-cli-linux-${ALIYUN_CLI_VER}-amd64.tgz
-RUN curl -L ${ALIYUN_CLI_PACKAGE} | tar -xz -C /usr/local/bin
+RUN curl --netrc-optional --retry 10 --retry-connrefused -fsSL ${ALIYUN_CLI_PACKAGE} | tar -xz -C /usr/local/bin
 
 # Add cleanup script
-RUN echo "alias cleanup=/opt/csp/script/cleanup-alicloud.sh" >> /etc/bash.bashrc
+RUN ln -s /opt/project/script/csp/opt/script/cleanup-alicloud.sh /usr/local/bin/cleanup && \
+    ln -s /opt/project/script/csp/opt/script/cleanup-common.sh /usr/local/bin/cleanup-common.sh
 
+# Preload terraform plugins
+RUN mkdir -p /usr/local/share/terraform/plugins; \
+    for dir in /opt/terraform/template/terraform/alicloud/*; do \
+      (cd $dir; terraform providers mirror /usr/local/share/terraform/plugins) \
+    done

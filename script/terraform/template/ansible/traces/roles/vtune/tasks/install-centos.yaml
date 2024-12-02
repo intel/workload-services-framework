@@ -1,0 +1,110 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Remove any pre installed vtune
+    yum:
+      name: 
+        - "intel-oneapi-vtune"
+      state: absent
+    become: yes
+  
+  - name: Remove any pre installation files
+    file:
+      path: "/opt/intel/oneapi/vtune"
+      state: absent
+    become: yes
+  
+  - name: Detect OS version
+    shell:
+      cmd: . /etc/os-release; echo $VERSION_ID
+      executable: /bin/bash
+    register: version_id
+  
+  - name: Detect kernel version
+    shell:
+      cmd: uname -r
+      executable: /bin/bash
+    register: kernel_version
+  
+  - name: Check if kernel header is already installed
+    stat:
+      path: "/usr/src/kernels/{{ kernel_version.stdout }}"
+    register: kernel_header
+  
+  - block:
+  
+    - name: Install prerequisites
+      yum:
+        name: 
+          - "@Development Tools"
+          - "kernel-devel-{{ kernel_version.stdout }}"
+        state: present
+      become: yes
+      register: yumrc
+      until: yumrc is success
+      retries: 10
+      delay: 10
+  
+    rescue:
+  
+      - name: Install prerequisites
+        yum:
+          name: 
+            - "@Development Tools"
+            - "kernel-devel"
+          state: present
+        become: yes
+        register: yumrc
+        until: yumrc is success
+        retries: 10
+        delay: 10
+  
+    when:
+      - version_id.stdout | int >= 8
+      - not kernel_header.stat.exists
+  
+  - name: install oneapi
+    block:
+      
+      - name: add the oneAPI repository
+        yum_repository:
+          name: oneapi
+          description: Intel® oneAPI repository
+          baseurl: "https://yum.repos.intel.com/oneapi"
+          enabled: 1
+          gpgcheck: 1
+          repo_gpgcheck: 1
+          gpgkey: "https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB"
+        environment:
+          no_proxy: "{{ one_proxy }}"
+        become: true
+      
+      - name: Install vtune
+        yum:
+          name: 
+            - "intel-oneapi-vtune-{{ vtune_version }}"
+          state: present
+          #update_cache: true
+        environment:
+          no_proxy: "{{ one_proxy }}"
+        become: yes
+        register: yumrc
+        until: yumrc is success
+        retries: 10
+        delay: 10
+      
+    always:
+  
+      - name: remove the oneAPI repository
+        yum_repository:
+          name: oneapi
+          state: absent
+        become: true
+
+  delegate_to: "{{ trace_node.1 }}"
+

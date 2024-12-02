@@ -1,0 +1,12 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+WORKSPACE: "/tmp/cassandra"
+OPENJDK_VER: "openjdk-14"
+CASSANDRA_VER: "4.1.0"
+CASSANDRA_HOME: "/tmp/cassandra/home"
+
+OPENJDK_PKG: "https://download.java.net/java/GA/jdk14/076bab302c7b4508975440c56f6cc26a/36/GPL/openjdk-14_linux-x64_bin.tar.gz"
+CASSANDRA_PKG: "https://archive.apache.org/dist/cassandra/4.1.0/apache-cassandra-4.1.0-bin.tar.gz"

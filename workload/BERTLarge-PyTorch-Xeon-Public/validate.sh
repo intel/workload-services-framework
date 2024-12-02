@@ -21,7 +21,7 @@ CUSTOMER_ENV=${CUSTOMER_ENV}
 
 if [ -n "$CASE_TYPE" ] && [ "$CASE_TYPE" == "pkm" ]; then
     if [ "$MODE" == "throughput" ]; then
-        EVENT_TRACE_PARAMS="roi,Start case topology,Finish case topology"
+        EVENT_TRACE_PARAMS="roi,Running evaluation,Evaluating: 100%"
     fi
 fi
 
@@ -55,7 +55,14 @@ else
 fi
 
 # Docker Setting
-DOCKER_IMAGE="$DIR/Dockerfile.1.${FUNCTION}"
+if [[ "$WORKLOAD" = *pdt ]]; then
+    DOCKER_IMAGE="$DIR/pdt/Dockerfile.1.${FUNCTION}"
+elif [[ -e $DIR/build_ext.sh ]]; then
+    DOCKER_IMAGE="$DIR/Dockerfile.1.${FUNCTION}_24.04"
+else
+    DOCKER_IMAGE="$DIR/Dockerfile.1.${FUNCTION}"
+fi
+
 DOCKER_OPTIONS="--privileged -e MODE=${MODE} -e PLATFORM=${PLATFORM} \
                 -e TOPOLOGY=${TOPOLOGY} -e PRECISION=${PRECISION} \
                 -e FUNCTION=${FUNCTION} -e DATA_TYPE=${DATA_TYPE} \

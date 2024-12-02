@@ -6,7 +6,7 @@
 
 - name: get node name
   shell: |
-    kubectl get nodes -o='custom-columns=name:.metadata.name,ip:.status.addresses[?(@.type=="InternalIP")].address' --no-headers | grep -F " {{ hostvars[node]['private_ip'] }}" | cut -f1 -d' '
+    kubectl get nodes -o='custom-columns=name:.metadata.name,ip:.status.addresses[?(@.type=="InternalIP")].address' --no-headers | grep -F " {% if (hostvars[node]['private_ip']|ipaddr) %}{{ hostvars[node]['private_ip'] }}{% else %}{{ query('dig',hostvars[node]['private_ip'])|first }}{% endif %}" | cut -f1 -d' '
   register: nodename
   until: nodename.stdout_lines | length > 0
   retries: 5
@@ -16,7 +16,7 @@
 
 - name: save node labels
   set_fact: 
-    node_labels_saved: "{{ lookup('file', wl_logs_dir + '/' + node + '-k8s-node-labels.json') | from_json | default({}) }}"
+    node_labels_saved: "{% if (wl_logs_dir+'/'+node+'-k8s-node-labels.json') is exists %}{{ lookup('file',wl_logs_dir+'/'+node+'-k8s-node-labels.json') | from_json | default({},true) }}{% else %}{{ {} }}{% endif %}"
   ignore_errors: true
 
 - name: remove saved node labels file

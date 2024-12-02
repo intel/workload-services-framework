@@ -23,8 +23,12 @@ print_help () {
     echo "--dry-run             Generate the testcase configurations and then exit."
     echo "--testcase            Run the test case exactly as specified."
     echo "--noenv               Clean environment variables before proceeding with the tests."
-    echo "--check-docker-image  Check image availability before running the workload."
-    echo "--push-docker-image <mirror>     Push the workload image(s) to the mirror registry."
+    echo "--check-docker-image          Check availability of docker image(s)."
+    echo "--inspect-docker-image <cmd>  Inspect docker image(s) with shell command."
+    echo "--push-docker-image <mirror>  Push the workload image(s) to the mirror registry."
+    echo "--testset <yaml>      Use a testset definition yaml file."
+    echo "--attach <file>       Attached a file to be under the logs directory."
+    echo "--describe-params     Show workload parameter descriptions."
     echo ""
     echo "<vars> accepts the following formats:"
     echo "VAR=str1 str2 str3    Enumerate the variable values."
@@ -36,6 +40,40 @@ print_help () {
     echo "Subset of the following ctest options apply:"
     /usr/bin/ctest --help | sed -n '/--progress/,/--help/{p}'
     exit 3
+}
+
+validate_ansible_option () {
+  if [ ${#valid_ansible_options[@]} -eq 0 ]; then
+      DIRPATH="$(dirname "$(readlink -f "$0")")"
+      valid_ansible_options=(run_stage_iterations)
+      valid_ansible_options+=($(find "$DIRPATH"/../terraform/template/ansible -ipath '*/defaults/*' -name '*.yaml' -exec grep -E '^[a-zA-Z_0-9][a-zA-Z_0-9]*:' {} \; | cut -f1 -d:))
+      valid_ansible_options+=($(find "$DIRPATH"/../terraform/script -name 'publish-*.py' -print | sed -e 's|.*/publish-||' -e 's|.py|_publish|'))
+  fi
+  if [[ " ${valid_ansible_options[@]} " != *" ${1%%:*} "* ]]; then
+    echo "Unsupported argument: >>$2<<"
+    exit 3
+  fi
+}
+
+validate_options () {
+  for opt1 in $@; do
+    opt1k="${opt1#--}"
+    case "$opt1" in
+    --*=*)
+      validate_ansible_option ${opt1k%%=*} $opt1
+      ;;
+    --no*)
+      validate_ansible_option ${opt1k#no} $opt1
+      ;;
+    --*)
+      validate_ansible_option ${opt1k} $opt1
+      ;;
+    *)
+      echo "Unsupported argument: >>$opt1<<"
+      exit 3
+      ;;
+    esac
+  done
 }
 
 if [ "$#" -eq 0 ]; then
@@ -105,10 +143,10 @@ if [ -n "$stop" ]; then
         DIRPATH="$(pwd)"
         while [[ "$DIRPATH" = */* ]]; do
             if [ -r "$DIRPATH/CMakeCache.txt" ]; then
-                backend="$(grep "BACKEND:UNINITIALIZED=" "$DIRPATH/CMakeCache.txt" | cut -f2 -d=)"
-                options="$(grep "${backend^^}_OPTIONS:UNINITIALIZED=" "$DIRPATH/CMakeCache.txt" | cut -f2- -d=)"
-                if [[ "$options" = *"--owner="* ]]; then
-                    OWNER="$(echo "x$options" | sed 's|.*--owner=\([^ ]*\).*|\1|')-"
+                cmake_backend="$(grep "BACKEND:UNINITIALIZED=" "$DIRPATH/CMakeCache.txt" | cut -f2 -d=)"
+                cmake_options="$(grep "${cmake_backend^^}_OPTIONS:UNINITIALIZED=" "$DIRPATH/CMakeCache.txt" | cut -f2- -d=)"
+                if [[ "$cmake_options" = *"--owner="* ]]; then
+                    OWNER="$(echo "x$cmake_options" | sed 's|.*--owner=\([^ ]*\).*|\1|')-"
                 fi
                 break
             fi
@@ -169,6 +207,170 @@ elif [ -n "$no_env" ]; then
     exit 0
 fi
 
+testset=""
+last_var=""
+testset_args=()
+testset_vars=()
+for var in "$@"; do
+    case "$var" in
+    --testset=*)
+      testset="${var#--testset=}"
+      ;;
+    --testset)
+      ;;
+    --set=*=*)
+      testset_args+=("$var")
+      [[ "$var" = *" "* ]] || testset_vars+=(${var/--set=/})
+      ;;
+    --set)
+      testset_args+=("$var")
+      ;;
+    *)
+        case "$last_var" in
+        --testset)
+            testset="$var"
+            ;;
+        --set)
+            testset_args+=("$var")
+            [[ "$var" = *" "* ]] || [[ "$var" != *=* ]] || testset_vars+=($var)
+            ;;
+        *)
+            testset_args+=("$var")
+            ;;
+        esac
+        ;;
+    esac
+    last_var="$var"
+done
+
+cleanup_cmake_vars () {
+    testset_key=""
+    testset_sync="wait"
+    testset_cmake=""
+    testset_ctest=()
+}
+
+apply_cmake_vars () {
+    if [[ " ${testset_ctest[@]} ${testset_args[@]} " = *" -R "* ]]; then
+        if [ -n "$testset_cmake" ]; then
+            echo "cmake $testset_cmake .."
+            eval "cmake $testset_cmake .."
+        fi
+    fi
+}
+
+run_ctest () {
+    if [[ " ${testset_ctest[@]} ${testset_args[@]} " = *" -R "* ]]; then
+        "$1" --loop=1 --burst=1 --run=1 "${testset_ctest[@]}" "${testset_args[@]}" &
+        testset_pid=$!
+        if [[ "$testset_sync" =~ ^[0-9][0-9]*[smh]$ ]]; then
+            sleep $testset_sync
+        elif [ "$testset_sync" != "skip" ]; then
+            wait $testset_pid
+        fi
+    fi
+}
+
+parse_value () {
+    _v="$(echo "$_line" | cut -f2- -d$1 | sed -e 's|^ *||' -e 's| *$||')"
+    if [[ "$_v" = "'"* ]]; then
+        _v="${_v#"'"}"
+        _v="${_v%"'"}"
+    elif [[ "$_v" = '"'* ]]; then
+        _v="${_v#'"'}"
+        _v="${_v%'"'}"
+    fi
+}
+
+parse_testcase () {
+    if [[ "$_v" = /*/ ]]; then
+        _v="${_v#/}"
+        testset_ctest+=("-R" "${_v%/}")
+    elif [[ "$_v" = !/*/ ]]; then
+        _v="${_v#!/}"
+        testset_ctest+=("-E" "${_v%/}")
+    else
+        testset_ctest+=("--$_k=$_v")
+    fi
+}
+
+parse_testset_vars () {
+    for kv in ${testset_vars[@]}; do
+      echo " $1 $kv"
+    done
+}
+
+if [ -n "$testset" ]; then
+    if [ ! -r "$testset" ]; then
+        echo "Failed to open testset $testset."
+        exit 3
+    fi
+
+    DIRPATH="$(pwd)"
+    if [[ "$DIRPATH" != */* ]] || [ ! -r "$DIRPATH/CMakeCache.txt" ] || [ -r "${DIRPATH%/*}/CMakeCache.txt" ]; then
+        echo "--testset can only be used from the build directory."
+        exit 3
+    fi
+    cmake_backend="$(grep "BACKEND:UNINITIALIZED=" "$DIRPATH/CMakeCache.txt" | cut -f2 -d= | tr 'a-z' 'A-Z')"
+
+    cleanup_cmake_vars
+    while IFS= read _line; do
+        if [[ "${_line}" = "---" ]]; then
+            apply_cmake_vars
+            run_ctest "$0"
+            cleanup_cmake_vars
+        elif [[ "${_line## }" = "- "* ]]; then
+            parse_value -
+            case "$testset_key" in
+            options)
+                testset_ctest+=("--options=$_v")
+                ;;
+            testcase)
+                parse_testcase
+                ;;
+            esac
+        elif [[ "$_line" = *:* ]] && [[ "${_line## }" != "#"* ]]; then
+            _k="$(echo "$_line" | cut -f1 -d: | sed -e 's|^ *||' -e 's| *$||' | tr -d "\"'")"
+            parse_value :
+            case "$_k" in
+            sync)
+                testset_sync="$_v"
+                ;;
+            testcase)
+                [ -z "${_v// /}" ] || parse_testcase
+                ;;
+            test-config|config|options|loop|burst|run)
+                [ -z "${_v// /}" ] || testset_ctest+=("--$_k=$_v")
+                ;;
+            PLATFORM|BENCHMARK|TIMEOUT|REGISTRY|RELEASE|REGISTRY_AUTH|"${cmake_backend}_OPTIONS"|"${cmake_backend}_SUT"|SPOT_INSTANCE)
+                testset_cmake+="-D$_k=\"$_v\" "
+                ;;
+            *)
+                testset_ctest+=("--set=$_k=$_v")
+                ;;
+            esac
+            testset_key="$_k"
+        fi
+    done < <(
+        if [[ "$testset" = *".m4" ]]; then
+            m4 $(parse_testset_vars -D) "$testset" | sed 's/\r$//'
+        elif [[ "$testset" = *".j2" ]]; then
+            tmp="$(mktemp)"
+            ansible all -i "localhost," -c local -m template -a "src=\"$testset\" dest=\"$tmp\"" $(parse_testset_vars -e) -o 1>&2 || true
+            sed 's/\r$//' "$tmp" || true
+            rm -f "$tmp"
+        else
+            sed 's/\r$//' "$testset"
+        fi
+        echo
+    )
+
+    apply_cmake_vars
+    run_ctest "$0"
+    wait
+    exit 0
+fi
+
 run=1
 burst=1
 loop=1
@@ -182,17 +384,16 @@ cleanup_sut=0
 reuse_sut=0
 dry_run=0
 run_as_ctest=1
-options=""
 empty_vars=()
 last_var=""
-CTESTSH_CMDLINE=""
+export CTESTSH_OPTIONS=""
+attach_files=()
+valid_ansible_options=()
 for var in "$@"; do
-    if [[ "$var" = *" "* ]]; then
-        CTESTSH_CMDLINE="$CTESTSH_CMDLINE \"${var//\"/\\\"}\""
-    else
-        CTESTSH_CMDLINE="$CTESTSH_CMDLINE $var"
-    fi
     case "$var" in
+    --describe-params)
+        export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --describe_workload_params"
+        ;;
     --loop=*)
         loop="${var/--loop=/}"
         run_as_ctest=0
@@ -214,7 +415,6 @@ for var in "$@"; do
         ;;
     --prepare-sut)
         prepare_sut=1
-        run_as_sut=0
         ;;
     --set=*)
         if [[ "$var" =~ ^--set=[A-Za-z0-9_]*=$ ]]; then
@@ -231,7 +431,8 @@ for var in "$@"; do
     --test-config|--config)
         ;;
     --options=*)
-        export CTESTSH_OPTIONS="$CTESTSH_OPTIONS ${var/--options=/}"
+        validate_options ${var#--options=}
+        export CTESTSH_OPTIONS="$CTESTSH_OPTIONS ${var#--options=}"
         ;;
     --options)
         ;;
@@ -255,10 +456,18 @@ for var in "$@"; do
     --check-docker-image)
         export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --check-docker-image"
         ;;
-    --push-docker-image=*)
-        export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --push-docker-image=${var#--push-docker-image=}"
+    --inspect-docker-image=*)
+        export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --inspect-docker-image=$(echo "${var#--inspect-docker-image=}" | base64 -w 0 2> /dev/null) --skip-app-status-check"
         ;;
-    --push-docker-image)
+    --push-docker-image=*)
+        export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --push-docker-image=${var#--push-docker-image=} --skip-app-status-check"
+        ;;
+    --push-docker-image|--inspect-docker-image)
+        ;;
+    --attach=*)
+        attach_files+=("$(readlink -f "${var#--attach=}")")
+        ;;
+    --attach)
         ;;
     --help|-help|-h|-H|"/?")
         print_help
@@ -289,8 +498,8 @@ for var in "$@"; do
             export TEST_CONFIG="$var"
             ;;
         --options)
+            validate_options $var
             export CTESTSH_OPTIONS="$CTESTSH_OPTIONS $var"
-            options=""
             ;;
         --testcase)
             args+=("-R" "^$var$")
@@ -301,16 +510,39 @@ for var in "$@"; do
         --push-docker-image)
             export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --push-docker-image=$var"
             ;;
+        --inspect-docker-image)
+            export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --inspect-docker-image=${var// /%20}"
+            ;;
+        --attach)
+            attach_files+=("$(readlink -f "$var")")
+            ;;
         *)
-            echo "Unknown option: $last_var $var"
-            exit 3
+            var1="${var#--}"
+            case "$var" in
+            --*=*)
+                validate_ansible_option ${var1%%=*} $var
+                export CTESTSH_OPTIONS="$CTESTSH_OPTIONS $var"
+                ;;
+            --no*)
+                validate_ansible_option ${var1#no} $var
+                export CTESTSH_OPTIONS="$CTESTSH_OPTIONS $var"
+                ;;
+            --*)
+                validate_ansible_option $var1 $var
+                export CTESTSH_OPTIONS="$CTESTSH_OPTIONS $var"
+                ;;
+            *)
+                echo "Unknown option: $last_var >>$var<<"
+                exit 3
+                ;;
+            esac
             ;;
         esac
         ;;
     esac
     last_var="$var"
 done
-export CTESTSH_CMDLINE="${CTESTSH_CMDLINE## }"
+export CTESTSH_CMDLINE="$(printf "%q " "$@" | base64 -w 0 2> /dev/null)"
 
 if [ "$loop" = "-1" ]; then
     loop=1
@@ -335,11 +567,7 @@ if [ $reuse_sut = 1 ]; then
 fi
 
 readarray -t values < <(for step1 in "${steps[@]}"; do
-    if [ $(echo "$step1" | tr '/' '\n' | wc -l) -lt $(echo "$step1" | tr '=' '\n' | wc -l) ]; then
-        echo "$step1" | tr '/' '\n'
-    else
-        echo "$step1"
-    fi | awk '{
+    echo "$step1" | sed 's|/\([A-Za-z0-9_]\{1,\}=\)|\n\1|g' | awk '{
         kk=gensub(/^([^=]*)=.*/,"\\1",1,$1)
         $1=gensub(/^[^=]*=(.*)/,"\\1",1,$1)
         if ($NF~/^\|[0-9]+$/ || $NF~/^[0-9]+\|$/) {
@@ -417,13 +645,6 @@ readarray -t values < <(for step1 in "${steps[@]}"; do
     }'
 done)
 
-tmp_files=()
-remove_tmp_files () {
-    rm -f "${tmp_files[@]}"
-    tmp_files=()
-}
-trap 'remove_tmp_files' ERR EXIT
-
 test_config=""
 if [ -n "$TEST_CONFIG" ]; then
     if [ -r "$TEST_CONFIG" ]; then
@@ -457,6 +678,16 @@ get_uniq_prefix () {
     ) 9< "$(pwd)"
 }
 
+remove_tmp_files () {
+    [ ${#tmp_files} -eq 0 ] || rm -f "${tmp_files[@]}"
+    tmp_files=()
+    [ ${#@} -eq 0 ] || exit $1
+}
+
+tmp_files=()
+trap 'remove_tmp_files 3' ERR TERM INT
+export CTESTSH_ATTACH_FILES="$(IFS=,;echo "${attach_files[*]}")"
+
 uniq_prefix="$(get_uniq_prefix)-"
 for loop1 in $(seq 1 $loop); do
     if [ "$loop" = "1" ]; then
@@ -465,8 +696,9 @@ for loop1 in $(seq 1 $loop); do
         loop_prefix="${uniq_prefix}l$loop1-"
         [[ "$burst" = "1" ]] || loop_prefix="${loop_prefix%-}"
     fi
-    [ $cleanup_sut = 1 ] || [ $run_as_ctest = 1 ] && loop_prefix=""
-    [ $prepare_sut = 1 ] && loop_prefix="sut-"
+    [ $cleanup_sut -eq 0 ] || loop_prefix=""
+    [ $prepare_sut -eq 0 ] || loop_prefix=""
+    [ $run_as_ctest -eq 0 ] || loop_prefix=""
     pids=()
     for burst1 in $(seq 1 $burst); do
         echo "Loop: $loop1 Burst: $burst1 Run: $run"
@@ -508,10 +740,11 @@ for loop1 in $(seq 1 $loop); do
         pids+=($!)
         [ "$burst" = "1" ] || sleep 60s
     done
-    if [ $contf = 1 ]; then
+    if [ "$contf" = "1" ]; then
         wait ${pids[@]} || true
     else
         wait ${pids[@]}
     fi
     remove_tmp_files
 done
+

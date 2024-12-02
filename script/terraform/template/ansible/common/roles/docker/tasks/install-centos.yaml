@@ -19,27 +19,41 @@
     - docker-ce-cli
     - docker-compose-plugin
     - docker-buildx-plugin
-    - docker-ce-rootless-extras
+    - docker-ce-rootless-extras 
     - docker-scan-plugin
     state: absent
   when: ((csp | default('static')) in ['static', 'kvm', 'hyperv'])
   ignore_errors: yes
 
+- name: remove legacy docker entries
+  include_role:
+    name: legacy-repo
+    tasks_from: remove-centos
+  vars:
+    conflict_repos:
+    - "{{ docker_dist_repo }}/linux/{{ (os.stdout in ['rhel','fedora']) | ternary(os.stdout,'centos') }}/"
+
 - name: Install docker repo
   get_url:
-    url: "{{ docker_dist_repo }}/linux/centos/docker-ce.repo"
+    url: "{{ docker_dist_repo }}/linux/{{ (os.stdout in ['rhel','fedora']) | ternary(os.stdout,'centos') }}/docker-ce.repo"
     dest: "/etc/yum.repos.d/docker-ce.repo"
+    force: true
   register: getrc
   until: getrc is success
   retries: 10
   delay: 5
 
+- name: get versions
+  command: |
+    yum list --showduplicates docker-ce docker-ce-cli docker-compose-plugin
+  register: versions
+
 - name: install docker
   yum:
     name:
-      - "docker-ce-{{ docker_version | default(docker_default_version.centos) }}*"
-      - "docker-ce-cli-{{ docker_cli_version | default(docker_cli_default_version.centos) }}*"
-      - "docker-compose-plugin-{{ docker_compose_plugin_version | default(docker_compose_plugin_default_version.centos) }}*"
+      - "docker-ce-{{ 1 | extract(versions.stdout_lines | select('match','docker-ce[.].*'+(docker_version|replace('.','[.]'))+'[-].*') | default(versions.stdout_lines | select('match','docker-ce[.].*'),true) | last | split(' ') | reject('==','')) }}*"
+      - "docker-ce-cli-{{ 1 | extract(versions.stdout_lines | select('match','docker-ce-cli[.].*'+(docker_cli_version|replace('.','[.]'))+'[-].*') | default(versions.stdout_lines | select('match','docker-ce-cli[.].*'),true) | last | split(' ') | reject('==','')) }}*"
+      - "docker-compose-plugin-{{ 1 | extract(versions.stdout_lines | select('match','docker-compose-plugin[.].*'+(docker_compose_plugin_version|replace('.','[.]'))+'[-].*') | default(versions.stdout_lines | select('match','docker-compose-plugin[.].*'),true) | last | split(' ') | reject('==','')) }}*"
     update_cache: true
   register: yumrc
   until: yumrc is success

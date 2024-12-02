@@ -17,13 +17,19 @@
       name: kubeadm
       tasks_from: join
     when:
-    - install_k8s
+    - (('controller' in groups) | ternary(install_k8s,false))
     - is_a_unique_worker_or_a_controller
+
+  - name: Restart containerd and kubelet
+    include_tasks:
+      file: restart-containerd-kubelet.yaml
+    when:
+    - ('controller' in groups)
+    - install_k8s or (hostvars['controller-0'].cert_updated | default(false) | bool)
 
   - name: wait for all nodes ready
     shell:
       cmd: |
-        timeout 600s bash -c "while ! kubectl wait --for=condition=Ready node \$(kubectl get nodes -o='custom-columns=name:.metadata.name,ip:.status.addresses[?(@.type==\"InternalIP\")].address' --no-headers | grep -F '{{ private_ip }}' | cut -f1 -d' ') --timeout 30s; do sleep 1s; done"
+        timeout {{ k8s_node_ready_wait }} bash -c "while true; do kubectl wait --for=condition=Ready node \$(kubectl get nodes -o='custom-columns=name:.metadata.name,ip:.status.addresses[?(@.type==\"InternalIP\")].address' --no-headers | grep -F '{% if (private_ip|ipaddr) %}{{ private_ip }}{% else %}{{ query('dig',private_ip)|first }}{% endif %}' | cut -f1 -d' ') --timeout 30s && break; sleep 1s; done"
       executable: /bin/bash
     delegate_to: "{{ ('controller' in groups) | ternary('controller-0','localhost') }}"
-

@@ -15,3 +15,4 @@ cat <<EOF
   "cpu_model": ":$cpu_model"
 }
 EOF
+

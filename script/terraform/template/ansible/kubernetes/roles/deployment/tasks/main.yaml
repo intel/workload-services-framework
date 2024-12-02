@@ -4,12 +4,24 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: create name space
-  command: "kubectl create namespace {{ wl_namespace }}"
+- block:
+
+    - name: create name space
+      command: "kubectl create namespace {{ wl_namespace }}"
+
+  rescue:
+
+    - name: delete namespace
+      include_role:
+        name: cleanup
+        tasks_from: delete-namespace
+
+    - name: create name space
+      command: "kubectl create namespace {{ wl_namespace }}"
 
 - name: Create ImagePullSecret
   include_role:
-    name: docker_auth
+    name: docker-auth
   vars:
     namespace: "{{ wl_namespace }}"
 
@@ -22,12 +34,26 @@
   - sut_sudo | default(true) | bool
 
 - name: create deployment
-  command: "kubectl create --namespace {{ wl_namespace }} -f /tmp/{{ wl_namespace }}-k8s-script.yaml"
+  shell:
+    cmd: |
+      kubectl create --namespace {{ wl_namespace }} secret generic workload-config --from-env-file=<(
+        {% if k8s_config_timezone | bool %}
+          echo "TZ=$(timedatectl show --va -p Timezone 2> /dev/null || echo $TZ)"
+        {% endif %}
+        {% for k in workload_secrets.keys() %}
+          echo "{{ k }}=${{ k }}"
+        {% endfor %}
+      )
+      kubectl create --namespace {{ wl_namespace }} -f /tmp/{{ wl_namespace }}-k8s-script.yaml
+    executable: /bin/bash
+  environment: "{{ workload_secrets }}"
+  vars:
+    workload_secrets: "{{ lookup('file',wl_logs_dir+'/.workload-secret.yaml') | from_yaml | default({},true) }}"
 
 - block:
   
     - name: wait for scheduling
-      shell: "timeout {{ timeout[1] | default(timeout[0]) }}s bash -c 'until kubectl --namespace={{ wl_namespace }} wait pod --all --for=condition=Ready --field-selector=status.phase!=Succeeded --timeout=5s 1>/dev/null 2>&1; do if kubectl --namespace={{ wl_namespace }} get pod -o json | grep -q Unschedulable; then exit 1; fi; done; exit 0'"
+      shell: "timeout {{ timeout[1] | default(timeout[0]) }} bash -c 'until kubectl --namespace={{ wl_namespace }} wait pod --all --for=condition=Ready --field-selector=status.phase!=Succeeded --timeout={{ k8s_schedule_wait_timeout }}; do if kubectl --namespace={{ wl_namespace }} get pod -o json | grep -q Unschedulable; then exit 1; fi; done; exit 0'"
       vars:
         timeout: "{{ 'timeout' | extract(lookup('file', wl_logs_dir+'/workload-config.yaml')|from_yaml) | split(',') }}"
 
@@ -41,27 +67,17 @@
       fail:
         msg: "abort due to scheduling failure"
 
-- name: record timing
-  shell:
-    cmd: |
-      echo "workload_itr{{ itr }}_start: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
-    executable: /bin/bash
-  delegate_to: localhost
-  async: 30
-  poll: 0
+- include_role:
+    name: timing
+    tasks_from: start-iteration
 
 - name: workload-execution
   include_tasks:
     file: process-traces-and-logs.yaml
 
-- name: record timing
-  shell:
-    cmd: |
-      echo "workload_itr{{ itr }}_end: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
-    executable: /bin/bash
-  delegate_to: localhost
-  async: 30
-  poll: 0
+- include_role:
+    name: timing
+    tasks_from: stop-iteration
 
 - name: collect trace data
   include_role:

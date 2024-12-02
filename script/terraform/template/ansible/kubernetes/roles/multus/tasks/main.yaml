@@ -1,0 +1,22 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: check multus installed or not
+  shell: "kubectl get pods --all-namespaces | grep -i multus"
+  register: multus_installed
+  
+- name: install multus if it is not installed
+  block:
+    - name: install multus
+      command: "kubectl apply -f {{ k8s_multus_repo }}"
+
+    - name: Wait for multus pod ready
+      shell: "timeout 600s kubectl wait --namespace=kube-system pod --for=condition=Ready -l app=multus"
+      register: wait_ready
+      retries: 10
+      delay: 3
+      until: wait_ready.rc == 0
+      ignore_errors: yes
+  when: multus_installed.rc != 0

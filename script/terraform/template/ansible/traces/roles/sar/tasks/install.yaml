@@ -6,49 +6,22 @@
 
 - block:
 
+  - name: Check if sar exists
+    command: "sar -V"
+    register: sar_rc
+    ignore_errors: true
+
   - name: Detect OS
     shell:
       cmd: ". /etc/os-release; echo $ID"
       executable: /bin/bash
     register: os
-
+    when: sar_rc is failed
+  
   - name: Install sysstat
     include_tasks:
-      file: "install-{{ (os.stdout == 'rhel' or os.stdout =='anolis') | ternary('centos', os.stdout) }}.yaml"
-
-  - name: Append the start script
-    blockinfile:
-      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-start-trace.sh"
-      marker: "# sar {mark}"
-      insertbefore: "^wait"
-      block: |
-        (
-          mkdir -p /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar
-          cd /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar
-          if is_roi "{{ trace_node.0 }}"; then
-            date -Ins >> TRACE_START
-            nohup sar {{ sar_options }} -o sar-$roi.logs > /dev/null 2>&1 &
-            echo $! > sar.pid
-            disown
-          else
-            echo "---" >> TRACE_START
-          fi
-        ) &
-
-  - name: Append the stop script
-    blockinfile:
-      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-stop-trace.sh"
-      marker: "# sar {mark}"
-      insertbefore: "^wait"
-      block: |
-        (
-          cd /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar
-          if is_roi "{{ trace_node.0 }}"; then
-            date -Ins >> TRACE_STOP
-            kill $(cat sar.pid)
-          else
-            echo "---" >> TRACE_STOP
-          fi
-        ) &
-
+      file: "install-{{ (os.stdout in ['ubuntu','debian']) | ternary('debian','centos') }}.yaml"
+    when: sar_rc is failed
+  
   delegate_to: "{{ trace_node.1 }}"
+  

@@ -1,0 +1,124 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+    - name: setup port forwarding
+      shell:
+        cmd: |
+          nohup ssh -4 -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -i {{ ansible_private_key_file }} -fNL {{ local_registry_url }}:{{ k8s_remote_registry_url }} >> /tmp/{{ wl_namespace }}-ssh.logs 2>&1 &
+          disown
+        executable: /bin/bash
+      delegate_to: localhost
+      when: not (k8s_enable_csp_registry | bool)
+      become: false
+
+    - name: create AWS ECR namespaces
+      shell: 
+        cmd: "AWS_PAGER= aws ecr create-repository --region {{ k8s_remote_registry_url.split('.')[3] }} --repository-name {{ k8s_remote_registry_url.split('/')[1:] | join('/') }}/{{ item.key.split(':')[0] | basename }}"
+        executable: /bin/bash
+      when:
+      - (k8s_enable_csp_registry | bool)
+      - (".amazonaws.com" in k8s_remote_registry_url)
+      loop: "{{ wl_docker_images | dict2items | rejectattr('key','match',(skopeo_sut_accessible_registries|split(',')|reject('==','')|default(['NO-REGISTRY'],true)|map('regex_replace','^(.*)$','^\\1.*$')|join('|'))) }}"
+      loop_control:
+        label: "{{ item.key }}"
+      delegate_to: localhost
+      ignore_errors: true
+      become: false
+      no_log: true
+
+    - name: inspect local images
+      command: "docker image inspect {{ item.key }}"
+      register: inspect_l
+      become: true
+      loop: "{{ wl_docker_images | dict2items | rejectattr('key','match',(skopeo_sut_accessible_registries|split(',')|reject('==','')|default(['NO-REGISTRY'],true)|map('regex_replace','^(.*)$','^\\1.*$')|join('|'))) }}"
+      loop_control:
+        label: "{{ item.key }}"
+      delegate_to: localhost
+      ignore_errors: true
+      no_log: true
+
+    - name: inspect remote registry images
+      command: "skopeo inspect {{ skopeo_inspect_options }} --tls-verify=false docker://{{ k8s_enable_csp_registry | bool | ternary(k8s_remote_registry_url,local_registry_url) }}/{{ item.item.key | basename }}"
+      environment:
+        ALL_PROXY: ""
+        all_proxy: ""
+      register: inspect_rreg
+      loop: "{{ inspect_l.results }}"
+      loop_control:
+        label: "{{ item.item.key }}"
+      delegate_to: localhost
+      become: true
+      ignore_errors: true
+      no_log: true
+
+    - name: copy daemon images to registry
+      include_tasks:
+        file: to-registry-copy.yaml
+      when: 
+      - inspect.rc == 0
+      - ('BUILD_ID' | extract('Labels' | extract(inspect_rreg.results[inspect_idx].stdout | default('{"Labels":{}}',true) | from_json)) | default('NB',true)) not in (inspect.stdout | from_json | map(attribute='Config') | map(attribute='Labels') | map(attribute='BUILD_ID') | map('default','NC',true))
+      loop: "{{ inspect_l.results }}"
+      loop_control:
+        loop_var: inspect
+        index_var: inspect_idx
+        label: "{{ inspect.item.key }}"
+      no_log: true
+
+    - name: Inspect local registry images
+      command: "skopeo inspect {{ skopeo_inspect_options }} --tls-verify={{ ((item.item.value|bool) and (item.item.key is not match('^'+(skopeo_insecure_registries|split(',')|reject('==','')|default(['NO-REGISTRY'],true)|join('|'))+'.*$'))) | ternary('true','false') }} docker://{{ item.item.key }}"
+      environment:
+        ALL_PROXY: ""
+        all_proxy: ""
+      register: inspect_lreg
+      when: item.rc != 0
+      loop: "{{ inspect_l.results }}"
+      loop_control:
+        label: "{{ item.item.key }}"
+      delegate_to: localhost
+      become: true
+      ignore_errors: true
+      no_log: true
+
+    - name: copy registry images to registry
+      include_tasks:
+        file: to-registry-copy.yaml
+      when:
+      - inspect.rc != 0
+      - ('BUILD_ID' | extract('Labels' | extract(inspect_lreg.results[inspect_idx].stdout | default('{"Labels":{}}',true) | from_json)) | default('NB',true)) != ('BUILD_ID' | extract('Labels' | extract(inspect_rreg.results[inspect_idx].stdout | default('{"Labels":{}}',true) | from_json)) | default('NC',true))
+      loop: "{{ inspect_l.results }}"
+      loop_control:
+        loop_var: inspect
+        index_var: inspect_idx
+        label: "{{ inspect.item.key }}"
+      no_log: true
+
+    - name: wait for docker images to be ready
+      shell:
+        cmd: |
+          timeout {{ skopeo_wait_ready }} bash -c '
+            {% for image in (inspect_l.results | map(attribute='item') | map(attribute='key')) %}
+              while ! skopeo inspect {{ skopeo_inspect_options }} --tls-verify=false docker://{{ k8s_enable_csp_registry | bool | ternary(k8s_remote_registry_url,local_registry_url) }}/{{ image | basename }} > /dev/null 2>&1; do sleep 1s; done &
+            {% endfor %}
+            wait
+          '
+        executable: /bin/bash
+      ignore_errors: true
+      delegate_to: localhost
+      become: true
+
+  always:
+
+    - name: cancel port forwarding
+      shell:
+        cmd: |
+          ssh -4 -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} -i {{ ansible_private_key_file }} -O cancel -L {{ local_registry_url }}:{{ k8s_remote_registry_url }} > /dev/null 2>&1
+        executable: /bin/bash
+      delegate_to: localhost
+      when: not (k8s_enable_csp_registry | bool)
+      become: false
+

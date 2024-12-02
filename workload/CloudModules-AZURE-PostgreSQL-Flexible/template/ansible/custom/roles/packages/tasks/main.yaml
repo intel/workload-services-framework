@@ -1,0 +1,24 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Run "apt update"
+  apt: update_cache=yes
+
+- name: Add mysql software dependencies
+  apt:
+    name:
+    - wget
+    - libpq5
+    - netcat-openbsd
+    - bc
+    - numactl
+    - procps
+    - net-tools
+    state: present
+  ignore_errors: no
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10

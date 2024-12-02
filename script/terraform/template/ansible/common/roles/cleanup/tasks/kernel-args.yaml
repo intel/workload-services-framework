@@ -13,13 +13,13 @@
 - name: Remove any changes
   blockinfile:
     marker: "# {mark} WSF Setup"
-    path: "{{ cleanup_hugepage_actions[os.stdout]['grub_path'] }}"
+    path: "{{ cleanup_hugepage_actions[(os.stdout in ['debian','ubuntu']) | ternary('debian','centos')]['grub_path'] }}"
     state: absent
   register: grubsts
   ignore_errors: yes
 
 - name: Update grub if updated
-  shell: "{{ cleanup_hugepage_actions[os.stdout]['update_grub_cmd'] }}"
+  shell: "{{ cleanup_hugepage_actions[(os.stdout in ['debian','ubuntu']) | ternary('debian','centos')]['update_grub_cmd'] }}"
   when: grubsts.msg == "Block removed"
   ignore_errors: yes
 

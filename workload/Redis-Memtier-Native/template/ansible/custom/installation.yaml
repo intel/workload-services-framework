@@ -1,0 +1,44 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- hosts: worker-0
+  gather_facts: no
+  become: yes
+  tasks:
+    - name: Installing dependencies
+      include_role:
+        name: installation
+        tasks_from: install-dependencies
+
+    - name: Installing applications
+      include_role:
+        name: installation
+        tasks_from: install-app
+
+- hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Create Client Group
+      set_fact:
+        dynamic_hosts: "{{ ['worker-0'] if wl_tunables['RUN_SINGLE_NODE'] | bool else range(0, wl_tunables['CLIENT_COUNT']|int) | map('string') | map('regex_replace', '^(.*)$', 'client-\\1') | list }}"
+    - name: Add Dynamic Hosts to Group
+      add_host:
+        name: "{{ item }}"
+        groups: dynamic_clients
+      loop: "{{ dynamic_hosts }}"
+
+- hosts: dynamic_clients
+  gather_facts: no
+  become: yes
+  tasks:
+    - name: Installing dependencies
+      include_role:
+        name: installation
+        tasks_from: install-dependencies
+
+    - name: Installing applications
+      include_role:
+        name: installation
+        tasks_from: install-benchmark

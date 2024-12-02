@@ -1,0 +1,61 @@
+# nginx-client-ab
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+
+FROM qatsw-crypto-base-ssl3-ubuntu-24.04.1${RELEASE} AS build
+RUN  apt-get update && apt-get install -y git gcc g++ cmake make autoconf automake libpcre3-dev nasm libtool pkg-config wget zlib1g-dev libapr*
+
+ARG NGINX_VER="1.22.1"
+ARG NGINX_PACKAGE=https://nginx.org/download/nginx-${NGINX_VER}.tar.gz
+RUN wget ${NGINX_PACKAGE} && tar xf nginx-${NGINX_VER}.tar.gz && \
+    cd nginx-${NGINX_VER} && \
+    ./configure \
+      --prefix=/var/www \
+      --conf-path=/usr/local/share/nginx/conf/nginx.conf \
+      --sbin-path=/usr/local/bin/nginx \
+      --pid-path=/run/nginx.pid \
+      --lock-path=/run/lock/nginx.lock \
+      --modules-path=/var/www/modules/ \
+      --without-http_rewrite_module \
+      --with-http_dav_module \
+      --with-http_ssl_module \
+      --with-pcre \
+      --with-cc-opt="-O3 -I/usr/local/include/openssl \
+	  -Wno-error=deprecated-declarations -Wimplicit-fallthrough=0" \
+      --with-ld-opt="-Wl,-rpath=/usr/local/lib64 -L/usr/local/lib64" && \
+    make -j && \
+    make install
+
+ARG APACHE_VER="2.4.53"
+ARG APACHE_PACKAGE="https://archive.apache.org/dist/httpd/httpd-${APACHE_VER}.tar.gz"
+ARG APACHE_TLS13_PATCH="https://bz.apache.org/bugzilla/attachment.cgi?id=36674"
+ARG APACHE_PATH="/usr/local"
+RUN wget ${APACHE_PACKAGE} && tar xf httpd-${APACHE_VER}.tar.gz && \
+    cd httpd-${APACHE_VER}/support && \
+    wget ${APACHE_TLS13_PATCH} -O tls13_ab.patch && \
+    patch -p0 < tls13_ab.patch && \
+    cd ../ && \
+    ./configure \
+      --sbindir=${APACHE_PATH} && \
+    make -j && \
+    make install 
+
+RUN rm -rf /usr/share/man/*
+RUN cp /usr/local/apache2/bin/ab /usr/local/bin
+
+FROM qatsw-crypto-base-ssl3-ubuntu-24.04.1${RELEASE}
+RUN  apt-get update && apt-get install -y curl wget libpcre3 zlib1g libapr* systemd && apt-get clean
+COPY --from=build /usr/local/ /usr/local/
+COPY --from=build /var/www/ /var/www/
+COPY conf/*.conf /usr/local/share/nginx/conf/
+COPY run_ab.sh /
+COPY run_openssl.sh /
+RUN mkfifo /export-logs
+CMD (/run_ab.sh; echo $? > status) 2>&1 | tee output.logs && \
+    tar cf /export-logs status output.logs concurrency_*.log && \
+    sleep infinity

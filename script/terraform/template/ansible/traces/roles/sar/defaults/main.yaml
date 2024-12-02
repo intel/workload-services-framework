@@ -4,4 +4,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-sar_options: "-B -b -d -p -H -I ALL -m ALL -n ALL -q -r -u ALL -P ALL -v -W -w -F 5"
+sar: false
+sar_interval: "5"
+sar_options: "-B -b -d -p -H -I ALL -m ALL -n ALL -q -r -u ALL -P ALL -v -W -w -F"

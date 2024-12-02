@@ -1,0 +1,32 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+*:
+    TPCC_THREADS_BUILD_SCHEMA: 64
+    TPCC_NUM_WAREHOUSES: 800
+    TPCC_HAMMER_NUM_VIRTUAL_USERS: "118_120_122_124_126_128_130_132_134_136_138"
+
+*postgresql*:
+    PG_SHARED_BUFFERS: 64
+
+*mysql*:
+    MYSQL_INNODB_BUFFER_POOL_SIZE: 64
+    TPCC_HAMMER_NUM_VIRTUAL_USERS: "512"
+
+*azure*:
+    AZURE_WORKER_INSTANCE_TYPE: Standard_D64s_v4
+    AZURE_CLIENT_INSTANCE_TYPE: Standard_D64s_v4
+    AZURE_DISK_TYPE: UltraSSD_LRS
+    AZURE_DISK_IOPS: 32000
+    AZURE_DISK_THROUGHPUT: 2000
+
+*azure*ubuntu2204*:
+    AZURE_WORKER_OS_TYPE: ubuntu2204
+    AZURE_CLIENT_OS_TYPE: ubuntu2204
+
+*azure*ubuntu2004*:
+    AZURE_WORKER_OS_TYPE: ubuntu2004
+    AZURE_CLIENT_OS_TYPE: ubuntu2004
+

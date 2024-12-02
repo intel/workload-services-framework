@@ -14,6 +14,8 @@ locals {
         cpu_model_regex = profile.cpu_model_regex
         os_disk_type = profile.os_disk_type
         os_disk_size = profile.os_disk_size
+        os_disk_iops = profile.os_disk_iops
+        os_disk_throughput = profile.os_disk_throughput
         min_cpu_platform = profile.min_cpu_platform
         threads_per_core = profile.threads_per_core
         cpu_core_count = profile.cpu_core_count
@@ -31,6 +33,8 @@ locals {
       cpu_model_regex = vm.cpu_model_regex
       os_disk_type = vm.os_disk_type
       os_disk_size = vm.os_disk_size
+      os_disk_iops = vm.os_disk_iops
+      os_disk_throughput = vm.os_disk_throughput
       min_cpu_platform = vm.min_cpu_platform
       threads_per_core = vm.threads_per_core
       cpu_core_count = vm.cpu_core_count

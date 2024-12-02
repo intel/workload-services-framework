@@ -1,0 +1,15 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+k8s_legacy_repos:
+  deb:
+  - "http://apt.kubernetes.io/"
+  - "https://dl.k8s.io/apt/doc/apt-key.gpg/"
+  - "https://pkgs.k8s.io/core:/stable:/v1.26/deb/"
+  yum:
+  - "https://packages.cloud.google.com/yum/repos/"
+  - "https://pkgs.k8s.io/core:/stable:/v1.26/rpm/"
+

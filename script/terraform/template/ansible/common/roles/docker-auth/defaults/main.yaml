@@ -1,0 +1,16 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ansible_user: "{{ lookup('env', 'USER') | default('tfu') }}"
+
+docker_auth_reuse: false
+docker_auth_method: "docker"
+docker_auth_config_json: ".docker/config.json"
+docker_auth_secret_name: "wsf-registry-secret"
+
+docker_auth_pass_keystore_dir: ".password-store"
+docker_auth_pass_keyring_dir: ".gnupg"
+docker_auth_pass_ver: "undefined"
+docker_auth_cred_ver: "undefined"

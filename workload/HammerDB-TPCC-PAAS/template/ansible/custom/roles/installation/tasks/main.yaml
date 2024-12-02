@@ -1,0 +1,60 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Create the workspace direcctory
+  file:
+    path: "{{ workspace }}"
+    state: directory
+
+- name: Install hammerDB
+  shell: "wget -c {{ hammerdb_package }} -O - | tar -xz -C {{ workspace }}"
+
+- name: Save the Json data to a Variable as a Fact
+  set_fact:
+    jsondata: "{{ lookup('file', '/opt/workspace/.tfplan.json') | from_json }}"
+  delegate_to: localhost
+
+- name: Set host
+  set_fact:
+    DB_HOST: "{{ jsondata['values']['outputs']['instances']['value']['dbinstance']['address'] }}"
+  delegate_to: localhost
+
+- name: Set port
+  set_fact:
+    DB_PORT: "{{ jsondata['values']['outputs']['instances']['value']['dbinstance']['port'] }}"
+  delegate_to: localhost
+
+- name: Set user name
+  set_fact:
+    ROOT_USER: "{{ jsondata['values']['outputs']['instances']['value']['dbinstance']['user_name'] }}"
+  delegate_to: localhost
+
+- name: Set DB password
+  set_fact:
+    ROOT_PASSWORD: "{{ jsondata['values']['outputs']['instances']['value']['dbinstance']['password'] }}"
+  delegate_to: localhost
+
+- name: Set database name
+  set_fact:
+    DATABASE: "{{ jsondata['values']['outputs']['instances']['value']['dbinstance']['database'] }}"
+  delegate_to: localhost
+
+- name: Copy file
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "a+rx"
+  with_items:
+  - {src: "prepare_common.sh", dest: "{{ workspace }}/prepare_common.sh"}
+  - {src: "prepare_hammerdb.sh", dest: "{{ workspace }}/prepare_hammerdb.sh"}
+  - {src: "run_hammerdb.sh.j2", dest: "{{ workspace }}/run_hammerdb.sh"} 
+
+- name: Copy tcl file
+  copy:
+    src: "configure/mysqloltp_custom.tcl"
+    dest: "{{ workspace }}/HammerDB-{{ hammerdb_ver }}/src/mysql/mysqloltp.tcl"
+    mode: "a+rx"
+  failed_when: false
+

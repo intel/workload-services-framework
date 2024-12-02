@@ -1,0 +1,47 @@
+# hammerdb-ubuntu24
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+# For apt install without question
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Enable apt sources
+RUN sed -i~orig -e 's/# deb-src/deb-src/' /etc/apt/sources.list
+
+# Update apt and download basic utilities
+# Install and configuring MySQL client libraries
+RUN apt-get update -y && \
+    apt-get install -y wget unzip gnupg apt-utils libaio-dev iputils-ping \
+    vim netcat-openbsd libxft-dev libcairo2-dev xauth postgresql-client numactl
+
+# Install configure HammerDB-v4.7
+ARG HAMMERDB_VER="4.7"
+ARG HAMMERDB_PACKAGE="https://github.com/TPC-Council/HammerDB/releases/download/v${HAMMERDB_VER}/HammerDB-${HAMMERDB_VER}-Linux.tar.gz"
+RUN wget -c "${HAMMERDB_PACKAGE}" -O - | tar -xz && \
+    echo 'export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH'  >> ~/.bashrc && \
+    rm -rf *.tar.gz *.zip
+
+ENV HAMMERDB_INSTALL_DIR="/HammerDB-${HAMMERDB_VER}"
+
+COPY script/create_mapping.sh /
+COPY script/create_tcl.sh /
+COPY script/run_test.sh /
+
+RUN chmod +x /create_mapping.sh \
+    && chmod +x /create_tcl.sh \
+    && chmod +x /run_test.sh 
+
+RUN mkfifo /export-logs
+
+CMD (/run_test.sh; echo $? > status) 2>&1 | tee client.logs \
+    && tar cf /export-logs status client.logs tcls/*\
+    && sleep infinity
+

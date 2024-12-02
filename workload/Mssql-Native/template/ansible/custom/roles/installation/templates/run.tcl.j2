@@ -1,0 +1,62 @@
+proc runtimer { seconds } {
+    set x 0
+    set timerstop 0
+    while {!$timerstop} {
+        incr x
+        after 1000
+        if { ![ expr {$x % 60} ] } {
+            set y [ expr $x / 60 ]
+            puts "Timer: $y minutes elapsed"
+        }
+        update
+        if {  [ vucomplete ] || $x eq $seconds } {
+            set timerstop 1
+        }
+    }
+    return
+}
+
+puts "SETTING CONFIGURATION"
+dbset db mssqls
+dbset bm TPC-C
+diset connection mssqls_server {{ hostvars["worker-0"]["private_ip"] }}
+diset connection mssqls_port 1433
+diset connection mssqls_tcp true
+diset connection mssqls_authentication sql
+diset connection mssqls_uid "sqladmin"
+diset connection mssqls_pass "ABCDegf123"
+diset connection mssqls_encrypt_connection true
+diset connection mssqls_trust_server_cert true
+diset connection mssqls_odbc_driver "ODBC Driver 17 for SQL Server"
+
+dict set configmssqlserver tpcc mssqls_driver timed
+dict set configmssqlserver tpcc mssqls_rampup {{ wl_tunables.TPCC_MINUTES_OF_RAMPUP }}
+dict set configmssqlserver tpcc mssqls_duration {{ wl_tunables.TPCC_MINUTES_OF_DURATION }}
+dict set configmssqlserver tpcc mssqls_total_iterations  {{ wl_tunables.TPCC_TOTAL_ITERATIONS }}
+dict set configmssqlserver tpcc mssqls_async_scale false
+dict set configmssqlserver tpcc mssqls_connect_pool false
+dict set configmssqlserver tpcc mssqls_dbase tempdb
+
+dict set configmssqlserver tpcc mssqls_raiseerror false
+dict set configmssqlserver tpcc mssqls_keyandthink false
+dict set configmssqlserver tpcc mssqls_checkpoint false
+dict set configmssqlserver tpcc mssqls_async_client false
+dict set configmssqlserver tpcc mssqls_async_verbose false
+dict set configmssqlserver tpcc mssqls_async_delay 1000
+
+vuset logtotemp 1
+vuset unique 1
+vuset timestamps 1
+loadscript
+puts "SEQUENCE STARTED"
+foreach z [ split "{{ wl_tunables.TPCC_HAMMER_NUM_VIRTUAL_USERS }}" "_" ] {
+    puts "$z VU TEST"
+    vuset vu $z
+    vucreate
+    vurun
+    runtimer {{ wl_tunables.TPCC_RUNTIMER_SECONDS }}
+    vudestroy
+    after {{ wl_tunables.TPCC_WAIT_COMPLETE_MILLSECONDS }}
+}
+puts "TEST SEQUENCE COMPLETE"
+exit

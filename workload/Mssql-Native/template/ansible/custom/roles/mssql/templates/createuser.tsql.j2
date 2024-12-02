@@ -1,0 +1,26 @@
+USE [master]
+GO
+CREATE LOGIN sqladmin WITH PASSWORD = 'ABCDegf123';
+GO
+EXEC master..sp_addsrvrolemember @loginame = N'sqladmin', @rolename = N'sysadmin'
+GO
+EXEC master..sp_addsrvrolemember @loginame = N'sqladmin', @rolename = N'dbcreator'
+GO
+EXEC master..sp_addsrvrolemember @loginame = N'sqladmin', @rolename = N'diskadmin'
+GO
+ 
+USE [tempdb]
+create user sqladmin from login sqladmin
+EXEC sp_addrolemember N'db_owner', N'sqladmin'
+GO
+ 
+USE [master]
+GO
+ALTER LOGIN sa ENABLE;
+GO
+ALTER LOGIN sa WITH PASSWORD = 'ABCDegf123';
+GO
+EXEC xp_instance_regwrite N'HKEY_LOCAL_MACHINE',
+  N'Software\Microsoft\MSSQLServer\MSSQLServer',
+   N'LoginMode', REG_DWORD, 2;
+GO

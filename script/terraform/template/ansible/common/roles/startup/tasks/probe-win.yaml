@@ -1,0 +1,20 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: probe host capacities
+  include_role:
+    name: "{{ label_roles | select('in',label_name|lower) | first }}"
+    tasks_from: probe-win
+  when:
+    - label_name.startswith('HAS-SETUP-')
+    - label_roles | select('in',label_name|lower) | length > 0
+  loop: "{{ k8s_node_labels }}"
+  loop_control:
+    loop_var: label_name
+  vars:
+    label_roles: "{{ lookup('pipe','ls -f '+playbook_dir+'/roles/*/tasks/probe-win.yaml') | split('\n') | map('regex_replace','^.*/roles/([a-z-]*)/.*$','\\1') | sort(reverse=true) }}"
+
+

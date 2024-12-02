@@ -1,0 +1,112 @@
+# syntax=docker/dockerfile:1
+# wasmscore
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER="24.04"
+ARG OS_IMAGE="ubuntu"
+FROM ${OS_IMAGE}:${OS_VER}
+ARG WASM_SCORE_VER="v0.2.0.2497a1f"
+ARG WASM_SCORE_REPO="https://github.com/bytecodealliance/wasm-score.git"
+ARG WASM_SCORE_REPO_BRANCH_NAME="main"
+ARG WASMTIME_REPO="https://github.com/bytecodealliance/wasmtime/"
+ARG WASMTIME_VER="v21.0.1"
+ARG WASMTIME_COMMIT="cedf9aa"
+ARG WASMTIME_REVISION=main
+ARG RUST_REPO=""
+ARG RUST_VER="nightly-2024-08-09"
+ARG SIGHTGLASS_REPO="https://github.com/bytecodealliance/sightglass.git"
+ARG SIGHTGLASS_BRANCH="main"
+ARG SIGHTGLASS_VER="e89fce0"
+
+ARG ARCH
+ENV LD_LIBRARY_PATH=/usr/local/lib
+ENV PATH=/usr/local/bin:$PATH
+ENV DEBIAN_FRONTEND="noninteractive" TZ="America"
+
+# Prerequisites
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends \
+	apt-utils build-essential gpg-agent \
+	curl ca-certificates wget software-properties-common \
+	psmisc lsof git nano zlib1g-dev libedit-dev time yasm \
+	libssl-dev pkg-config
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -sSf | sh -s -- --default-toolchain ${RUST_VER} -y
+ENV PATH=/root/.cargo/bin:${PATH}
+#RUN cargo install cargo-binutils
+
+
+# Download wasmscore
+RUN --mount=type=secret,id=.netrc,dst=/root/.netrc git clone --recurse-submodules ${WASM_SCORE_REPO} wasmscore \
+    && cd wasmscore \
+    && git checkout ${WASM_SCORE_REPO_BRANCH_NAME} \
+    && git submodule update --init \
+    && git fetch --tags \
+    && git checkout ${WASM_SCORE_VER} -b checkout_${WASM_SCORE_VER} \
+    && rm -rf .git
+
+# Install sightglass
+RUN git clone --recurse-submodules ${SIGHTGLASS_REPO} sightglass
+WORKDIR /sightglass
+RUN git checkout ${SIGHTGLASS_VER} -b ${SIGHTGLASS_VER}
+WORKDIR /wasmscore/
+RUN cp wasmscore.py add_time_metric.diff build.sh requirements.txt Dockerfile wasmscore.py config.inc /sightglass/
+RUN rm -rf /sightglass/benchmarks
+RUN cp -r benchmarks /sightglass/benchmarks
+RUN cp wasmscore.sh /
+WORKDIR /sightglass
+RUN git apply add_time_metric.diff
+RUN cargo build --release
+RUN mkdir results
+
+# Build wasmtime engine for sightglass
+WORKDIR /
+RUN git clone ${WASMTIME_REPO} wasmtime
+WORKDIR /wasmtime
+RUN git checkout ${WASMTIME_COMMIT} -b ${WASMTIME_COMMIT}
+RUN git submodule update --init --recursive
+RUN cargo build -p wasmtime-bench-api --release
+RUN cp target/release/libwasmtime_bench_api.so /sightglass/engines/wasmtime/libengine.so
+
+# Build native engine for sightglass
+WORKDIR /sightglass/engines/native/libengine
+RUN cargo build --release
+RUN cp target/release/libnative_bench_api.so ../libengine.so
+
+
+# Install Clang
+RUN apt-get install -y --no-install-recommends clang
+
+
+# Install Python 3.12 and necessary dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends python3.12 python3-pip
+
+
+
+
+# Install packages using Python 3.12
+RUN python3.12 -m pip install --break-system-packages termgraph termcolor pyyaml
+
+# Create a symbolic link to use Python 3.12 as python3.8
+RUN ln -sf /usr/bin/python3.12 /usr/bin/python3.8
+
+# Install packages using the symbolic link (python3.8)
+RUN python3.8 -m pip install --break-system-packages termgraph pandas termcolor pyyaml
+
+# Verify the symbolic link
+RUN ls -l /usr/bin/python3.8
+
+WORKDIR /
+
+#WORKDIR /wasmscore
+#RUN ln -s /wasmscore/sightglass /sightglass
+#RUN mv run_bench.py sightglass/run_bench.py
+RUN mkfifo /export-logs
+CMD (./wasmscore.sh; echo $? > status) 2>&1 | tee benchmark_${MODE}_$(date +"%m-%d-%y-%H-%M-%S").log && \
+    tar cf /export-logs status $(find . -maxdepth 1 -name "*.log") && \
+    sleep infinity

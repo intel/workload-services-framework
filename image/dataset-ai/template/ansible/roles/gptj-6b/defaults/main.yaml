@@ -1,0 +1,9 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+GPTJ_6B_VERSION: "EleutherAI/gpt-j-6b"
+GPTJ_6B_REPOSITORY: "huggingface"
+

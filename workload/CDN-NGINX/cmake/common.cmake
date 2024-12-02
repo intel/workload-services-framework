@@ -18,7 +18,7 @@ if(NOT BACKEND STREQUAL "docker")
   add_workload("cdn_nginx_qatsw")
   foreach(media "vod" "live")
     add_testcase(${workload}_${media}_https_async "${media}" "https_async")
-  endforeach()
+  endforeach() 
   add_testcase(${workload}_live_https_async_gated "live" "https_async" "gated")
   add_testcase(${workload}_live_https_async_pkm "live" "https_async" "pkm")
 

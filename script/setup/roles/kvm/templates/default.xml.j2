@@ -1,0 +1,12 @@
+<network>
+  <name>{{ kvm_default_name }}</name>
+  <uuid>{{ inventory_hostname | to_uuid }}</uuid>
+  <forward mode='nat'/>
+  <bridge name='{{ kvm_default_bridge }}' stp='on' delay='0'/>
+  <ip address='{{ kvm_default_subnet | ipaddr('1') | ipaddr("address") }}' netmask='{{ kvm_default_subnet | ipaddr('netmask') }}'>
+    <dhcp>
+      <range start='{{ kvm_default_subnet | ipaddr('2') | ipaddr("address") }}' end='{{ kvm_default_subnet | ipaddr('-2') | ipaddr("address") }}'/>
+    </dhcp>
+  </ip>
+</network>
+

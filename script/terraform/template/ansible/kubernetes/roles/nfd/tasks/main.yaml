@@ -24,7 +24,7 @@
   become: "{{ sut_sudo | default(true) | bool }}"
   when: 
   - (install_nfd.rc == 0) or (k8s_enable_nfd | default('false') | bool)
-  - nfd_check != 0
+  - nfd_check is failed
   - sut_sudo | default(true) | bool
   register: pkgrc
   until: pkgrc is success
@@ -39,15 +39,14 @@
   delay: 10
   when: 
   - (install_nfd.rc == 0) or (k8s_enable_nfd | default('false') | bool)
-  - nfd_check != 0
+  - nfd_check is failed
 
 - name: wait for NFD to become fully available
-  shell: "kubectl get node -o jsonpath --template='{.items[*].metadata.labels}' | grep -q -F feature.node.kubernetes.io"
-  register: nfd_info
-  until: nfd_info.rc == 0
-  retries: "{{ k8s_nfd_retries }}"
-  delay: 10
+  shell:
+    cmd: |
+      timeout 5m bash -c "while true; do kubectl get node -o jsonpath --template='{.items[*].metadata.labels}' | grep -q -F feature.node.kubernetes.io && break; sleep 1s; done"
+    executable: /bin/bash
   when:
   - (install_nfd.rc == 0) or (k8s_enable_nfd | default('false') | bool)
-  - nfd_check != 0
+  - nfd_check is failed
 

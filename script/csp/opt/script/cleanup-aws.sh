@@ -363,5 +363,5 @@ if [ $has_image -eq 1 ]; then
     echo "VM images are left untouched."
     echo "Use 'cleanup --images' to clean up VM images"
 else
-    delete_regions aws
+    delete_regions aws 
 fi

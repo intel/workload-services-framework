@@ -34,13 +34,13 @@ locals {
 resource "tencentcloud_cbs_storage" "default" {
   for_each = local.disks
 
-  storage_name = "wsf-${var.job_id}-${each.key}-storage"
+  storage_name = format("wsf-%s-${each.key}-storage", substr(var.job_id,0,60-length("wsf--${each.key}-storage")))
   availability_zone = var.zone
   force_delete = true
 
   storage_size = each.value.disk_size
   storage_type = each.value.disk_type
-  throughput_performance = each.value.disk_iops
+  throughput_performance = contains(["CLOUD_TSSD", "CLOUD_HSSD"], each.value.disk_type) ? each.value.disk_iops : 0
   
   tags = var.common_tags
 }

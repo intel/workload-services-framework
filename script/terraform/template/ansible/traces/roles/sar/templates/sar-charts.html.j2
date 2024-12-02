@@ -236,8 +236,25 @@
             aria-hidden="true"></i>Save as PDF</button>
         <div class="row d-flex"></div>
       </div>
-      <div class="card-body overflow-auto row col-12">
-        <div class="col-11" id="disk-id" style="height: 400px;"></div>
+      <div class="row" id="sortable_disk_util">
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="card-body overflow-auto row col-12">
+            <div class="col-11 printable" id="disk-tps-id" style="height: 400px;"></div>
+          </div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="card-body overflow-auto row col-12">
+            <div class="col-11 printable" id="disk-read-id" style="height: 400px;"></div>
+          </div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="card-body overflow-auto row col-12">
+            <div class="col-11 printable" id="disk-write-id" style="height: 400px;"></div>
+          </div>
+        </div>
       </div>
     </div>
     <div id="IOUtil" class="tabcontent px-0 py-2">
@@ -285,6 +302,14 @@
         <div class="card-body overflow-auto row col-12 wrapper">
           <div class="handle col-1"></div>
           <div class="col-11 printable" id="processes-procps-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="processes-sizeps-cswchps-id" style="height: 400px;"></div>
+        </div>
+        <div class="card-body overflow-auto row col-12 wrapper">
+          <div class="handle col-1"></div>
+          <div class="col-11 printable" id="processes-sizeps-intrps-id" style="height: 400px;"></div>
         </div>
         <div class="card-body overflow-auto row col-12 wrapper">
           <div class="handle col-1"></div>
@@ -362,7 +387,7 @@
         xaxis: {
           type: 'datetime',
           labels: {
-            datetimeUTC: false,
+            datetimeUTC: true,
           },
           min: min_time,
           max: max_time,
@@ -461,7 +486,7 @@
           for (let k in data_mhz) {
             series.push({
               name: "cpu-" + k,
-              data: data_mhz[k].map((x) => [x[0], x[1] / 1024]),
+              data: data_mhz[k].map((x) => [x[0], x[1] / 1000]),
             });
           }
           create_line_chart(id, {
@@ -474,7 +499,7 @@
               text: title,
             },
             yaxis: {
-              decimalsInFloat: 2,
+              decimalsInFloat: 3,
             },
             series: series,
           });
@@ -486,6 +511,11 @@
 
       function create_memory_percent_chart(id, title) {
         try {
+          var data_memfree = [];
+          for (let t in data_kbmemfree) {
+            data_memfree.push([data_kbmemfree[t][0], (data_kbmemfree[t][1]/(data_kbmemfree[t][1]+data_kbbuffers[t][1]+data_kbcached[t][1])*100)])
+          }
+
           create_line_chart(id, {
             title: {
               text: title,
@@ -501,6 +531,9 @@
             }, {
               name: 'commit',
               data: data_commit,
+            }, {
+              name: 'memfree',
+              data: data_memfree,
             }],
           });
         } catch (e) {
@@ -653,6 +686,47 @@
           console.log(e);
         }
       }
+
+      function create_processes_sizeps_cswchps_chart(id, title) {
+        try {
+          create_line_chart(id, {
+            title: {
+              text: title,
+            },
+            yaxis: {
+              decimalsInFloat: 0,
+            },
+            series: [{
+              name: 'cswch/s',
+              data: data_cswchps,
+            }],
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+      }
+
+      function create_processes_sizeps_intrps_chart(id, title) {
+        try {
+          create_line_chart(id, {
+            title: {
+              text: title,
+            },
+            yaxis: {
+              decimalsInFloat: 0,
+            },
+            series: [{
+              name: 'intr/s',
+              data: data_intrps,
+            }],
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+      }
+
       function create_processes_sizeps_chart(id, title) {
         try {
           create_line_chart(id, {
@@ -663,12 +737,6 @@
               decimalsInFloat: 2,
             },
             series: [{
-              name: 'cswch/s',
-              data: data_cswchps.map((x) => [x[0], x[1] / 1024]),
-            }, {
-              name: 'intr/s',
-              data: data_intrps.map((x) => [x[0], x[1] / 1024]),
-            }, {
               name: 'pgpgin/s',
               data: data_pgpginps.map((x) => [x[0], x[1] / 1024]),
             }, {
@@ -722,21 +790,61 @@
         }
       }
 
-      function create_disk_chart(id, title) {
+      function create_disk_tps_chart(id, title) {
         try {
           var series = [];
           for (let k in data_devtps) {
             series.push({
-              name: "tps-" + k,
+              name: k,
               data: data_devtps[k],
             });
+          }
+          create_line_chart(id, {
+            title: {
+              text: title,
+            },
+            yaxis: {
+              decimalsInFloat: 2,
+            },
+            series: series,
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+      }
+
+      function create_disk_read_chart(id, title) {
+        try {
+          var series = [];
+          for (let k in data_devtps) {
             series.push({
-              name: "rMB/s-" + k,
-              data: data_devrkbps[k].map((x) => [x[0], x[1] / 1024]),
+              name: k,
+              data: data_devrkbps[k].map((x) => [x[0], x[1] / 1000]),
             });
+          }
+          create_line_chart(id, {
+            title: {
+              text: title,
+            },
+            yaxis: {
+              decimalsInFloat: 2,
+            },
+            series: series,
+          });
+        } catch (e) {
+          hide_chart(id);
+          console.log(e);
+        }
+      }
+
+      function create_disk_write_chart(id, title) {
+        try {
+          var series = [];
+          for (let k in data_devtps) {
             series.push({
-              name: "wMB/s-" + k,
-              data: data_devwkbps[k].map((x) => [x[0], x[1] / 1024]),
+              name: k,
+              data: data_devwkbps[k].map((x) => [x[0], x[1] / 1000]),
             });
           }
           create_line_chart(id, {
@@ -760,11 +868,11 @@
           for (let k in data_ifrxkbps) {
             series.push({
               name: "ifrxMbps-" + k,
-              data: data_ifrxkbps[k].map((x) => [x[0], x[1] / 1024]),
+              data: data_ifrxkbps[k].map((x) => [x[0], x[1] / 1000]),
             });
             series.push({
               name: "iftxMbps-" + k,
-              data: data_iftxkbps[k].map((x) => [x[0], x[1] / 1024]),
+              data: data_iftxkbps[k].map((x) => [x[0], x[1] / 1000]),
             });
           }
           create_line_chart(id, {
@@ -849,10 +957,14 @@
       create_load_tasks_chart('load-tasks', 'Load (#tasks in K/s)');
 
       create_processes_procps_chart('processes-procps-id', 'Processes (proc/s)');
-      create_processes_sizeps_chart('processes-sizeps-id', 'Processes (MB/s)');
+      create_processes_sizeps_cswchps_chart('processes-sizeps-cswchps-id', 'Processes (cswch/s)');
+      create_processes_sizeps_intrps_chart('processes-sizeps-intrps-id', 'Processes (intr/s)');
+      create_processes_sizeps_chart('processes-sizeps-id', 'Processes (MiB/s)');
       create_processes_percent_chart('processes-percent-id', 'Processes (%vmeff)');
 
-      create_disk_chart('disk-id', 'Disk');
+      create_disk_tps_chart('disk-tps-id', 'Transaction(/s)');
+      create_disk_read_chart('disk-read-id', 'Disk Read (MB/s)');
+      create_disk_write_chart('disk-write-id', 'Disk Write (MB/s)');
       create_interfaces_chart('network-id', 'Network (Mbps)');
       create_sockets_chart('sockets-id', 'Sockets');
 
@@ -881,6 +993,7 @@
       createSortable('sortable_cpu');
       createSortable('sortable_load');
       createSortable('sortable_mem_util');
+      createSortable('sortable_disk_util');
       createSortable('sortable_process_util');
 
     });

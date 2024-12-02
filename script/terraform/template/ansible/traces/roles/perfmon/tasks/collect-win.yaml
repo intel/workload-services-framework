@@ -1,0 +1,38 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Get perfmon files
+    ansible.windows.win_shell: |
+      Get-ChildItem -Name -Recurse -File
+    args:
+      chdir: "{{ trace_data_path }}"
+    register: perfmon_files
+  
+  - name: Create sub-directories
+    file:
+      path: "{{ trace_data_local_path }}/{{ item }}"
+      state: directory
+    loop: "{{ perfmon_files.stdout_lines | map('replace',backslash,'/') | map('dirname') | reject('==','') | unique }}"
+    delegate_to: localhost
+
+  - name: Fetch perfmon files
+    fetch:
+      src: "{{ trace_data_path }}\\{{ item }}"
+      dest: "{{ trace_data_local_path }}/{{ item | replace(backslash,'/') | dirname }}/"
+      flat: yes
+    loop: "{{ perfmon_files.stdout_lines }}"
+    register: fetchrc
+    until: fetchrc is success
+    retries: 10
+    delay: 10
+  
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: false
+  vars:
+    backslash: "\\"

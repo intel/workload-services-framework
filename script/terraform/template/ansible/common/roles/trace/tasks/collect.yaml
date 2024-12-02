@@ -4,15 +4,32 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: collect trace data
-  include_tasks:
-    file: collect-block.yaml
-  loop: "{{ ((trace_module_list | select('match','.*:host.*') | product(groups.trace_hosts | map('extract',hostvars,['vmhost_host']) | map('default','') | reject('==','') | select('in', unique_vmhosts))) + (trace_module_list | reject('match','.*:host.*') | product(groups.trace_hosts))) | unique }}"
-  loop_control:
-    loop_var: trace_node
-  ignore_errors: yes
+- block:
+
+  - name: wait until all trace jobs completed
+    async_status:
+      jid: "{{ item }}"
+    delegate_to: localhost
+    register: statusrc
+    until: statusrc.finished
+    retries: "{{ trace_stop_timeout|int }}"
+    delay: 2
+    loop: "{{ ((groups.trace_hosts | map('extract',hostvars,['vmhost_host']) | map('default','') | reject('==','') | select('in', unique_vmhosts)) + groups.trace_hosts) | unique | map('extract',hostvars,['trace_stop_async_jobs']) | map('default',[]) | flatten | select('match','[a-z][0-9.]*') }}"
+    no_log: true
+
+  - name: collect trace data
+    include_tasks:
+      file: collect-block.yaml
+    loop: "{{ ((trace_module_list | select('match','.*:host.*') | product(groups.trace_hosts | map('extract',hostvars,['vmhost_host']) | map('default','') | reject('==','') | select('in', unique_vmhosts))) + (trace_module_list | reject('match','.*:host.*') | product(groups.trace_hosts))) | unique }}"
+    loop_control:
+      loop_var: trace_node
+    vars:
+      trace_module_list: "{{ wl_trace_modules | default('') | split(',') | reject('==','') }}"
+
+  ignore_errors: true
   when: sut_sudo | default(true) | bool
+  run_once: true
   vars:
-    trace_module_list: "{{ wl_trace_modules | default('') | split(',') | reject('==','') }}"
-    unique_vmhosts: "{{ dict(groups.vmhost_hosts | map('extract', hostvars, ['ansible_host']) | zip(groups.vmhost_hosts | map('extract', hostvars, ['ansible_port'])) | map('join',':') | zip(groups.vmhost_hosts)).values() }}"
+    all_trace_vmhosts: "{{ groups.trace_hosts | map('extract', hostvars, ['vmhost_host']) | map('default','') | reject('==','') }}"
+    unique_vmhosts: "{{ dict(all_trace_vmhosts | map('extract', hostvars, ['ansible_host']) | zip(all_trace_vmhosts | map('extract', hostvars, ['ansible_port'])) | map('join',':') | zip(all_trace_vmhosts)).values() }}"
 

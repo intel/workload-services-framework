@@ -6,5 +6,5 @@
 
 wl_kernel_args: {}
 wl_kernel_args_optional: {}
-sut_default_hugepagesz: false
+sut_hugepage_mode: "{{ ((ansible_connection | default('ssh')) in ['local']) | ternary('none','fit') }}"
 

@@ -18,7 +18,7 @@
     - docker-scan-plugin
     state: absent
   when: ((csp | default('static')) in ['static', 'kvm', 'hyperv'])
-  ignore_errors: yes
+  ignore_errors: true
 
 - name: install prerequisite
   apt:
@@ -30,16 +30,19 @@
   retries: 10
   delay: 5
 
-- name: add docker GPG key
+- name: get the docker GPG key
   get_url:
-    url: "{{ docker_dist_repo }}/linux/debian/gpg"
-    dest: /usr/share/keyrings/docker.asc
-    mode: '0644'
+    url: "{{ docker_dist_repo }}/linux/{{ os.stdout }}/gpg"
+    dest: "/tmp/{{ wl_namespace }}-docker.asc"
     force: true
-  register: getrc
-  until: getrc is success
-  retries: 10
-  delay: 5
+  delegate_to: localhost
+  run_once: true
+  become: false
+
+- name: copy the docker GPG key to remote
+  copy:
+    src: "/tmp/{{ wl_namespace }}-docker.asc"
+    dest: /usr/share/keyrings/docker.asc
 
 - name: get os codename
   shell:
@@ -47,30 +50,65 @@
     executable: /bin/bash
   register: codename
 
+- name: remove legacy docker entries
+  include_role:
+    name: legacy-repo
+    tasks_from: remove-debian
+  vars:
+    conflict_repos:
+    - "{{ docker_dist_repo }}/linux/{{ os.stdout }}/"
+
 - name: add docker repository to apt
   apt_repository:
-    repo: "deb [signed-by=/usr/share/keyrings/docker.asc] {{ docker_dist_repo }}/linux/debian {{ codename.stdout | lower }} stable"
+    filename: docker
+    repo: "deb [signed-by=/usr/share/keyrings/docker.asc] {{ docker_dist_repo }}/linux/{{ os.stdout }} {{ codename.stdout | lower }} stable"
     state: present
-    update_cache: false
-
-- name: apt update
-  apt:
     update_cache: true
-  register: aptrc
-  until: aptrc is success
-  retries: 10
-  delay: 10
 
-- name: install docker
-  apt:
-    name:
-    - "docker-ce={{ docker_version | default(docker_default_version.debian) }}*"
-    - "docker-ce-cli={{ docker_cli_version | default(docker_cli_default_version.debian) }}*"
-    - "docker-compose-plugin={{ docker_compose_plugin_version | default(docker_compose_plugin_default_version.debian) }}*"
-    update_cache: false
-  register: aptrc
-  until: aptrc is success
-  retries: 10
-  delay: 10
+- name: "get docker-ce versions"
+  shell: 
+    cmd: "apt-cache madison docker-ce docker-ce-cli docker-compose-plugin"
+    executable: /bin/bash
+  register: versions
+  become: true
 
+- block:
+
+    - name: install docker
+      apt:
+        name:
+        - "docker-ce={{ package_version.docker_ce }}"
+        - "docker-ce-cli={{ package_version.docker_ce_cli }}"
+        - "docker-compose-plugin={{ package_version.docker_compose_plugin }}"
+        update_cache: false
+      register: aptrc
+      until: aptrc is success
+      retries: 10
+      delay: 10
+
+  rescue:
+
+    - name: "apt-mark unhold docker-ce docker-ce-cli docker-compose-plugin"
+      command: |
+        apt-mark unhold docker-ce docker-ce-cli docker-compose-plugin
+      ignore_errors: true
+      become: true
+
+    - name: install docker
+      apt:
+        name:
+        - "docker-ce={{ package_version.docker_ce }}"
+        - "docker-ce-cli={{ package_version.docker_ce_cli }}"
+        - "docker-compose-plugin={{ package_version.docker_compose_plugin }}"
+        update_cache: false
+      register: aptrc
+      until: aptrc is success
+      retries: 10
+      delay: 10
+
+  vars:
+    package_version:
+      docker_ce: "{{ 1 | extract(versions.stdout_lines | select('match',' *docker-ce *[|] *[0-9]:'+(docker_version|replace('.','[.]'))+'[-~].*') | default(versions.stdout_lines|select('match',' *docker-ce *[|].*'),true) | first | split('|')) | trim }}"
+      docker_ce_cli: "{{ 1 | extract(versions.stdout_lines | select('match',' *docker-ce-cli *[|] *[0-9]:'+(docker_cli_version|replace('.','[.]'))+'[-~].*') | default(versions.stdout_lines|select('match',' *docker-ce-cli *[|].*'),true) | first | split('|')) | trim }}"
+      docker_compose_plugin: "{{ 1 | extract(versions.stdout_lines | select('match',' *docker-compose-plugin *[|] *'+(docker_compose_plugin_version|replace('.','[.]'))+'[-~].*') | default(versions.stdout_lines|select('match',' *docker-compose-plugin *[|].*'),true) | first | split('|')) | trim }}"
 

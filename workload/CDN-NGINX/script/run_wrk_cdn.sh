@@ -5,8 +5,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-
-
 ulimit -n 65535
 PORT=${PORT:-8080}
 GATED=${GATED:-""}
@@ -17,6 +15,8 @@ DURATION=${DURATION:-60}
 NICIP_W1=${NICIP_W1:-192.168.2.200}
 STORAGE_MEDIUM=${STORAGE_MEDIUM:-disk}
 LUASCRIPT=${LUASCRIPT:-$DIR/query.lua}
+KEEPALIVE=${KEEPALIVE:-"true"}
+URL_NUM=${URL_NUM:-100000}
 
 if [[ "$PORT" == "8080" ]];then
     if [[ "$GATED" == "gated" ]];then
@@ -33,12 +33,13 @@ else
 fi
 
 
-
-
 if [[ "$NTHREADS" -gt "$NUSERS" ]]; then
    NTHREADS="$NUSERS"
 fi
 
+if [[ "$URL_NUM" -gt 0 ]]; then
+    sed -i "s|math.random(800000)|math.random($URL_NUM)|" $LUASCRIPT
+fi
 
 for i in {1..10}; do
     sleep 1s
@@ -53,13 +54,17 @@ for i in {1..10}; do
         else
             timeout 360s wrk -t $NTHREADS -c $NUSERS -d 300s -s $LUASCRIPT --timeout 10s $URL:$PORT || continue
         fi
+        sleep 10
+        (sleep 10 && echo "begin_region_of_interest") &
+        (sleep 20 && echo "end_region_of_interest") &
     fi
 
-    sleep 10
     # read cache
-    (sleep 10 && echo "begin_region_of_interest") &
-    (sleep 20 && echo "end_region_of_interest") &
-    # echo "timeout $((DURATION+60))s wrk -t $NTHREADS -c $NUSERS -d ${DURATION}s -s $LUASCRIPT --timeout 10s -L $URL:$PORT"
-    timeout $((DURATION+60))s wrk -t $NTHREADS -c $NUSERS -d ${DURATION}s -s $LUASCRIPT --timeout 10s -L $URL:$PORT && exit 0 || continue
+    if [[ "$KEEPALIVE" == "false" ]]; then
+        timeout $((DURATION+60))s wrk -H 'Connection: Close' -t $NTHREADS -c $NUSERS -d ${DURATION}s -s $LUASCRIPT --timeout 10s -L $URL:$PORT && exit 0 || continue
+    else
+        timeout $((DURATION+60))s wrk -t $NTHREADS -c $NUSERS -d ${DURATION}s -s $LUASCRIPT --timeout 10s -L $URL:$PORT && exit 0 || continue
+    fi
+    
 done
 exit 3

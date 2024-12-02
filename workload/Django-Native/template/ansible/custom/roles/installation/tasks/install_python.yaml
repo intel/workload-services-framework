@@ -1,0 +1,49 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Ensure data directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+  loop:
+    - "{{ PYTHON_INSTALL_DIR }}"
+    - "{{ PYTHON_VENV_DIR }}"
+
+- name: Download Python source
+  get_url:
+    url: "https://www.python.org/ftp/python/{{ PYTHON_VER }}/Python-{{ PYTHON_VER }}.tar.xz"
+    dest: "{{ PYTHON_INSTALL_DIR }}/Python-{{ PYTHON_VER }}.tar.xz"
+
+- name: Extract Python source
+  ansible.builtin.unarchive:
+    remote_src: yes
+    src: "{{ PYTHON_INSTALL_DIR }}/Python-{{ PYTHON_VER }}.tar.xz"
+    dest: "{{ PYTHON_INSTALL_DIR }}"
+
+- name: Compile and install Python
+  ansible.builtin.command: >
+    ./configure --prefix={{ PYTHON_INSTALL_DIR }} --enable-optimizations
+  args:
+    chdir: "{{ PYTHON_INSTALL_DIR }}/Python-{{ PYTHON_VER }}"
+    creates: "{{ PYTHON_INSTALL_DIR }}/bin/python{{ PYTHON_VER }}"
+
+# - name: Make Python
+#   ansible.builtin.command: >
+#     make -j 4
+#   args:
+#     chdir: "{{ PYTHON_INSTALL_DIR }}/Python-{{ PYTHON_VER }}"
+#     creates: "{{ PYTHON_INSTALL_DIR }}/bin/python{{ PYTHON_VER }}"
+
+- name: Install Python
+  ansible.builtin.command: >
+    make altinstall
+  args:
+    chdir: "{{ PYTHON_INSTALL_DIR }}/Python-{{ PYTHON_VER }}"
+    creates: "{{ PYTHON_INSTALL_DIR }}/bin/python{{ PYTHON_VER }}"
+
+- name: Create virtual environment
+  ansible.builtin.command: |
+    {{ PYTHON_INSTALL_DIR }}/bin/python{{ PYTHON_VENV_VER }} -m venv "{{ PYTHON_VENV_DIR }}"

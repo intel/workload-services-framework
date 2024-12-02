@@ -1,0 +1,9 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+pdu: false
+pdu_url: ""
+pdu_interval: 1
+pdu_local: true

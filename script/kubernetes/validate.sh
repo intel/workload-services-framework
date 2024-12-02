@@ -45,7 +45,7 @@ kubernetes_run () {
         kubectl get node -o json
         kubectl --namespace=$NAMESPACE describe pod 2> /dev/null || true
         kubectl delete -f "$KUBERNETES_CONFIG" --namespace=$NAMESPACE --ignore-not-found=true || true
-        kubectl --namespace=$NAMESPACE delete $(kubectl api-resources --namespaced -o name --no-headers | cut -f1 -d. | tr '\n' ',' | sed 's/,$//') --all --ignore-not-found=true --grace-period=150 --timeout=5m || true
+        kubectl --namespace=$NAMESPACE delete $(kubectl api-resources --namespaced -o name --no-headers | cut -f1 -d. | grep -v localsubjectaccessreviews | grep -v bindings | tr '\n' ',' | sed 's/,$//') --all --ignore-not-found=true --grace-period=150 --timeout=5m || true
         kubectl delete namespace $NAMESPACE --wait --grace-period=300 --timeout=10m --ignore-not-found=true || (kubectl replace --raw "/api/v1/namespaces/$NAMESPACE/finalize" -f <(kubectl get ns $NAMESPACE -o json | grep -v '"kubernetes"')) || true
         [ "$1" = "0" ] || exit 3
 	  }
@@ -54,6 +54,14 @@ kubernetes_run () {
     trap stop_kubernetes ERR SIGINT EXIT
 
     # start the jobs and wait until the namespace is stable
+    kubectl create --namespace=$NAMESPACE secret generic workload-config --from-env-file=<(
+        echo "TZ=$(timedatectl show --va -p Timezone 2> /dev/null || echo $TZ)"
+        for k in "${WORKLOAD_PARAMS[@]%%#*}"; do
+            if [[ "$k" = "-"* ]]; then
+                eval "echo \"${k#-}=\$${k#-}\""
+            fi
+        done
+    )
     kubectl create -f "$KUBERNETES_CONFIG" --namespace=$NAMESPACE
 
     wait_for_pods_ready () {
@@ -71,7 +79,9 @@ kubernetes_run () {
 
     extract_logs () {
         container="${1#*=}"
-        for pod1 in $(kubectl get pod --namespace=$NAMESPACE --selector="$1" -o=jsonpath="{.items[*].metadata.name}"); do
+        container="${container#*:}"
+        selector="${1%:*}"
+        for pod1 in $(kubectl get pod --namespace=$NAMESPACE --selector="$selector" -o=jsonpath="{.items[*].metadata.name}"); do
             mkdir -p "$LOGSDIRH/itr-$2/$pod1"
             kubectl logs -f --namespace=$NAMESPACE $pod1 -c $container &
             kubectl exec --namespace=$NAMESPACE $pod1 -c $container -- sh -c "cat $EXPORT_LOGS > /tmp/$NAMESPACE-logs.tar;tar tf /tmp/$NAMESPACE-logs.tar > /dev/null 2>&1 || tar cf /tmp/$NAMESPACE-logs.tar \$(cat /tmp/$NAMESPACE-logs.tar)"
@@ -105,18 +115,17 @@ if [ -z "$REGISTRY" ]; then
         exit 3
     fi
 fi
-
+ 
 print_workload_configurations 2>&1 | tee -a "$LOGSDIRH"/k8s.logs
 iterations="$(echo "x--run_stage_iterations=1 $KUBERNETES_OPTIONS $CTESTSH_OPTIONS" | sed 's/.*--run_stage_iterations=\([0-9]*\).*/\1/')"
-rebuild_config "$CLUSTER_CONFIG_M4" "$CLUSTER_CONFIG"
 rebuild_kubernetes_config
 # replace %20 to space 
 sed -i '/^\s*-\s*name:/,/^\s*/{/value:/s/%20/ /g}' "$KUBERNETES_CONFIG"
 print_labels "$KUBERNETES_CONFIG"
 for itr in $(seq 1 $iterations); do
     mkdir -p "$LOGSDIRH/itr-$itr"
-    cp -f "$LOGSDIRH/kpi.sh" "$LOGSDIRH/itr-$itr"
+    cp -f "$LOGSDIRH/kpi.sh" "$LOGSDIRH/itr-$itr" 2> /dev/null || true
     kubernetes_run $itr
 done 2>&1 | tee -a "$LOGSDIRH/k8s.logs"
-sed -i '1acd itr-1' "$LOGSDIRH/kpi.sh"
+sed -i '1acd itr-1' "$LOGSDIRH/kpi.sh" 2> /dev/null || true
 

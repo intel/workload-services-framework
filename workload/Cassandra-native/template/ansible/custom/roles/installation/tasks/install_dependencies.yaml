@@ -1,0 +1,30 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Detect kernel version
+  shell:
+    cmd: uname -r
+    executable: /bin/bash
+  register: kernel_version
+
+- name: Install additional development packages
+  package:
+    name:
+      -  wget
+      -  curl
+      -  git
+      -  procps
+      -  net-tools
+      -  numactl
+      -  python3
+      -  kmod
+      -  sudo
+      -  vim
+#      -  iproute2
+#      -  iputils-ping
+#      -  dnsutils
+      -  nmap
+    state: latest
+    update_cache: true 

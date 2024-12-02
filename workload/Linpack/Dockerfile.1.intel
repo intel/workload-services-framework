@@ -6,7 +6,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 ARG RELEASE
-ARG OS_VER=22.04
+ARG OS_VER=24.04
 ARG OS_IMAGE=ubuntu
 
 FROM linpack-base-intel${RELEASE} as base
@@ -21,6 +21,8 @@ COPY run_test_intel.sh run_test.sh
 
 RUN mkfifo /export-logs
 
+SHELL ["/bin/bash", "-c"]
 CMD  (bash run_test.sh; echo $? > status) 2>&1  | tee output.logs && \
-     tar cf /export-logs status output.logs && \
+     if [ `grep -R -i -c 'PASSED' output.logs` == 0 ]; then echo 2 > status; fi && \
+     tar cPf /export-logs status output.logs && \
      sleep infinity

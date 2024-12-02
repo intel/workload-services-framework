@@ -1,0 +1,67 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Set App Parameters
+  set_fact:
+    uwsgi_worker: "{{ wl_tunables['UWSGI_WORKER'] }}"
+    cassandra_endpoint: "{{ CASSANDRA_ENDPOINT }}"
+    memcached_endpoint: "{{ MEMCACHED_ENDPOINT }}"
+    graphite_endpoint: "{{ GRAPHITE_ENDPOINT }}"
+    tls: "{{ wl_tunables['TLS'] }}"
+    app_ip: "{{ hostvars['worker-0']['private_ip'] }}"
+
+- name: Kill uwsgi processes
+  ansible.builtin.shell: "kill -9 $(pgrep -f  'uWSGI') || true"
+  ignore_errors: true
+
+- name: Ensure data directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+  loop:
+    - "{{ DJANGO_APP_INSTALL_DIR }}"
+
+- name: Install Template of app settings
+  template:
+    src: "app.settings.sh.j2"
+    dest: "{{ DJANGO_APP_INSTALL_DIR }}/app_settings.sh"
+    mode: "0755"
+
+- name: Run app settings script
+  shell: "{{ DJANGO_APP_INSTALL_DIR }}/app_settings.sh"
+
+- name: Add directory to sys.path in virtual environment activation script
+  ansible.builtin.lineinfile:
+    path: "{{ PYTHON_VENV_DIR }}/bin/activate"  # Path to the activation script of your virtual environment
+    line: 'export PYTHONPATH="{{ DJANGO_APP_INSTALL_DIR }}/django-workload/:$PYTHONPATH"'
+
+- name: Uncomment middleware lines
+  ansible.builtin.replace:
+    path: "{{ DJANGO_APP_INSTALL_DIR }}/django-workload/django_workload/settings.py"
+    regexp: '^#\s*(.*)(django\.contrib\.sessions\.middleware\.SessionMiddleware|django\.contrib\.auth\.middleware\.AuthenticationMiddleware|django\.contrib\.messages\.middleware\.MessageMiddleware)'
+    replace: '\1\2'
+
+- name: Wait for Cassandra to start
+  ansible.builtin.wait_for:
+    host: "{{ cassandra_endpoint }}"  # Replace with Cassandra host if it's running on a different host
+    port: 9042       # Cassandra default port
+    state: started
+    delay: 10         # Delay 10 seconds before starting the check
+    timeout: 300      # Timeout after 300 seconds (5 minutes)
+
+- name: Activate virtual environment, change directory, and run django-admin setup
+  ansible.builtin.shell:
+    cmd: "source {{ PYTHON_VENV_DIR }}/bin/activate && DJANGO_SETTINGS_MODULE=cluster_settings django-admin setup"
+    executable: /bin/bash
+  args:
+    chdir: "{{ DJANGO_APP_INSTALL_DIR }}/django-workload"
+
+
+- name: Run Django application
+  ansible.builtin.shell:
+    cmd: "source {{ PYTHON_VENV_DIR }}/bin/activate && uwsgi uwsgi_benchmark.ini --daemonize uwsgi_run.log"
+    executable: /bin/bash
+  args:
+    chdir: "{{ DJANGO_APP_INSTALL_DIR }}/django-workload"

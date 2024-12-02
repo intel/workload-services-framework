@@ -6,23 +6,28 @@
 
 - block:
 
-  - name: Check if emon is already installed
-    stat:
-      path: "{{ emon_bin_path }}/sep/sep_vars.sh"
-    register: emon
-  
+  - name: Check sep and emon directories
+    shell:
+      cmd: ls -1 {{ emon_bin_path }}/*/sep_vars.sh
+      executable: /bin/bash
+    register: emon_st
+    ignore_errors: true
+
   - block:
 
     - name: Detect OS
       shell:
-        cmd: . /etc/os-release; echo $ID_LIKE; echo $VERSION_ID
+        cmd: . /etc/os-release; echo $ID; echo $VERSION_ID
         executable: /bin/bash
       register: os
   
-    - name: Install prerequisites
+    - set_fact:
+        emon_gcc_options: ''
+
+    - name: Install prerequisites and emon
       include_tasks:
-        file: "install-{{ os.stdout_lines | first | split(' ') | first }}.yaml"
-  
+        file: "install-{{ ((os.stdout_lines | first) in ['debian','ubuntu']) | ternary('debian','rhel') }}.yaml"
+
     - name: "Create an {{ emon_group }} group"
       group:
         name: "{{ emon_group }}"
@@ -39,12 +44,22 @@
     - name: reset ssh connection
       meta: reset_connection
   
+    - name: "Remove {{ emon_bin_path }}"
+      file:
+        path: "{{ emon_bin_path }}"
+        state: absent
+  
     - name: "Create {{ emon_bin_path }}"
       file:
         path: "{{ emon_bin_path }}"
         state: directory
   
-    - name: Create the emon directory
+    - name: "Remove {{ emon_src_path }}"
+      file:
+        path: "{{ emon_src_path }}"
+        state: absent
+    
+    - name: "Create {{ emon_src_path }}"
       file:
         path: "{{ emon_src_path }}"
         state: directory
@@ -55,72 +70,41 @@
         executable: /bin/bash
       register: vendor_id
   
+    - name: Download emon
+      get_url:
+        url: "{{ emon_sep_url[vendor_id.stdout] }}"
+        dest: "/tmp/{{ emon_sep_package[vendor_id.stdout] }}"
+        use_proxy: false
+      delegate_to: localhost
+      run_once: true
+      become: false
+      when:
+      - emon_sep_url is defined
+      - ('/opt/project/script/terraform/data/'+emon_sep_package[vendor_id.stdout]) is not exists
+      - ('/tmp/'+emon_sep_package[vendor_id.stdout]) is not exists
+
     - name: Unpackage sep
       unarchive:
-        src: "/usr/local/src/{{ emon_sep_package[vendor_id.stdout] }}"
+        src: "{{ (('/opt/project/script/terraform/data/'+emon_sep_package[vendor_id.stdout]) is exists) | ternary('/opt/project/script/terraform/data/','/tmp/')+emon_sep_package[vendor_id.stdout] }}"
         dest: "{{ emon_src_path }}"
         extra_opts: --strip-components=1
-      when: not emon.stat.exists
-  
+      when: (emon_st is failed) or (emon_reset | bool)
+
     - name: Install emon
       shell:
         cmd: |
-          ./sep-installer.sh -u -C {{ emon_bin_path }} --accept-license -ni -i -g {{ emon_group }} --install-boot-script
-        chdir: "{{ emon_src_path }}"
+          . $(ls -1 ./*-installer.sh | head -n1) -u -C {{ emon_bin_path }} --accept-license -ni -i -g {{ emon_group }} --install-boot-script {{ emon_gcc_options | default('--c-compiler $(which gcc)',true) }}
         executable: /bin/bash
+        chdir: "{{ emon_src_path }}"
 
     - name: Remove any installation files
       file:
         path: "{{ emon_src_path }}"
         state: absent
   
-    when: not emon.stat.exists
+    when: (emon_st is failed) or (emon_reset | bool)
     become: true
-
-  - name: stop any pending emon session
-    shell: 
-      cmd: ". ./sep_vars.sh; emon -stop"
-      executable: /bin/bash
-      chdir: "{{ emon_bin_path }}/sep"
-    failed_when: false
-    become: true
-  
-  - name: Append the start script
-    blockinfile:
-      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-start-trace.sh"
-      marker: "# emon {mark}"
-      insertbefore: "^wait"
-      block: |
-        (
-          mkdir -p /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon
-          cd /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon
-          if is_roi "{{ trace_node.0 }}"; then
-            date -Ins >> TRACE_START
-            . {{ emon_bin_path }}/sep/sep_vars.sh
-            nohup emon -collect-edp {{ emon_options }} -f emon-$roi.dat > emon-$roi.logs 2>&1 &
-            disown
-          else
-            echo "---" >> TRACE_START
-          fi
-        ) &
-  
-  - name: Append the stop script
-    blockinfile:
-      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-stop-trace.sh"
-      marker: "# emon {mark}"
-      insertbefore: "^wait"
-      block: |
-        (
-          cd /tmp/{{ wl_namespace }}-{{ trace_node.1 }}-emon
-          if is_roi "{{ trace_node.0 }}"; then
-            date -Ins >> TRACE_STOP
-            . {{ emon_bin_path }}/sep/sep_vars.sh
-            emon -stop
-            chmod a+r emon-*.dat
-          else
-            echo "---" >> TRACE_STOP
-          fi
-        ) &
 
   delegate_to: "{{ trace_node.1 }}"
+  when: (hostvars[trace_node.1].ansible_connection | default('ssh')) not in ['local']
 

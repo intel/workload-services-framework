@@ -1,0 +1,114 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Check if emon is already installed
+    shell:
+      cmd: ls -1 {{ emon_bin_path }}/*/sep_vars.sh
+      executable: /bin/bash
+    register: emon_installed
+    ignore_errors: true
+
+  - block:
+
+    - name: Get CPU vendor_id locally
+      shell:
+        cmd: "sed -n '/^vendor_id/{s/.*: //;p;q}' /proc/cpuinfo"
+        executable: /bin/bash
+      register: vendor_id
+    
+    - name: Create the emon directory locally
+      file:
+        path: "{{ item }}"
+        state: directory
+      loop:
+      - "{{ emon_src_path }}"
+      - "{{ emon_bin_path }}"
+    
+    - name: Download emon
+      get_url:
+        url: "{{ emon_sep_url[vendor_id.stdout] }}"
+        dest: "/tmp/{{ emon_sep_package[vendor_id.stdout] }}"
+        use_proxy: false
+      delegate_to: localhost
+      become: false
+      when:
+      - emon_sep_url is defined
+      - ('/opt/project/script/terraform/data/'+emon_sep_package[vendor_id.stdout]) is not exists
+      - ('/tmp/'+emon_sep_package[vendor_id.stdout]) is not exists
+  
+    - name: Unpackage sep locally
+      unarchive:
+        src: "{{ (('/opt/project/script/terraform/data/'+emon_sep_package[vendor_id.stdout]) is exists) | ternary('/opt/project/script/terraform/data/','/tmp/')+emon_sep_package[vendor_id.stdout] }}"
+        dest: "{{ emon_src_path }}"
+        extra_opts: --strip-components=1
+    
+    - name: Install gcc locally
+      apt:
+        name:
+        - gcc
+        - python3-dev
+        - python3-venv
+        update_cache: true
+      register: aptrc
+      until: aptrc is success
+      retries: 10
+      delay: 10
+      environment:
+        http_proxy: "{{ lookup('env','http_proxy') }}"
+        no_proxy: "{{ lookup('env','no_proxy') }}"
+
+    - name: Install emon locally
+      shell:
+        cmd: |
+          which () {
+            echo "x"
+          }
+          . $(ls -1 ./*-installer.sh | head -n1) -i -u -C {{ emon_bin_path }} --accept-license -ni -i --no-load-driver
+        chdir: "{{ emon_src_path }}"
+        executable: /bin/bash
+
+    - name: Install pip packages
+      shell:
+        cmd: |
+          python3 -m venv /opt/emon-venv
+          . /opt/emon-venv/bin/activate
+          cd $(ls -1d {{ emon_bin_path }}/*/{{ emon_pyedp_path }} | head -n1)
+          python3 -m pip install . tdigest natsort numpy==1.26.4
+        executable: /bin/bash
+      environment:
+        http_proxy: "{{ lookup('env','http_proxy') }}"
+        https_proxy: "{{ lookup('env','https_proxy') }}"
+        no_proxy: "{{ lookup('env','no_proxy') }}"
+
+    when: emon_installed is failed
+    run_once: true
+    become: true
+
+  - name: Create the emon-{{ roi_index }}-edp directory 
+    file:
+      path: "{{ trace_data_path }}/emon-{{ roi_index }}-edp"
+      state: directory
+
+  - name: Run emon post-processing
+    shell:
+      cmd: |
+        . $(ls -1 {{ emon_bin_path }}/*/sep_vars.sh | head -n1)
+        . /opt/emon-venv/bin/activate
+        python3 -m pyedp.edp {{ emon_pyedp_options }} -i {{ trace_data_path }}/emon-{{ roi_index }}.dat -o "{{ workload_config.testcase.split("_")[2:] | join("_") }}_summary.xlsx" -m {{ metric_hybrid_files }} -f {{ chart_hybrid_files }} 2>&1 | tee pyedp.logs
+      chdir: "{{ trace_data_path }}/emon-{{ roi_index }}-edp"
+      executable: /bin/bash
+    vars:
+      emon_dat: "{{ lookup('pipe','head -n200 '+trace_data_path+'/emon-'+(roi_index|string)+'.dat') | split('\n') }}"
+      edp_config_path: "{{ lookup('pipe','ls -1d '+emon_bin_path+'/*/'+emon_pyedp_path+'/../ | head -n1') }}"
+      metric_hybrid_files: "{% for metric_file in (emon_dat | map('regex_replace','^EDP (.+) metric file:(.+)$','EDP metric file:\\\\1=\\\\2') | select('match','^EDP metric file:.*') | map('replace','EDP metric file:','')) %}{{ ('=' in metric_file) | ternary(metric_file | regex_replace('=.*$','='),'') }}{{ ('/' in (metric_file | regex_replace('^.*=',''))) | ternary(metric_file | regex_replace('^.*=',''),edp_config_path+(metric_file | regex_replace('^.*=','') | regex_replace('_[0-9]+s_','_'))) }} {% endfor %}"
+      chart_hybrid_files: "{% for chart_file in (emon_dat | map('regex_replace','^EDP (.+) chart file:(.+)$','EDP chart file:\\\\1=\\\\2') | select('match','^EDP chart file:.*') | map('replace','EDP chart file:','')) %}{{ ('=' in chart_file) | ternary(chart_file | regex_replace('=.*$','='),'') }}{{ ('/' in (chart_file | regex_replace('^.*=',''))) | ternary(chart_file | regex_replace('^.*=',''),edp_config_path+(chart_file | regex_replace('^.*=','') | regex_replace('_[0-9]+s_','_'))) }} {% endfor %}"
+        
+  when:
+  - not (emon_skip_edp | bool)
+  - (trace_data_path+'/emon-'+(roi_index|string)+'.dat') is exists
+  ignore_errors: yes

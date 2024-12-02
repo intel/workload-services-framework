@@ -6,21 +6,22 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 ARG RELEASE
-FROM terraform-static${RELEASE}
+FROM terraform-csp-base${RELEASE}
 
 # Install AWS CLI 
 ARG AWSCLI_VER=2.13.10
 ARG AWSCLI_PKG=https://awscli.amazonaws.com/awscli-exe-linux-x86_64-${AWSCLI_VER}.zip
-RUN curl -L ${AWSCLI_PKG} -o awscliv2.zip && \
+RUN curl --netrc-optional --retry 10 --retry-connrefused -fsSL ${AWSCLI_PKG} -o awscliv2.zip && \
     unzip awscliv2.zip && \
     ./aws/install && \
     rm -rf aws
 
-# Install kubectl
-ARG KUBECTL_CLI=v1.26.6
-ARG KUBECTL_REPO=https://dl.k8s.io/release/${KUBECTL_CLI}/bin/linux/amd64/kubectl
-RUN curl -o /usr/local/bin/kubectl -L ${KUBECTL_REPO} && \
-    chmod a+rx /usr/local/bin/kubectl
-
 # Add cleanup script
-RUN echo "alias cleanup=/opt/csp/script/cleanup-aws.sh" >> /etc/bash.bashrc
+RUN ln -s /opt/project/script/csp/opt/script/cleanup-aws.sh /usr/local/bin/cleanup && \
+    ln -s /opt/project/script/csp/opt/script/cleanup-common.sh /usr/local/bin/cleanup-common.sh
+
+# Preload terraform plugins
+RUN mkdir -p /usr/local/share/terraform/plugins; \
+    for dir in /opt/terraform/template/terraform/aws/*; do \
+      (cd $dir; terraform providers mirror /usr/local/share/terraform/plugins) \
+    done

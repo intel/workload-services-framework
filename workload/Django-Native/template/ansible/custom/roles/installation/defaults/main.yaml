@@ -1,0 +1,21 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+WORKSPACE: "/tmp/django"
+CASSANDRA_VER: "3.0.14"
+CASSANDRA_PKG: "http://archive.apache.org/dist/cassandra/{{ CASSANDRA_VER }}/apache-cassandra-{{ CASSANDRA_VER }}-bin.tar.gz"
+CASSANDRA_INSTALL_DIR: "{{ WORKSPACE }}/cassandra"
+JAVA_VER: "openjdk-8"
+MEMCACHED_WORKING_DIR: "{{ WORKSPACE }}/memcached"
+PYTHON_VER: "3.7.9"
+PYTHON_VENV_VER: "3.7"
+PYTHON_INSTALL_DIR: "{{ WORKSPACE }}/python"
+PYTHON_VENV_DIR: "{{ WORKSPACE }}/venv"
+DJANGO_APP_INSTALL_DIR: "{{ WORKSPACE }}/django"
+DJANGO_APP_REPO: "https://github.com/facebookarchive/django-workload.git"
+DJANGO_APP_VER: "v1.0rc1"
+SIEGE_WORKING_DIR: "{{ WORKSPACE }}/siege"
+SIEGE_PKG: "https://download.joedog.org/siege/siege-4.1.6.tar.gz"
+SIEGE_VER: "v4.1.6"

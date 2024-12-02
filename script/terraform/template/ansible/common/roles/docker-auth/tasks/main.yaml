@@ -1,0 +1,10 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+- name: 'Import docker auth method tasks'
+  ansible.builtin.import_tasks:
+    file: "{{ docker_auth_method | default('docker') }}.yaml"
+  when: (role_path+'/tasks/'+(docker_auth_method|default('docker'))+'.yaml') is exists

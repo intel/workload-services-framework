@@ -1,0 +1,31 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Create folder
+  file:
+    path: "{{ wl_logs_dir }}/{{ inventory_hostname }}-bios"
+    state: directory
+  delegate_to: localhost
+  become: false
+
+- name: set global BIOS options
+  set_fact:
+    bios_options_dict: "{{ bios_options_dict | combine(dict(sut_bios_options | split(',') | map('trim') | select('match',item+':.*') | map('regex_replace','^[^:]*:','') | map('trim') | reject('==','') | map('split','=') | map('map','trim'))) }}"
+  loop: "{{ group_names }}"
+  vars:
+    bios_options_dict: {}
+
+- name: create BIOS workspace
+  file:
+    path: "/tmp/{{ wl_namespace }}-bios"
+    state: directory
+  when: (wl_bios.keys() | length > 0) or (bios_options_dict.keys() | length > 0) or (sut_bios_probe | bool)
+
+- name: "dispatch to {{ sut_bios_tool }} tasks"
+  include_tasks:
+    file: startup-{{ sut_bios_tool }}.yaml
+  when: (wl_bios.keys() | length > 0) or (bios_options_dict.keys() | length > 0) or (sut_bios_probe | bool)
+

@@ -1,0 +1,22 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Create the workspace direcctory
+  file:
+    path: "{{ workspace }}"
+    state: directory
+    
+- name: Install hammerDB
+  shell: "wget -c {{ hammerdb_package }}/v{{ hammerdb_ver }}/HammerDB-{{ hammerdb_ver }}-Linux.tar.gz -O - | tar -xz -C {{ workspace }}"
+
+- name: Copy file
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "a+rx"
+  with_items:
+  - {src: "prepare_common.sh", dest: "{{ workspace }}/prepare_common.sh"}
+  - {src: "prepare_hammerdb.sh", dest: "{{ workspace }}/prepare_hammerdb.sh"}
+  - {src: "run_hammerdb.sh.j2", dest: "{{ workspace }}/run_hammerdb.sh"}

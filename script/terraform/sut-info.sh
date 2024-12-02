@@ -19,31 +19,35 @@ if [ -x "$PROJECTROOT/script/csp/opt/script/sut-info-$csp.sh" ] && [[ "$@" != *"
     profiles=(
         $(for profile1 in $(sed -n '/^\s*variable\s*".*_profile"\s*{/{s/.*"\(.*\)_profile".*/\1/;p}' "$TERRAFORM_CONFIG"); do
             if [ "$csp" = "static" ]; then
-                public_ip="$(sed -n "/^\s*variable\s*\"${profile1}_profile\"\s*{/,/^\s*}\s*$/{/^\s*[\"]public_ip[\"]:\s*/{s/.*:\s*[\"]\([0-9.]*\)[\"].*/\\1/;p}}" "$TERRAFORM_CONFIG")"
-                user_name="$(sed -n "/^\s*variable\s*\"${profile1}_profile\"\s*{/,/^\s*}\s*$/{/^\s*[\"]user_name[\"]:\s*/{s/.*:\s*[\"]\([^\"]*\)[\"].*/\\1/;p}}" "$TERRAFORM_CONFIG")"
-                ssh_port="$(sed -n "/^\s*variable\s*\"${profile1}_profile\"\s*{/,/^\s*}\s*$/{/^\s*[\"]ssh_port[\"]:\s*/{s/.*:\s*\([0-9]*\).*/\\1/;p}}" "$TERRAFORM_CONFIG")"
+                public_ip="$(sed -n "/^\s*variable\s*\"${profile1}_profile\"\s*{/,/^\s*}\s*$/{/^\s*[\"]public_ip[\"]:\s*/{s/.*:\s*[\"]\([^\"]*\)[\"].*/\\1/;p;q}}" "$TERRAFORM_CONFIG")"
+                user_name="$(sed -n "/^\s*variable\s*\"${profile1}_profile\"\s*{/,/^\s*}\s*$/{/^\s*[\"]user_name[\"]:\s*/{s/.*:\s*[\"]\([^\"]*\)[\"].*/\\1/;p;q}}" "$TERRAFORM_CONFIG")"
+                ssh_port="$(sed -n "/^\s*variable\s*\"${profile1}_profile\"\s*{/,/^\s*}\s*$/{/^\s*[\"]ssh_port[\"]:\s*/{s/.*:\s*\([0-9]*\).*/\\1/;p;q}}" "$TERRAFORM_CONFIG")"
                 echo "${profile1^^}:$ssh_port:$user_name@$public_ip"
             else
-                core_count="$(sed -n "/^\s*variable\s*\"${profile1}_profile\"\s*{/,/^\s*}\s*$/{/^\s*cpu_core_count\s*=\s*/{s/.*=\s*\([^ ]*\).*/\\1/;p}}" "$TERRAFORM_CONFIG")"
+                core_count="$(sed -n "/^\s*variable\s*\"${profile1}_profile\"\s*{/,/^\s*}\s*$/{/^\s*cpu_core_count\s*=\s*/{s/.*=\s*\([^ ]*\).*/\\1/;p;q}}" "$TERRAFORM_CONFIG")"
                 if [ -z "$core_count" ] || [ "$core_count" = "null" ]; then
                     core_count=""
                 else
                     core_count="-$core_count"
                 fi
-                memory_size="$(sed -n "/^\s*variable\s*\"${profile1}_profile\"\s*{/,/^\s*}\s*$/{/^\s*memory_size\s*=\s*/{s/.*=\s*\([^ ]*\).*/\\1/;p}}" "$TERRAFORM_CONFIG")"
+                memory_size="$(sed -n "/^\s*variable\s*\"${profile1}_profile\"\s*{/,/^\s*}\s*$/{/^\s*memory_size\s*=\s*/{s/.*=\s*\([^ ]*\).*/\\1/;p;q}}" "$TERRAFORM_CONFIG")"
                 if [ -z "$memory_size" ] || [ "$memory_size" = "null" ]; then
                     memory_size=""
                 else
                     memory_size="-$memory_size"
                 fi
-                instance_type="$(sed -n "/^\s*variable\s*\"${profile1}_profile\"\s{/,/^\s*}\s*$/{/^\s*instance_type\s*=\s*/{s/.*=\s*\"\(.*\)\".*/\\1/;p}}" "$TERRAFORM_CONFIG")"
+                instance_type="$(sed -n "/^\s*variable\s*\"${profile1}_profile\"\s{/,/^\s*}\s*$/{/^\s*instance_type\s*=\s*/{s/.*=\s*\"\(.*\)\".*/\\1/;p;q}}" "$TERRAFORM_CONFIG")"
                 echo "${profile1^^}:$instance_type$core_count$memory_size"
             fi
           done)
     )
-    vars=($("$PROJECTROOT/script/terraform/shell.sh" $csp -v "$PROJECTROOT/script/csp:/home" -v "$PROJECTROOT/script/csp:/root" -- /opt/project/script/csp/opt/script/sut-info-$csp.sh $zone $rid ${profiles[@]}))
-    for var1 in "${vars[@]}"; do
-        echo "SUTINFO_$var1"
-        eval "SUTINFO_$var1"
-    done
+
+    sut_info="$(
+        IFS=$'\n' vars=($("$PROJECTROOT/script/terraform/shell.sh" $csp -v "$PROJECTROOT/script/csp:/home" -v "$PROJECTROOT/script/csp:/root" -- /opt/project/script/csp/opt/script/sut-info-$csp.sh $zone $rid ${profiles[@]}))
+        for var1 in "${vars[@]}"; do
+            echo "SUTINFO_$var1"
+        done
+    )"
+    echo "$sut_info"
+    eval "$sut_info"
 fi

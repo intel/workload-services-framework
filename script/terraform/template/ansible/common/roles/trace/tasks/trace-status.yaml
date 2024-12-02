@@ -7,13 +7,14 @@
     - name: retrieve waitproc status
       shell:
         cmd: |
-          rc="$(cat /tmp/{{ wl_namespace }}-{{ trace_logs_host | default(inventory_hostname) }}-waitproc.status)"
-          rm -f /tmp/{{ wl_namespace }}-{{ trace_logs_host | default(inventory_hostname) }}-waitproc.status
+          rc="$(cat "{{ status_file }}")"
           exit ${rc:-0}
         executable: /bin/bash
       register: waitproc_status
       delegate_to: "{{ trace_logs_host | default(inventory_hostname) }}"
       ignore_errors: true
+      vars:
+        status_file: "{{ trace_status_file | default(trace_tmp_path+'/'+wl_namespace+'-'+(trace_logs_host|default(inventory_hostname))+'-waitproc.status') }}"
 
     - name: create the itr/waitproc logs directory
       file:
@@ -33,3 +34,4 @@
       when: waitproc_status.rc != 0
       ignore_errors: true
       become: false
+

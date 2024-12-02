@@ -1,0 +1,20 @@
+# This is a two node scenario, we have a client SUT and server SUT respectively
+# Client SUTs are two-socket platform with 128 cores per socket
+# Server SUTs are two-socket plafrom with 64 cores per socket
+# We would like to let server instances start from socket 1 and client instances start from socket 0
+# and let server instance fully used all cores on socket 1
+# if SERVER_CORES_PI=4, we will need 64 cores/SERVER_CORES_PI=16 DB_INSTANCE to fully used all cores on socket 1
+# for client SUTs, if we want to fully used all cores on socket 0, we can make CLIENT_CORES_PI bigger, 128/16=8
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+*_hugepage_off$:
+    RUN_SINGLE_NODE: false
+    DB_INSTANCE: 16
+    SERVER_CORES_PI: 4
+    CLIENT_CORES_PI: 4
+    CLIENT_SOCKET_BIND_NODE: 0
+    SERVER_SOCKET_BIND_NODE: 1

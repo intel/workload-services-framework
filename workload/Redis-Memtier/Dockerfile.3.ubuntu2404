@@ -1,0 +1,37 @@
+# redis-server-ubuntu2404
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+FROM ${OS_IMAGE}:${OS_VER}
+
+# Dependencies
+ENV TZ=America/Los_Angeles
+RUN apt update && apt install -y findutils wget build-essential make ruby zlib1g-dev autoconf automake libpcre3 libpcre3-dev libevent-dev pkgconf libssl-dev openssl zip unzip numactl procps netcat-openbsd kmod iproute2 sudo
+
+WORKDIR /build
+
+# Redis
+ARG REDIS_VER=7.0.5
+ARG REDIS_PACKAGE=https://download.redis.io/releases/redis-${REDIS_VER}.tar.gz
+RUN wget ${REDIS_PACKAGE} -O redis.tgz && tar -zxvf redis.tgz
+RUN cd redis-${REDIS_VER} && make install
+
+# Add script
+WORKDIR /redis
+RUN mkdir redis-conf
+#copy redis_conf.conf to /redis/redis-conf/
+COPY redis_conf.conf /redis/redis-conf/ 
+COPY network_tune.sh .
+COPY entrypoint-server.sh .
+RUN chmod +x network_tune.sh
+RUN chmod +x entrypoint-server.sh
+
+RUN mkfifo /export-logs
+
+CMD (/redis/entrypoint-server.sh; echo $? > status) 2>&1 | tee run.log && \
+    tar cf /export-logs status run.log memtier*.log redis*.log && sleep infinity;

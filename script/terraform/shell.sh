@@ -23,31 +23,23 @@ options+=(
     "-e" "TF_UID=$(id -u)"
     "-e" "TF_GID=$(id -g)"
     "-e" "DOCKER_GID=$(getent group docker | cut -f3 -d:)"
-    "-e" "TZ=$(timedatectl show | grep Timezone= | cut -f2 -d=)"
+    "-e" "TZ=$(timedatectl show --va -p Timezone 2> /dev/null || echo $TZ)"
     $(compgen -e | sed -nE '/_(proxy|PROXY)$/{s/^/-e /;p}')
-    "-v" "/etc/localtime:/etc/localtime:ro"
     "-v" "/var/run/docker.sock:/var/run/docker.sock"
     "-v" "$SDIR/../..:/opt/project:ro"
-    $(find "$SDIR/../csp" -name ".??*" -type d ! -name .docker ! -name .gitconfig ! -name .ssh ! -name .kube ! -name .diskv-temp -exec sh -c 'printf -- "-v\\n{}:/home/$(basename "{}")\\n-v\\n{}:/root/$(basename "{}")\\n"' \;)
+    $(find "$SDIR/../csp" -name ".??*" -type d ! -name .docker ! -name .gitconfig ! -name .ssh ! -name .kube ! -name .netrc ! -name .diskv-temp -exec sh -c 'printf -- "-v\\n{}:/home/$(basename "{}")\\n-v\\n{}:/root/$(basename "{}")\\n"' \;)
 )
+
+if [ -n "$REGISTRY$TERRAFORM_REGISTRY" ]; then
+    options+=(
+        "--pull" "always"
+    )
+fi
 
 # if used a different release, use its native script/template
 if [[ -z "$TERRAFORM_REGISTRY$TERRAFORM_RELEASE" ]]; then
     options+=(
         "-v" "$SDIR:/opt/terraform:ro"
-    )
-fi
-if [ -r "$HOME"/.gitconfig ]; then
-    options+=(
-        "-v" "$HOME/.gitconfig:/home/.gitconfig:ro"
-        "-v" "$HOME/.gitconfig:/root/.gitconfig:ro"
-    )
-fi
-
-if [ -d "$HOME/.docker" ]; then
-    options+=(
-        "-v" "$HOME/.docker:/home/.docker"
-        "-v" "$HOME/.docker:/root/.docker"
     )
 fi
 
@@ -57,11 +49,41 @@ if [ -d "/usr/local/etc/wsf" ]; then
     )
 fi
 
-if [ -d "$HOME/.ssh" ]; then
+if [ -r "$HOME"/.gitconfig ]; then
+    gitconfig_path="$(readlink -e "$HOME/.gitconfig")"
     options+=(
-        "-v" "$(readlink -e "$HOME/.ssh"):/home/.ssh"
-        "-v" "$(readlink -e "$HOME/.ssh"):/root/.ssh"
+        "-v" "$gitconfig_path:/home/.gitconfig:ro"
+        "-v" "$gitconfig_path:/root/.gitconfig:ro"
     )
+fi
+
+if [ -d "$HOME/.docker" ]; then
+    dockerconfig_path="$(readlink -e "$HOME/.docker")"
+    options+=(
+        "-v" "$dockerconfig_path:/home/.docker"
+        "-v" "$dockerconfig_path:/root/.docker"
+    )
+fi
+
+if [ -d "$HOME/.ssh" ]; then
+    sshconfig_path="$(readlink -e "$HOME/.ssh")"
+    options+=(
+        "-v" "$sshconfig_path:/home/.ssh"
+        "-v" "$sshconfig_path:/root/.ssh"
+    )
+fi
+
+if [ -r "$HOME/.netrc" ]; then
+    netrconfig_path="$(readlink -e "$HOME/.netrc")"
+    options+=(
+        "-v" "$netrconfig_path:/home/.netrc:ro"
+        "-v" "$netrconfig_path:/root/.netrc:ro"
+    )
+    if [ -n "$(find "$netrconfig_path" -perm /177 2>/dev/null)" ]; then
+        echo "The ~/.netrc permission is too permissive."
+        echo "Consider chmod 600 ~/.netrc instead."
+        exit 3
+    fi
 fi
 
 terraform_image="${TERRAFORM_REGISTRY:-$REGISTRY}terraform-${cloud}${TERRAFORM_RELEASE:-$RELEASE}"

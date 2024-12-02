@@ -1,0 +1,38 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+    - name: retrieve waitproc status
+      ansible.windows.win_shell: |
+        $rc=(Get-Content -Path "{{ status_file }}" -ErrorAction SilentlyContinue)
+        if (!($rc -is [int])) { $rc=0 }
+        exit $rc
+      register: waitproc_status
+      delegate_to: "{{ trace_logs_host | default(inventory_hostname) }}"
+      ignore_errors: true
+      become: false
+      vars:
+        default_status_file: "{{ trace_win_tmp_path }}\\{{ wl_namespace }}-{{ trace_logs_host|default(inventory_hostname) }}-waitproc.status"
+        status_file: "{{ trace_status_file | default(default_status_file) }}"
+
+    - name: create the itr/waitproc logs directory
+      file:
+        path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ trace_logs_host | default(inventory_hostname) }}-waitproc"
+        state: directory
+        recurse: true
+      when: waitproc_status.rc != 0
+      delegate_to: localhost
+      ignore_errors: true
+      become: false
+
+    - name: "write down waitproc status: {{ waitproc_status.rc }}"
+      copy:
+        content: "{{ waitproc_status.rc }}"
+        dest: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ trace_logs_host | default(inventory_hostname) }}-waitproc/status"
+      delegate_to: localhost
+      when: waitproc_status.rc != 0
+      ignore_errors: true
+      become: false
+

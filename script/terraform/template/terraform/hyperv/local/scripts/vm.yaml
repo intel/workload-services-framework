@@ -1,0 +1,122 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- hosts: all
+  gather_facts: no
+  tasks:
+
+  - block:
+
+    - name: create instance folder
+      ansible.windows.win_file:
+        path: "{{ vmpath }}"
+        state: directory
+  
+    - name: create vm
+      ansible.windows.win_shell: |
+        New-VM -Name {{ vmname }} -BootDevice VHD -SwitchName {{ switches | first }} -VHDPath "{{ lookup('env','OS_DISK') }}" -Path "{{ vmpath }}" -Generation {{ generation }}
+        Set-VM -Name {{ vmname }} -AutomaticCheckpointsEnabled $false -AutomaticStartAction Start -CheckpointType Disabled
+  
+    - name: set firmware
+      ansible.windows.win_shell: |
+        Set-VMFirmware -VMName {{ vmname }} -EnableSecureBoot {{ secure_boot }} {% if secure_boot=='On' %}-SecureBootTemplate MicrosoftUEFICertificateAuthority{% endif %}
+      when: 
+      - generation == '2'
+      vars:
+        secure_boot: "{{ lookup('env','SECURE_BOOT') }}"
+
+    - name: set processor
+      ansible.windows.win_shell: |
+        Set-VMProcessor -VMName {{ vmname }} -Count {{ lookup('env','PROCESSOR_COUNT') }} -HWThreadCountPerCore 0 -RelativeWeight 100 -Maximum 100
+        
+    - name: set memory
+      ansible.windows.win_shell: |
+        Set-VMMemory -VMName {{ vmname }} -DynamicMemoryEnabled:$false -StartupBytes "{{ lookup('env','MEMORY_SIZE') }}"
+
+    - name: add network adapters
+      ansible.windows.win_shell: |
+        {% for network in (networks | zip_longest(switches, fillvalue=(switches | last))) %}
+          {% if (loop.index==1) %}
+            foreach ($adapter in Get-VMNetworkAdapter -VMName {{ vmname }}) {
+              Rename-VMNetworkAdapter -VMName {{ vmname }} -Name $adapter.Name -NewName "{{ network.0 }}"
+            }
+          {% else %}
+            Add-VMNetworkAdapter -VMName {{ vmname }} -Name {{ network.0 }} -SwitchName {{ network.1 }}
+          {% endif %}
+          if ((Get-VMSwitch -Name "{{ network.1 }}" | select IovEnabled).IovEnabled -eq 'True') {
+            $iov_weight=100
+          } else {
+            $iov_weight=0
+          }
+          Set-VMNetworkAdapter -VMName {{ vmname }} -Name {{ network.0 }} -DynamicMacAddress -IoVWeight $iov_weight -FixSpeed10G Off -VmqWeight 100 -IPsecOffloadMaximumSecurityAssociation 512 -DhcpGuard Off -RouterGuard Off -AllowTeaming Off -MaximumBandwidth 0 -DeviceNaming Off -IeeePriorityTag On -StormLimit 0
+        {% endfor %}
+  
+    - name: add cloud-init disk
+      ansible.windows.win_shell: |
+        Set-VMDvdDrive -VMName {{ vmname }} -Path "{{ lookup('env','DVD_ISO') }}" -ControllerNumber 1 -ControllerLocation 0
+  
+    - name: add data disks
+      ansible.windows.win_shell: |
+        {% for disk in (lookup('env','DATA_DISKS') | split(',') | reject('==','')) %}
+          Add-VMHardDiskDrive -VMName {{ vmname }} -ControllerType {{ data_disk_ctr.0 }} -Path "{{ disk }}" -ControllerNumber {{ data_disk_ctr.1 }} -ControllerLocation {{ loop.index0+(data_disk_ctr.2|int) }}
+        {% endfor %}
+      vars:
+        data_disk_ctr: "{{ lookup('env','DATA_DISK_CONTROLLER') | split(',') }}"
+        
+    - name: set integration service
+      ansible.windows.win_shell: |
+        Enable-VMIntegrationService -VMName {{ vmname }} -Name "Guest Service Interface"
+
+    - name: start vm
+      ansible.windows.win_shell: |
+        Start-VM -Name {{ vmname }}
+        $state=(Get-VM -Name {{ vmname }} | Select State).State
+        while ($state -ne 'Running') {
+          Start-Sleep -Seconds 1
+          $state=(Get-VM -Name {{ vmname }} | Select State).State
+        }
+
+    vars:
+      generation: "{{ lookup('env','GENERATION') }}"
+      switches: "{{ lookup('env','SWITCHES') | split(',') }}"
+      networks: "{{ lookup('env','NETWORKS') | split(',') | reject('==','') }}"
+    tags:
+    - create
+
+  - block:
+
+    - name: stop vm
+      ansible.windows.win_shell: |
+        Stop-VM -Name {{ vmname }} -TurnOff -Force -Confirm:$false
+      ignore_errors: true
+
+    - name: remove vm
+      ansible.windows.win_shell: |
+        Remove-VM -Name {{ vmname }} -Force -Confirm:$false
+        Get-VM -Name {{ vmname }}
+        while ($?) {
+          Start-Sleep -Seconds 1
+          Get-VM -Name {{ vmname }}
+        }
+      ignore_errors: true
+
+    - name: remove instance folder
+      ansible.windows.win_file:
+        path: "{{ vmpath }}"
+        state: absent
+      register: filerc
+      until: filerc is success
+      retries: 20
+      delay: 10
+      ignore_errors: true
+  
+    tags:
+    - destroy
+    
+  vars:
+    vmname: "{{ lookup('env','VM_NAME') }}"
+    vmpath: "{{ lookup('env','VM_PATH') }}"
+      

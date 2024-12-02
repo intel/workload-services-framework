@@ -9,19 +9,36 @@
   - name: uname -r
     command: uname -r
     register: unamer
+  
+  - name: update apt-get cache
+    apt:
+      update_cache: true
+
+  - name: check if unamer specific linux-tools exists
+    shell:
+      cmd: |
+        apt-cache madison {{ perf_packages[os.stdout] | join(' ') }} | cut -f1 -d' ' | uniq
+    register: perf_package_versions
 
   - name: Install perf
     apt:
-      name:
-        - linux-tools-common
-        - linux-tools-generic
-        - "linux-tools-{{ unamer.stdout }}"
-      update_cache: true
+      name: "{{ perf_package_versions.stdout_lines | intersect(perf_packages[os.stdout]) }}"
       state: present
-    become: yes
     register: aptrc
     until: aptrc is success
     retries: 10
     delay: 10
 
   delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: true
+  vars:
+    perf_packages:
+      ubuntu:
+      - linux-tools-common
+      - linux-tools-generic
+      - "linux-tools-{{ unamer.stdout }}"
+      - perl-modules
+      debian:
+      - linux-perf
+  

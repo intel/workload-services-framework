@@ -1,0 +1,18 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- set_fact:
+    trace_module_start_block: |
+            date -Ins > start-$roi
+            date +%s%3N > start.time-$roi
+    trace_module_stop_block: |
+            date -Ins > stop-$roi
+            start_time="$(cat start.time-$roi)"
+            end_time="$( date +%s%3N )"
+            time_range=$(( end_time - start_time ))
+            end_time=$(( end_time / 1000 ))
+            python3 {{ trace_script_path }}/get-powerstat-metrics.py $time_range $end_time "{{ trace_nodes.stdout_lines }}" {{ powerstat_prometheus_url }} > logs-$roi
+

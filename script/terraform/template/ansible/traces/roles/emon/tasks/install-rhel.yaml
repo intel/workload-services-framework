@@ -57,7 +57,61 @@
     when:
     - os.stdout_lines | last | int >= 8
     - not kernel_header.stat.exists
-  
+
+  - name: Get /proc/version
+    shell: cat /proc/version
+    register: proc_version_output
+
+  - name: Compile kernel gcc version
+    set_fact:
+      gcc_version: "{{ (proc_version_output.stdout | regex_search('gcc \\(GCC\\) (\\d+\\.\\d+\\.\\d+)', '\\1') | first ) }}"
+    when: proc_version_output.stdout is search('gcc \\(GCC\\)')
+
+  - name: Compile kernel gcc version
+    set_fact:
+      gcc_version: "{{ proc_version_output.stdout | regex_search('gcc version (\\d+\\.\\d+\\.\\d+)', '\\1') | first }}"
+    when: proc_version_output.stdout is search('gcc version (\\d+\\.\\d+\\.\\d+)')
+
+  - name: Get install gcc version
+    shell: "gcc --version | awk 'NR==1{print $3}'"
+    register: installed_gcc_version
+
+  - name: Compare install gcc version whether equal compile kernel gcc version
+    set_fact:
+      gcc_versions_match:  "{{ 2 if installed_gcc_version.stdout < gcc_version else (1 if installed_gcc_version.stdout == gcc_version else 3) }}"
+
+# There are two scenarios 
+# 1. The default version of gcc installed on the system is equal to the version of gcc used to compile the kernel, so use the system gcc directly.
+# 2. The default gcc version installed by the system is not equal to the kernel gcc version compiled, which is divided into two scenarios here
+#  a. The name of the gcc that compiles the kernel does not contain the word toolset in the dnf, so the gcc is installed in the bin directory after installation.
+#  b. If the name of the gcc that compiles the kernel in the dnf contains the word toolset, then the gcc is installed in the directory /opt/rh/gcc-toolset-xx, with xx representing the major version number of the gcc.
+  - block:
+    - name: Get all gcc version in yum repo
+      shell: "dnf provides '*bin/gcc'"
+      register: gcc_list
+
+    - name: Check compile kernel gcc version in yum repo
+      set_fact:
+        matching_gcc_version: "{{ item | split(':') | map('trim') | list | first }}"
+      when: gcc_version in item
+      loop: "{{ gcc_list.stdout_lines  }}"
+
+    - name: Install compile kernel gcc version
+      shell: "dnf install {{ matching_gcc_version }} -y"
+      ignore_errors: true
+      register: install_rc
+
+    - name: Fail if install compile kernel gcc version error
+      fail:
+        msg: "Unable to install the gcc version of the compiled kernel"
+      when: install_rc.rc != 0
+
+    - set_fact:
+        emon_gcc_options: "--c-compiler /opt/rh/gcc-toolset-{{ gcc_version | regex_search('(\\d+)(\\.\\d+\\.\\d+)', '\\1') | first }}/root/bin/gcc"
+      when: ("gcc-toolset" in matching_gcc_version)
+
+    when: gcc_versions_match != "1"
+
   delegate_to: "{{ trace_node.1 }}"
   become: true
 

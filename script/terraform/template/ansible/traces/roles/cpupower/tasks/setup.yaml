@@ -1,0 +1,15 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- set_fact:
+    trace_module_start_block: |
+        nohup bash -c "while true; do date -Ins >> cpupower-$roi.dat; cpupower monitor {{ cpupower_options }} >> cpupower-$roi.dat;sleep {{ cpupower_interval }};done" > cpupower-$roi.logs 2>&1 &
+        echo $! > cpupower.pid
+        disown
+    trace_module_stop_block: |
+        kill $(cat cpupower.pid)
+        tail -f --pid=$(cat cpupower.pid) /dev/null
+

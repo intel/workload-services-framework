@@ -1,0 +1,50 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+services:
+{% for DB_INDEX in range(0, DB_INSTANCE|int) %}
+{% set DB_PORT=5432+DB_INDEX %}
+{% set DB_DISK_INDEX=DB_INDEX%(MULTI_DISK_NUM|int) %}
+{% set DB_DISK_INDEX=DB_DISK_INDEX+1 %}
+  db-{{ DB_INDEX }}:
+    image: "{{ REGISTRY }}pgsql{{ RELEASE }}"
+    network_mode: "host"
+{% if ENABLE_MOUNT_DIR == 'true' %}
+    volumes:
+    - /mnt/disk{{ DB_DISK_INDEX }}/data{{ DB_INDEX }}:/var/lib/postgresql/data
+{% endif %}
+    cap_add:
+    - ALL
+    environment: 
+      DB_HOST: "{{ DB_HOST }}"
+      DB_PORT: "{{ DB_PORT }}"
+      DB_INDEX: "{{ DB_INDEX }}"
+      POSTGRES_PASSWORD: "{{ POSTGRES_PASSWORD }}"
+      TPCC_NUM_WAREHOUSES: "{{ TPCC_NUM_WAREHOUSES }}"
+      TPCC_MINUTES_OF_RAMPUP: "{{ TPCC_MINUTES_OF_RAMPUP }}"
+      TPCC_MINUTES_OF_DURATION: "{{ TPCC_MINUTES_OF_DURATION }}"
+      TPCC_VU_THREADS: "{{ TPCC_VU_THREADS }}"
+      TPCC_VU_NUMBER: "{{ TPCC_VU_NUMBER }}"
+      HUGE_PAGES_STATUS: "{{ HUGE_PAGES_STATUS }}"
+      SERVER_CORES_PI: "{{ SERVER_CORES_PI }}"
+      
+  benchmark-{{ DB_INDEX }}:
+    image: "{{ REGISTRY }}hammerdb-{{ 'ubuntu24' if 'ubuntu24' in TESTCASE else 'ubuntu22' }}{{ RELEASE }}"
+    cap_add:
+    - ALL
+    network_mode: "host"
+    environment:
+      DB_HOST: "{{ DB_HOST }}"
+      DB_PORT: "{{ DB_PORT }}"
+      DB_INDEX: "{{ DB_INDEX }}"
+      POSTGRES_PASSWORD: "{{ POSTGRES_PASSWORD }}"
+      TPCC_NUM_WAREHOUSES: "{{ TPCC_NUM_WAREHOUSES }}"
+      TPCC_MINUTES_OF_RAMPUP: "{{ TPCC_MINUTES_OF_RAMPUP }}"
+      TPCC_MINUTES_OF_DURATION: "{{ TPCC_MINUTES_OF_DURATION }}"
+      TPCC_VU_THREADS: "{{ TPCC_VU_THREADS }}"
+      TPCC_VU_NUMBER: "{{ TPCC_VU_NUMBER }}"
+      TPCC_TCL_SCRIPT_PATH: "/tcls"
+      CLIENT_CORES_PI: "{{ CLIENT_CORES_PI }}"
+{% endfor %}

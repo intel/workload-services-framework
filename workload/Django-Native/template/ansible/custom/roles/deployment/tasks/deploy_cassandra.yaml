@@ -1,0 +1,82 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Set Cassandra Parameters
+  set_fact:
+    cassandra_config_file: "{{ CASSANDRA_INSTALL_DIR }}/conf/cassandra.yaml"
+    concurrent_reads: "{{ wl_tunables['CASSANDRA_CR'] }}"
+    concurrent_writes: "{{ wl_tunables['CASSANDRA_CW'] }}"
+    concurrent_counter_writes: "{{ wl_tunables['CASSANDRA_CCW'] }}"
+    java_xmx: "{{ wl_tunables['CASSANDRA_JAVA_XMX'] | default('500g') }}"
+    java_xms: "{{ wl_tunables['CASSANDRA_JAVA_XMX'] | default('500g') }}"
+    java_xmn: "{{ wl_tunables['CASSANDRA_JAVA_XMX'] | default('498g') }}"
+    ansible_memfree_gb: "{{ (ansible_memfree_mb / 1024) | int }}"
+
+- name: Kill cassandra processes
+  ansible.builtin.shell: "kill -9 $(pgrep -f  'cassandra') || true"
+  ignore_errors: true
+
+- name: Find Java installation directory
+  ansible.builtin.find:
+    paths: /usr/lib/jvm
+    patterns: "java-1.8.0-openjdk-*,java-8-openjdk*"
+    file_type: directory
+  register: java_install_dir
+
+- name: Set java bin directory
+  set_fact:
+    java_bin_dir: "{{ java_install_dir.files[0].path }}/jre/bin/java"
+  when: ansible_facts['distribution'] in ['CentOS', 'RedHat'] 
+
+- name: Set java bin directory
+  set_fact:
+    java_bin_dir: "{{ java_install_dir.files[0].path }}/bin/java"
+  when: ansible_facts['distribution'] in ['Debian', 'Ubuntu']
+
+- name: Remove Existing Java Symbolic Link
+  file:
+    path: /usr/bin/java
+    state: absent
+  register: removed_link
+  ignore_errors: yes
+
+- name: Link New java to /usr/local/bin
+  become: true
+  file:
+    src: "{{ java_bin_dir }}"
+    dest: '/usr/bin/java'
+    state: link
+  when: removed_link.stat.islnk is not defined
+
+- name: Update Cassandra configuration
+  ansible.builtin.lineinfile:
+    path: "{{ cassandra_config_file }}"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.new_line }}"
+  loop:
+    - { regexp: '^concurrent_reads:', new_line: 'concurrent_reads: {{ concurrent_reads }}' }
+    - { regexp: '^concurrent_writes:', new_line: 'concurrent_writes: {{ concurrent_writes }}' }
+    - { regexp: '^concurrent_counter_writes:', new_line: 'concurrent_counter_writes: {{ concurrent_counter_writes }}' }
+    - { regexp: '^concurrent_materialized_view_writes:', new_line: '#concurrent_materialized_view_writes: 32' }
+
+- name: Install JVM Options
+  template:
+    src: "jvm8.options.new.j2"
+    dest: "{{ CASSANDRA_INSTALL_DIR }}/conf/jvm.options"
+    mode: "0755"
+
+- name: Ensure Cassandra data directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+  loop:
+    - "{{ CASSANDRA_INSTALL_DIR }}/logs"
+    - "{{ CASSANDRA_INSTALL_DIR }}/data"
+
+- name: Start Cassandra
+  ansible.builtin.shell: 
+    cmd: "nohup {{ CASSANDRA_INSTALL_DIR }}/bin/cassandra -f > {{ CASSANDRA_INSTALL_DIR }}/cassandra.log 2>&1 &"
+    executable: /bin/bash
+

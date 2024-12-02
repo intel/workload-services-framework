@@ -1,0 +1,48 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Locate the perf path
+  shell:
+    cmd: |
+      find /usr/bin /usr/lib/linux-tools -name perf -exec bash -c '{} -v > /dev/null 2>&1' \; -print
+    executable: /bin/bash
+  register: perf_path
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: false
+
+- name: Check perf stat events
+  shell:
+    cmd: |
+      {{ perf_path.stdout_lines | first }} list --no-desc | grep -q -E '(^  *{{ item | replace('-','[-]') }} | OR {{ item | replace('-','[-]') }} )'
+    executable: /bin/bash
+  when: perf_path.stdout_lines | default([]) | length > 0
+  loop: "{{ ((' '+lookup('vars','perf_'+perf_action+'_options')) | split(' -e '))[1:] | map('regex_replace',' .*$','') | reject('==','') }}"
+  register: perf_events
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: true
+
+- set_fact:
+    trace_module_start_block: |
+      {% if perf_path.stdout_lines | default([]) | length > 0 %}
+        {% if perf_events.results | rejectattr('rc','==',0) | length > 0 %}
+          echo "Unsupported events: {{ perf_events.results | rejectattr('rc','==',0) | map(attribute='item') | join(' ') }}" > perf-$roi.logs
+        {% endif %}
+        mkfifo perf-$roi.stop
+        pid_options="$(get_docker_pids $@ | tr '\n' ',')"
+        [ -z "$pid_options" ] || pid_options="--pid=${pid_options%%,}"
+        echo {{ perf_path.stdout_lines | first }} {{ perf_action }} {{ lookup('vars','perf_'+perf_action+'_options') | regex_replace('-e *[^ ]*','') }} {{ (perf_events.results | selectattr('rc','==',0) | length > 0) | ternary('-e','') }} {{ perf_events.results | selectattr('rc','==',0) | map(attribute='item') | join(' -e ') }} {% if perf_action == 'stat' %}-x ,{% endif %} $pid_options --output perf-$roi.record cat perf-$roi.stop >> perf-$roi.logs
+        nohup {{ perf_path.stdout_lines | first }} {{ perf_action }} {{ lookup('vars','perf_'+perf_action+'_options') | regex_replace('-e *[^ ]*','') }} {{ (perf_events.results | selectattr('rc','==',0) | length > 0) | ternary('-e','') }} {{ perf_events.results | selectattr('rc','==',0) | map(attribute='item') | join(' -e ') }} {% if perf_action == 'stat' %}-x ,{% endif %} $pid_options --output perf-$roi.record cat perf-$roi.stop >> perf-$roi.logs 2>&1 &
+        echo $! > perf.pid
+        disown
+      {% endif %}
+    trace_module_stop_block: |
+      {% if perf_path.stdout_lines | default([]) | length > 0 %}
+        echo stop > perf-$roi.stop
+        tail -f --pid=$(cat perf.pid) /dev/null
+      {% endif %}
+

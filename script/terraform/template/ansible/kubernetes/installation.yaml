@@ -10,14 +10,9 @@
   become: false
   tasks:
 
-    - name: Record timing
-      shell:
-        cmd: |
-          echo "k8s_setup_start: \"$(date -Ins)\"" >> {{ wl_logs_dir}}/timing.yaml
-        executable: /bin/bash
-      when: (ansible_connection|default('ssh')) == 'ssh'
-      async: 30
-      poll: 0
+    - include_role:
+        name: timing
+        tasks_from: start-setup
 
 - name: "Cluster hosts preparation"
   hosts: cluster_hosts
@@ -81,6 +76,38 @@
         tasks_from: finalize-controller
       when: (ansible_connection|default('ssh')) == 'ssh'
 
+- name: "Transfer Images"
+  hosts: "{{ ('controller' in groups) | ternary('controller','localhost') }}"
+  gather_facts: false
+  become: false
+  tasks:
+
+    - include_role:
+        name: timing
+        tasks_from: start-image-transfer
+
+    - name: Record build commit in workload-config
+      include_role:
+        name: docker-image
+        tasks_from: to-config
+      when:
+      - (wl_docker_images | default({}) | dict2items | length) > 0
+      - (ansible_connection|default('ssh')) in ['ssh','local']
+
+    - name: Transfer image(s) to docker registry
+      include_role:
+        name: docker-image
+        tasks_from: to-registry
+      when:
+      - (wl_docker_images | default({}) | dict2items | length) > 0
+      - (ansible_connection|default('ssh')) in ['ssh','local']
+      - k8s_enable_registry | default(true) | bool
+      - (k8s_remote_registry_url | split(':') | first) not in (my_ip_list | split(','))
+
+    - include_role:
+        name: timing
+        tasks_from: stop-image-transfer
+
 - name: "Finalize workload hosts installation tasks"
   hosts: workload_hosts
   any_errors_fatal: true
@@ -102,11 +129,7 @@
   become: false
   tasks:
 
-    - name: Record timing
-      shell:
-        cmd: |
-          echo "k8s_setup_end: \"$(date -Ins)\"" >> {{ wl_logs_dir}}/timing.yaml
-        executable: /bin/bash
-      when: (ansible_connection|default('ssh')) == 'ssh'
-      async: 30
-      poll: 0
+    - include_role:
+        name: timing
+        tasks_from: stop-setup
+

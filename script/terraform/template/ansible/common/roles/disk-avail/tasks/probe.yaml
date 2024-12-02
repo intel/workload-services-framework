@@ -1,0 +1,39 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# HAS-SETUP-DISK-AVAIL-150
+# HAS-SETUP-DISK-AVAIL-150-MNT-DISK1
+
+- block:
+
+    - name: check disk path availability
+      shell:
+        cmd: |
+          find / -mindepth 1 -maxdepth {{ disk_path_items | length }} -type d -ipath "/{{ disk_path_items | join('[/-]') }}" -print
+        executable: /bin/bash
+      register: disk_paths
+
+    - fail:
+        msg: "disk path not found in {{ label_name }}"
+      when: disk_paths.stdout_lines | default([]) | length == 0
+
+    - name: Check disk size
+      shell:
+        cmd: |
+          df -B 1 --output=avail "{{ disk_paths.stdout_lines | join('" "') }}" | tail -n +2
+        executable: /bin/bash
+      register: disk_avail
+
+    - fail:
+        msg: "disk available {{ ((item.0|int) / 1000000000)|int }}GB under {{ item.1 }} is less than {{ label_name_items[4] }}GB."
+      when: (item.0|int) < ((label_name_items[4]|int)*1000000000)
+      loop: "{{ disk_avail.stdout_lines | zip(disk_paths.stdout_lines) }}"
+        
+  when: ('=required' in label_name)
+  vars:
+    label_name_items: "{{ label_name | split('=') | first | split('-') }}"
+    disk_path_items: "{% if (label_name | split('=') | first | split('-') | length)==5 %}{% if (wl_logs_dir+'/kubernetes-config.yaml') is exists %}{{ 'var/lib/kubelet' | split('/') }}{% elif ((wl_logs_dir+'/compose-config.yaml') is exists) or (((wl_logs_dir+'/docker-config.yaml') is exists) and (not (native|default(false)|bool))) %}{{ 'var/lib/docker' | split('/') }}{% else %}{{ 'tmp' | split('/') }}{% endif %}{% else %}{{ label_name_items[5:] }}{% endif %}"
+

@@ -1,0 +1,68 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Create directory
+  file:
+    path: "{{ WORKSPACE }}"
+    state: directory
+
+- name: Update APT cache
+  apt: 
+    update_cache: yes
+
+- name: Install additional development packages on ubuntu
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - findutils
+    - wget
+    - build-essential
+    - make
+    - ruby
+    - autoconf
+    - automake
+    - pkgconf
+    - zip
+    - unzip
+    - numactl
+    - procps
+    - netcat-openbsd
+    - kmod
+    - iproute2
+    - sudo
+  register: pkg_install_result
+  become: true
+
+- name: Install development libraries on ubuntu
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - zlib1g-dev
+    - libpcre3
+    - libpcre3-dev
+    - libevent-dev
+    - libssl-dev
+    - openssl
+    - libtool
+  register: lib_install_result
+  become: true
+
+- name: install list
+  shell:
+      cd "{{ WORKSPACE }}" && touch install_list
+      
+- name: Record pkg install list
+  shell:
+      cd "{{ WORKSPACE }}" && echo "{{ item.item }}" >> install_list 
+  loop: "{{ pkg_install_result.results }}" 
+  when: "{{ item.changed }}"
+
+- name: Record lib install list
+  shell:
+      cd "{{ WORKSPACE }}" && echo "{{ item.item }}" >> install_list
+  loop: "{{ lib_install_result.results }}" 
+  when: "{{ item.changed }}"

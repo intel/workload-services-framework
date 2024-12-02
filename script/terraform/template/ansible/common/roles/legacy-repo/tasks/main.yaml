@@ -1,0 +1,18 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Remove debian k8s entries
+  include_tasks:
+    file: remove-debian.yaml
+  vars:
+    conflict_repos: "{{ k8s_legacy_repos.deb }}"
+
+- name: Remove centos k8s entries
+  include_tasks:
+    file: remove-centos.yaml
+  vars:
+    conflict_repos: "{{ k8s_legacy_repos.yum }}"
+

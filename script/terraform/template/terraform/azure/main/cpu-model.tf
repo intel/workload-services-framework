@@ -10,13 +10,16 @@ data "external" "cpu_model" {
       if v.cpu_model_regex != null
   }
 
-  program = contains(keys(azurerm_linux_virtual_machine.default), each.key)?[
+  program = fileexists("${path.root}/cleanup.logs")?[
+    "printf",
+    "{\"cpu_model\":\":\"}"
+  ]:contains(keys(azurerm_linux_virtual_machine.default), each.key)?[
     "timeout",
     var.cpu_model_timeout,
-    "${path.module}/templates/get-cpu-model.sh",
-    "-i",
-    "${path.root}/${var.ssh_pri_key_file}",
-    "${local.os_image_user[each.value.os_type]}@${azurerm_public_ip.default[each.key].ip_address}"
+    "${path.module}/templates/get-cpu-model.sh", 
+    "-i", 
+    "${path.root}/${var.ssh_pri_key_file}", 
+    "${local.os_image_user[each.value.os_type]}@${azurerm_public_ip.default[each.key].ip_address}" 
   ]:[
     "timeout",
     var.cpu_model_timeout,
@@ -34,3 +37,4 @@ data "external" "cpu_model" {
     azurerm_virtual_machine_extension.setup
   ]
 }
+

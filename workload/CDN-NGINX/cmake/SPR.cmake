@@ -10,6 +10,6 @@ if(NOT BACKEND STREQUAL "docker")
   add_workload("cdn_nginx_qathw")
   foreach(media "vod" "live")
     add_testcase(${workload}_${media}_https_async "${media}" "https_async")
-  endforeach()
+  endforeach() 
 
 endif()

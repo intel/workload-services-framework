@@ -1,0 +1,19 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Install HammerDB on windows client 
+  include_tasks:
+    file: "install-win.yaml"
+  when: wl_tunables.HOSTOS_VER in ['windows2016','windows2019']
+
+- name: Install HammerDB on Centos client 
+  include_tasks:
+    file: "install-centos.yaml"
+  when: wl_tunables.HOSTOS_VER in ['centos7', 'centos9']
+
+- name: Install HammerDB on Ubuntu client 
+  include_tasks:
+    file: "install-ubuntu.yaml"
+  when: wl_tunables.HOSTOS_VER in ['ubuntu2204', 'ubuntu2004']

@@ -7,3 +7,5 @@
 k8s_pod_cidr: "10.244.0.0/16"
 k8s_service_cidr: "10.96.0.0/12"
 k8s_apiserver_cluster_ip: "10.96.0.1"
+sut_update_proxy: false
+

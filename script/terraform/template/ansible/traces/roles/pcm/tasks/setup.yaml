@@ -1,0 +1,38 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Modprobe msr
+    modprobe:
+      name: msr
+      state: present
+
+  - name: "Remove any existing {{ pcm_action }}"
+    command: |
+      killall {{ pcm_action }}
+    ignore_errors: true
+
+  delegate_to: "{{ trace_node.1 }}"
+
+- set_fact:
+    trace_module_start_block: |
+        mkdir -p roi-$roi
+        cd roi-$roi
+        {% if pcm_action == 'pcm-sensor-server' %}
+        nohup bash -c '{{ pcm_sensor_server_envs }} /usr/local/sbin/pcm-sensor-server {{ pcm_sensor_server_options }} -p {{ pcm_sensor_server_port }} -d >> pcm.logs 2>&1; while true; do sleep 1s; curl -H "Accept: application/json" http://localhost:{{ pcm_sensor_server_port }}{{ pcm_sensor_server_path }} >> records.mjson; done' > /dev/null 2>&1 &
+        {% elif pcm_action == 'pcm-power' %}
+        nohup bash -c 'PCM_IGNORE_ARCH_PERFMON=1 /usr/local/sbin/pcm-power {{ pcm_power_options }} > power.records' > power.logs 2>&1 &
+        {% endif %}
+        echo $! > ../pcm.pid
+        disown
+    trace_module_stop_block: |
+        kill $(cat pcm.pid)
+        {% if pcm_action == 'pcm-sensor-server' %}
+        kill $(lsof -t -i 4TCP:{{ pcm_sensor_server_port }})
+        {% endif %}
+        tail -f --pid=$(cat pcm.pid) /dev/null
+  

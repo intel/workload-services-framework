@@ -4,18 +4,26 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- hosts: localhost
+- hosts: all
   connection: local
   become: yes
   gather_facts: no
   tasks:
+
+    - name: remove legacy Kubernetes entries
+      include_role:
+        name: legacy-repo
+
+    - name: check for essentials
+      include_role:
+        name: check
 
     - name: Check Intel certificate exists
       stat:
         path: "{{ playbook_dir }}/roles/intel-ca"
       register: intelca
 
-    - name: Intall Intel Certificate
+    - name: Install Intel Certificate
       include_role:
         name: intel-ca
       when: intelca.stat.exists
@@ -27,6 +35,12 @@
     - name: Install docker
       include_role:
         name: docker
+      vars:
+        wl_namespace: install-docker
+
+    - name: Install dataset prerequisite
+      include_role:
+        name: dataset
 
     - name: ctest alias
       include_role:

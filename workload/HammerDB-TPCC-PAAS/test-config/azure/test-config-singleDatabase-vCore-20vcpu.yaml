@@ -1,0 +1,10 @@
+# test-config-cloud.yaml
+# Overwrite the test cases for performance tunning on Cloud instances.
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+*:
+    SINGLE_DATABASES_SKU_NAME: BC_Gen5_20
+    ELASTIC_POOL_ENABLED: false

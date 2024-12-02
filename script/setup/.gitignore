@@ -1,3 +1,4 @@
 cluster-info.json
 timing.yaml
 *.logs
+*.retry

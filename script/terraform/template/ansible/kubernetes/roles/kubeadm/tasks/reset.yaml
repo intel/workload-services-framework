@@ -37,6 +37,8 @@
   include_role:
     name: containerd
     tasks_from: restart
+  vars:
+    containerd_restart_required: [true]
 
 - name: remove cpumanager, topologymanager, memorymanager states
   file:

@@ -6,21 +6,26 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 ARG RELEASE
-FROM terraform-static${RELEASE}
+FROM terraform-csp-base${RELEASE}
 
-# Install AZure CLI
-ARG AZURE_CLI_VER=2.51.0-1
-ARG AZURE_CLI_REPO=https://packages.microsoft.com
-RUN apt-get update && apt-get install -y ca-certificates curl apt-transport-https gnupg && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-RUN curl -sL ${AZURE_CLI_REPO}/keys/microsoft.asc | \
-    gpg --dearmor > /etc/apt/trusted.gpg.d/microsoft.gpg && \
-    echo "deb [arch=amd64] ${AZURE_CLI_REPO}/repos/azure-cli/ $(. /etc/os-release; echo $VERSION_CODENAME) main" > /etc/apt/sources.list.d/azure-cli.list && \
-    apt-get update && \
-    apt-get install -y azure-cli=${AZURE_CLI_VER}~* && \
-    rm -f /etc/apt/sources.list.d/azure-cli.list && \
-    apt-get clean && \
+ARG AZURE_CLI_VER=2.60.0
+ARG AZURE_CLI_PKG=https://github.com/Azure/azure-cli/archive/refs/tags/azure-cli-${AZURE_CLI_VER}.tar.gz
+RUN apt-get update && apt-get install -y --no-install-recommends python3-pip python3-distutils-extra pipx python3-colorama && \
+    curl -L ${AZURE_CLI_PKG} -o - | tar xvfz - && \
+    cd azure-cli-azure-cli-${AZURE_CLI_VER}/src/azure-cli && \
+    PIPX_HOME=/opt/pipxhome PIPX_BIN_DIR=/usr/local/bin PIPX_MAN_DIR=/opt/pipxman pipx install --include-deps --system-site-packages --pip-args . azure-cli && \
+    rm -rf /azure-cli-azure-cli-${AZURE_CLI_VER} /opt/pipxman && \
+    apt-get purge -y python3-pip pipx && \
+    apt-get autoremove -y && apt-get clean -y && \
     rm -rf /var/lib/apt/lists/*
 
 # Add cleanup script
-RUN echo "alias cleanup=/opt/csp/script/cleanup-azure.sh" >> /etc/bash.bashrc
+RUN ln -s /opt/project/script/csp/opt/script/cleanup-azure.sh /usr/local/bin/cleanup && \
+    ln -s /opt/project/script/csp/opt/script/cleanup-common.sh /usr/local/bin/cleanup-common.sh
+
+# Preload terraform plugins
+RUN mkdir -p /usr/local/share/terraform/plugins; \
+    for dir in /opt/terraform/template/terraform/azure/*; do \
+      (cd $dir; terraform providers mirror /usr/local/share/terraform/plugins) \
+    done
+

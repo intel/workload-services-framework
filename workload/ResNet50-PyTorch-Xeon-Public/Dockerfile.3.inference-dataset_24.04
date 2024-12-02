@@ -1,0 +1,32 @@
+# resnet50-pytorch-inference-dataset-24.04
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER="24.04"
+ARG OS_IMAGE="ubuntu"
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt -o Acquire::Check-Date=false update && \
+    apt install -y wget
+
+ARG INFERENCE_DATASET_TAR="ILSVRC2012_img_val.tar"
+ARG INFERENCE_DATASET_VER="2012"
+ARG INFERENCE_DATASET_REPO="https://image-net.org/data/ILSVRC/2012/ILSVRC2012_img_val.tar"
+
+# Download dataset 
+RUN mkdir -p /dataset/val
+RUN cd /dataset && \
+    wget ${INFERENCE_DATASET_REPO} && \
+    tar xvf ${INFERENCE_DATASET_TAR} -C /dataset/val && \
+    rm ${INFERENCE_DATASET_TAR}
+
+# Use shell script to process the Inference dataset.
+RUN cd /dataset/val && \
+    wget https://raw.githubusercontent.com/soumith/imagenetloader.torch/master/valprep.sh && \
+    bash valprep.sh

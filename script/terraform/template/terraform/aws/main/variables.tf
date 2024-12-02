@@ -107,3 +107,14 @@ variable "cpu_model_timeout" {
   type = string
   default = "10m"
 }
+
+variable "winrm_port" {
+  type = number
+  default = 5986
+}
+
+variable "winrm_timeout" {
+  type = number
+  default = 60
+}
+

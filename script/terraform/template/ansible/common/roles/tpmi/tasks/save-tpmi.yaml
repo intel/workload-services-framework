@@ -1,0 +1,38 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Run the pcm-tpmi command to determine I/O and compute dies
+  shell:
+    cmd: |
+      /usr/local/sbin/pcm-tpmi 2 0x10 -d -b 26:26
+    executable: /bin/bash
+  register: tpmi_rc
+  become: true
+
+- name: Fail if platform not support tpmi
+  fail:
+    msg: "Failed to determine I/O and compute dies"
+  when: tpmi_rc.stderr_lines | length > 0   # tpmi_rc.rc is 0 even if pcm-tpmi execution fail
+
+- block:
+  - name: Get die 0 Uncore Compute
+    shell: "/usr/local/sbin/pcm-tpmi 2 0x18 -d -e 0 -b 28:22"
+    register: pcm_tpmi_output
+    become: true
+
+  - name: Save to file
+    copy:
+      content: |
+        {% set extracted_values = pcm_tpmi_output.stdout | regex_findall('value (\\d+)', multiline=True) %}
+        {%- if extracted_values -%}
+          {%- set extracted_value = extracted_values[0] | int -%}
+          {{- 'default' if extracted_value == 12 else ('latency-optimized-mode' if extracted_value == 0 else 'unknown') -}}
+        {%- else -%}
+          error: no value found
+        {%- endif -%}
+      dest: "{{ wl_logs_dir }}/{{ inventory_hostname }}-tpmi/tpmi"
+    delegate_to: localhost
+
+  when: tpmi_rc.stderr_lines | length == 0

@@ -4,25 +4,39 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: get workload_config
-  set_fact:
-    workload_config: "{{ lookup('file',wl_logs_dir+'/workload-config.yaml') | from_yaml }}"
-
 - name: get benchmark pods
-  shell: "kubectl get --namespace={{ wl_namespace }} pod --selector={{ workload_config.job_filter.split(',')[0] }} '-o=jsonpath={.items[*].metadata.name}' | tr ' ' '\n'"
+  shell:
+    cmd: |
+      kubectl get --namespace={{ wl_namespace }} pod --selector={{ workload_config.job_filter | split(',') | first | split(':') | first }} '-o=jsonpath={.items[*].metadata.name}' | tr ' ' '\n'
+    executable: /bin/bash
   register: pods
+
+- name: get trace pods
+  shell:
+    cmd: |
+      kubectl get --namespace={{ wl_namespace }} pod "-o=jsonpath={.items[?(@.spec.nodeName in ['{{ groups.trace_hosts | join(sep) }}'])].metadata.name}"
+    executable: /bin/bash
+  register: trace_pods
+  when: wl_trace_modules | default('') | split(',') | reject('==','') | reject('match','.*:host.*') | length > 0
+  vars:
+    sep: "','"
+
+- set_fact:
+    WORKLOAD_PROCESSES: "kubernetes:{{ trace_pods.stdout }}"
+  when: wl_trace_modules | default('') | split(',') | reject('==','') | reject('match','.*:host.*') | length > 0
 
 - name: waitproc to wait for logs complete
   shell:
     cmd: |
-      nohup bash -c "timeout {{ timeout }}s bash -c \"{% for pod in pods.stdout_lines %}kubectl exec --namespace={{ wl_namespace }} {{ pod }} -c {{ pod_container }} -- sh -c 'cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-{{ pod }}-{{ itr }}-logs.tar; tar tf /tmp/{{ wl_namespace }}-{{ pod }}-{{ itr }}-logs.tar || tar cf /tmp/{{ wl_namespace }}-{{ pod }}-{{ itr }}-logs.tar \\\$(cat /tmp/{{ wl_namespace }}-{{ pod }}-{{ itr }}-logs.tar)'; {% endfor %}\"; echo \$? > /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-waitproc.status" > /dev/null 2>&1 &
+      nohup bash -c "timeout {{ timeout }}s bash -c \"{% if (k8s_detect_pod_failure|bool) %}kubectl --namespace={{ wl_namespace }} wait pod --all --for=condition=Failed --timeout={{ timeout | int+300 }}s & kubectl --namespace={{ wl_namespace }} wait pod --all --for=condition=Error --timeout={{ timeout | int+300 }}s & {% endif %}({% for pod in pods.stdout_lines %}kubectl exec --namespace={{ wl_namespace }} {{ pod }} -c {{ pod_container }} -- sh -c 'cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-{{ pod }}-{{ itr }}-logs.tar; tar tf /tmp/{{ wl_namespace }}-{{ pod }}-{{ itr }}-logs.tar || tar cf /tmp/{{ wl_namespace }}-{{ pod }}-{{ itr }}-logs.tar \\\$(cat /tmp/{{ wl_namespace }}-{{ pod }}-{{ itr }}-logs.tar)'; {% endfor %})& wait -n\"; echo \$? > /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-waitproc.status" > /dev/null 2>&1 &
       echo $!
       disown
     executable: /bin/bash
   register: waitproc
   vars:
     pods_str: "{{ pods.stdout_lines | join(' ') }}"
-    pod_container: "{{ workload_config.job_filter.split(',')[0].split('=')[1] | default(workload_config.job_filter.split(',')[0].split('=')[0]) }}"
+    pod_container_tmp: "{{ workload_config.job_filter.split(',')[0].split('=')[1] | default(workload_config.job_filter.split(',')[0].split('=')[0]) }}"
+    pod_container: "{{ pod_container_tmp.split(':')[1] | default(pod_container_tmp.split(':')[0]) }}"
     timeout: "{{ workload_config.timeout.split(',') | first }}"
 
 - name: invoke the trace procedure
@@ -30,13 +44,16 @@
     name: trace
   vars:
     trace_waitproc_pid: "{{ waitproc.stdout }}"
-    trace_logs_scripts: "{{ pods.stdout_lines | map('regex_replace', '^(.*)$', 'kubectl logs --ignore-errors --prefix=false --tail=-1 --namespace=' + wl_namespace + ' \\1 -c ' + (workload_config.job_filter.split(',')[0].split('=')[1] | default(workload_config.job_filter.split(',')[0].split('=')[0]))) }}"
+    pod_container_tmp: "{{ workload_config.job_filter.split(',')[0].split('=')[1] | default(workload_config.job_filter.split(',')[0].split('=')[0]) }}"
+    pod_container: "{{ pod_container_tmp.split(':')[1] | default(pod_container_tmp.split(':')[0]) }}"
+    trace_logs_scripts: "{{ pods.stdout_lines | map('regex_replace', '^(.*)$', 'kubectl logs --ignore-errors --prefix=false --tail=-1 --namespace=' + wl_namespace + ' \\1 -c ' + pod_container) }}"
     trace_logs_host: "{{ inventory_hostname }}"
-
+    trace_status_file: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-waitproc.status"
+    
 - name: retrieve execution logs
   shell: 
     cmd: |
-      kubectl exec --namespace={{ wl_namespace }} {{ item }} -c {{ workload_config.job_filter.split(',')[0].split('=')[1] | default(workload_config.job_filter.split(',')[0].split('=')[0]) }} -- sh -c 'cat /tmp/{{ wl_namespace }}-{{ item }}-{{ itr }}-logs.tar' > /tmp/{{ wl_namespace }}-{{ item }}-{{ itr }}-logs.tar && tar tf /tmp/{{ wl_namespace }}-{{ item }}-{{ itr }}-logs.tar > /dev/null
+      kubectl exec --namespace={{ wl_namespace }} {{ item }} -c {{ pod_container }} -- sh -c 'cat /tmp/{{ wl_namespace }}-{{ item }}-{{ itr }}-logs.tar' > /tmp/{{ wl_namespace }}-{{ item }}-{{ itr }}-logs.tar && tar tf /tmp/{{ wl_namespace }}-{{ item }}-{{ itr }}-logs.tar > /dev/null
     executable: /bin/bash
   register: status
   until: status.rc == 0
@@ -44,9 +61,12 @@
   delay: 5
   with_items: "{{ pods.stdout_lines }}"
   ignore_errors: yes
+  vars:
+    pod_container_tmp: "{{ workload_config.job_filter.split(',')[0].split('=')[1] | default(workload_config.job_filter.split(',')[0].split('=')[0]) }}"
+    pod_container: "{{ pod_container_tmp.split(':')[1] | default(pod_container_tmp.split(':')[0]) }}"
 
 - name: get service pods
-  shell: "kubectl get --namespace={{ wl_namespace }} pod --selector={{ item }} '-o=jsonpath={.items[*].metadata.name}' | tr ' ' '\n'"
+  shell: "kubectl get --namespace={{ wl_namespace }} pod --selector={{ item | split(':') | first }} '-o=jsonpath={.items[*].metadata.name}' | tr ' ' '\n'"
   register: services
   loop: "{{ workload_config.job_filter.split(',')[1:] }}"
 
@@ -54,10 +74,10 @@
   shell:
     cmd: |
       for pod in {{ item.stdout_lines | difference(pods.stdout_lines) | join(' ') }}; do
-        (
-          kubectl exec --namespace={{ wl_namespace }} $pod -c {{ item.item.split('=')[1] | default(item.item.split('=')[0]) }} -- sh -c "cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar; tar tf /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar || tar cf /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar \$(cat /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar)"
+        ( 
+          kubectl exec --namespace={{ wl_namespace }} $pod -c {{ (item.item.split('=')[1] | default(item.item.split('=')[0])).split(':')[1] | default((item.item.split('=')[1] | default(item.item.split('=')[0])).split(':')[0]) }} -- sh -c "cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar; tar tf /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar || tar cf /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar \$(cat /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar)"
           for retries in 1 2 3 4 5; do
-            kubectl exec --namespace={{ wl_namespace }} $pod -c {{ item.item.split('=')[1] | default(item.item.split('=')[0]) }} -- sh -c "cat /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar" > /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar && tar tf /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar && break
+            kubectl exec --namespace={{ wl_namespace }} $pod -c {{ (item.item.split('=')[1] | default(item.item.split('=')[0])).split(':')[1] | default((item.item.split('=')[1] | default(item.item.split('=')[0])).split(':')[0]) }} -- sh -c "cat /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar" > /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar && tar tf /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar && break
             sleep 5s
           done
         )&

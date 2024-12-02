@@ -6,7 +6,6 @@
 #
 
 TERRAFORM_CONFIG="${TERRAFORM_CONFIG:-$LOGSDIRH/terraform-config.tf}"
-LOGSTARFILE="${LOGSTARFILE:-$LOGSDIRH/output.tar}"
 
 # add tags
 if [ -n "$WORKLOAD_TAGS" ]; then
@@ -26,29 +25,47 @@ _reconfigure_terraform () {
 }
 
 _reconfigure_reuse_sut () {
-    sutdir="$(echo $LOGSDIRH | sed 's|/[^/]*\(logs-[^/]*\)$|/sut-\1|')"
+    local sutdir="$(echo $LOGSDIRH | sed 's|/[^/]*\(logs-[^/]*\)$|/sut-\1|')"
     case "$CTESTSH_OPTIONS" in
     *"--prepare-sut"*)
+        if [ -r "$sutdir/tfplan.logs" ] && [ -r "$sutdir/.tfplan.json" ] && ! grep -q -E '^Destroy SUT resources...' "$sutdir/tfplan.logs" 2> /dev/null; then
+            echo -e "\033[31m${sutdir/*\//} already exists. Did you forget to --cleanup-sut the reuseable SUT?\033[0m"
+            exit 3
+        fi
+        rm -rf "$sutdir"
+        mv -f "$LOGSDIRH" "$sutdir"
+        cd "$sutdir"
         export CTESTSH_OPTIONS="${CTESTSH_OPTIONS/--prepare-sut/} --stage=provision --skip-app-status-check"
+        export LOGSDIRH="$sutdir"
+        export TERRAFORM_CONFIG="$LOGSDIRH/terraform-config.tf"
         ;;
     *"--reuse-sut"*)
+        if [ ! -r "$sutdir/tfplan.logs" ] || [ ! -r "$sutdir/.tfplan.json" ] || grep -q -E '^Destroy SUT resources...' "$sutdir"/tfplan.logs 2> /dev/null; then
+            echo -e "\033[31m${sutdir/*\//} does not exist or already destroyed. Did you forget to --prepare-sut a reusable SUT first?\033[0m"
+            exit 3
+        fi
         export CTESTSH_OPTIONS="${CTESTSH_OPTIONS/--reuse-sut/} --stage=validation"
-        cp -f "$sutdir"/ssh_access.key "$LOGSDIRH" 2> /dev/null || true
-        chmod 400 "$LOGSDIRH"/ssh_access.key 2> /dev/null || true
-        cp -f "$sutdir"/ssh_access.key.pub "$LOGSDIRH" 2> /dev/null || true
+        cp -f --preserve=mode "$sutdir"/ssh_access.key "$LOGSDIRH" 2> /dev/null || true
+        cp -f --preserve=mode "$sutdir"/ssh_access.key.pub "$LOGSDIRH" 2> /dev/null || true
         cp -f "$sutdir"/inventory.yaml "$LOGSDIRH"
         cp -f "$sutdir"/.inventory-*.yaml "$LOGSDIRH" 2> /dev/null || true
         cp -f "$sutdir"/.tfplan.json "$LOGSDIRH"
         cp -f "$sutdir"/tfplan.json "$LOGSDIRH" 2> /dev/null || true
-        cp -f "$sutdir"/ssh_config* "$LOGSDIRH" 2> /dev/null || true
+        cp -f --preserve=mode "$sutdir"/ssh_config* "$LOGSDIRH" 2> /dev/null || true
         cp -rf "$sutdir"/*-svrinfo "$LOGSDIRH" 2> /dev/null || true
         cp -rf "$sutdir"/*-msrinfo "$LOGSDIRH" 2> /dev/null || true
         ;;
     *"--cleanup-sut"*)
+        if [ ! -d "$sutdir" ]; then
+            echo -e "\033[31m${sutdir/*\//} does not exist. Did you forget to --prepare-sut a reusable SUT first?\033[0m"
+            exit 3
+        fi
         export CTESTSH_OPTIONS="${CTESTSH_OPTIONS/--cleanup-sut/} --stage=cleanup --skip-app-status-check"
         export LOGSDIRH="$sutdir"
-        cd "$LOGSDIRH"
         export TERRAFORM_CONFIG="$LOGSDIRH/terraform-config.tf"
+        cd "$LOGSDIRH"
+        # sut not ready if .tfplan.json does not exist
+        [ -r .tfplan.json ] || exit 0
         ;;
     esac
 }
@@ -56,7 +73,7 @@ _reconfigure_reuse_sut () {
 # args: <none>
 _invoke_terraform () {
     st_options=(
-        "--my_ip_list=$(ip -4 addr show scope global | sed -n '/^[0-9]*:.*state UP/,/^[0-9]*:/{/^ *inet /{s|.*inet \([0-9.]*\).*|\1|;p}}' | tr '\n' ',')"
+        "--my_ip_list=$(hostname -f),$(ip -4 addr show scope global | sed -n '/^[0-9]*:.*state UP/,/^[0-9]*:/{/^ *inet /{s|.*inet \([0-9.]*\).*|\1|;p}}' | tr '\n' ',')"
     )
     dk_options=(
         "--name" "$NAMESPACE"
@@ -65,16 +82,28 @@ _invoke_terraform () {
         "-e" STACK_TEMPLATE_PATH
         "--add-host" "host.docker.internal:host-gateway"
     )
-    if [ -r "$HOME/.netrc" ]; then
-        dk_options+=(
-            "-v" "$HOME/.netrc:/home/.netrc:ro"
-            "-v" "$HOME/.netrc:/root/.netrc:ro"
-        )
-        touch "$LOGSDIRH/.netrc"
-    fi
     csp="$(grep -E '^\s*csp\s*=' "$TERRAFORM_CONFIG" | cut -f2 -d'"' | tail -n1)"
-    if [[ " static kvm hyperv " != *" ${csp:-static} "* ]] && [ ! -e "$LOGSDIRH/ssh_config" ]; then
-        cp -f "$PROJECTROOT/script/csp/ssh_config" "$LOGSDIRH/ssh_config"
+    if [[ " static kvm hyperv " != *" ${csp:-static} "* ]] && [ ! -e "$LOGSDIRH/ssh_config_csp" ]; then
+        cat "$PROJECTROOT/script/csp/ssh_config" > "$LOGSDIRH/ssh_config_csp"
+        chmod 600 "$LOGSDIRH/ssh_config_csp"
+    fi
+    if [ "static" = "${csp:-static}" ] && [ -d "$HOME/.kube" ]; then
+        kubeconfig_path="$(readlink -e "$HOME/.kube")"
+        dk_options+=(
+            "-v" "$kubeconfig_path:/home/.kube"
+            "-v" "$kubeconfig_path:/root/.kube"
+        )
+    fi
+    if [ "static" = "${csp:-static}" ]; then
+        worker_ip="$(sed -n '/^ *variable *"worker_profile" *{/,/}/{/"public_ip"/{p;q}}' "$TERRAFORM_CONFIG" | cut -f4 -d'"')"
+        if [ "$worker_ip" = "127.0.0.1" ]; then
+            dk_options+=(--privileged)
+            if [ -d /opt/dataset ]; then
+                dk_options+=(
+                    "-v" "/opt/dataset:/opt/dataset"
+                )
+            fi
+        fi
     fi
     if [[ "$CTESTSH_OPTIONS " != *"--nodockerconf "* ]]; then
         if [ -n "$REGISTRY" ]; then
@@ -124,22 +153,23 @@ _invoke_terraform () {
         fi
     fi
     (
-        echo "TERRAFORM_OPTIONS=${TERRAFORM_OPTIONS} ${st_options[@]} ${CTESTSH_OPTIONS}"
-        [[ "$TERRAFORM_OPTIONS $CTESTSH_OPTIONS " = *"--dry-run "* ]] && [[ "$TERRAFORM_OPTIONS $CTESTSH_OPTIONS " != *"--check-docker-image "* ]] && [[ "$TERRAFORM_OPTIONS$CTESTSH_OPTIONS" != *"--push-docker-image="* ]] && exit 0
+        [[ "$TERRAFORM_OPTIONS $CTESTSH_OPTIONS " =~ .*--(check[-]docker[-]image|push[-]docker[-]image=|inspect[-]docker[-]image=).* ]] || [[ "$TERRAFORM_OPTIONS $CTESTSH_OPTIONS " != *"--dry-run "* ]] || exit 0
         . "$PROJECTROOT"/script/csp/opt/script/save-region.sh $csp \
             "$(sed -n '/^\s*variable\s*"zone"\s*{/,/^\s*}/{/^\s*default\s*=\s*/p}' "$TERRAFORM_CONFIG" | cut -f2 -d'"')" \
             "$(sed -n '/^\s*variable\s*"\(resource_group_id\|compartment\)"\s*{/,/^\s*}/{/^\s*default\s*=\s*/p}' "$TERRAFORM_CONFIG" | cut -f2 -d'"')" \
-            "$(sed -n '/^\s*variable\s*"zone"\s*{/,/^\s*}/{/^\s*default\s*=\s*/p}' "${TERRAFORM_CONFIG_TF:-$TERRAFORM_CONFIG_IN}" | cut -f2 -d'"')" \
-            "$(sed -n '/^\s*variable\s*"\(resource_group_id\|compartment\)"\s*{/,/^\s*}/{/^\s*default\s*=\s*/p}' "${TERRAFORM_CONFIG_TF:-$TERRAFORM_CONFIG_IN}" | cut -f2 -d'"')"
+            "$(sed -n '/^\s*variable\s*"zone"\s*{/,/^\s*}/{/^\s*default\s*=\s*/p}' "${TERRAFORM_CONFIG_IN:-$PROJECTROOT/script/terraform/terraform-config.$TERRAFORM_SUT.tf}" | cut -f2 -d'"')" \
+            "$(sed -n '/^\s*variable\s*"\(resource_group_id\|compartment\)"\s*{/,/^\s*}/{/^\s*default\s*=\s*/p}' "${TERRAFORM_CONFIG_IN:-$PROJECTROOT/script/terraform/terraform-config.$TERRAFORM_SUT.tf}" | cut -f2 -d'"')"
         "$PROJECTROOT"/script/terraform/shell.sh ${csp:-static} "${dk_options[@]}" -- /opt/terraform/script/start.sh ${TERRAFORM_OPTIONS} "${st_options[@]}" ${CTESTSH_OPTIONS} --owner=$OWNER
     )
 }
 
-if [[ "$TERRAFORM_OPTIONS $CTESTSH_OPTIONS " = *"--native "* ]] && [ -n "$DOCKER_IMAGE" ]; then
-    nctrs=0
-elif [[ "$TERRAFORM_OPTIONS $CTESTSH_OPTIONS " = *"--docker "* ]] && [ -n "$DOCKER_IMAGE" ]; then
+if [[ "$TERRAFORM_OPTIONS $CTESTSH_OPTIONS " = *"--kubernetes "* ]] && rebuild_kubernetes_config; then
+    nctrs=1
+elif [[ "$TERRAFORM_OPTIONS $CTESTSH_OPTIONS " = *"--native "* ]] && rebuild_docker_config; then
     nctrs=0
 elif [[ "$TERRAFORM_OPTIONS $CTESTSH_OPTIONS " = *"--compose "* ]] && rebuild_compose_config; then
+    nctrs=0
+elif [[ "$TERRAFORM_OPTIONS $CTESTSH_OPTIONS " = *"--docker "* ]] && rebuild_docker_config; then
     nctrs=0
 elif rebuild_kubernetes_config; then
     nctrs=1

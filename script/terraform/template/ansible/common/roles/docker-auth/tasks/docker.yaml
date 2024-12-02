@@ -1,0 +1,38 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+- name: Find Home path
+  ansible.builtin.shell:
+    cmd: "echo $HOME"
+    executable: /bin/bash
+  register: home
+  failed_when: false
+  become: false
+
+- name: Create docker auth path
+  ansible.builtin.file:
+    path: "{{ home.stdout }}/{{ docker_auth_config_json | dirname }}"
+    mode: "0700"
+    state: directory
+  failed_when: false
+  become: false
+
+- name: Preserve existing configuration
+  shell:
+    cmd: |
+      mv -f "{{ home.stdout }}/{{ docker_auth_config_json }}" "{{ home.stdout }}/{{ docker_auth_config_json }}.wsfbackup" 2> /dev/null || true
+    executable: /bin/bash
+  failed_when: false
+  become: false
+
+- name: Copy docker auth
+  ansible.builtin.copy:
+    src: "/home/{{ docker_auth_config_json }}"
+    dest: "{{ home.stdout }}/{{ docker_auth_config_json }}"
+    mode: preserve
+    owner: "{{ ansible_user }}"
+  failed_when: false
+  become: false

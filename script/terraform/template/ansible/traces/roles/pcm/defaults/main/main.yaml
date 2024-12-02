@@ -1,0 +1,18 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+pcm: false
+pcm_action: pcm-power
+pcm_reset: false
+
+pcm_sensor_server_options: ""
+pcm_sensor_server_port: 12666
+pcm_sensor_server_envs: ""
+pcm_sensor_server_path: "/"
+
+pcm_power_options: "1"
+
+

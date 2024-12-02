@@ -1,0 +1,14 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: "Download progress {{ item }}%"
+  shell:
+    cmd: |
+      while kill -0 {{ download_process.stdout }}; do
+        [ "$(awk -v RS='\r' '{p=$1}END{print p*1}' /tmp/{{ wl_namespace }}-dataset-progress.logs)" -lt "{{ item }}" ] || break
+        sleep 1s
+      done
+    executable: /bin/bash
+  no_log: true

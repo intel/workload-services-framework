@@ -1,0 +1,29 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Check helm existance
+  command: helm version
+  register: helm
+  ignore_errors: true
+
+- name: uname -m
+  command: uname -m
+  register: uname_m
+  when: helm.rc != 0
+
+- name: Install helm
+  unarchive:
+    src: "{{ helm_repository }}/helm-{{ helm_version }}-linux-{{ arch }}.tar.gz"
+    remote_src: true
+    dest: "/usr/local/bin/"
+    include: "linux-{{ arch }}/helm"
+    extra_opts: "--strip-components=1"
+    mode: "a+rx"
+  when: helm.rc != 0
+  become: true
+  vars:
+    arch: "{{ (uname_m.stdout=='aarch64') | ternary('arm64','amd64') }}"
+

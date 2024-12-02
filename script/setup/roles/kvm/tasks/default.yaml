@@ -1,0 +1,35 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: create the default network definition
+  shell:
+    cmd: |
+      virsh net-list --all | grep -q -F ' {{ kvm_default_name }} '
+    executable: /bin/bash
+  register: default_network
+  ignore_errors: true
+
+- name: Create the default network definition
+  template:
+    src: default.xml.j2
+    dest: /tmp/kvm-default.xml
+  when: default_network.rc != 0
+
+- name: Define the default network
+  shell:
+    cmd: |
+      virsh net-define --file /tmp/kvm-default.xml
+    executable: /bin/bash
+  when: default_network.rc != 0
+
+- name: activate the default network
+  shell:
+    cmd: |
+      virsh net-list | grep -q -F ' {{ kvm_default_name }} ' || virsh net-start {{ kvm_default_name }}
+      virsh net-autostart --network {{ kvm_default_name }}
+    executable: /bin/bash
+  ignore_errors: true
+

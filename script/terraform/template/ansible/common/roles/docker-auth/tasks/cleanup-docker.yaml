@@ -1,0 +1,24 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+---
+- name: 'Find Home path'
+  ansible.builtin.shell:
+    cmd: "echo $HOME"
+    executable: /bin/bash
+  register: home
+  failed_when: false
+  become: false
+
+- name: 'Restore docker auth'
+  shell:
+    cmd: |
+      rm -f "{{ home.stdout }}/{{ docker_auth_config_json }}"
+      [ ! -e "{{ home.stdout }}/{{ docker_auth_config_json }}.wsfbackup" ] || mv -f "{{ home.stdout }}/{{ docker_auth_config_json }}.wsfbackup" "{{ home.stdout }}/{{ docker_auth_config_json }}"
+    executable: /bin/bash
+  failed_when: false
+  become: false
+

@@ -1,0 +1,18 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Install sysstat
+  yum:
+    name: 
+      - sysstat
+    update_cache: true
+  become: yes
+  delegate_to: "{{ trace_node.1 }}"
+  register: yumrc
+  until: yumrc is success
+  retries: 10
+  delay: 10
+

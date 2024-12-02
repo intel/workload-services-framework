@@ -7,11 +7,20 @@
 - name: start the trace procedure
   block:
 
-    - name: start trace
+    - name: start global region trace
+      include_tasks:
+        file: start.yaml
+      when: wl_trace_modules | default('') | split(',') | select('match','.*:0.*') | length > 0
+      vars:
+        roi_index: 0
+
+    - name: start trace 
       include_tasks:
         file: trace-proc.yaml
-      when: wl_trace_modules | default('') | split(',') | reject('==','') | length > 0
-      loop: "{{ workload_config.trace_mode | split(',') | slice([((workload_config.trace_mode | split(',') | length)/3)|int,1] | max) }}"
+      when: 
+      - roi_index > 0
+      - wl_trace_modules | default('') | split(',') | reject('==','') | reject('match','.*:0.*') | length > 0
+      loop: "{{ ['roi'] + (workload_config.trace_mode | split(',') | slice([((workload_config.trace_mode | split(',') | length)/3)|int,1] | max)) }}"
       loop_control:
         loop_var: roi_region
         index_var: roi_index
@@ -62,15 +71,21 @@
     - name: revoke trace
       include_tasks:
         file: stop.yaml
-      when: wl_trace_modules | default('') | split(',') | reject('==','') | length > 0
+      when:
+      - wl_trace_modules | default('') | split(',') | reject('==','') | reject('match','.*:0.*') | length > 0
       vars:
-        roi_index: "{{ [(((workload_config.trace_mode | split(',') | length) / 3) | int) - 1, 0] | max }}"
+        roi_index: "{{ [(((workload_config.trace_mode | split(',') | length) / 3) | int) - 1, 0] | max | int+1 }}"
+
+    - name: revoke global region trace
+      include_tasks:
+        file: stop.yaml
+      when: wl_trace_modules | default('') | split(',') | select('match', '.*:0.*') | length > 0
+      vars:
+        roi_index: 0
 
     - name: retrieve waitproc status
       include_tasks:
         file: "trace-status{{ win_suffix }}.yaml"
 
   vars:
-
-    workload_config: "{{ lookup('file',wl_logs_dir+'/workload-config.yaml') | from_yaml }}"
     win_suffix: "{{ ((hostvars[trace_logs_host|default(inventory_hostname)].ansible_connection|default('ssh'))=='winrm')|ternary('-win','') }}"

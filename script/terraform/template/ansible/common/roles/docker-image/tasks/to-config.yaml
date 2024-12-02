@@ -1,0 +1,37 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+    - name: inspect local images
+      command: "docker image inspect {{ item.key }}"
+      register: inspect_l
+      with_dict: "{{ wl_docker_images }}"
+      become: true
+      no_log: true
+
+    - name: inspect remote images
+      command: "skopeo inspect {{ skopeo_inspect_options }} --tls-verify={{ ((item.item.value|bool) and (item.item.key is not match('^'+(skopeo_insecure_registries|split(',')|reject('==','')|default(['NO-REGISTRY'],true)|join('|'))+'.*$'))) | ternary('true','false') }} docker://{{ item.item.key }}"
+      register: inspect_r
+      become: true
+      when: item.rc != 0
+      loop: "{{ inspect_l.results }}"
+      no_log: true
+
+    - name: append build_commit_id and build_branch to workload-config.yaml
+      blockinfile:
+        path: "{{ wl_logs_dir }}/workload-config.yaml"
+        marker: "# {mark} BUILD CONFIG"
+        content: |
+          build_commit_id: "{{ image_labels | selectattr('key', '==', 'BUILD_COMMIT_ID') | map(attribute='value') | unique | join(',') }}"
+          build_branch: "{{ image_labels | selectattr('key', '==', 'BUILD_BRANCH') | map(attribute='value') | unique | join(',') }}"
+          build_id: "{{ image_labels | selectattr('key', '==', 'BUILD_ID') | map(attribute='value') | unique | join(',') }}"
+      become: false
+      vars:
+        image_labels: "{{ inspect_l.results | map(attribute='stdout') | map('from_json') | flatten | map(attribute='Config') | map('default',[],true) | map(attribute='Labels') | union(inspect_r.results | default([]) | map(attribute='stdout') | map('default','[]',true) | map('from_json') | flatten | map(attribute='Labels')) | map('default',{},true) | map('dict2items') | flatten }}"
+
+  delegate_to: localhost
+  ignore_errors: true

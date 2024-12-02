@@ -6,22 +6,23 @@
 
 - block:
 
-  - name: "Create start-trace.sh on {{ trace_host }}"
+  - name: "Create the local trace directory"
+    file:
+      path: "{{ trace_script_local_path }}"
+      state: directory
+
+  - name: "Copy trace scripts"
     template:
-      src: "start-trace.sh.j2"
-      dest: "/tmp/{{ wl_namespace }}-{{ trace_host }}-start-trace.sh"
+      src: "scripts/{{ item }}"
+      dest: "{{ trace_script_local_path }}/"
       mode: "a+rx"
+      force: false
+    loop:
+    - start-trace.sh
+    - stop-trace.sh
 
-  - name: "Create stop-trace.sh on {{ trace_host }}"
-    template:
-      src: "stop-trace.sh.j2"
-      dest: "/tmp/{{ wl_namespace }}-{{ trace_host }}-stop-trace.sh"
-      mode: "a+rx"
+  delegate_to: localhost
+  become: false
+  vars:
+    trace_script_local_path: "{{ trace_tmp_path }}/{{ wl_namespace }}-{{ trace_host }}-trace"
 
-  - name: set flag to prevent multiple installations
-    set_fact:
-      trace_script_installed: true
-    delegate_facts: true
-
-  when: not (hostvars[trace_host].trace_script_installed | default(false))
-  delegate_to: "{{ trace_host }}"

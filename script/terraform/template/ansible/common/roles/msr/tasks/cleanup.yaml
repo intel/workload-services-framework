@@ -1,0 +1,13 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Restore individual MSR setting
+  include_tasks:
+    file: cleanup-msr.yaml
+  when:
+  - sut_update_msr | bool
+  - restore_file is exists
+  vars:
+    restore_file: "{{ wl_logs_dir }}/{{ inventory_hostname }}-msrinfo/restore"

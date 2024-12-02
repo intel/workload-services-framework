@@ -1,0 +1,275 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Create Client Group
+  set_fact:
+    dynamic_hosts: "{{ ['worker-0'] if wl_tunables['RUN_SINGLE_NODE'] | bool else range(0, wl_tunables['CLIENT_COUNT']|int) | map('string') | map('regex_replace', '^(.*)$', 'client-\\1') | list }}"
+  delegate_to: localhost
+
+- name: Add Dynamic Hosts to Group
+  add_host:
+    name: "{{ item }}"
+    groups: dynamic_clients
+  loop: "{{ dynamic_hosts }}"
+  delegate_to: localhost
+
+- name: Set Redis Server Parameters
+  set_fact:
+    RPS_TUNE: "{{ wl_tunables['RPS_TUNE'] }}"
+    REDIS_VERSION: "7.0.5"
+    SERVER_IP: "{{ hostvars['worker-0']['private_ip'] }}"
+    RUN_SINGLE_NODE: "{{ wl_tunables['RUN_SINGLE_NODE'] }}"
+    REDIS_SERVER_NUMACTL_OPTIONS: "{{ wl_tunables['REDIS_SERVER_NUMACTL_OPTIONS'] }}"
+    REDIS_INSTANCE_NUMBER: "{{ wl_tunables['CPU_USED'] }}"
+    START_NUMA_NODE: "{{ wl_tunables['START_NUMA_NODE'] }}"
+    MEMTIER_CONFIG_CENTER_PORT: "{{ wl_tunables['CONFIG_CENTER_PORT'] }}"
+    MEMTIER_CONFIG_CENTER_IP: "{{ hostvars[dynamic_hosts[0]]['private_ip'] }}"
+    REDIS_NUMACTL_STRATEGY: "{{ wl_tunables['REDIS_NUMACTL_STRATEGY'] }}"
+    REDIS_SERVER_IO_THREADS: "{{ wl_tunables['REDIS_SERVER_IO_THREADS'] }}"
+    REDIS_SERVER_IO_THREADS_DO_READS: "{{ wl_tunables['REDIS_SERVER_IO_THREADS_DO_READS'] }}"
+    MEMTIER_DATA_SIZE: "{{ wl_tunables['MEMTIER_DATA_SIZE'] }}"
+    MEMTIER_REQUESTS: "{{ wl_tunables['MEMTIER_REQUESTS'] }}"
+    MEMTIER_KEY_MAXIMUM: "{{ wl_tunables['MEMTIER_KEY_MAXIMUM'] }}"
+    REDIS_PERSISTENCE_POLICY: "{{ wl_tunables['REDIS_PERSISTENCE_POLICY'] }}"
+    REDIS_APPENDFSYNC_MODE: "{{ wl_tunables['REDIS_APPENDFSYNC_MODE'] }}"
+    REDIS_RDB_SECONDS: "{{ wl_tunables['REDIS_RDB_SECONDS'] }}"
+    REDIS_RDB_CHANGES: "{{ wl_tunables['REDIS_RDB_CHANGES'] }}"
+    REDIS_SERVER_IO_THREADS_CPU_AFFINITY: "{{ wl_tunables['REDIS_SERVER_IO_THREADS_CPU_AFFINITY'] }}"
+    REDIS_EVICTION_POLICY: "{{ wl_tunables['REDIS_EVICTION_POLICY'] | string }}"
+    REDIS_NATIVE_TRANSPORT_PORT: "{{ wl_tunables['REDIS_NATIVE_TRANSPORT_PORT'] }}"
+    MULTI_SERVERIP_LIST: "{{ wl_tunables['MULTI_SERVERIP_LIST'] }}"
+    cacheable: yes
+  delegate_to: worker-0
+
+- name: Install Redis Configuration
+  template:
+    src: "redis_conf.conf.j2"
+    dest: "{{ WORKSPACE }}/redis_conf.conf"
+    mode: "0755"
+  delegate_to: worker-0
+
+- name: Install Template(s) of Redis
+  template:
+    src: "entrypoint_server.j2"
+    dest: "{{ WORKSPACE }}/entrypoint_server.sh"
+    mode: "0755"
+  delegate_to: worker-0
+
+- name: Install Template(s) of Memtier wait
+  template:
+    src: "wait_run_test_finish.j2"
+    dest: "{{ WORKSPACE }}/wait_run_test_finish.sh"
+    mode: "0755"
+  delegate_to: worker-0
+
+- name: Create trace log file
+  file:
+    path: "{{ WORKSPACE }}/entrypoint_server.log"
+    state: touch
+    mode: "0666"
+  delegate_to: worker-0
+
+- name: Running Template(s) of Redis
+  shell: "cd {{ WORKSPACE }}; ./entrypoint_server.sh > ./entrypoint_server.log"
+  register: server_results
+  become: true
+  delegate_to: worker-0
+  async: 3600
+  poll: 0
+
+- name: Set Memtier Parameters
+  set_fact:
+    REDIS_VERSION: "7.0.5"
+    RUN_SINGLE_NODE: "{{ wl_tunables['RUN_SINGLE_NODE'] }}"
+    MEMTIER_CLIENT_NUMACTL_OPTIONS: "{{ wl_tunables['MEMTIER_CLIENT_NUMACTL_OPTIONS'] }}"
+    REDIS_NUMACTL_STRATEGY: "{{ wl_tunables['REDIS_NUMACTL_STRATEGY'] }}"
+    R_CLIENT_SERVER_PAIR: "{{ wl_tunables['CPU_USED'] }}"
+    START_NUMA_NODE: "{{ wl_tunables['START_NUMA_NODE'] }}"
+    MEMTIER_STARTPORT: "{{ wl_tunables['REDIS_NATIVE_TRANSPORT_PORT'] }}"
+    MEMTIER_CONFIG_CENTER_PORT: "{{ wl_tunables['CONFIG_CENTER_PORT'] }}"
+    MEMTIER_CONFIG_CENTER_IP: "{{ hostvars[dynamic_hosts[0]]['private_ip'] }}"
+    MEMTIER_UNIX_SOCKET: "{{ wl_tunables['MEMTIER_UNIX_SOCKET'] }}"
+    MEMTIER_PROTOCOL: "{{ wl_tunables['MEMTIER_PROTOCOL'] }}"
+    MEMTIER_AUTHENTICATE: "{{ wl_tunables['MEMTIER_AUTHENTICATE'] }}"
+    MEMTIER_TLS: "{{ wl_tunables['MEMTIER_TLS'] }}"
+    MEMTIER_KEY: "{{ wl_tunables['MEMTIER_KEY'] }}"
+    MEMTIER_CACERT: "{{ wl_tunables['MEMTIER_CACERT'] }}"
+    MEMTIER_TLS_SKIP_VERIFY: "{{ wl_tunables['MEMTIER_TLS_SKIP_VERIFY'] }}"
+    MEMTIER_SNI: "{{ wl_tunables['MEMTIER_SNI'] }}"
+    MEMTIER_RUN_COUNT: "{{ wl_tunables['MEMTIER_RUN_COUNT'] }}"
+    MEMTIER_DEBUG: "{{ wl_tunables['MEMTIER_DEBUG'] }}"
+    MEMTIER_CLIENT_STATS: "{{ wl_tunables['MEMTIER_CLIENT_STATS'] }}"
+    MEMTIER_OUT_FILE: "{{ wl_tunables['MEMTIER_OUT_FILE'] }}"
+    MEMTIER_JSON_OUT_FILE: "{{ wl_tunables['MEMTIER_JSON_OUT_FILE'] }}"
+    MEMTIER_HDR_FILE_PREFIX: "{{ wl_tunables['MEMTIER_HDR_FILE_PREFIX'] }}"
+    MEMTIER_SHOW_CONFIG: "{{ wl_tunables['MEMTIER_SHOW_CONFIG'] }}"
+    MEMTIER_HIDE_HISTOGRAM: "{{ wl_tunables['MEMTIER_HIDE_HISTOGRAM'] }}"
+    MEMTIER_PRINT_PERCENTILES: "{{ wl_tunables['MEMTIER_PRINT_PERCENTILES'] }}"
+    MEMTIER_CLUSTER_MODE: "{{ wl_tunables['MEMTIER_CLUSTER_MODE'] }}"
+    MEMTIER_REQUESTS: "{{ wl_tunables['MEMTIER_REQUESTS'] }}"
+    MEMTIER_POPULATE_REQUESTS: "{{ wl_tunables['MEMTIER_POPULATE_REQUESTS'] }}"
+    MEMTIER_CLIENTS: "{{ wl_tunables['MEMTIER_CLIENTS'] }}"
+    MEMTIER_THREADS: "{{ wl_tunables['MEMTIER_THREADS'] }}"
+    MEMTIER_TEST_TIME: "{{ wl_tunables['MEMTIER_TEST_TIME'] }}"
+    MEMTIER_RATIO: "{{ wl_tunables['MEMTIER_RATIO'] }}"
+    MEMTIER_PIPELINE: "{{ wl_tunables['MEMTIER_PIPELINE'] }}"
+    MEMTIER_RECONNECT_INTERVAL: "{{ wl_tunables['MEMTIER_RECONNECT_INTERVAL'] }}"
+    MEMTIER_MULTI_KEY_GET: "{{ wl_tunables['MEMTIER_MULTI_KEY_GET'] }}"
+    MEMTIER_DISTINCT_CLIENT_SEED: "{{ wl_tunables['MEMTIER_DISTINCT_CLIENT_SEED'] }}"
+    MEMTIER_RANDOMIZE: "{{ wl_tunables['MEMTIER_RANDOMIZE'] }}"
+    MEMTIER_DATA_SIZE: "{{ wl_tunables['MEMTIER_DATA_SIZE'] }}"
+    MEMTIER_DATA_OFFSET: "{{ wl_tunables['MEMTIER_DATA_OFFSET'] }}"
+    MEMTIER_RANDOM_DATA: "{{ wl_tunables['MEMTIER_RANDOM_DATA'] }}"
+    MEMTIER_DATA_SIZE_RANGE: "{{ wl_tunables['MEMTIER_DATA_SIZE_RANGE'] }}"
+    MEMTIER_DATA_SIZE_LIST: "{{ wl_tunables['MEMTIER_DATA_SIZE_LIST'] }}"
+    MEMTIER_DATA_SIZE_PATTERN: "{{ wl_tunables['MEMTIER_DATA_SIZE_PATTERN'] }}"
+    MEMTIER_EXPIRY_RANGE: "{{ wl_tunables['MEMTIER_EXPIRY_RANGE'] }}"
+    MEMTIER_DATA_IMPORT: "{{ wl_tunables['MEMTIER_DATA_IMPORT'] }}"
+    MEMTIER_DATA_VERIFY: "{{ wl_tunables['MEMTIER_DATA_VERIFY'] }}"
+    MEMTIER_VERIFY_ONLY: "{{ wl_tunables['MEMTIER_VERIFY_ONLY'] }}"
+    MEMTIER_GENERATE_KEYS: "{{ wl_tunables['MEMTIER_GENERATE_KEYS'] }}"
+    MEMTIER_NO_EXPIRY: "{{ wl_tunables['MEMTIER_NO_EXPIRY'] }}"
+    MEMTIER_KEY_PREFIX: "{{ wl_tunables['MEMTIER_KEY_PREFIX'] }}"
+    MEMTIER_KEY_MINIMUM: "{{ wl_tunables['MEMTIER_KEY_MINIMUM'] }}"
+    MEMTIER_KEY_MAXIMUM: "{{ wl_tunables['MEMTIER_KEY_MAXIMUM'] }}"
+    MEMTIER_KEY_STDDEV: "{{ wl_tunables['MEMTIER_KEY_STDDEV'] }}"
+    MEMTIER_KEY_MEDIAN: "{{ wl_tunables['MEMTIER_KEY_MEDIAN'] }}"
+    MEMTIER_WAIT_RATIO: "{{ wl_tunables['MEMTIER_WAIT_RATIO'] }}"
+    MEMTIER_NUM_SLAVES: "{{ wl_tunables['MEMTIER_NUM_SLAVES'] }}"
+    MEMTIER_WAIT_TIMEOUT: "{{ wl_tunables['MEMTIER_WAIT_TIMEOUT'] }}"
+    MEMTIER_RUN_KEY_PATTERN: "{{ wl_tunables['MEMTIER_KEY_PATTERN'] }}"
+    MEMTIER_LOAD_KEY_PATTERN: "{{ wl_tunables['MEMTIER_LOAD_KEY_PATTERN'] }}"
+    SERVER_IP: "{{ hostvars['worker-0']['private_ip'] }}"
+    NODE_NUM: "{{ wl_tunables['CLIENT_COUNT'] }}"
+    MULTI_SERVERIP_LIST: "{{ wl_tunables['MULTI_SERVERIP_LIST'] }}"
+    cacheable: yes
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['dynamic_clients'] }}"
+
+- name: Running Template(s) of Config Center on singlenode
+  shell: "numactl --cpunodebind=!{{ START_NUMA_NODE }} {{ WORKSPACE }}/redis-{{ REDIS_VERSION }}/src/redis-server --protected-mode no --port {{ MEMTIER_CONFIG_CENTER_PORT }} --save \"\" &"
+  when: RUN_SINGLE_NODE is true
+  become: true
+  register: "config_center_single"
+  delegate_to: "{{ groups['dynamic_clients'][0] }}"
+
+- name: Running Template(s) of Config Center on multinode
+  shell: "{{ WORKSPACE }}/redis-{{ REDIS_VERSION }}/src/redis-server --protected-mode no --port {{ MEMTIER_CONFIG_CENTER_PORT }} --save \"\" &"
+  when: RUN_SINGLE_NODE is false
+  become: true
+  register: "config_center_multi"
+  delegate_to: "{{ groups['dynamic_clients'][0] }}"
+
+- name: Install Template(s) of Memtier
+  template:
+    src: "run_test.j2"
+    dest: "{{ WORKSPACE }}/run_test.sh"
+    mode: "0755"
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['dynamic_clients'] }}"
+
+- name: Create the logs directory
+  file:
+    path: "{{ WORKSPACE }}/itr-{{ itr }}/"
+    state: directory
+    recurse: yes
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['dynamic_clients'] }}"
+
+- name: Running Template(s) of Memtier
+  shell: "cd {{ WORKSPACE }}; nohup ./run_test.sh {{ item.split('-')[1] | int }} > /dev/null 2>&1 &"
+  become: true
+  register: "results"
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['dynamic_clients'] }}"
+  async: 3600
+  poll: 0
+
+- name: Create trace log file
+  file:
+    path: "{{ WORKSPACE }}/wait_run_test_finish.log"
+    state: touch
+    mode: "0666"
+  delegate_to: worker-0
+
+- name: waitproc to wait for Memtier complete
+  shell:
+    cmd: |
+      cd {{ WORKSPACE }}
+      nohup bash -c '(./wait_run_test_finish.sh) | tee ./wait_run_test_finish.log' > /dev/null 2>&1 &      
+      echo $!
+      disown
+    executable: /bin/bash
+  register: waitproc
+  delegate_to: worker-0
+
+- name: invoke the trace procedure
+  include_role:
+    name: trace
+  vars:
+    trace_waitproc_pid: "{{ waitproc.stdout }}"
+    trace_logs_scripts: ["cat {{ WORKSPACE }}/wait_run_test_finish.log"]
+    trace_logs_host: "worker-0"
+
+- name: collect trace data
+  include_role:
+    name: trace
+    tasks_from: collect
+  when: wl_trace_modules | default('') | split(',') | reject('==','') | length > 0
+
+- name: Archive Logs
+  archive:
+    path: "{{ WORKSPACE }}/itr-{{ itr }}/"
+    dest: "{{ WORKSPACE }}/itr-{{ itr }}-{{ item }}.tar.gz"
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['dynamic_clients'] }}"
+
+- name: Fetch Logs to Localhost
+  fetch:
+    src: "{{ WORKSPACE }}/itr-{{ itr }}-{{ item }}.tar.gz"
+    dest: "{{ wl_logs_dir }}/"
+    flat: yes
+    validate_checksum: yes
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['dynamic_clients'] }}"
+
+- name: Create the Logs Directory on Localhost
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}/"
+    state: directory
+    recurse: yes
+    mode: "0777"
+  delegate_to: localhost
+
+- name: UnArchive Logs on Localhost
+  unarchive:
+    src: "{{ wl_logs_dir }}/itr-{{ itr }}-{{ item }}.tar.gz"
+    dest: "{{ wl_logs_dir }}/itr-{{ itr }}"
+    mode: "0777"
+  loop: "{{ groups['dynamic_clients'] }}"
+  delegate_to: localhost
+
+- name: copy kpi.sh to the itr directory
+  copy:
+    src: "{{ wl_logs_dir }}/kpi.sh"
+    dest: "{{ wl_logs_dir }}/itr-{{ item }}/"
+    mode: "a+rx"
+  loop: "{{ range(1, run_stage_iterations | default(1) |int+1, 1) | list }}"
+  when: ((wl_logs_dir + '/kpi.sh') is exists)
+  ignore_errors: true
+
+- name: Remove Archive Logs on Localhost
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}-{{ item }}.tar.gz"
+    state: absent
+  loop: "{{ groups['dynamic_clients'] }}"
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: Terminate Redis processes on Server Host
+  shell: ps aux | grep redis-server | grep -v grep | awk '{ print $2 }' | xargs -n1 kill -9
+  register: redis_process_ids
+  changed_when: false # Mark task as unchanged even if the output changes
+  delegate_to: worker-0

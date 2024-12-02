@@ -1,0 +1,19 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+  - name: Install prerequisites
+    apt:
+      name:
+      - build-essential
+      - cmake
+      - curl
+      update_cache: true
+    register: aptrc
+    until: aptrc is success
+    retries: 10
+    delay: 10
+    delegate_to: "{{ trace_node.1 }}"
+  

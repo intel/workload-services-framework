@@ -1,0 +1,142 @@
+#!/bin/bash
+
+CPU_CORES=$(nproc)
+if [[ "{{ TPCC_THREADS_BUILD_SCHEMA }}" -gt  "$CPU_CORES" ]]; then
+    echo "Warning: specified build schema thread count {{ TPCC_THREADS_BUILD_SCHEMA }} greater than current cpu cores $CPU_CORES adjust to current cpu cores"
+    TPCC_THREADS_BUILD_SCHEMA="$CPU_CORES"
+fi
+
+echo "TPCC_HAMMER_NUM_VIRTUAL_USERS = {{ TPCC_HAMMER_NUM_VIRTUAL_USERS }}"
+
+function buildschema_postgresql() {
+    cat >"{{ TPCC_TCL_SCRIPT_PATH }}/build_schema.tcl"<<EOF
+#!/bin/tclsh
+puts "SETTING CONFIGURATION"
+global complete
+proc wait_to_complete {} {
+    global complete
+    set complete [vucomplete]
+    puts "Is it complete ?: \$complete"
+    if {!\$complete} {
+        after {{ TPCC_WAIT_COMPLETE_MILLSECONDS }} wait_to_complete
+    } else {
+        puts "BUILD SCHEMA COMPLETE"
+        exit
+    }
+}
+dbset db pg
+dbset bm TPC-C
+diset connection pg_host {{ DB_HOST }}
+diset connection pg_port {{ DB_PORT }}
+diset tpcc pg_superuser {{ ROOT_USER }}
+diset tpcc pg_superuserpass {{ ROOT_PASSWORD }}
+diset tpcc pg_num_vu {{ TPCC_THREADS_BUILD_SCHEMA }}
+diset tpcc pg_count_ware {{ TPCC_NUM_WAREHOUSES }}
+diset tpcc pg_raiseerror  true
+diset tpcc pg_storedprocs true
+diset tpcc pg_dbase {{ DATABASE }}
+print dict
+buildschema
+wait_to_complete
+vwait forever
+EOF
+}
+
+function runhammer_postgresql() {
+    cat >"{{ TPCC_TCL_SCRIPT_PATH }}/run_timer.tcl"<<EOF
+#!/bin/tclsh
+proc runtimer { seconds } {
+    set x 0
+    set timerstop 0
+    while {!\$timerstop} {
+        incr x
+        after 1000
+        if { ![ expr {\$x % 60} ] } {
+            set y [ expr \$x / 60 ]
+            puts "Timer: \$y minutes elapsed"
+        }
+        update
+        if {  [ vucomplete ] || \$x eq \$seconds } {
+            set timerstop 1
+        }
+    }
+    return
+}
+
+puts "SETTING CONFIGURATION"
+dbset db pg
+dbset bm TPC-C
+diset connection pg_host {{ DB_HOST }}
+diset connection pg_port {{ DB_PORT }}
+diset tpcc pg_superuser {{ ROOT_USER }}
+diset tpcc pg_superuserpass {{ ROOT_PASSWORD }}
+diset tpcc pg_driver timed
+diset tpcc pg_rampup {{ TPCC_MINUTES_OF_RAMPUP }}
+diset tpcc pg_duration {{ TPCC_MINUTES_OF_DURATION }}
+diset tpcc pg_total_iterations {{ TPCC_TOTAL_ITERATIONS }}
+diset tpcc pg_allwarehouse false
+diset tpcc pg_vacuum true
+diset tpcc pg_raiseerror  true
+diset tpcc pg_storedprocs true
+diset tpcc pg_timeprofile true
+diset tpcc pg_async_scale false
+diset tpcc pg_connect_pool false
+diset tpcc pg_dbase {{ DATABASE }}
+vuset logtotemp 1
+vuset unique 1
+vuset timestamps 1
+loadscript
+puts "SEQUENCE STARTED"
+foreach z [ split "{{ TPCC_HAMMER_NUM_VIRTUAL_USERS }}" "_" ] {
+    puts "\$z VU TEST"
+    vuset vu \$z
+    vucreate
+    vurun
+    runtimer {{ TPCC_RUNTIMER_SECONDS }}
+    vudestroy
+    after {{ TPCC_WAIT_COMPLETE_MILLSECONDS }}
+}
+puts "TEST SEQUENCE COMPLETE"
+exit
+EOF
+}
+
+if [[ ! -d "{{ TPCC_TCL_SCRIPT_PATH }}" ]]; then
+    mkdir -p "{{ TPCC_TCL_SCRIPT_PATH }}"
+fi
+
+if [[ "{{ DB_TYPE }}" == "postgresql" ]]; then
+    buildschema_postgresql
+    runhammer_postgresql
+fi
+
+# Make sure with a stable connection to database server
+echo "Checking if database connection is stable..."
+counter=0
+until ((counter >= 5)); do
+    nc -z -w5 {{ DB_HOST }} {{ DB_PORT }}
+    if [ $? -eq 0 ]; then
+        ((counter++))
+    else
+        echo "database service connection is unstable, retry"
+        counter=0
+    fi
+    sleep 1
+done
+echo "Database connection is stable for $counter seconds"
+
+cd {{ HAMMERDB_INSTALL_DIR }}
+
+if [[ "$1" == "1" ]]; then
+    echo "===Stage 1: Build schema started==="
+    start=$(date +%s)
+    ./hammerdbcli auto {{ TPCC_TCL_SCRIPT_PATH }}/build_schema.tcl
+    end=$(date +%s)
+    echo "===Stage 1: Build schema finished spent $(( end - start )) seconds"
+fi
+
+echo "===Stage 2: Run timer started"
+./hammerdbcli auto {{ TPCC_TCL_SCRIPT_PATH }}/run_timer.tcl
+echo "===Stage 2: Run timer finished"
+
+exit

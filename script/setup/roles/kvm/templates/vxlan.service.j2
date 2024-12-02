@@ -1,0 +1,21 @@
+[Unit]
+Description=Manage VXLANs for multiple KVMs
+After=network.target
+After=libvirtd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+{% for cmd1 in stop_cmds %}
+ExecStart=-/bin/sh -c '{{ cmd1 }}'
+{% endfor %}
+{% for cmd1 in start_cmds|flatten %}
+ExecStart=/bin/sh -c '{{ cmd1 }}'
+{% endfor %}
+{% for cmd1 in stop_cmds %}
+ExecStop=-/bin/sh -c '{{ cmd1 }}'
+{% endfor %}
+
+[Install]
+WantedBy=multi-user.target
+

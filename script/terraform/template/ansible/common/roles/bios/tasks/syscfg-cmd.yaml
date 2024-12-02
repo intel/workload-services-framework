@@ -1,0 +1,46 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: "set {{ request.key }}={{ request.value }}"
+  shell:
+    cmd: "{{ syscfg_bin }} /bcs '{{ sut_bios_passwd }}' '{{ request.key }}' '{{ settings_alt | regex_replace('.*~' + key_alt + '=[^;]*;Options[^~]*: '+ value_alt + '=([a-zA-Z0-9]*).*', '\\1') }}'"
+    executable: /bin/bash
+  vars:
+    settings_alt: "{{ bios_settings.replace('\n','~') | replace('(','Lq') | replace(')','Rq') }}"
+    key_alt: "{{ request.key.replace('(','Lq').replace(')','Rq') }}"
+    value_alt: "{{ request.value.replace('(','Lq').replace(')','Rq') }}"
+  register: syscfgrc
+  ignore_errors: true
+
+- name: Print out BIOS changes
+  debug:
+    msg: "[{{ inventory_hostname }}]: Host BIOS+ {{ request.key }}={{ request.value }}"
+
+- name: touch a restore file
+  lineinfile:
+    path: "{{ wl_logs_dir }}/{{ inventory_hostname }}-bios/restore"
+    line: "'{{ request.key }}' '{{ settings_alt | regex_replace('.*~' + key_alt + '=[^;]*;Options[^~]*: '+ (settings_alt | regex_replace('.*~' + key_alt + '=([^;]*).*','\\1') | trim) + '=([0-9]*).*', '\\1') }}'"
+    create: true
+  when: syscfgrc.rc == 0
+  delegate_to: localhost
+  become: false
+  vars:
+    settings_alt: "{{ bios_settings.replace('\n','~') | replace('(','Lq') | replace(')','Rq') }}"
+    key_alt: "{{ request.key.replace('(','Lq').replace(')','Rq') }}"
+
+- name: touch a bios file
+  lineinfile:
+    path: "{{ wl_logs_dir }}/{{ inventory_hostname }}-bios/bios"
+    line: "{{ request.key }} {{ request.value }}"
+    create: true
+  delegate_to: localhost
+  when: syscfgrc.rc == 0
+  become: false
+
+- name: request reboot
+  set_fact:
+    startup_reboot_required: "{{ startup_reboot_required or (syscfgrc.rc==0) }}"
+

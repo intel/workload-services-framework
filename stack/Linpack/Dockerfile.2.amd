@@ -1,0 +1,35 @@
+# linpack-base-amd
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+FROM ${OS_IMAGE}:${OS_VER} as base
+
+ARG AMD_HPL_VER="2023_07_18_automated_v2"
+ARG AMD_HPL_TAR="amd-zen-hpl-${AMD_HPL_VER}.tar.gz"
+ARG AMD_HPL_REPO="http://storage.dcpcomp.intel.com/files/${AMD_HPL_TAR}"
+ARG AMD_HPL_DIR="amd-zen-hpl-${AMD_HPL_VER}"
+
+# Install Dependencies
+RUN apt-get -y update && \
+    apt-get install build-essential -y && \
+    apt-get install unzip numactl wget bc ssh -y
+
+# Install OpenMPI
+RUN apt-get install openmpi-bin openmpi-doc libopenmpi-dev -y
+
+RUN cd / && \
+    wget ${AMD_HPL_REPO} && \
+    tar xf ${AMD_HPL_TAR} && \
+    cd ${AMD_HPL_DIR} && \
+    chmod +x *
+    
+# Cleanup unneeded oneapi components
+RUN rm -rf /${AMD_HPL_TAR}
+
+FROM scratch
+COPY --from=base / /

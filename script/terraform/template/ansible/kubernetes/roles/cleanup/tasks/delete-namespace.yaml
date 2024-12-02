@@ -17,7 +17,7 @@
 
   - name: delete resources
     shell:
-      cmd: "timeout 5m kubectl --namespace={{ wl_namespace }} delete {{ resources.stdout_lines | join(',') }} --all --ignore-not-found=true --grace-period=150"
+      cmd: "timeout 5m kubectl --namespace={{ wl_namespace }} delete {{ resources.stdout_lines | reject('==','localsubjectaccessreviews') | reject('==','bindings') | join(',') }} --all --ignore-not-found=true --grace-period=150"
       executable: /bin/bash
     ignore_errors: yes
 
@@ -33,3 +33,4 @@
   - name: perform kill namespace workaround
     command: "bash -c 'kubectl replace --raw \"/api/v1/namespaces/{{ wl_namespace }}/finalize\" -f <(kubectl get ns {{ wl_namespace }} -o json | grep -v \"\\\"kubernetes\\\"\")'"
     ignore_errors: yes
+

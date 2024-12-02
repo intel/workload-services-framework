@@ -64,6 +64,14 @@ resource "aws_default_security_group" "default" {
   }
 
   ingress {
+    description      = "WINRM"
+    from_port        = var.winrm_port
+    to_port          = var.winrm_port
+    protocol         = "tcp"
+    cidr_blocks      = local.sg_whitelist_cidr_blocks
+  }
+
+  ingress {
     from_port        = 0
     to_port          = 0
     protocol         = "-1"

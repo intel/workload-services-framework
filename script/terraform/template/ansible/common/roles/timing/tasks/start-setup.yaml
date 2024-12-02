@@ -1,0 +1,17 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Recording timing of starting setup
+  shell:
+    cmd: |
+      echo "setup_start: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
+    executable: /bin/bash
+  delegate_to: localhost
+  run_once: true
+  become: false
+  async: 30
+  poll: 0
+

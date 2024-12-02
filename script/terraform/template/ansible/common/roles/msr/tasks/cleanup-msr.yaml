@@ -1,0 +1,12 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Write msr register
+  shell:
+    cmd: "wrmsr -a {{ request }}"
+    executable: /bin/bash
+  loop: "{{ lookup('file',restore_file) | split('\n') }}"
+  loop_control:
+    loop_var: request

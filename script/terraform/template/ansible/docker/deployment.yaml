@@ -14,18 +14,16 @@
       include_role:
         name: burn-cpu
       when:
-      - (ansible_connection|default('ssh')) == 'ssh'
+      - (ansible_connection|default('ssh')) in ['ssh','local']
       - sut_sudo | default(true) | bool
       - burn_cpu_seconds is defined
 
     - name: run docker validation over iterations
       include_role:
         name: deployment
-        tasks_from: "invoke-{{ native | default(false) | bool | ternary('native', docker | default(false) | bool | ternary('docker', 'compose')) }}"
-      when: (ansible_connection|default('ssh')) == 'ssh'
+        tasks_from: "invoke-{{ native | default(false) | bool | ternary(((ansible_connection|default('ssh'))=='local')|ternary('docker','native'), compose | default(false) | bool | ternary('compose', 'docker')) }}"
+      when: (ansible_connection|default('ssh')) in ['ssh','local']
       loop: "{{ range(1, run_stage_iterations | default(1) |int+1, 1) | list }}"
       loop_control:
         loop_var: itr
-      vars:
-        workload_config: "{{ lookup('file', wl_logs_dir + '/workload-config.yaml') | from_yaml }}"
 

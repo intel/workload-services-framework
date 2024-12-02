@@ -31,13 +31,21 @@ spec:
           value: "defn(`K_Q_SIZE')"
         - name: `NB_SIZE'
           value: "defn(`K_NB_SIZE')"
-        - name: `ASM'
-          value: "defn(`K_ASM')"
+        - name: `ISA'
+          value: "defn(`K_ISA')"
+        - name: `MAP_BY'
+          value: "defn(`K_MAP_BY')"
+        - name: `MPI_PROC_NUM'
+          value: "defn(`K_MPI_PROC_NUM')"
+        - name: `MPI_PER_NODE'
+          value: "defn(`K_MPI_PER_NODE')"
+        - name: `NUMA_PER_MPI'
+          value: "defn(`K_NUMA_PER_MPI')"
         securityContext:
           privileged: true
       volumes:
       - name: dshm
         emptyDir:
           medium: Memory
-          sizeLimit: "16Gi"
+          sizeLimit: "8Gi"
       restartPolicy: Never

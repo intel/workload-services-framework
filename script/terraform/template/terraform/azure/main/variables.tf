@@ -132,3 +132,24 @@ variable "subnet_name" {
   type = string
   default = null
 }
+
+variable "encrypt_disk" {
+  type = bool
+  default = false
+}
+
+variable "encrypt_key_size" {
+  type = number
+  default = 2048
+}
+
+variable "disk_encryption_set_name" {
+  type = string
+  default = null
+}
+
+variable "security_encryption_type" {
+  type = string
+  default = "VMGuestStateOnly"
+}
+

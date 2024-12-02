@@ -1,0 +1,30 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Get powerstat files
+    shell:
+      cmd: ls -1
+      chdir: "{{ trace_data_path }}"
+      executable: /bin/bash
+    register: powerstat_files
+
+  - name: Fetch powerstat files
+    fetch:
+      src: "{{ trace_data_path }}/{{ item }}"
+      dest: "{{ trace_data_local_path }}/"
+      flat: true
+    loop: "{{ powerstat_files.stdout_lines }}"
+    register: fetchrc
+    until: fetchrc is success
+    retries: 10
+    delay: 10
+
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: false
+

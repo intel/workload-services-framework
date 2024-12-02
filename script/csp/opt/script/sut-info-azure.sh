@@ -13,7 +13,7 @@ for instance in $@; do
   vm_group="${instance/:*/}"
   instance="${instance/*:/}"
   cores="$(echo "$lines" | sed -n "/\"name\":\s*\"$instance\"/,/\"name\":/{/\"numberOfCores\":/{s/.*:\s*\([0-9]*\).*/\\1/;p;q}}")"
-  memory="$(echo "$lines" | tac | sed -n "/\"name\":\s*\"$instance\"/,/\"name\":/{/\"memoryInMb\":/{s/.*:\s*\([0-9]*\).*/\\1/;p;q}}")"
+  memory="$(echo "$lines" | tac | sed -n "/\"name\":\s*\"$instance\"/,/\"name\":/{/\"memoryInMB\":/{s/.*:\s*\([0-9]*\).*/\\1/;p;q}}")"
   echo "${vm_group^^}_VCPUS=$cores"
-  echo "${vm_group^^}_MEMORY=$(( memory / 1024 ))"
+  echo "${vm_group^^}_MEMORY=$memory"
 done

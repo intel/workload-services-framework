@@ -1,0 +1,25 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Get iostat files
+    shell:
+      cmd: ls -1
+      chdir: "{{ trace_data_path }}"
+      executable: /bin/bash
+    register: iostat_files
+  
+  - name: Fetch iostat files
+    fetch:
+      src: "{{ trace_data_path }}/{{ item }}"
+      dest: "{{ trace_data_local_path }}/"
+      flat: yes
+    loop: "{{ iostat_files.stdout_lines | reject('==', 'iostat.pid') }}"
+  
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: false

@@ -4,6 +4,13 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+locals {
+  burstable_instances = [
+    "ecs.t5-",
+    "ecs.t6-",
+  ]
+}
+
 resource "alicloud_ecs_key_pair" "default" {
   key_pair_name = replace("wsf-${var.job_id}", "-", "_")
   public_key = var.ssh_pub_key
@@ -25,7 +32,7 @@ resource "alicloud_instance" "default" {
   resource_group_id = var.resource_group_id
   vswitch_id = alicloud_vswitch.default.id
 
-  credit_specification = "Unlimited"
+  credit_specification = length([for ins in local.burstable_instances: 1 if startswith(each.value.instance_type,ins)])>0?var.credit_specification:null
 
   spot_strategy = var.spot_instance?(var.spot_price>0?"SpotWithPriceLimit":"SpotAsPriceGo"):"NoSpot"
   spot_price_limit = var.spot_instance?var.spot_price:null

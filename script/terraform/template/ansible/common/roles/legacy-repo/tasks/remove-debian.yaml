@@ -1,0 +1,20 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: remove legacy deb entries
+  shell:
+    cmd: |
+      for r in "{{ conflict_repos | join('" "') }}"; do
+        [ -r /etc/apt/sources.list ] && sed -i "s|^\(deb.*$r\)|#\1|" /etc/apt/sources.list || true
+        for e in /etc/apt/sources.list.d/*.list; do
+          [ -r "$e" ] && grep -s -q -E "deb.*$r" "$e" && mv -f "$e" "$e".save || true
+        done
+      done
+    executable: /bin/bash
+  when: conflict_repos | length > 0
+  ignore_errors: true
+  become: true
+

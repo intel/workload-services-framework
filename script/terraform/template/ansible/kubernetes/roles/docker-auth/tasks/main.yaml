@@ -1,0 +1,28 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Find Home
+  shell:
+    cmd: "echo $HOME"
+    executable: /bin/bash
+  register: home
+  when: docker_auth_reuse
+
+- name: Create ImagePullSecret
+  command: "kubectl create secret docker-registry {{ docker_auth_secret_name }} --from-file=.dockerconfigjson={{ home.stdout }}/{{ docker_auth_config_json }} -n {{ namespace }}"
+  register: secret
+  ignore_errors: yes
+  when: docker_auth_reuse
+
+- name: Patch service account
+  shell:
+    cmd: |
+      kubectl patch serviceaccount default -p '{"imagePullSecrets":[{"name": "{{ docker_auth_secret_name }}"}]}' -n {{ namespace }}
+  when: 
+  - docker_auth_reuse
+  - secret.rc == 0
+  ignore_errors: yes
+

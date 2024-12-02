@@ -6,10 +6,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 ARG RELEASE
-ARG OS_VER=22.04
+ARG OS_VER=24.04
 ARG OS_IMAGE=ubuntu
 
-ARG DOCKER_CLI_VER=24.0.5
+ARG DOCKER_CLI_VER=26.1.4
 ARG DOCKER_CLI_IMG=docker:${DOCKER_CLI_VER}-dind
 FROM ${DOCKER_CLI_IMG} as dockercli
 
@@ -20,42 +20,78 @@ ARG FLAMEGRAPH_VER=v1.0
 ARG FLAMEGRAPH_REPO=https://github.com/brendangregg/FlameGraph.git
 RUN git clone ${FLAMEGRAPH_REPO} flamegraph && \
     cd flamegraph && \
-    git checkout ${FLAMEGRAPH_VER}
+    git checkout tags/${FLAMEGRAPH_VER}
+
+FROM ${OS_IMAGE}:${OS_VER} as skopeo
+RUN apt-get update && apt-get install -y git curl make gcc pkg-config libdevmapper-dev libgpgme-dev
+
+ARG GO_VER=1.23.3
+ARG GO_PKG=https://go.dev/dl/go${GO_VER}.linux-amd64.tar.gz
+RUN curl --netrc-optional --retry 10 --retry-connrefused -fsSL ${GO_PKG} | tar xfz - -C /usr/local
+
+ARG SKOPEO_VER=1.17.0
+ARG SKOPEO_REPO=https://github.com/containers/skopeo.git
+RUN export GOPATH=/home/go && \
+    export PATH=/usr/local/go/bin:$PATH && \
+    mkdir -p $GOPATH/src/github.com/containers && \
+    git clone -b v${SKOPEO_VER} ${SKOPEO_REPO} $GOPATH/src/github.com/containers/skopeo && \
+    cd $GOPATH/src/github.com/containers/skopeo && \
+    DISABLE_DOCS=1 make bin/skopeo && \
+    DISABLE_DOCS=1 make install
+
+FROM ${OS_IMAGE}:${OS_VER} as kubectl
+RUN apt-get update && apt-get install -y curl gnupg
+
+ARG KUBECTL_VER=1.30
+ARG KUBECTL_REPO=https://pkgs.k8s.io/core:/stable:/v${KUBECTL_VER}/deb
+RUN mkdir -p /etc/apt/keyrings && \
+    curl --netrc-optional --retry 10 --retry-connrefused -fsSL ${KUBECTL_REPO}/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] ${KUBECTL_REPO}/ /" > /etc/apt/sources.list.d/kubernetes.list && \
+    apt-get update && \
+    apt-get install -y kubectl=${KUBECTL_VER}*
 
 FROM ${OS_IMAGE}:${OS_VER}
 ENV DEBIAN_FRONTEND=noninteractive
-RUN  apt-get update && apt-get install -y skopeo zip less gnupg curl gawk netcat connect-proxy sudo openssh-client bzip2 tzdata rsync && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends libdevmapper1.02.1 libgpgme11t64 sshpass zip unzip less gnupg ca-certificates curl gawk netcat-openbsd connect-proxy sudo openssh-client bzip2 jq git && \
+    apt-get clean -y && \
+    rm -rf /var/lib/apt/lists/*
 
-# python3, Ansible and various validation tools
-ARG CONDA_DIR=/opt/conda
-ARG CONDA_VER=Miniconda3-py311_23.5.2-0
-ARG CONDA_REPO=https://repo.anaconda.com/miniconda/${CONDA_VER}-Linux-x86_64.sh
-ARG ANSIBLE_VER=8.5.0
-ARG ANSIBLE_REPO=conda
-RUN curl -L -o ~/miniconda.sh ${CONDA_REPO} && \
-    bash ~/miniconda.sh -b -p ${CONDA_DIR} && \
-    rm -f ~/miniconda.sh && \
-    chmod oug+x ${CONDA_DIR}/etc/profile.d/conda.sh && \
-    ${CONDA_DIR}/etc/profile.d/conda.sh && \
-    ${CONDA_DIR}/bin/conda install jmespath paramiko lxml pywinrm jq && \
-    ${CONDA_DIR}/bin/conda install -c conda-forge ansible==${ANSIBLE_VER} kazoo kafka-python && \
-    ${CONDA_DIR}/bin/conda clean --all
-ENV PATH=${CONDA_DIR}/bin:$PATH
+# Install python3 and libraries
+ARG PYTHON3_VER=3.12
+ARG PYTHON3_REPO=apt
+RUN apt-get update && apt-get install -y --no-install-recommends python${PYTHON3_VER} python3-lxml python3-paramiko python3-kazoo && \
+    apt-get clean -y && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install terraform & packer
-ARG TERRAFORM_VER=1.5.7
-ARG TERRAFORM_REPO=https://apt.releases.hashicorp.com
-ARG PACKER_VER=1.9.4
-ARG PACKER_REPO=https://apt.releases.hashicorp.com
-RUN  curl ${TERRAFORM_REPO}/gpg | gpg --dearmor > /usr/share/keyrings/hashicorp-archive-keyring.gpg && \
-     echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] ${TERRAFORM_REPO} $(. /etc/os-release;echo $VERSION_CODENAME) main" > /etc/apt/sources.list.d/hashicorp.list && \
-     apt-get update && apt-get install --fix-missing --fix-broken -y terraform=${TERRAFORM_VER}-* packer=${PACKER_VER}-* && \
-     rm -f /etc/apt/sources.list.d/hashicorp.list && \
-     apt-get clean && \
-     rm -rf /var/lib/apt/lists/*
+# Install ansible
+ARG ANSIBLE_VER=9.2.0+dfsg
+ARG ANSIBLE_REPO=apt
+RUN apt-get update && apt-get install -y --no-install-recommends ansible=${ANSIBLE_VER}* python3-dnspython python3-netaddr python3-winrm python3-jmespath && \
+    apt-get clean -y && \
+    rm -rf /var/lib/apt/lists/* 
+
+# Install terraform and packer
+ARG TERRAFORM_VER=1.9.8
+ARG TERRAFORM_PKG=https://releases.hashicorp.com/terraform/${TERRAFORM_VER}/terraform_${TERRAFORM_VER}_linux_amd64.zip
+RUN curl --netrc-optional --retry 10 --retry-connrefused -L ${TERRAFORM_PKG} -o /tmp/terraform.zip && \
+    unzip /tmp/terraform.zip -d /usr/local/bin && \
+    mv /usr/local/bin/LICENSE.txt /usr/local/bin/LICENSE.terraform.txt && \
+    rm -f /tmp/terraform.zip
+
+# Install packer
+ARG PACKER_VER=1.11.2
+ARG PACKER_PKG=https://releases.hashicorp.com/packer/${PACKER_VER}/packer_${PACKER_VER}_linux_amd64.zip
+RUN curl --netrc-optional --retry 10 --retry-connrefused -L ${PACKER_PKG} -o /tmp/packer.zip && \
+    unzip /tmp/packer.zip -d /usr/local/bin && \
+    mv /usr/local/bin/LICENSE.txt /usr/local/bin/LICENSE.packer.txt && \
+    rm -f /tmp/packer.zip
 
 # Install docker CLI
 COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/
+COPY --from=dockercli /usr/local/libexec/docker/cli-plugins/docker-compose /usr/local/libexec/docker/cli-plugins/
+
+# Install kubectl
+COPY --from=kubectl /usr/bin/kubectl /usr/local/bin/
 
 # Copy FlameGraph utilities
 COPY --from=flamegraph /flamegraph/stackcollapse-perf.pl /usr/local/bin/
@@ -64,17 +100,23 @@ COPY --from=flamegraph /flamegraph/flamegraph.pl /usr/local/bin/
 ####
 ARG USER=tfu
 ARG GROUP=tfu
+RUN userdel -f -r ubuntu && groupdel -f ubuntu || true
 RUN groupadd -f ${GROUP} && useradd -d /home -M ${USER} -g ${GROUP}
 RUN echo "${USER} ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers
 RUN groupadd -f docker && usermod -aG docker tfu
 ####
 
 # Install gosu
-ARG GOSU_VER=1.16
+ARG GOSU_VER=1.17
 ARG GOSU_REPO=https://github.com/tianon/gosu/releases/download/${GOSU_VER}/gosu-amd64
-RUN curl -o /usr/local/bin/gosu -SL ${GOSU_REPO} && \
-    curl -o /usr/local/bin/gosu.asc ${GOSU_REPO}.asc && \
+RUN curl --netrc-optional --retry 10 --retry-connrefused -o /usr/local/bin/gosu -fsSL ${GOSU_REPO} && \
+    curl --netrc-optional --retry 10 --retry-connrefused -o /usr/local/bin/gosu.asc -fsSL ${GOSU_REPO}.asc && \
     chmod +x /usr/local/bin/gosu
+
+# Install skopeo
+COPY --from=skopeo /usr/local/bin/skopeo /usr/local/bin/
+COPY --from=skopeo /var/lib/containers/* /var/lib/containers/
+COPY --from=skopeo /etc/containers/* /etc/containers/
 
 # create .ssh
 RUN mkdir -p /home/.ssh /root/.ssh && chmod 700 /home/.ssh /root/.ssh
@@ -85,15 +127,13 @@ ENTRYPOINT [ "/entrypoint.sh" ]
 WORKDIR /opt/workspace
 
 # Setup ssh proxy
-RUN echo "Include /opt/terraform/ssh_config" >> /etc/ssh/ssh_config
+RUN echo "Include /opt/workspace/ssh_config*" >> /etc/ssh/ssh_config
+
 
 # Copy script/template
 COPY script/ /opt/terraform/script/
-COPY template/ /opt/terraform/template/
+COPY template/ /opt/terraform/template/ 
 COPY ssh_config /opt/terraform/
 
-# Link common folders for backward compatibility
-RUN ln -s /opt/terraform/script /opt/script && \
-    ln -s /opt/terraform/template /opt/template && \
-    ln -s /opt/project/stack /opt/stack && \
-    ln -s /opt/project/script/csp/opt /opt/csp
+# Backward compatibility
+RUN ln -s /opt/terraform/script /opt/script

@@ -6,6 +6,6 @@
 ---
 
 qatplugin_repository: https://github.com/intel/intel-device-plugins-for-kubernetes.git
-qatplugin_release: v0.26.0
+qatplugin_release: v0.28.0
 qatplugin_namespace: inteldeviceplugins-system
 qatplugin_max_qat_devices: 128

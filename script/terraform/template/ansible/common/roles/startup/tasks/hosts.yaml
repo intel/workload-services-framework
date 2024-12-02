@@ -1,0 +1,16 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# conflicts with sudo escalation
+# https://superuser.com/questions/429790/sudo-command-trying-to-search-for-hostname#429890
+
+- name: Comment out 127.0.[0-9].1 in /etc/hosts
+  lineinfile:
+    path: /etc/hosts
+    regexp: '^(127.0.[0-9].1 .*{{ inventory_hostname }}.*)$'
+    line: '#\1'
+    backrefs: true
+

@@ -1,0 +1,74 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Find the perf executable
+    find:
+      paths: /usr/lib/linux-tools
+      patterns: perf
+      file_type: link
+      recurse: true
+    register: perf_path
+    ignore_errors: true
+
+  - name: Install perf & perl-modules locally
+    apt:
+      name:
+      - linux-tools-generic
+      - perl-modules
+      update_cache: true
+      install_recommends: false
+    register: aptrc
+    until: aptrc is success
+    retries: 10
+    delay: 10
+    become: true
+    when: perf_path.files | length == 0
+
+  - name: Find the perf executable
+    find:
+      paths: /usr/lib/linux-tools
+      patterns: perf
+      file_type: link
+      recurse: true
+    register: perf_path
+
+  - name: Process perf records
+    shell:
+      cmd: |
+        {% if not (perf_skip_report | bool) %}
+          {{ perf_path.files[0].path }} report {{ perf_report_options }} -i perf-{{ roi_index }}.record > perf-{{ roi_index }}.report
+        {% endif %}
+          {{ perf_path.files[0].path }} script {{ perf_script_options }} -i perf-{{ roi_index }}.record > perf-{{ roi_index }}.record.out
+      chdir: "{{ trace_data_path }}"
+      executable: /bin/bash
+
+  - name: Create flamegraph SVG
+    template:
+      src: perf-charts.html.j2
+      dest: "{{ trace_data_path }}/roi-{{ roi_index }}.html"
+    when: (' -g ' in (' '+perf_record_options+' '))
+
+  - name: Remove .record.out
+    file:
+      path: "{{ trace_data_path }}/perf-{{ roi_index }}.record.out"
+      state: absent
+
+  when:
+  - perf_action == 'record'
+  - (trace_data_path + '/perf-' + (roi_index|string) + '.record') is exists
+  ignore_errors: yes
+
+- name: Create power graph
+  template:
+    src: perf-charts.html.j2
+    dest: "{{ trace_data_path }}/roi-{{ roi_index }}.html"
+  when:
+  - perf_action == 'stat'
+  - (trace_data_path + '/perf-' + (roi_index|string) + '.record') is exists
+  ignore_errors: yes
+

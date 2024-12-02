@@ -1,8 +1,3 @@
-#
-# Apache v2 license
-# Copyright (C) 2023 Intel Corporation
-# SPDX-License-Identifier: Apache-2.0
-#
 
 # CMakeLists.txt is the place to manage test cases. Think of a test case as certain 
 # combination of configurable parameters of a workload. You need to configure at 
@@ -19,7 +14,7 @@
 # It is recommendded to condition your workload build on the supported platforms.
 # The full list of supported platforms is in workload/platforms.  
 
-# include(cmake/${PLATFORM}.cmake OPTIONAL)
+include(cmake/${PLATFORM}.cmake OPTIONAL)
 
 # For workloads with multiple versions, repeat the definitions to support multiple
 # versions. The recommendation is to suffix the versions as part of the workload 

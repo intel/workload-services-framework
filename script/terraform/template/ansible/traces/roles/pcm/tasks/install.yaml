@@ -1,0 +1,66 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: "Check if {{ pcm_action }} exists"
+    command: "/usr/local/sbin/{{ pcm_action }} --version"
+    register: pcm_v
+    ignore_errors: true
+
+  - block:
+
+      - name: Detect OS
+        shell:
+          cmd: ". /etc/os-release; echo $ID"
+          executable: /bin/bash
+        register: os
+      
+      - name: Install software
+        include_tasks:
+          file: "install-{{ (os.stdout in ['ubuntu','debian']) | ternary('debian','centos') }}.yaml"
+      
+      - name: Clone pcm locally
+        shell: |
+            mkdir -p /usr/local/src/pcm
+            curl --noproxy .intel.com -sL {{ pcm_repository }} -o /usr/local/src/pcm-{{ pcm_version }}.tar.gz
+        delegate_to: localhost
+        run_once: true
+        
+      - name: Remove /usr/local/src/pcm
+        file:
+          path: /usr/local/src/pcm/
+          state: absent
+
+      - name: Create /usr/local/src/pcm
+        file:
+          path: /usr/local/src/pcm/
+          state: directory
+
+      - name: Unarchive pcm remotely
+        unarchive:
+          src: "/usr/local/src/pcm-{{ pcm_version }}.tar.gz"
+          dest: /usr/local/src/pcm/
+
+      - name: Build pcm
+        shell: |
+          mkdir -p /usr/local/src/pcm/build
+          cd /usr/local/src/pcm/build
+          cmake ..
+          cmake --build . --parallel
+          make install
+          make clean
+
+    when: (pcm_reset | bool) or ((pcm_v1|string) is version_compare(pcm_v2|string,'<'))
+    vars:
+      pcm_v1: "{{ pcm_v.stdout_lines | default([]) | select('match','^version:.*') | default(['version: (0-0-0'],true) | first | regex_replace('^version: .([0-9]+)[-]([0-9]+)[-]([0-9]+).*$','\\1.\\2.\\3') }}"
+      pcm_v2: "{{ pcm_version | regex_replace('^([0-9]{4})([0-9]{2})','\\1.\\2') | regex_replace('^([0-9]+)[-]([0-9]+)[-]([0-9]+)$','\\1.\\2.\\3') }}"
+
+  delegate_to: "{{ trace_node.1 }}"
+  vars:
+    pcm_version: "{{ pcm_private_version | default(pcm_public_version) }}"
+    pcm_repository: "{{ pcm_private_repository | default(pcm_public_repository) }}"
+  

@@ -1,0 +1,159 @@
+import os
+import sys
+import socket
+import shutil
+import subprocess
+
+install_base_path="{{ WORKSPACE }}"
+transport_port={{ cassandra_native_transport_port }}
+storage_port={{ cassandra_storage_port }}
+JMX_port={{ cassandra_JMX_port }}
+instance_num={{ cassandra_server_instance_num }}
+fill_data_only={{ cassandra_fill_data_only }}
+{% raw %}
+server_port = 30000
+OP_COMPACT_WAIT = "compact_wait"
+OP_CLEAN = "clean"
+{% endraw %}
+
+def user_exists(username):
+    try:
+        subprocess.run(["id", username], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+def delete_user(username):
+    try:
+        # Run the userdel command to delete the user
+        subprocess.run(["sudo", "userdel", "-r", username], check=True)
+        print(f"User '{username}' deleted successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error deleting user '{username}': {e}")
+
+def delete_folder(folder_path):
+    shutil.rmtree(folder_path)
+    print(f"The directory '{folder_path}' has been deleted.")
+    return 0
+
+def delete_contents_of_folder(path):
+    target_folder = path
+    if ( os.path.islink(path) ):
+        target_folder = os.path.realpath(path)
+        # Iterate over the items in the folder
+        for item in os.listdir(target_folder):
+            item_path = os.path.join(target_folder, item)
+
+            # Check if it's a file or a directory
+            if os.path.isfile(item_path):
+                os.remove(item_path)  # Remove the file
+            elif os.path.isdir(item_path):
+                shutil.rmtree(item_path)  # Remove the directory and its contents
+
+        print(f"Deleted all files and sub folders in {target_folder}")
+
+def delete_db_data():
+    i = 0
+    message = ""
+    
+    if fill_data_only == True:
+        message="Only data fill, no need to delete data"
+        return message
+
+    i = 0
+    while i < int(instance_num):
+        folder_path = install_base_path + "/cassandra" + str(i) + "/current_data"
+        if delete_contents_of_folder(folder_path):
+            message = message + " " + f"The folder '{folder_path}' does not exist."
+        else:
+            message = message + " " + f"The folder '{folder_path}' has been deleted."
+        i = i + 1
+    return message
+
+def clean_workspace():
+    msg = ""
+    i = 0
+    while i < int(instance_num):
+        path = install_base_path + "/cassandra" + str(i)
+        if os.path.exists(path):
+            if delete_folder(path):
+                msg = msg + " " + f"The folder '{path}' does not exist."
+            else:
+                msg = msg + " " + f"The folder '{path}' has been deleted."
+        #if exist, delete the user
+        username = "cassandra" + str(i)
+        if(user_exists(username)):
+            delete_user(username)
+        i = i + 1
+    return msg
+
+def check_compaction_status():
+    i = 0
+    message = ""
+    while i < int(instance_num):
+        cmd = install_base_path + "/cassandra" + str(i) + "/bin/nodetool compactionstats"
+        print("DEBUG-cmd:%s" %cmd)
+        result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        print(result.stdout)
+        stdout_text = result.stdout.decode('utf-8')
+        if "Active compaction remaining time" in stdout_text:
+            #DB data is in compaction
+            message = result.stdout
+            return message
+        i = i + 1
+    message = "finished"
+    return message
+
+def handle_client_connection(client_socket):
+    # Receive the message from the client
+    message = client_socket.recv(1024).decode()
+    print(f"Received message from client: {message}")
+
+    #check operation code
+    if OP_COMPACT_WAIT == message:
+        response = check_compaction_status()
+    if OP_CLEAN == message:
+        response = delete_db_data()
+        response = response + "  " + clean_workspace()
+
+    # Send the response back to the client
+    client_socket.send(response.encode())
+
+    # Close the connection
+    client_socket.close()
+
+    #if clean, stop itself.
+    if OP_CLEAN == message:
+        kill_process_by_port(int(server_port))
+
+def start_server():
+    # Create a TCP/IP socket
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    # Define the server address and port
+    server_address = ("", server_port)
+
+    # Bind the socket to the server address and port
+    server_socket.bind(server_address)
+
+    # Listen for incoming connections (up to 1 connection)
+    server_socket.listen(1)
+    print("Server started. Waiting for connections...")
+
+    while True:
+        # Wait for a client connection
+        client_socket, client_address = server_socket.accept()
+        print(f"Accepted connection from {client_address}")
+
+        # Handle the client connection in a separate thread
+        handle_client_connection(client_socket)
+
+if __name__ == '__main__':
+    if sys.argv[1] is not None and sys.argv[1] != "":
+        server_port = int(sys.argv[1])
+    if sys.argv[2] is not None and sys.argv[2] != "":
+        instance_num = int(sys.argv[2])
+    if sys.argv[3] is not None and sys.argv[3] != "":
+        install_base_path = sys.argv[3]
+
+    start_server()

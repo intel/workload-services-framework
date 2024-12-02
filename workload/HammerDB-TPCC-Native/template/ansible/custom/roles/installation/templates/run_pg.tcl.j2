@@ -1,0 +1,54 @@
+proc runtimer { seconds } {
+    set x 0
+    set timerstop 0
+    while {!$timerstop} {
+        incr x
+        after 1000
+        if { ![ expr {$x % 60} ] } {
+            set y [ expr $x / 60 ]
+            puts "Timer: $y minutes elapsed"
+        }
+        update
+        if {  [ vucomplete ] || $x eq $seconds } {
+            set timerstop 1
+        }
+    }
+    return
+}
+
+puts "SETTING CONFIGURATION"
+dbset db pg
+dbset bm TPC-C
+diset connection pg_host {{ hostvars["worker-0"]["private_ip"] }}
+diset connection pg_port 5432
+diset tpcc pg_superuser postgres
+diset tpcc pg_superuserpass Postgres@123
+diset tpcc pg_defaultdbase postgres
+diset tpcc pg_driver timed
+diset tpcc pg_rampup {{ wl_tunables.TPCC_MINUTES_OF_RAMPUP }}
+diset tpcc pg_duration {{ wl_tunables.TPCC_MINUTES_OF_DURATION }}
+diset tpcc pg_total_iterations {{ wl_tunables.TPCC_TOTAL_ITERATIONS }}
+diset tpcc pg_allwarehouse false
+diset tpcc pg_vacuum true
+diset tpcc pg_raiseerror  true
+diset tpcc pg_storedprocs true
+diset tpcc pg_timeprofile false
+diset tpcc pg_async_scale false
+diset tpcc pg_connect_pool false
+
+vuset logtotemp 1
+vuset unique 1
+vuset timestamps 1
+loadscript
+puts "SEQUENCE STARTED"
+foreach z [ split "{{ wl_tunables.TPCC_HAMMER_NUM_VIRTUAL_USERS }}" "_" ] {
+    puts "$z VU TEST"
+    vuset vu $z
+    vucreate
+    vurun
+    runtimer {{ wl_tunables.TPCC_RUNTIMER_SECONDS }}
+    vudestroy
+    after {{ wl_tunables.TPCC_WAIT_COMPLETE_MILLSECONDS }}
+}
+puts "TEST SEQUENCE COMPLETE"
+exit

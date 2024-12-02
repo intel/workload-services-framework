@@ -1,0 +1,25 @@
+# distilbert-pytorch-xeon-public-benchmark-24.04
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER="24.04"
+ARG OS_IMAGE="ubuntu"
+FROM ${OS_IMAGE}:${OS_VER} as build
+
+RUN apt update && apt install -y git
+
+RUN mkdir -p /home/workspace
+WORKDIR /home/workspace
+
+ARG IntelAI_MODELS_VER="327946fed06c9c9075c1c2f98d2f8eb7d83b3c8a"
+ARG IntelAI_MODELS_REPO="https://github.com/intel/ai-reference-models"
+RUN git clone -b pytorch-r2.3-models ${IntelAI_MODELS_REPO} && \
+    cd ai-reference-models && \
+    git reset --hard ${IntelAI_MODELS_VER}
+
+# construct the final image
+FROM scratch
+COPY --from=build /home/workspace /home/workspace

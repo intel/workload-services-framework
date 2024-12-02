@@ -1,0 +1,74 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Check if emon is already installed
+    ansible.windows.win_shell: |
+      Get-ChildItem -Path "{{ emon_win_bin_path }}\*\sep_vars.cmd"
+    register: emon_st
+    ignore_errors: true
+  
+  - block:
+  
+    - name: Check processor information
+      ansible.windows.win_shell: |
+        (Get-WmiObject Win32_Processor).Manufacturer | Select -First 1
+      register: vendor_id
+  
+    - name: Remove Directory
+      ansible.windows.win_file:
+        path: "{{ emon_win_bin_path }}\\src"
+        state: absent
+  
+    - name: Create Directory
+      ansible.windows.win_file:
+        path: "{{ emon_win_bin_path }}\\src"
+        state: directory
+  
+    - name: Download the emon installer locally
+      get_url:
+        url: "{{ emon_sep_win_url[vendor_id.stdout_lines|first] }}"
+        dest: "/tmp/{{ emon_sep_win_package[vendor_id.stdout_lines|first] }}"
+        use_proxy: false
+      delegate_to: localhost
+      run_once: true
+      become: false
+      when:
+      - emon_sep_win_url is defined
+      - ('/tmp/'+emon_sep_win_package[vendor_id.stdout_lines|first]) is not exists
+      - ('/opt/project/script/terraform/data/'+emon_sep_win_package[vendor_id.stdout_lines|first]) is not exists
+
+    - name: Copy the emon installer from local
+      ansible.windows.win_copy:
+        src: "{{ (('/opt/project/script/terraform/data/'+emon_sep_win_package[vendor_id.stdout_lines|first]) is exists) | ternary('/opt/project/script/terraform/data/','/tmp/') + emon_sep_win_package[vendor_id.stdout_lines|first] }}"
+        dest: "{{ emon_win_bin_path }}\\src\\sep.zip"
+
+    - name: Unzip the emon package
+      community.windows.win_unzip:
+        src: "{{ emon_win_bin_path }}\\src\\sep.zip"
+        dest: "{{ emon_win_bin_path }}\\src\\"
+        delete_archive: true
+  
+    - name: Get the installer path
+      ansible.windows.win_find:
+        paths: "{{ emon_win_bin_path }}\\src"
+        patterns: "*-installer.cmd"
+        recurse: true
+      register: sep_path
+      
+    - name: Run the emon installer
+      ansible.windows.win_shell: |
+        {{ sep_path.files[0].path | win_basename }} -u -i --accept-license -ni
+      args:
+        chdir: "{{ sep_path.files[0].path | win_dirname }}"
+        executable: cmd
+  
+    when: (emon_st is failed) or (emon_reset | bool)
+  
+  delegate_to: "{{ trace_node.1 }}"
+  become: false
+

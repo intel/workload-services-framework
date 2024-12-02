@@ -1,0 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+sriov_dp_version: 'v3.5.1'
+sriov_dp_configmap_url: "https://raw.githubusercontent.com/k8snetworkplumbingwg/sriov-network-device-plugin/{{ sriov_dp_version }}/deployments/configMap.yaml"
+sriov_dp_daemonset_url: "https://raw.githubusercontent.com/k8snetworkplumbingwg/sriov-network-device-plugin/{{ sriov_dp_version }}/deployments/k8s-v1.16/sriovdp-daemonset.yaml"

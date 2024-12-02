@@ -1,0 +1,39 @@
+# redis-memtier-ubuntu2404
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+FROM ${OS_IMAGE}:${OS_VER}
+
+# Dependencies
+ENV TZ=America/Los_Angeles
+RUN apt update && apt install -y findutils wget build-essential make ruby zlib1g-dev autoconf automake libpcre3 libpcre3-dev libevent-dev pkgconf libssl-dev openssl zip unzip numactl procps netcat-openbsd
+
+WORKDIR /build
+
+# Memtier
+ARG MEMTIER_VER=1.4.0
+ARG MEMTIER_PACKAGE=https://github.com/RedisLabs/memtier_benchmark/archive/refs/tags/${MEMTIER_VER}.tar.gz
+RUN wget ${MEMTIER_PACKAGE} -O memtier.tgz && tar -zxvf memtier.tgz
+RUN cd memtier_benchmark-${MEMTIER_VER} && autoreconf -ivf && ./configure && make && make install
+
+# Redis
+ARG REDIS_VER=7.0.5
+ARG REDIS_PACKAGE=https://download.redis.io/releases/redis-${REDIS_VER}.tar.gz
+RUN wget ${REDIS_PACKAGE} -O redis.tgz && tar -zxvf redis.tgz
+RUN cd redis-${REDIS_VER} && make install
+
+# Add script
+WORKDIR /redis
+RUN mkdir redis-conf
+COPY run-test.sh .
+RUN chmod +x run-test.sh
+
+RUN mkfifo /export-logs
+
+CMD (/redis/run-test.sh; echo $? > status) 2>&1 | tee run.log && \
+    tar cf /export-logs status run.log memtier*.log test-config && sleep infinity

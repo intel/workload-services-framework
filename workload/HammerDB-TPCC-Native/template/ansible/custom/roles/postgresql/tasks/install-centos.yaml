@@ -1,0 +1,67 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Install the prerequests
+  yum:
+    name:
+    - "{{ POSTGRES_CENTOS9_PKG }}"
+    - zlib-devel
+    update_cache: true
+    disable_gpg_check: true
+  register: yumrc
+  until: yumrc is success
+  retries: 10
+  delay: 10
+  become: true
+
+- name: Install PostgreSQL
+  yum:
+    name:
+    - postgresql14-server
+    update_cache: true
+    disable_gpg_check: true
+  register: yumrc
+  until: yumrc is success
+  retries: 10
+  delay: 10
+  become: true
+
+- name: Setup data dir
+  shell: |
+    mkdir -p /mnt/disk1/pgdata
+    sudo chown -R postgres:postgres /mnt/disk1/pgdata
+    mkdir -p /etc/systemd/system/postgresql-14.service.d
+    echo "[Service]" >> /etc/systemd/system/postgresql-14.service.d/override.conf
+    echo "Environment=PGDATA=/mnt/disk1/pgdata" >> /etc/systemd/system/postgresql-14.service.d/override.conf
+  become: true
+
+- name: Stop database and init data dir
+  shell: |
+    systemctl stop postgresql-14
+    /usr/pgsql-14/bin/postgresql-14-setup initdb
+  become: true
+
+- name: Copy cnf file
+  template:
+    src: "pg.cnf.j2"
+    dest: "/mnt/disk1/pgdata/postgresql.conf"
+  become: true
+
+- name: Update pg_hba
+  shell: |
+    echo "host all all all password" >> /mnt/disk1/pgdata/pg_hba.conf
+  become: true
+
+- name: Initialize the database and enable automatic start
+  shell: |
+    systemctl daemon-reload
+    systemctl enable postgresql-14
+    systemctl start postgresql-14
+  become: true
+
+- name: Set password
+  shell: |
+    sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'Postgres@123';"
+  become: true

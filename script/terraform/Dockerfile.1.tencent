@@ -6,12 +6,25 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 ARG RELEASE
-FROM terraform-static${RELEASE}
+FROM terraform-csp-base${RELEASE}
 
 # Install TCCLI 
-ARG TENCENT_CLI_VER=3.0.996.1
-ARG TENCENT_CLI_REPO=conda
-RUN /opt/conda/bin/python3 -m pip install --no-cache-dir tccli==${TENCENT_CLI_VER}
+ARG TENCENT_CLI_VER=3.0.1053.1
+ARG TENCENT_CLI_REPO=pip
+RUN apt-get update && apt-get install -y --no-install-recommends python3-pip pipx && \
+    PIPX_HOME=/opt/pipxhome PIPX_BIN_DIR=/usr/local/bin PIPX_MAN_DIR=/opt/pipxman pipx install --system-site-packages --include-deps --pip-args tccli==${TENCENT_CLI_VER} tccli && \
+    rm -rf /opt/pipxman && \
+    apt-get purge -y python3-pip pipx && \
+    apt-get autoremove -y && apt-get clean -y && \
+    rm -rf /var/lib/apt/lists/*
 
 # Add cleanup script
-RUN echo "alias cleanup=/opt/csp/script/cleanup-tencent.sh" >> /etc/bash.bashrc
+RUN ln -s /opt/project/script/csp/opt/script/cleanup-tencent.sh /usr/local/bin/cleanup && \
+    ln -s /opt/project/script/csp/opt/script/cleanup-common.sh /usr/local/bin/cleanup-common.sh
+
+# Preload terraform plugins
+RUN mkdir -p /usr/local/share/terraform/plugins; \
+    for dir in /opt/terraform/template/terraform/tencent/*; do \
+      (cd $dir; terraform providers mirror /usr/local/share/terraform/plugins) \
+    done
+

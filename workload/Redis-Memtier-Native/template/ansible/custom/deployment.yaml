@@ -1,0 +1,28 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- hosts: localhost
+  gather_facts: no
+  become: yes
+  tasks:
+    - name: Loop Over itr Times
+      include_role:
+        name: deployment
+        tasks_from: itr_deployment.yaml
+      loop: "{{ range(1, run_stage_iterations | default(1) | int+1) }}"
+      loop_control:
+        loop_var: itr
+
+- hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Create Client Group
+      set_fact:
+        dynamic_hosts: "{{ ['worker-0'] if wl_tunables['RUN_SINGLE_NODE'] | bool else range(0, wl_tunables['CLIENT_COUNT']|int) | map('string') | map('regex_replace', '^(.*)$', 'client-\\1') | list }}"
+    - name: Add Dynamic Hosts to Group
+      add_host:
+        name: "{{ item }}"
+        groups: dynamic_clients
+      loop: "{{ dynamic_hosts }}"

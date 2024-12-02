@@ -1,0 +1,16 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- hosts: kvm_hosts
+  become: yes
+  any_errors_fatal: true
+  gather_facts: no
+  tasks:
+
+  - name: Setup KVM
+    include_role:
+      name: kvm
+

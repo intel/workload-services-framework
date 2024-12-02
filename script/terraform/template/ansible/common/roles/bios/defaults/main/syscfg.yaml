@@ -1,0 +1,10 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+syscfg_version: "16.0.9"
+syscfg_package: "https://downloadmirror.intel.com/777360/Syscfg_V{{ syscfg_version }}_AllOS.zip"
+syscfg_bin: "/usr/bin/syscfg/syscfg"
+

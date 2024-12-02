@@ -1,0 +1,10 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+check_connectivity_urls:
+- http://hub.docker.com
+- https://hub.docker.com
+

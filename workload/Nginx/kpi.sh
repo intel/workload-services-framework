@@ -26,23 +26,31 @@ function kvformat(key, value) {
 '
 
 parse_openssl_kpi () {
-    find . -name "$1" -exec awk -e "$parse_common" -e '
+    awk -e "$parse_common" -e '
+BEGIN{
+   Total_CPS=0
+}
 /_Nginx_core_number/ {
     print kvformat($1,$2)
 }
 /OpenSSL_test_client_number/ {
-    print kvformat("OpenSSL test processes number",$2)
+    print kvformat($1,$2)
 }
 /OpenSSL_s_time_test_period/ {
-    print kvformat("OpenSSL s_time test seconds",$2)
+    print kvformat($1,$2)
 }
 /Connections_per_second/ {
-    print kvformat("*Connections per second",$2)
+    print kvformat($1,$2)
+    Total_CPS+=$2
 }
 /Test_case_cost_seconds/ {
-    print kvformat("Test case cost seconds",$2)
+    print kvformat($1,$2)
+    counter+=1
 }
-' "{}" \;
+END {
+    print kvformat("* Total Connections per second",Total_CPS)
+}
+' */output.logs 2>/dev/null
 }
 
 
@@ -75,6 +83,9 @@ parse_ab_kpi () {
 /_requests_per_second/ {
     print kvformat($1,$2)
 }
+/_HTML_transferred_rate/ {
+    print kvformat($1,$2)
+}
 /Client_Stress_Latency_Min/ {
     print kvformat("Client Stress Latency Min (ms)",$2)
 }
@@ -92,6 +103,9 @@ parse_ab_kpi () {
 }
 /Client_Node_Total_Requests_per_second/ {
     print kvformat("*Total requests per second (Requests/s)",$2)
+}
+/Client_Node_Total_HTML_transferred_rate/ {
+    print kvformat("Total HTML ransferred rate (Kbytes/sec)",$2)
 }
 ' "{}" \;
 }
@@ -135,6 +149,7 @@ BEGIN {
     if ($1~/Transfer/) {
         $2=$2"/s"
     } else {
+        $1="*"$1
         $2=$2"reqs/s"
     }
     print kvformat($1,$2);
@@ -145,6 +160,8 @@ BEGIN {
 # https
 if [ ${CLIENT_TYPE} == "openssl" ]; then
 parse_openssl_kpi "output.logs" || true;
+elif [ ${CLIENT_TYPE} == "wrk" ]; then
+parse_wrk_kpi "output.logs" || true;
 else
 parse_ab_kpi "concurrency_max.log" || true;
 fi

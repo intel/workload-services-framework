@@ -10,6 +10,7 @@
     enabled: no
     state: stopped
   failed_when: false
+  no_log: true
 
 - name: Remove wsf-sysfs-settings.service
   file:
@@ -23,7 +24,10 @@
   register: sysfssav
 
 - name: Restore sysfs settings
-  shell: "cat {{ cleanup_restore_path }}/sysfs | bash"
+  shell:
+    cmd: |
+      cat {{ cleanup_restore_path }}/sysfs | bash
+    executable: /bin/bash
   when: sysfssav.stat.exists
   failed_when: false
 

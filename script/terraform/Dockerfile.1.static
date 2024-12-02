@@ -1,0 +1,14 @@
+# terraform-static
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+
+FROM terraform-csp-base${RELEASE}
+RUN  apt-get update && apt-get install -y --no-install-recommends openssh-server && \
+     apt-get clean && \
+     rm -rf /var/lib/apt/lists/*
+

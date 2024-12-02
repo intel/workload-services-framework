@@ -1,0 +1,15 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- set_fact:
+    trace_module_start_block: |
+        nohup bash -c "while true; do date -Ins; numastat {{ numastat_options }} 2>&1; echo ''; sleep {{ numastat_interval }}; done" > numastat-$roi.logs 2>&1 &
+        echo $! > numastat.pid
+        disown
+    trace_module_stop_block: |
+        kill $(cat numastat.pid)
+        tail -f --pid=$(cat numastat.pid) /dev/null
+

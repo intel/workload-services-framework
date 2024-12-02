@@ -1,0 +1,19 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Install Postgresql on Windows worker
+  include_tasks:
+    file: "install-win.yaml"
+  when: wl_tunables.HOSTOS_VER in ['windows2016','windows2019']
+
+- name: Install Postgresql on Centos worker
+  include_tasks:
+    file: "install-centos.yaml"
+  when: wl_tunables.HOSTOS_VER in ['centos7', 'centos9']
+
+- name: Install Postgresql on Ubuntu worker
+  include_tasks:
+    file: "install-ubuntu.yaml"
+  when: wl_tunables.HOSTOS_VER in ['ubuntu2204', 'ubuntu2004']

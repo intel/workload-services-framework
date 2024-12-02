@@ -1,0 +1,14 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+### fix known issue: flannel namespace changed from kube-system to kube-flannel since v0.19.0
+- name: Wait for flannel pod ready
+  shell:
+    cmd: |
+      timeout {{ k8s_cni_ready_wait }} bash -c "while ! kubectl wait --namespace={{ 'kube-flannel' if (k8s_flannel_version is version('v0.19.0', '>=') ) else 'kube-system' }} pod --for=condition=Ready -l app=flannel --timeout 30s; do sleep 1s; done"
+  delegate_to: "{{ ('controller' in groups) | ternary('controller-0','localhost') }}"
+  run_once: true
+

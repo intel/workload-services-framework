@@ -1,0 +1,11 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+nri_version: "v0.2.3"
+nri_repository: "https://github.com/containers/nri-plugins.git"
+nri_resource_policy: "topology-aware"
+nri_installer_options: "--set nri.patchRuntimeConfig=true --set image.tag={{ nri_version }}"
+

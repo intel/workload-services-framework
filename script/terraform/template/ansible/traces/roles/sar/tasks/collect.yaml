@@ -6,27 +6,18 @@
 
 - block:
 
-  - name: Create the sar directory
-    file:
-      path: "{{ wl_logs_dir}}/{{ trace_node.1 }}-{{ itr | default(1) }}-sar"
-      state: directory
-    delegate_to: localhost
-    become: no
-    ignore_errors: yes
-
   - name: "convert sar log on {{ trace_node.1 }}"
     shell:
       cmd: |
         for logs in sar-*.logs; do
           if [ -e "$logs" ]; then
-            sar {{ sar_options }} -f $logs > $logs.txt 2>&1
+            S_TIME_FORMAT=ISO S_TIME_DEF_TIME=UTC sar {{ sar_options }} -f $logs > $logs.txt 2>&1
           fi
         done
-      chdir: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar"
+      chdir: "{{ trace_data_path }}"
       executable: /bin/bash
-    become: yes
-    ignore_errors: yes
-
+    become: true
+  
   - name: get sar_options for sadf
     set_fact:
       sadf_options: >-
@@ -35,64 +26,38 @@
           regex_findall('sar_options\:.*.*', multiline=True) |
           map('regex_replace', '.*: *(.*)$', '\1') |  join(" ")
         }}
-
+  
   - name: Get sadf output
     shell:
       cmd: |
         for logs in sar-*.logs; do
-          if [ -e "$logs" ]; then
-            sadf -d -U -- {{ sadf_options }} $logs > $logs-sadf.logs 2>&1
-          fi
+          [ ! -r "$logs" ] || S_TIME_DEF_TIME=UTC sadf -d -U -- {{ sadf_options }} -t $logs > $logs-sadf.logs 2>&1 || true
         done
-      chdir: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar"
+      chdir: "{{ trace_data_path }}"
       executable: /bin/bash
-    become: yes
-    ignore_errors: yes
-
+    become: true
+  
   - name: Copy profile to log folder
     copy:
       src: sar_profiles.yaml
-      dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-sar/sar_profiles.yaml"
+      dest: "{{ trace_data_local_path }}/sar_profiles.yaml"
     delegate_to: localhost
-    ignore_errors: yes
-
+  
   - name: Get sar fles
     shell:
       cmd: ls -1
-      chdir: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar"
+      chdir: "{{ trace_data_path }}"
       executable: /bin/bash
     register: sar_files
-    ignore_errors: true
-    become: false
-
+  
   - name: Fetch sar files
     fetch:
-      src: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar/{{ item }}"
-      dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-sar/"
-      flat: yes
-    become: no
+      src: "{{ trace_data_path }}/{{ item }}"
+      dest: "{{ trace_data_local_path }}/"
+      flat: true
     loop: "{{ sar_files.stdout_lines | reject('==', 'sar.pid') }}"
-    ignore_errors: yes
-
-  - name: Remove any collection files
-    file:
-      path: "/tmp/{{ wl_namespace }}-{{ trace_node.1 }}-sar"
-      state: absent
-    become: yes
-    ignore_errors: yes
-
-  - name: Generate sar html pages
-    include_tasks:
-      file: sar-html.yaml
-    when: (roi.0 != '---') and (roi.1 != '---')
-    loop: "{{ start | zip(stop) }}"
-    loop_control:
-      loop_var: roi
-      index_var: roi_index
-    vars:
-      sar_dir: "{{ wl_logs_dir }}/{{ trace_node.1 }}-{{ itr | default(1) }}-sar"
-      start: "{{ lookup('file', sar_dir + '/TRACE_START') | split('\n') }}"
-      stop: "{{ lookup('file', sar_dir + '/TRACE_STOP') | split('\n') }}"
-
+  
   delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: false
 

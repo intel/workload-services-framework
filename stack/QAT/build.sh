@@ -6,5 +6,5 @@
 #
 
 DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
-FIND_OPTIONS="( -name Dockerfile.*.${STACK//_/-}* )"
+FIND_OPTIONS="( -name Dockerfile.*.${STACK//_/-} )"
 . "$DIR"/../../script/build.sh

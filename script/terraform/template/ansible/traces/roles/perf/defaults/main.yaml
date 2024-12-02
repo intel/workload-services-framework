@@ -3,12 +3,13 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
-
+perf: false
+perf_interval: 500
+perf_delay: 0
 perf_record_options: "-a -g"
 perf_report_options: "--header"
 perf_fetch_data: false
 perf_script_options: ""
-perf_action: "record"
-perf_stat_options: "-a -I 500 -e cycles -e instructions"
-perf_options: "{{ (perf_action == 'stat') | ternary(perf_stat_options, perf_record_options) }}"
+perf_action: "stat"
+perf_stat_options: "-a -I {{ perf_interval }} -D {{ perf_delay }} -e cycles -e instructions --per-socket -e power/energy-pkg/"
 perf_skip_report: false

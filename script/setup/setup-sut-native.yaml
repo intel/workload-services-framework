@@ -1,0 +1,55 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- hosts: cluster_hosts
+  any_errors_fatal: true
+  gather_facts: false
+  become: true
+  tasks:
+
+    - block:
+
+      - name: set no proxy
+        include_role:
+          name: no-proxy
+
+      - name: set timezone and datetime
+        include_role:
+          name: datetime
+        when: sut_update_datetime | bool
+
+      - name: remove legacy Kubernetes entries
+        include_role:
+          name: legacy-repo
+
+      - name: check for essentials
+        include_role:
+          name: check
+
+      - name: Intall Intel Certificate
+        include_role:
+          name: intel-ca
+        when:
+        - install_intelca | bool
+        - (playbook_dir + '/roles/intel-ca') is exists
+
+      when: inventory_hostname in dict(play_hosts | map('extract',hostvars,['private_ip']) | zip(play_hosts)).values()
+
+- hosts: trace_hosts
+  any_errors_fatal: true
+  become: true
+  gather_facts: false
+  tasks:
+
+    - name: Install trace programs
+      include_role:
+        name: "{{ trace_node.0 }}"
+        tasks_from: install
+      when:
+      - hostvars[trace_node.1][trace_node.0 | basename] | default(false) | bool
+      loop: "{{ lookup('pipe','find ../terraform/template/ansible/traces/roles -mindepth 3 -maxdepth 3 -name install.yaml -print') | split('\n') | map('regex_replace','.*/roles/([^/]*)/.*','\\1') | zip_longest([], fillvalue=inventory_hostname) }}"
+      loop_control:
+        loop_var: trace_node

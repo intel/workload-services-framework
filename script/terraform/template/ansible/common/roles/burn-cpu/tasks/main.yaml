@@ -1,0 +1,9 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Burn CPU
+  script: scripts/calc_pi.sh {{ burn_cpu_scale }} {{ burn_cpu_seconds }} {{ burn_cpu_threads }}
+

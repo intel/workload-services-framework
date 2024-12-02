@@ -28,7 +28,7 @@ spec:
         secret:
           secretName: wsf-registry-config
       containers:
-        - image: registry:2
+        - image: {{ k8s_registry_image }}
           name: registry
           imagePullPolicy: IfNotPresent
           ports:

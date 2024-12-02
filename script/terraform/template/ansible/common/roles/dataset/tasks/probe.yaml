@@ -1,0 +1,34 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- block:
+
+  - name: check dataset availability
+    shell:
+      cmd: |
+        find -L -mindepth 1 -maxdepth {{ dataset_path_items | length }} -type d -ipath "./{{ dataset_path_items | join('[/-]') }}" -print 2> /dev/null || true
+      executable: /bin/bash
+      chdir: "/opt/dataset"
+    register: dataset_paths
+    ignore_errors: true
+
+  - name: fail if dataset is not available
+    fail:
+      msg: "Dataset {{ dataset_path_items | join('-') }} not found. This workload requires to prepare the dataset under /opt/dataset. Please see workload README for details."
+    when:
+    - dataset_paths.stdout_lines | default([],true) | length == 0
+    - (role_path+'/tasks/install-'+dataset_name+'.yaml') is not exists
+
+  - name: set to install dataset
+    set_fact:
+      dataset_to_be_installed: "{{ dataset_to_be_installed | default([]) | union([label_name]) }}"
+    when:
+    - dataset_paths.stdout_lines | default([], true) | length == 0
+
+  when: ('=required' in label_name)
+  vars:
+    dataset_path_items: "{{ label_name | split('=') | first | replace('HAS-SETUP-DATASET-','') | split('-') }}"
+    dataset_name: "{{ label_name | split('=') | first | replace('HAS-SETUP-DATASET-','') | lower }}"
+

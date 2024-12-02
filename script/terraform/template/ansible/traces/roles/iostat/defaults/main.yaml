@@ -1,0 +1,9 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+iostat: false
+iostat_interval: "5"
+iostat_options: "-c -d -h -N -p ALL -x -z"
+

@@ -1,0 +1,111 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Remove any pre installed vtune
+    apt:
+      name: 
+        - "intel-oneapi-vtune"
+      state: absent
+    become: yes
+  
+  - name: Remove any pre installation files
+    file:
+      path: "/opt/intel/oneapi/vtune"
+      state: absent
+    become: yes
+  
+  - name: install prerequisite
+    apt:
+      name: gnupg
+      state: present
+      update_cache: true
+    register: aptrc
+    until: aptrc is success
+    retries: 10
+    delay: 5
+    become: true
+  
+  - name: Detect kernel version
+    shell:
+      cmd: uname -r
+      executable: /bin/bash
+    register: kernel_version
+  
+  - name: Check if kernel header is already installed
+    stat:
+      path: "/usr/src/kernels/{{ kernel_version.stdout }}"
+    register: kernel_header
+  
+  - name: Install kernel header
+    apt:
+      name: 
+        - "linux-headers-{{ kernel_version.stdout }}"
+      state: present
+    become: yes
+    register: aptrc
+    until: aptrc is success
+    retries: 10
+    delay: 10
+    when: not kernel_header.stat.exists
+  
+  - name: add oneAPI GPG key
+    get_url:
+      url: "https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB" 
+      dest: /tmp/oneAPI.gpg
+      mode: '0644'
+      force: true
+    environment:
+      no_proxy: "{{ no_proxy }}"
+    become: false
+    register: getrc
+    until: getrc is success
+    retries: 10
+    delay: 10
+  
+  - name: deamor the oneAPI GPG key
+    command: gpg --yes --dearmor -o /usr/share/keyrings/oneapi-archive-keyring.gpg /tmp/oneAPI.gpg
+    become: true
+  
+  - name: install oneapi
+    block:
+  
+      - name: add oneAPI repository to apt
+        apt_repository:
+          filename: oneapi
+          repo: "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main"
+          state: present
+          update_cache: false
+        environment:
+          no_proxy: "{{ no_proxy }}"
+        become: true
+  
+       - name: Install vtune
+         apt:
+           name: 
+             - "intel-oneapi-vtune={{ vtune_version }}"
+           state: present
+           update_cache: yes
+         environment:
+           no_proxy: "{{ no_proxy }}"
+         become: yes
+         register: aptrc
+         until: aptrc is success
+         retries: 10
+         delay: 10
+  
+    always:
+  
+      - name: add oneAPI repository to apt
+        apt_repository:
+          filename: oneapi
+          repo: "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main"
+          state: absent
+        become: true
+  
+  delegate_to: "{{ trace_node.1 }}"
+

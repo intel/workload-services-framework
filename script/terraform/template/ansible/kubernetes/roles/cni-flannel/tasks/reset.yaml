@@ -8,3 +8,4 @@
   command: "ip link delete flannel.1"
   become: true
   ignore_errors: yes
+

@@ -1,0 +1,31 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: check intel-gpu-top exists
+    stat:
+      path: "{{ item }}"
+    loop:
+      - /usr/bin/intel_gpu_top
+      - /usr/bin/ts
+    register: intelgputop_st
+    ignore_errors: true
+
+  - name: Detect OS
+    shell:
+      cmd: ". /etc/os-release; echo $ID"
+      executable: /bin/bash
+    register: os
+    when: not (intelgputop_st.results[0].stat.exists and intelgputop_st.results[1].stat.exists)
+  
+  - name: Install intel-gpu-tools and moreutils
+    include_tasks:
+      file: "install-{{ (os.stdout in ['ubuntu','debian']) | ternary('debian', 'centos') }}.yaml"
+    when: not (intelgputop_st.results[0].stat.exists and intelgputop_st.results[1].stat.exists)
+  
+  delegate_to: "{{ trace_node.1 }}"
+  

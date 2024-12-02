@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+openssl version
 NODE=${NODE:-2}
 MODE=${MODE:-https}
 NGINX_HOST=${NGINX_SERVICE_NAME:-nginx-server-service}
@@ -12,7 +13,8 @@ PORT=${PORT:-443}
 APACHE_PATH=${APACHE_PATH:-"/home"}
 APACHE_BINARY=ab
 GETFILE=${GETFILE:-index.html}
-CLIENT_CPU_LISTS=${CLIENT_CPU_LISTS:-0} 
+CLIENT_CPU_LISTS=${CLIENT_CPU_LISTS:-0}
+BIND_CORE=${BIND_CORE:-1C1T}
 
 echo "client testing configurations:"
 echo NODE:$NODE
@@ -24,6 +26,7 @@ echo GETFILE:$GETFILE
 echo CLIENT_CPU_LISTS:$CLIENT_CPU_LISTS
 echo SWEEPING:$SWEEPING
 echo PACE:$PACE
+echo BIND_CORE:$BIND_CORE
 
 PROTOCOL=${PROTOCOL:-TLSv1.3}
 CIPHER=${CIPHER:-AES128-GCM-SHA256}
@@ -35,8 +38,6 @@ PROTOCOL=$(echo "$PROTOCOL" | sed 's/v//g')
 
 echo PROTOCOL:$PROTOCOL
 echo CIPHER:$CIPHER
-echo CURVE:$CURVE
-echo CERT:$CERT
 
 if [[ $MODE == "http" ]]; then
   REQUESTS=${REQUESTS:-1000000}
@@ -114,7 +115,7 @@ whole_system_cores=`nproc`
 system_last_core_id=`expr $whole_system_cores - 1`
 echo system cores $whole_system_cores, core list 0 - $system_last_core_id
 
-NGINX_WORKERS=${NGINX_WORKERS:-4}
+NGINX_WORKERS=${NGINX_WORKERS:-1}
 if [[ $MAX_CORE_WORKER_CLIENT == "true" ]]; then
     NGINX_WORKERS=$whole_system_cores
     CLIENT_CPU_NUM=$whole_system_cores
@@ -126,7 +127,10 @@ echo CLIENT_CPU_NUM:$CLIENT_CPU_NUM
 
 begin=0
 if [ $NODE == 1 ]; then
-  begin=$NGINX_WORKERS
+  begin=$((NGINX_WORKERS + CORE_START))
+  if [[ $BIND_CORE == "1C2T" ]]; then
+    begin=$(lscpu | grep "NUMA node1 CPU(s):" | awk '{print $4}' | awk '{split($1, arr, ","); print arr[1]}' | awk '{split($1, arr, "-"); print arr[1]}')
+  fi
 fi
 
 # for 2node simu 3node only
@@ -160,18 +164,19 @@ lscpu
 # client check nginx server IP address access ready
 wget_cur_wait_loop=0
 NGINX_RESPONSE=0
-while [ ! $NGINX_RESPONSE ] || [ $NGINX_RESPONSE -ne 200 ] ; 
+while [ ! $NGINX_RESPONSE ] || [ $NGINX_RESPONSE -ne 200 ] ;
 do
   wget_cur_wait_loop=`expr $wget_cur_wait_loop + 1`
   if (( wget_cur_wait_loop > 100 )); then
     echo client wait for Nginx server $URL timeout;
     exit 3;
   fi
-  echo round:$wget_cur_wait_loop wget_waiting $URL...;sleep 3s; 
+  echo round:$wget_cur_wait_loop wget_waiting $URL...;sleep 3s;
   NGINX_RESPONSE=$(wget --server-response --no-check-certificate $URL 2>&1 | awk '/^  HTTP/{print $2}')
   echo NGINX_RESPONSE:$NGINX_RESPONSE
 done
 echo wget waiting $URL available done
+
 
 function run(){
     concurrency=$1
@@ -217,48 +222,56 @@ function run(){
       done
     fi
 
-    if [ $CLIENT_ID == 2 ]; then
-      sed -i "s|listen 80|listen 999|" /usr/local/share/nginx/conf/nginx-http-with-upload.conf
-      nginx -c /usr/local/share/nginx/conf/nginx-http-with-upload.conf
+    if [ $CLIENT_ID -ge 2 ]; then
+     sed -i "s|listen 80|listen ${SERVICE_PORT}|" /usr/local/share/nginx/conf/nginx-http-with-upload.conf
+     nginx -c /usr/local/share/nginx/conf/nginx-http-with-upload.conf
     fi
 
-    for i in {1..90}; do
+  for i in {1..90}; do
+
+    seq=$i
 
     # clean up
     rm -f tmp*.log
-    rm -f client?_cps_ok.txt
-    rm -f client?_ready.txt
 
-    # client1 & client2 sync to start the stress
-    if [ $NODE == 3 ]; then
-     if [ $CLIENT_ID == 2 ]; then
-      echo ready > /var/www/html/client2_ready.txt   # self ready marker
-      echo client node 2 wait for client node 1 ready
-      while [ ! -s /var/www/html/client1_ready.txt ]; do
-        sleep 0;
-      done
-      rm -f /var/www/html/client?_ready.txt
-      rm -f /var/www/html/client?_cps_ok.txt
-      echo go
-     else
-      # client1 wait client2 ready
-      wget_client2_wait_loop=0
-      while [ ! -f client2_ready.txt ] ;
-      do
-        wget_client2_wait_loop=$(( $wget_client2_wait_loop + 1 ))
-        if (( wget_client2_wait_loop > 1000 )); then
-          echo client1 wait for client2 timeout;
-          exit 3;
-        fi
-        echo round:$wget_client2_wait_loop wget_waiting http://client2-service:999/client2_ready.txt...; sleep 1;
-        timeout -s 9 20s wget http://client2-service:999/client2_ready.txt
-      done
+    if [ $NODE -ge 3 ]; then
+      LOCAL_TEST_RESULT="OK"
+      echo $LOCAL_TEST_RESULT > /var/www/html/client${CLIENT_ID}_ready_$seq.txt
+      if [ $CLIENT_ID == 1 ]; then
+        for (( j=2 ; j<$NODE ; j++ ));
+        do
+          wget_client_wait_loop=0
+          while [ ! -f "client${j}_ready_$seq.txt" ] ;
+          do
+            wget_client_wait_loop=$(( $wget_client_wait_loop + 1 ))
+            if (( wget_client_wait_loop > 2000 )); then
+              echo client${CLIENT_ID} wait for client${j} timeout;
+              exit 3;
+            fi
+            echo client${CLIENT_ID} waiting client${j} ....
+            sleep 5;
+            let "port=1001-$j"
+            timeout -s 9 20s wget http://client${j}-service:${port}/client${j}_ready_$seq.txt
+          done
+        done
+        for (( j=2 ; j<$NODE ; j++ ));
+        do
+          let "port=1001-$j"
+          curl http://client${j}-service:${port}/client1_ready_$seq.txt --upload-file /var/www/html/client1_ready_$seq.txt
+        done
+      else
+        wget_client_wait_loop=0
+        while [ ! -s /var/www/html/client1_ready_$seq.txt ]; do
+          wget_client_wait_loop=$(( $wget_client_wait_loop + 1 ))
+          if (( wget_client_wait_loop > 2000 )); then
+            echo client${CLIENT_ID} wait for other client to ready timeout;
+            exit 3;
+          fi
+          echo client node ${CLIENT_ID} wait for other client to be ready ...
+          sleep 1;
+        done
+      fi
 
-      echo client node1 put ready flag to client node2
-      echo ready > client1_ready.txt
-      $APACHE_BINARY -u client1_ready.txt http://client2-service:999/client1_ready.txt > /dev/null
-      echo go
-     fi
     fi
 
       sleep 0;
@@ -266,18 +279,18 @@ function run(){
       if [ $CLIENT_CPU_LISTS != 0 ]; then
         for i in ${CLIENT_CPU_LISTS_ARRAY[*]}; do
           if [ $GETFILE != index.html ]; then
-            taskset -c ${i} ${APACHE_BINARY} -n $REQUESTS -q -r -c $concurrency -Z $CIPHER -f $PROTOCOL $URL > tmp${i}.log &
+            taskset -c ${i} ${APACHE_BINARY} -n $REQUESTS -q -r -c $concurrency -Z $CIPHER -f $PROTOCOL $URL > tmp${i}.log 2>>log_error.out &
           else
-            taskset -c ${i} ${APACHE_BINARY} -n $REQUESTS -q -r -i -c $concurrency -Z $CIPHER -f $PROTOCOL $URL > tmp${i}.log &
+            taskset -c ${i} ${APACHE_BINARY} -n $REQUESTS -q -r -i -c $concurrency -Z $CIPHER -f $PROTOCOL $URL > tmp${i}.log 2>>log_error.out &
           fi
         done
       else
         for (( i=$begin;i<=$end;i=i+1 )); do
           # -i: ab executes the HEAD request
           if [ $GETFILE != index.html ]; then
-            taskset -c ${i} ${APACHE_BINARY} -n $REQUESTS -q -r -c $concurrency -Z $CIPHER -f $PROTOCOL $URL > tmp${i}.log &
+            taskset -c ${i} ${APACHE_BINARY} -n $REQUESTS -q -r -c $concurrency -Z $CIPHER -f $PROTOCOL $URL > tmp${i}.log 2>>log_error.out &
           else
-            taskset -c ${i} ${APACHE_BINARY} -n $REQUESTS -q -r -i -c $concurrency -Z $CIPHER -f $PROTOCOL $URL > tmp${i}.log &
+            taskset -c ${i} ${APACHE_BINARY} -n $REQUESTS -q -r -i -c $concurrency -Z $CIPHER -f $PROTOCOL $URL > tmp${i}.log 2>>log_error.out &
           fi
         done
       fi
@@ -312,7 +325,7 @@ function run(){
 
     # check client node apache bench logs number both OK
     LOCAL_TEST_RESULT=""
-    if [ $log_cps_ok == `expr $end - $begin + 1` ]; then
+    if [ $log_cps_ok == `expr $end - $begin + 1` ] || [ $log_cps_ok == ${#CLIENT_CPU_LISTS_ARRAY[@]} ] ; then
      LOCAL_TEST_RESULT="OK"
     else
      LOCAL_TEST_RESULT="FAILED"
@@ -322,37 +335,79 @@ function run(){
     fi
 
     REMOTE_TEST_RESULT=""
-    if [ $NODE == 3 ]; then
-     if [ $CLIENT_ID == 2 ]; then
-      echo $LOCAL_TEST_RESULT > /var/www/html/client2_cps_ok.txt
-      while [ ! -s /var/www/html/client1_cps_ok.txt ]; do
-        echo client node 2 wait for client node 1 result
-        sleep 1;
-      done
-      REMOTE_TEST_RESULT=$(cat /var/www/html/client1_cps_ok.txt)
-     else
-      echo $LOCAL_TEST_RESULT > client1_cps_ok.txt
-      $APACHE_BINARY -u client1_cps_ok.txt http://client2-service:999/client1_cps_ok.txt > /dev/null
-      while [ ! -f "client2_cps_ok.txt" ] ;
-      do
-       echo client1 waiting client2 result
-       sleep 1;
-       timeout -s 9 20s wget http://client2-service:999/client2_cps_ok.txt
-      done
-      REMOTE_TEST_RESULT=$(cat client2_cps_ok.txt)
-     fi
+    if [ $NODE -ge 3 ]; then
+      OK_TEST_RESULT_COUNT=1
+      if [ $CLIENT_ID == 1 ]; then
+        echo $LOCAL_TEST_RESULT > client${CLIENT_ID}_cps_ok_$seq.txt
+        for (( j=2 ; j<$NODE ; j++ ));
+        do
+          let "port=1001-$j"
+          wget_client_wait_loop=0
+          while [ ! -f "client${j}_cps_ok_$seq.txt" ] ;
+          do
+            wget_client_wait_loop=$(( $wget_client_wait_loop + 1 ))
+            if (( wget_client_wait_loop > 2000 )); then
+              echo client${CLIENT_ID} wait for client${j} result timeout;
+              exit 3;
+            fi
+            echo "client$CLIENT_ID waiting client$j result"
+            sleep 1;
+            let "port=1001-$j"
+            timeout -s 9 20s wget http://client${j}-service:${port}/client${j}_cps_ok_$seq.txt
+          done
+          REMOTE_TEST_RESULT=$(cat client${j}_cps_ok_$seq.txt)
+          echo "remote result $REMOTE_TEST_RESULT $j "
+          if [ "$REMOTE_TEST_RESULT" == "OK" ] ; then
+            OK_TEST_RESULT_COUNT=$((OK_TEST_RESULT_COUNT+1))
+          fi
+        done
+        if [ "$LOCAL_TEST_RESULT" == "OK" ] ; then
+          OK_TEST_RESULT_COUNT=$((OK_TEST_RESULT_COUNT+1))
+        fi
+        if [ $OK_TEST_RESULT_COUNT == $NODE ]; then
+          for (( j=2 ; j<$NODE ; j++ ));
+          do
+            let "port=1001-$j"
+            $APACHE_BINARY -u client${CLIENT_ID}_cps_ok_$seq.txt http://client${j}-service:${port}/client${CLIENT_ID}_cps_ok_$seq.txt > /dev/null
+          done
+          break
+        else
+          echo "FAILED" > client${CLIENT_ID}_cps_ok_$seq.txt
+          for (( j=2 ; j<$NODE ; j++ ));
+          do
+            let "port=1001-$j"
+            $APACHE_BINARY -u client${CLIENT_ID}_cps_ok_$seq.txt http://client${j}-service:${port}/client${CLIENT_ID}_cps_ok_$seq.txt > /dev/null
+          done
+        fi
 
-      if [ "$LOCAL_TEST_RESULT" == "OK" ] && [ "$REMOTE_TEST_RESULT" == "OK" ] ; then
-        echo local and remote apache bench testing log number both OK.
-        break;
+      else
+        echo $LOCAL_TEST_RESULT > /var/www/html/client${CLIENT_ID}_cps_ok_$seq.txt
+        while [ ! -s /var/www/html/client1_cps_ok_$seq.txt ]; do
+          echo "client node ${CLIENT_ID} wait for client node 1 result"
+          sleep 1;
+        done
+        REMOTE_TEST_RESULT=$(cat /var/www/html/client1_cps_ok_$seq.txt)
+        if [ "$REMOTE_TEST_RESULT" == "OK" ] ; then
+          echo "result ok, collect result"
+          break
+        fi
       fi
     else
       if [ "$LOCAL_TEST_RESULT" == "OK" ] ; then
+        echo "result ok, collect result"
         break;
       fi
     fi
 
-    done
+    echo "test result not ok"
+
+    # clean up
+    rm -f client?_cps_ok_$seq.txt
+    rm -f client?_ready_$seq.txt
+    rm -f /var/www/html/client?_cps_ok_$seq.txt
+    rm -f /var/www/html/client?_ready_$seq.txt
+
+  done
 
     if [ $CLIENT_CPU_LISTS != 0 ]; then
       for i in ${CLIENT_CPU_LISTS_ARRAY[*]}; do
@@ -372,37 +427,43 @@ function run(){
     Failed_requests=$(grep 'Failed requests' tmp*.log |awk '{print $3}' |awk '{sum+=$1} END{print sum}')
     Total_transferred=$(grep 'Total transferred' tmp*.log |awk '{print $3}' |awk '{sum+=$1} END{print sum}')
     HTML_transferred=$(grep 'HTML transferred' tmp*.log |awk '{print $3}' |awk '{sum+=$1} END{print sum}')
+    Transfer_rate=$(grep 'Transfer rate' tmp*.log |awk '{print $3}' |awk '{sum+=$1} END{print sum}')
 
-    if [ $CLIENT_ID == 2 ]; then
-     echo "--- Client Node 2 Get final results for all $log_cps_ok vclients ---"
+    if [ $CLIENT_ID -ge 2 ]; then
+      echo "--- Client Node $CLIENT_ID Get final results for all $log_cps_ok vclients ---"
 
-     echo Client_Node2_Configured_Core_Number: $CLIENT_CPU_NUM > /var/www/html/client2.log
-     echo Client_Node2_Testing_Core_Number: $CLIENT_TESTING_REAL_NUM >> /var/www/html/client2.log
-     echo Client_Node2_Launch_vclients_seconds: $(($waitstarttime - $starttime)) >> /var/www/html/client2.log
-     echo Client_Node2_Reqeuest_per_vclient: $REQUESTS >> /var/www/html/client2.log
-     echo Client_Node2_Concurrency_per_vclient: $concurrency >> /var/www/html/client2.log
-     echo Client_Node2_Complete_requests: ${Complete_requests} >> /var/www/html/client2.log
-     echo Client_Node2_Failed_requests: ${Failed_requests} >> /var/www/html/client2.log
-     echo Client_Node2_requests_per_second: ${Request_Per_Second} >> /var/www/html/client2.log
-     echo Client_Node2_Total_transferred_byte: ${Total_transferred} >> /var/www/html/client2.log
-     echo Client_Node2_HTML_transferred_byte: ${HTML_transferred} >> /var/www/html/client2.log
+      echo Client_Node${CLIENT_ID}_Configured_Core_Number: $CLIENT_CPU_NUM > /var/www/html/client${CLIENT_ID}.log
+      echo Client_Node${CLIENT_ID}_Testing_Core_Number: $CLIENT_TESTING_REAL_NUM >> /var/www/html/client${CLIENT_ID}.log
+      echo Client_Node${CLIENT_ID}_Launch_vclients_seconds: $(($waitstarttime - $starttime)) >> /var/www/html/client${CLIENT_ID}.log
+      echo Client_Node${CLIENT_ID}_Reqeuest_per_vclient: $REQUESTS >> /var/www/html/client${CLIENT_ID}.log
+      echo Client_Node${CLIENT_ID}_Concurrency_per_vclient: $concurrency >> /var/www/html/client${CLIENT_ID}.log
+      echo Client_Node${CLIENT_ID}_Complete_requests: ${Complete_requests} >> /var/www/html/client${CLIENT_ID}.log
+      echo Client_Node${CLIENT_ID}_Failed_requests: ${Failed_requests} >> /var/www/html/client${CLIENT_ID}.log
+      echo Client_Node${CLIENT_ID}_requests_per_second: ${Request_Per_Second} >> /var/www/html/client${CLIENT_ID}.log
+      echo Client_Node${CLIENT_ID}_Total_transferred_byte: ${Total_transferred} >> /var/www/html/client${CLIENT_ID}.log
+      echo Client_Node${CLIENT_ID}_HTML_transferred_byte: ${HTML_transferred} >> /var/www/html/client${CLIENT_ID}.log
+      echo Client_Node${CLIENT_ID}_HTML_transferred_rate: ${Transfer_rate} >> /var/www/html/client${CLIENT_ID}.log
 
     else
 
-     if [ $NODE == 3 ]; then
-      wget_client2_wait_loop=0
-      rm -f client2.log;
-      while [ ! -f "client2.log" ] ;
+     if [ $NODE -ge 3 ]; then
+      for (( i=2 ; i<$NODE ; i++ ));
       do
-        wget_client2_wait_loop=`expr $wget_client2_wait_loop + 1`
-        if (( wget_client2_wait_loop > 200 )); then
-          echo client wait for client2 log timeout;
-          exit 3;
-        fi
-        sleep 5;
-        timeout -s 9 20s wget http://client2-service:999/client2.log
+        wget_client_wait_loop=0
+        rm -f client${i}.log;
+        while [ ! -f "client${i}.log" ] ;
+        do
+          wget_client_wait_loop=`expr $wget_client_wait_loop + 1`
+          if (( wget_client_wait_loop > 200 )); then
+            echo client wait for client$i log timeout;
+            exit 3;
+          fi
+          sleep 5;
+          let "port=1001-$i"
+          timeout -s 9 20s wget http://client${i}-service:${port}/client${i}.log
+        done
+        echo client${CLIENT_ID} waiting client${i} available done
       done
-      echo client1 waiting client2 available done
      fi
 
      echo "--- Client Node 1 Get final results for all vclients ---"
@@ -419,15 +480,22 @@ function run(){
      echo Client_Node1_requests_per_second: ${Request_Per_Second} | tee -a $log_file
      echo Client_Node1_Total_transferred_byte: ${Total_transferred} | tee -a $log_file
      echo Client_Node1_HTML_transferred_byte: ${HTML_transferred} | tee -a $log_file
+     echo Client_Node1_HTML_transferred_rate: ${Transfer_rate} | tee -a $log_file
 
-     total_cps2=0
-     if [ $NODE == 3 ]; then
-        cat client2.log
-        total_cps2=$(grep 'requests_per_second' client2.log |awk '{print $2}' |awk '{sum+=$1} END{print sum}')
+     if [ $NODE -ge 3 ]; then
+        for (( i=2 ; i<$NODE ; i++ ));
+        do
+          cat client${i}.log
+          total_cps=$(grep 'requests_per_second' client${i}.log |awk '{print $2}' |awk '{sum+=$1} END{print sum}')
+          total_throughput=$(grep 'transferred_rate' client${i}.log |awk '{print $2}' |awk '{sum+=$1} END{print sum}')
+          echo cps $total_cps > node${i}_cps_result
+          echo throughput $total_throughput > node${i}_tpt_result
+        done
      fi
-     echo cps $total_cps2 > node2_cps_result
      echo cps $Request_Per_Second > node1_cps_result
+     echo throughput $Transfer_rate > node1_tpt_result
      total_cps=$(grep 'cps' node*_cps_result |awk '{print $2}' |awk '{sum+=$1} END{print sum}')
+     total_throughput=$(grep 'throughput' node*_tpt_result |awk '{print $2}' |awk '{sum+=$1} END{print sum}')
 
     for (( j=$begin;j<=$end;j=j+1 )); do
      if [ -s tmp${j}.log ]; then
@@ -447,10 +515,12 @@ function run(){
     done
 
      echo Client_Node_Total_Requests_per_second: $total_cps | tee -a $log_file
+     echo Client_Node_Total_HTML_transferred_rate: $total_throughput | tee -a $log_file
      echo Test_case_cost_seconds: $(($(date +%s) - $starttime)) | tee -a $log_file
 
     fi
 }
+
 #If sweeping is off, run benchmark with default concurrency
 if [[ $SWEEPING == "off" ]]; then
     run $CONCURRENCY concurrency_max.log

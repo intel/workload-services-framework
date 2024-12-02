@@ -14,14 +14,28 @@ import copy
 CLUSTER_CONFIG = "cluster-config.yaml"
 KUBERNETES_CONFIG = "kubernetes-config.yaml"
 COMPOSE_CONFIG = "compose-config.yaml"
+DOCKER_CONFIG = "docker-config.yaml"
 INVENTORY = "inventory.yaml"
 CLUSTER = "cluster.yaml"
 CLEANUP = "cleanup.yaml"
+EXPORT = "export.yaml"
 SSH_CONFIG = "ssh_config_bastion"
 WORKLOAD_CONFIG = "workload-config.yaml"
 
 tfoutput = json.load(sys.stdin)
 options = tfoutput["values"]["outputs"]["options"]["value"]
+
+with open(CLUSTER_CONFIG) as fd:
+  for doc in yaml.safe_load_all(fd):
+    if doc and "terraform" in doc:
+      for option1 in doc["terraform"]:
+        if option1 not in options:
+          options[option1] = doc["terraform"][option1]
+        elif isinstance(options[option1], dict):
+          tmp = copy.deepcopy(doc["terraform"][option1])
+          tmp.update(options[option1])
+          options[option1] = tmp
+
 for argv in sys.argv:
   if argv.startswith("--"):
     argv = argv[2:]
@@ -70,7 +84,7 @@ for host in instances:
   inventories[vm_group]["hosts"][host]=dict(instances[host])
   inventories[vm_group]["hosts"][host].update({
     "ansible_host": instances[host].get("ansible_host", instances[host].get("public_ip", instances[host].get("private_ip","127.0.0.1"))),
-    "ansible_user": instances[host].get("ansible_user", instances[host].get("user_name","")),
+    "ansible_user": instances[host].get("ansible_user", instances[host].get("user_name",os.environ["TF_USER"])),
     "ansible_port": instances[host].get("ansible_port", instances[host].get("ssh_port", 22)),
     "wl_kernel_args": options.get("wl_kernel_args", {}),
   })
@@ -90,6 +104,9 @@ with open(WORKLOAD_CONFIG) as fd:
 def _ExtendOptions(updates):
   tmp = options.copy()
   tmp.update(updates)
+  tmp.update({
+    "workload_config": workload_config
+  })
   return tmp
 
 
@@ -129,24 +146,6 @@ def _ScanK8sImages():
   return list(images.keys())
 
 
-def _ScanDockerImages():
-  images = {}
-
-  if options.get("compose", False) and os.path.exists(COMPOSE_CONFIG):
-    with open(COMPOSE_CONFIG) as fd:
-      for doc in yaml.safe_load_all(fd):
-        if doc:
-          if "services" in doc:
-            for svc in doc["services"]:
-              if "image" in doc["services"][svc]:
-                images[doc["services"][svc]["image"]] = 1
-
-  if options.get("docker", False) and "docker_image" in workload_config:
-    images[workload_config["docker_image"]] = 1
-
-  return list(images.keys())
-
-
 def _DecodeKernelArgs(line):
   llist = line.split(" ")
   return { llist[k]:llist[k+1] for k in range(0,len(llist)-1,2) }
@@ -154,20 +153,6 @@ def _DecodeKernelArgs(line):
 
 def _EncodeKernelArgs(args):
   return " ".join([f"{k} {args[k]}" for k in args])
-
-
-def _IsSUTAccessible(image):
-  for reg1 in options.get("skopeo_sut_accessible_registries", "").split(","):
-    if reg1 and image.startswith(reg1):
-      return True
-  return False
-
-
-def _IsRegistrySecure(image):
-  for reg1 in options.get("skopeo_insecure_registries", "").split(","):
-    if reg1 and image.startswith(reg1):
-      return "false"
-  return "true"
 
 
 def _CreatePerHostCtls(name, ctls):
@@ -200,6 +185,7 @@ sysctls = {}
 sysfs = {}
 bios = {}
 msr = {}
+tpmi = {}
 with open(CLUSTER_CONFIG) as fd:
   for doc in yaml.safe_load_all(fd):
     if doc and "cluster" in doc:
@@ -231,7 +217,7 @@ with open(CLUSTER_CONFIG) as fd:
 
         if c["labels"]:
           for label in c["labels"]:
-            label_str = f"{label}=yes"
+            label_str = f"{label}={c['labels'][label]}"
             if label_str not in inventories[vm_group]["hosts"][host]["k8s_node_labels"]:
               inventories[vm_group]["hosts"][host]["k8s_node_labels"].append(label_str)
 
@@ -254,21 +240,18 @@ with open(CLUSTER_CONFIG) as fd:
           if vm_group not in msr:
             msr[vm_group] = {}
           msr[vm_group].update(c["msr"])
-
-    if doc and "terraform" in doc:
-      for option1 in doc["terraform"]:
-        if option1 not in options:
-          options[option1] = doc["terraform"][option1]
-        elif isinstance(options[option1], dict):
-          tmp = copy.deepcopy(doc["terraform"][option1])
-          tmp.update(options[option1])
-          options[option1] = tmp
+          
+        if "tpmi" in c:
+          if vm_group not in tpmi:
+            tpmi[vm_group] = ""
+          tpmi[vm_group] += c["tpmi"]
 
 
 _CreatePerHostCtls("wl_sysctls", sysctls)
 _CreatePerHostCtls("wl_sysfs", sysfs)
 _CreatePerHostCtls("wl_bios", bios)
 _CreatePerHostCtls("wl_msr", msr)
+_CreatePerHostCtls("wl_tpmi", tpmi)
 
 playbooks = [{
   "name": "startup sequence",
@@ -278,7 +261,7 @@ playbooks = [{
   })
 }]
 
-if ((options.get("docker", False) or options.get("native", False)) and ("docker_image" in workload_config)) or (options.get("compose", False) and os.path.exists(COMPOSE_CONFIG)):
+if (((str(options.get("docker", False)).lower()=='true' or str(options.get("native", False)).lower()=='true') and os.path.exists(DOCKER_CONFIG)) or (str(options.get("compose", False)).lower()=='true' and os.path.exists(COMPOSE_CONFIG))) and str(options.get("kubernetes", False)).lower()=='false':
   playbooks.append({
     "name": "docker installation",
     "import_playbook": "./template/ansible/docker/installation.yaml",
@@ -286,19 +269,11 @@ if ((options.get("docker", False) or options.get("native", False)) and ("docker_
       "wl_tunables": workload_config.get('tunables', {}),
     })
   })
-  playbooks.append({
-    "name": "transfer image",
-    "import_playbook": "./template/ansible/common/image_to_daemon.yaml",
-    "vars": _ExtendOptions({
-      "wl_docker_images": {
-        im: _IsRegistrySecure(im) for im in _ScanDockerImages() if not _IsSUTAccessible(im)
-      },
-    })
-  })
 
-elif os.path.exists(KUBERNETES_CONFIG) or options.get("k8s_install", False):
+elif os.path.exists(KUBERNETES_CONFIG) or str(options.get("k8s_install", False)).lower()=='true':
   k8s_registry_port = options.get("k8s_registry_port", "30668")
   k8s_registry_ip = inventories["controller"]["hosts"]["controller-0"]["private_ip"] if "controller" in inventories else "127.0.0.1"
+  images = options["wl_docker_images"].split(",") if "wl_docker_images" in options else _ScanK8sImages()
 
   playbooks.append({
     "name": f"k8s installation",
@@ -306,22 +281,13 @@ elif os.path.exists(KUBERNETES_CONFIG) or options.get("k8s_install", False):
     "vars": _ExtendOptions({
       "k8s_registry_port": k8s_registry_port,
       "k8s_registry_ip": k8s_registry_ip,
+      "k8s_remote_registry_url": options.get("k8s_remote_registry_url", k8s_registry_ip + ":" + k8s_registry_port),
       "wl_tunables": workload_config.get('tunables', {}),
+      "wl_docker_images": {
+        im: True for im in images
+      },
     })
   })
-
-  if _RegistryEnabled():
-    images = options["wl_docker_images"].split(",") if "wl_docker_images" in options else _ScanK8sImages()
-    playbooks.append({
-      "name": "transfer image",
-      "import_playbook": "./template/ansible/common/image_to_registry.yaml",
-      "vars": _ExtendOptions({
-        "wl_docker_images": {
-          im: _IsRegistrySecure(im) for im in images if not _IsSUTAccessible(im)
-        },
-        "k8s_remote_registry_url": options.get("k8s_remote_registry_url", k8s_registry_ip + ":" + k8s_registry_port),
-      })
-    })
 
 if os.path.exists("/opt/workload/template/ansible/custom/installation.yaml"):
   playbooks.append({
@@ -340,10 +306,10 @@ if inventories["trace_hosts"]["hosts"]:
     })
   })
 
-if options.get("svrinfo", True):
+if str(options.get("sutinfo", str(options.get("svrinfo", 'true')).lower() == 'true')).lower() == 'true':
   playbooks.append({
-    "name": "Invoke svrinfo",
-    "import_playbook": "./template/ansible/common/svrinfo.yaml",
+    "name": "Invoke sutinfo",
+    "import_playbook": "./template/ansible/common/sutinfo.yaml",
     "vars": _ExtendOptions({
     })
   })
@@ -366,7 +332,7 @@ with open(CLEANUP, "w") as fd:
     }]
   }]
 
-  if ((options.get("docker", False) or options.get("native", False)) and ("docker_image" in workload_config)) or (options.get("compose", False) and os.path.exists(COMPOSE_CONFIG)):
+  if ((str(options.get("docker", False)).lower()=='true' or str(options.get("native", False)).lower()=='true') and os.path.exists(DOCKER_CONFIG)) or (str(options.get("compose", False)).lower()=='true' and os.path.exists(COMPOSE_CONFIG)):
     playbooks.append({
       "name": "Docker cleanup sequence",
       "import_playbook": "./template/ansible/docker/cleanup.yaml",
@@ -376,7 +342,7 @@ with open(CLEANUP, "w") as fd:
     })
 
   # k8s cleanup
-  if os.path.exists(KUBERNETES_CONFIG) or options.get("k8s_install", False):
+  if os.path.exists(KUBERNETES_CONFIG) or str(options.get("k8s_install", False)).lower()=='true':
     playbooks.append({
       "name": "Kubernetes cleanup sequence",
       "import_playbook": "./template/ansible/kubernetes/cleanup.yaml",
@@ -406,13 +372,36 @@ with open(CLEANUP, "w") as fd:
 
   yaml.dump(playbooks, fd)
 
+if options.get("wl_trace_modules",""):
+  with open(EXPORT, "w") as fd:
+    playbooks = []
+  
+    # custom trace export
+    if os.path.exists("/opt/workload/template/ansible/custom/export.yaml"):
+      playbooks.append({
+        "name": "custom trace export sequence",
+        "import_playbook": "./template/ansible/custom/export.yaml",
+        "vars": _ExtendOptions({
+        }),
+      })
+  
+    # default export sequence
+    playbooks.append({
+      "name": "default trace export sequence",
+      "import_playbook": "./template/ansible/common/export.yaml",
+      "vars": _ExtendOptions({
+      }),
+    })
+  
+    yaml.dump(playbooks, fd)
+
 with open(INVENTORY, "w") as fd:
   inventory_update = options.get("ansible_inventory", {})
   for group in inventory_update:
     if "hosts" in inventory_update[group]:
       if group not in inventories:
         inventories[group] = {"hosts": {}}
-      inventories[group]["hosts"].update(inventories_update[group]["hosts"])
+      inventories[group]["hosts"].update(inventory_update[group]["hosts"])
   yaml.dump({
     "all": {
       "children": inventories

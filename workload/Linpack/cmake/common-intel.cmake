@@ -5,5 +5,5 @@
 #
 add_workload("linpack_intel")
 
-add_testcase(linpack_intel_gated avx2 intel)
-add_testcase(linpack_intel_pkm avx2 intel)
+add_testcase(linpack_intel_avx2_gated avx2 intel)
+add_testcase(linpack_intel_avx2_pkm avx2 intel)

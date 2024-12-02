@@ -1,0 +1,274 @@
+#!/bin/bash
+
+node_index=$1
+redis_version={{ REDIS_VERSION }}
+instance_num={{ R_CLIENT_SERVER_PAIR }}
+redis_counter=0
+config_port={{ MEMTIER_CONFIG_CENTER_PORT }}
+redis_config_center={{ MEMTIER_CONFIG_CENTER_IP }}
+
+function wait_service_up {
+    local service_ip=$1
+    local service_port=$2
+    local log_path=$3
+    for ((;;)); do
+        nc -z -w5 ${service_ip} $service_port
+        if [ $? -eq 0 ]; then
+            echo "Connection to ${service_ip} on port $service_port are stable."  >> $log_path
+            break
+        else
+            echo "service on IP:${service_ip} port:$service_port is not ready, wait..."  >> $log_path
+            sleep 2      
+        fi
+    done
+}
+
+run_test_log="{{ WORKSPACE }}/run_test.log"
+echo '' > $run_test_log
+wait_service_up $redis_config_center $config_port $run_test_log
+
+#### server_ip and port
+server_ip={{ SERVER_IP }}
+memtier_options=""
+memtier_requests={{ MEMTIER_REQUESTS }}
+memtier_test_time={{ MEMTIER_TEST_TIME }}
+memtier_data_size={{ MEMTIER_DATA_SIZE }}
+memtier_pipeline={{ MEMTIER_PIPELINE }}
+memtier_clients={{ MEMTIER_CLIENTS }}
+memtier_threads={{ MEMTIER_THREADS }}
+memtier_ratio={{ MEMTIER_RATIO }}
+memtier_key_minimum={{ MEMTIER_KEY_MINIMUM }}
+memtier_key_maximum={{ MEMTIER_KEY_MAXIMUM }}
+memtier_run_key_pattern={{ MEMTIER_RUN_KEY_PATTERN }}   
+memtier_load_key_pattern={{ MEMTIER_LOAD_KEY_PATTERN }}
+memtier_randomize={{ MEMTIER_RANDOMIZE }}
+memtier_distinct_client_seed={{ MEMTIER_DISTINCT_CLIENT_SEED }}
+memtier_run_count={{ MEMTIER_RUN_COUNT }}
+r_client_server_pair={{ R_CLIENT_SERVER_PAIR }}
+start_numa_node={{ START_NUMA_NODE }}
+MEMTIER_CLIENT_NUMACTL_OPTIONS={{ MEMTIER_CLIENT_NUMACTL_OPTIONS }}
+RUN_SINGLE_NODE={{ RUN_SINGLE_NODE }}
+redis_numactl_strategy={{ REDIS_NUMACTL_STRATEGY }}
+memtier_start_port={{ MEMTIER_STARTPORT }}
+NODE_NUM={{ NODE_NUM }}
+multi_serverip_list={{ MULTI_SERVERIP_LIST }}
+
+if [[ $RUN_SINGLE_NODE == "True" ]]; then
+    NODE_NUM=1
+fi
+
+sysctl -w net.ipv4.tcp_tw_reuse=1
+
+## for multi ip list
+function update_server_ip() {
+    redis_instance_index=$1
+    if [[ $redis_numactl_strategy == 10 ]]; then
+        IFS=','
+        read -ra multi_serverip_array <<< "$multi_serverip_list"
+        IFS=' '
+{% raw %}
+        multi_serverip_len=${#multi_serverip_array[@]}
+{% endraw %}
+        local ip_index=$((redis_instance_index % multi_serverip_len))
+        server_ip=${multi_serverip_array[ip_index]}
+    fi
+}
+
+function config_memtier() {
+    port=$1
+    echo "Configure memtier parameters for instance $port" >> {{ WORKSPACE }}/itr-{{ itr }}/benchmark-${port}/run_test.log
+
+    ## template for multi ip
+    memtier_options="--server %s --port $port --ratio=$memtier_ratio \
+    --pipeline=$memtier_pipeline --key-pattern=$memtier_run_key_pattern --key-minimum=$memtier_key_minimum \
+    --key-maximum=$memtier_key_maximum --clients=$memtier_clients --threads=$memtier_threads \
+    --run-count=$memtier_run_count --out-file={{ WORKSPACE }}/itr-{{ itr }}/benchmark-${port}/memtier-bench${port}.log"
+    
+    echo "DEBUG:: Configure memtier after memtier_options " >> {{ WORKSPACE }}/itr-{{ itr }}/benchmark-${port}/run_test.log
+
+    if [[ $memtier_data_size == *":"* ]]; then
+        echo "using data-size-list to define data size"
+        memtier_options="${memtier_options} --data-size-list=$memtier_data_size"
+    else
+        memtier_options="${memtier_options} --data-size=$memtier_data_size"
+    fi
+    
+    echo "DEBUG:: Configure memtier : memtier_data_size " >> {{ WORKSPACE }}/itr-{{ itr }}/benchmark-${port}/run_test.log
+
+
+    if [[ "$memtier_requests" == "0" ]];
+    then 
+        echo "test specified by memtier_test_time" >> {{ WORKSPACE }}/itr-{{ itr }}/benchmark-${port}/run_test.log
+        memtier_options="${memtier_options} --test-time=$memtier_test_time"
+    else
+        echo "test specified by memtier_requests" >> {{ WORKSPACE }}/itr-{{ itr }}/benchmark-${port}/run_test.log
+        memtier_options="${memtier_options} --requests=$memtier_requests"
+    fi
+
+    echo "DEBUG:: Configure memtier : memtier_requests " >> {{ WORKSPACE }}/itr-{{ itr }}/benchmark-${port}/run_test.log
+
+    if [[ "$memtier_distinct_client_seed" == "True" ]];
+    then
+        memtier_options="${memtier_options} --distinct-client-seed"
+    fi
+
+     echo "DEBUG:: Configure memtier : memtier_distinct_client_seed " >> {{ WORKSPACE }}/itr-{{ itr }}/benchmark-${port}/run_test.log
+
+    if [[ "$memtier_randomize" == "True" ]];
+    then
+        memtier_options="${memtier_options} --randomize"
+    fi    
+    echo "memtier_options: $memtier_options" >> {{ WORKSPACE }}/itr-{{ itr }}/benchmark-${port}/run_test.log
+}
+
+function get_memtier_bind_cpunodelist() {
+    numa_node_num=$(lscpu | awk '/^NUMA node\(s\)/{print $3'})
+    memtier_bind_node_list=""
+    for ((i=numa_node_num/2;i<numa_node_num;i++));do
+        memtier_bind_node_list="$i,$memtier_bind_node_list"
+    done 
+    #remove the end character ','
+    memtier_bind_node_list=$(echo "$memtier_bind_node_list" | sed 's/,\([^,]*\)$/\1/')
+}
+
+echo "############Redis Begins testing#############"
+total_core=$(nproc)
+total_numa=$(lscpu | awk '/^NUMA node\(s\)/{print $3'})
+core_pernuma=$(($total_core/$total_numa))
+function get_numa_param {
+    if [[ $RUN_SINGLE_NODE == "True" ]]; then
+        #bind to half numa nodes.
+        get_memtier_bind_cpunodelist
+        MEMTIER_CLIENT_NUMACTL_OPTIONS="numactl --cpunodebind=${memtier_bind_node_list}" 
+    fi
+}
+function get_numa_param_plus {
+    JOB_INDEX=$1
+    redis_instance_index=$(($JOB_INDEX+$start_numa_node*$core_pernuma))
+    if [[ $RUN_SINGLE_NODE == "True" ]]; then
+        if [ $r_client_server_pair -ge $total_core ]; then
+            echo "there is no more cores for memtier client" >> $run_test_log
+        fi
+
+        if [[ $redis_numactl_strategy == 0 ]]; then
+            echo "you are using customerize numactl_options, please make sure your policy is valid"
+            MEMTIER_CLIENT_NUMACTL_OPTIONS=$(echo $MEMTIER_CLIENT_NUMACTL_OPTIONS | sed 's/+/ /g')
+            MEMTIER_CLIENT_NUMACTL_OPTIONS="numactl $MEMTIER_CLIENT_NUMACTL_OPTIONS"
+        elif [[ $redis_numactl_strategy == 1 ]]; then
+            cpuset=$(cat /sys/devices/system/cpu/cpu${redis_instance_index}/topology/thread_siblings_list)
+            for((j=1;j<$r_client_server_pair;j++));  
+            do  
+                tmp=$(($redis_instance_index+$j))
+                tmpcpuset=$(cat /sys/devices/system/cpu/cpu${tmp}/topology/thread_siblings_list)
+                cpuset="$cpuset,$tmpcpuset"
+            done
+            MEMTIER_CLIENT_NUMACTL_OPTIONS="numactl --physcpubind=!$cpuset"
+        elif [[ $redis_numactl_strategy == 2 ]]; then
+            cpuset="${redis_instance_index}"
+            for((k=1;k<$r_client_server_pair;k++));
+            do
+                tmp=$(($redis_instance_index+$k))
+                cpuset="$cpuset,$tmp"
+            done
+            MEMTIER_CLIENT_NUMACTL_OPTIONS="numactl --physcpubind=!$cpuset"
+        elif [[ $redis_numactl_strategy == 3 || $redis_numactl_strategy == 5 ]]; then
+            #bind to half numa nodes.
+            get_memtier_bind_cpunodelist
+            MEMTIER_CLIENT_NUMACTL_OPTIONS="numactl --cpunodebind=${memtier_bind_node_list}"
+        else
+            echo "error: redis_numactl_strategy invalid" >> $run_test_log
+        fi 
+    else
+        echo "multinode"
+    fi
+}
+
+load_data_size=""
+if [[ $memtier_data_size == *":"* ]]; then
+    echo "using data-size-list to define data size" >> $run_test_log
+    load_data_size="--data-size-list=$memtier_data_size"
+else
+    load_data_size="--data-size=$memtier_data_size"
+fi
+
+LOADPIDS=()
+for ((i=0; i<instance_num; i++)); do
+    if [ $((i % NODE_NUM)) -eq $node_index ]; then
+        portindex=$((${memtier_start_port}+${i}))
+        mkdir -p {{ WORKSPACE }}/itr-{{ itr }}/benchmark-${portindex}
+        tmp_log_path="{{ WORKSPACE }}/itr-{{ itr }}/benchmark-${portindex}/run_test.log"
+        echo '' > $tmp_log_path
+        update_server_ip $i
+        wait_service_up ${server_ip} ${portindex}  ${tmp_log_path}
+        echo "Redis-server configuration:" > {{ WORKSPACE }}/itr-1/benchmark-${portindex}/test-config
+        {{ WORKSPACE }}/redis-${redis_version}/src/redis-cli -h ${server_ip} -p ${portindex} CONFIG GET \* >> {{ WORKSPACE }}/itr-1/benchmark-${portindex}/test-config
+        echo "Begin to populate for instance ${portindex}" >> ${tmp_log_path}
+        {{ WORKSPACE }}/memtier_benchmark-1.4.0/memtier_benchmark -s $server_ip -p $portindex --key-maximum=$memtier_key_maximum -n allkeys $load_data_size --key-pattern=$memtier_load_key_pattern --ratio=1:0 -c 4 --threads=8 --pipeline=64 --out-file={{ WORKSPACE }}/itr-{{ itr }}/benchmark-${portindex}/memtier-populate${portindex}.log > /dev/null 2>&1 &
+        LOADPIDS+=($!)
+    fi
+done
+
+for PID in ${LOADPIDS[*]}; do
+  wait $PID
+  if [ $? -eq 0 ]; then
+    echo "Populate Process with PID $PID was SUCCESSFUL." >> $run_test_log
+    {{ WORKSPACE }}/redis-${redis_version}/src/redis-cli -h $redis_config_center -p $config_port incr populate_index
+  else
+    echo "Populate Process with PID $PID FAILED." >> $run_test_log
+    exit 1
+  fi
+done
+
+until test $({{ WORKSPACE }}/redis-${redis_version}/src/redis-cli -h $redis_config_center -p $config_port GET populate_index) -eq $instance_num; do
+    echo "Query config center for populate_index" >> $run_test_log
+    sleep 0.2
+done
+sleep 3
+echo "############Redis begin testing##########" >> $run_test_log
+RUNPIDS=()
+PORTINXS=()
+for ((ii=0; ii<instance_num; ii++)); do
+    if [ $((ii % NODE_NUM)) -eq $node_index ]; then
+        portindex=$((${memtier_start_port}+${ii}))
+        echo "MEMTIER_CLIENT_NUMACTL_OPTIONS= $MEMTIER_CLIENT_NUMACTL_OPTIONS" >> {{ WORKSPACE }}/itr-{{ itr }}/benchmark-${portindex}/run_test.log
+        ### set trace index into configure DB 
+        {{ WORKSPACE }}/redis-${redis_version}/src/redis-cli -h ${redis_config_center} -p $config_port incr trace_index
+        echo "DEBUG:: ii:$ii portindex:$portindex memtier_start_port:$memtier_start_port instance_num:$instance_num NODE_NUM:$NODE_NUM node_inx:$node_index " >> {{ WORKSPACE }}/itr-{{ itr }}/benchmark-${portindex}/run_test.log
+        config_memtier ${portindex}
+        iii=${ii}
+        get_numa_param ${iii}
+        update_server_ip ${iii}
+        cur_memtier_option=$(echo "${memtier_options}" | sed "s/%s/$server_ip/")
+        $MEMTIER_CLIENT_NUMACTL_OPTIONS {{ WORKSPACE }}/memtier_benchmark-1.4.0/memtier_benchmark ${cur_memtier_option} > /dev/null 2>&1 &
+        RUNPIDS+=($!)
+        PORTINXS+=($portindex)
+    fi
+done
+
+for inx in "${!RUNPIDS[@]}"; do
+    PID=${RUNPIDS[$inx]}
+    wait $PID    
+    exit_status=$?
+    port=${PORTINXS[$inx]}
+    if [[ "$exit_status" == "0" ]]; then
+        ### print status info
+        echo $exit_status > {{ WORKSPACE }}/itr-{{ itr }}/benchmark-${port}/status
+        echo "Run Process with instance port $port was SUCCESSFUL." >> {{ WORKSPACE }}/itr-{{ itr }}/benchmark-${port}/run_test.log
+    else
+        echo $exit_status > {{ WORKSPACE }}/itr-{{ itr }}/benchmark-${port}/status
+        echo "Run Process with instance port $port FAILED." >> {{ WORKSPACE }}/itr-{{ itr }}/benchmark-${port}/run_test.log
+    fi
+done
+echo "############Redis completed testing##########" >> $run_test_log
+
+### for finish flag
+{{ WORKSPACE }}/redis-${redis_version}/src/redis-cli -h ${redis_config_center} -p $config_port incr chicken_dinner
+
+server_logfile={{ WORKSPACE }}/entrypoint_server.log
+if [ -f "$server_logfile" ]; then
+    # Move the log file
+    mv "$server_logfile" {{ WORKSPACE }}/itr-{{ itr }}
+    echo "$server_logfile has been moved." >> $run_test_log
+else
+    echo "$server_logfile does not exist." >> $run_test_log
+fi

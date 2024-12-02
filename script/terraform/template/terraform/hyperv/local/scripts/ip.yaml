@@ -1,0 +1,33 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- hosts: all
+  gather_facts: no
+  tasks:
+
+  - name: get IP Address
+    ansible.windows.win_shell: |
+      $state=(Get-VM -Name {{ vmname }} | select State).State
+      while ($state -eq 'Running') {
+        $adapters=(Get-VMNetworkAdapter -VMName "{{ vmname }}" -Name "{{ netname }}")
+        foreach ($adapter in $adapters) {
+          foreach ($ip in $adapter.IPAddresses) {
+            if ($ip -match '^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+$') {
+              echo $ip
+              exit 0
+            }
+          }
+        }
+        Start-Sleep -Seconds 1
+      }
+      echo "127.0.0.1"
+    register: ip
+    when: skip == 'false'
+
+  - name: print out the IP information
+    fail:
+      msg: "IP_START{{ ip.stdout_lines | default(['127.0.0.1']) | first }}IP_END"
+

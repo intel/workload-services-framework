@@ -1,0 +1,107 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- include_tasks:
+    file: setup.yaml
+  when: pdu_local | bool
+
+- block:
+
+    - block:
+
+        - name: Check if pdu is accessible
+          ansible.windows.win_shell: |
+            {{ turn_off_ssl_check_cmds }}
+            {{ no_proxy_cmds }}
+            $response = Invoke-RestMethod -Uri https://{{ pdu_ip1 }}/model/outlet -Headers {{ header_str }} -Method GET -WebSession $no_proxy
+            if ($response.result._ret_.numberOfOutlets -gt 0) { Exit 0 } else { Exit 1 }
+          delegate_to: "{{ trace_node.1 }}"
+          register: pdu_check
+          no_log: true
+
+        - name: Create the pdu script
+          copy:
+            content: |
+              param($roi)
+              function get_reading ($url,$header,$method,$no_proxy) {
+                $response=Invoke-RestMethod -Uri ${url} -Body $method -ContentType "application/json" -Headers ${header} -Method POST -WebSession ${no_proxy}
+                return $response.result._ret_.value
+              }
+              {{ turn_off_ssl_check_cmds }}
+              {{ no_proxy_cmds }}
+              $header={{ header_str }}
+              $method=(@{"jsonrpc"="2.0";"method"="getReading";}|ConvertTo-Json)
+              {% if pdu_port1 | length > 0 %}
+                $pdu_rest_url="https://{{ pdu_ip1 }}/model/pdu/0/outlet/{{ pdu_port1 }}"
+              {% elif pdu_group1 | length > 0 %}
+                $pdu_rest_url="https://{{ pdu_ip1 }}/model/outletgroup/{{ pdu_group1 }}"
+              {% endif %}
+              echo "Time,Power (W),Energy (Wh)" | Out-File -Force -Encoding utf8 -FilePath "{{ trace_data_path }}\pdu-${roi}.logs"
+              while ($True) {
+                $timestamp = [int64](Get-Date -UFormat %s) * 1000
+                $power = get_reading "${pdu_rest_url}/activePower" $header $method $no_proxy
+                $energy = get_reading "${pdu_rest_url}/activeEnergy" $header $method $no_proxy
+                echo "${timestamp},${power},${energy}" | Out-File -Append -Encoding utf8 -FilePath "{{ trace_data_path }}\pdu-${roi}.logs"
+                Start-Sleep -Seconds {{ pdu_interval }}
+              }
+            dest: "{{ trace_script_local_path }}/read-pdu.ps1"
+          delegate_to: localhost
+
+      rescue:
+
+        - name: Create the pdu directory
+          file:
+            path: "{{ wl_logs_dir }}/{{ trace_node.1 }}-1-pdu"
+            state: directory
+          delegate_to: localhost
+          ignore_errors: true
+
+        - name: Write down pdu_check results
+          copy:
+            content: |
+              url:
+              https://{{ pdu_ip1 }}/model/outlet
+
+              stdout:
+              {{ pdu_check.stdout | default('') }}
+
+              stderr:
+              {{ pdu_check.stderr | default('') }}
+            dest: "{{ wl_logs_dir }}/{{ trace_node.1 }}-1-pdu/pdu_check.logs"
+          delegate_to: localhost
+          ignore_errors: true
+
+    - set_fact:
+        trace_module_start_block: |
+          {% if pdu_check is success %}
+            (Invoke-WmiMethod -Path win32_process -Name create -ArgumentList "powershell -NonInteractive -ExecutionPolicy Unrestricted -File `"{{ trace_script_path }}\read-pdu.ps1`" ${roi}").ProcessId | Out-File -Force -Encoding utf8 -FilePath "{{ trace_data_path }}\pdu-${roi}.pid"
+          {% endif %}
+        trace_module_stop_block: |
+          {% if pdu_check is success %}
+            Stop-Process -Id (cat pdu-${roi}.pid) -Force -Confirm:$False
+          {% endif %}
+      no_log: true
+
+  when: not (pdu_local | bool)
+  become: false
+  vars:
+    pdu_ip1: "{{ hostvars[trace_node.1]['pdu_ip'] | default('') }}"
+    pdu_port1: "{{ hostvars[trace_node.1]['pdu_port'] | default('') }}"
+    pdu_user1: "{{ hostvars[trace_node.1]['pdu_user'] | default('') }}"
+    pdu_password1: "{{ hostvars[trace_node.1]['pdu_password'] | default('') }}"
+    pdu_group1: "{{ hostvars[trace_node.1]['pdu_group'] | default('') }}"
+    turn_off_ssl_check_cmds: |
+      if (-not ([System.Management.Automation.PSTypeName]'ServerCertificateValidationCallback').Type) {
+        $certCallback = "using System;using System.Net;using System.Net.Security;using System.Security.Cryptography.X509Certificates;public class ServerCertificateValidationCallback{public static void Ignore(){if(ServicePointManager.ServerCertificateValidationCallback==null){ServicePointManager.ServerCertificateValidationCallback+=delegate(Object obj,X509Certificate certificate,X509Chain chain,SslPolicyErrors errors){return true;};}}}"
+        Add-Type $certCallback
+      }
+      [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12;
+      [ServerCertificateValidationCallback]::Ignore()
+    no_proxy_cmds: |
+      $no_proxy=New-Object Microsoft.PowerShell.Commands.WebRequestSession
+      $no_proxy.Proxy=New-Object System.Net.WebProxy
+    header_str: '@{Authorization="Basic "+[System.Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes("{{ pdu_user1 }}:{{ pdu_password1 }}"))}'
+

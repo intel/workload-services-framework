@@ -1,0 +1,24 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+
+# Write the corresponding key-value to cpu
+#TODO: May be using string as key, but now we need using register address value as key
+
+- name: set global msr options
+  set_fact:
+    msr_options_dict: "{{ msr_options_dict | combine(dict(sut_msr_options | split(',') | map('trim') | select('match',item+':.*') | map('regex_replace','^[^:]*:','') | map('trim') | reject('==','') | map('split','=') | map('map','trim'))) }}"
+  loop: "{{ group_names }}"
+  vars:
+    msr_options_dict: {}
+
+- name: write msr setting to register
+  include_tasks: 
+    file: msr-write.yaml
+  loop: "{{ wl_msr | combine(msr_options_dict) | dict2items }}"
+  loop_control:
+    loop_var: request
+  when: (msr_options_dict.keys() | length > 0) or  (wl_msr.keys() | length > 0)

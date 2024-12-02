@@ -18,3 +18,4 @@ for line in sys.stdin.readlines():
 
 for k in stacks:
   print(f"{k} {stacks[k]}")
+

@@ -1,0 +1,16 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- include_role:
+    name: hf-dataset
+  vars:
+    DEST_DIR: "/opt/dataset/stablediffusion-dev/v1-5/stable-diffusion-v1-5"
+    MODEL_ID: "runwayml/stable-diffusion-v1-5"
+    DATASET_SIZE: 100
+    exclude: []
+    revision: []
+    HF_LOGIN: false
+

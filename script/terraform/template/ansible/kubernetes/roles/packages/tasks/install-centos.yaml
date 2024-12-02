@@ -16,12 +16,20 @@
   when: ((csp | default('static')) == 'static')
   ignore_errors: true
 
+- name: remove legacy k8s repository
+  include_role:
+    name: legacy-repo
+    tasks_from: remove-centos
+  vars:
+    conflict_repos:
+    - "{{ k8s_repo_url.centos }}"
+
 - name: add the k8s repository
   yum_repository:
     name: k8s
     description: k8s installation
-    baseurl: "{{ k8s_repo_url['centos'] }}"
-    gpgkey: "{{ k8s_repo_key_url['centos'] }}"
+    baseurl: "{{ k8s_repo_url.centos }}"
+    gpgkey: "{{ k8s_repo_key_url.centos }}"
   become: true
 
 - name: install kubeadm, kubelet, and kubectl

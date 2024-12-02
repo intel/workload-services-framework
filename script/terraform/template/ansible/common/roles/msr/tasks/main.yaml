@@ -1,0 +1,60 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: get os and processor info
+  shell:
+    cmd: |
+      . /etc/os-release; echo $ID
+      grep -q -F GenuineIntel /proc/cpuinfo
+    executable: /bin/bash
+  register: os
+  failed_when: false
+
+- block:
+
+  - name: Install msr-tool on Debian
+    apt:
+      name: msr-tools
+      update_cache: true
+    become: true
+    when: ((os.stdout_lines | first) in ['debian','ubuntu'])
+    register: aptrc
+    until: aptrc is success
+    retries: 10
+    delay: 10
+    environment:
+      DEBIAN_FRONTEND: noninteractive
+      ACCEPT_EULA: Y
+    ignore_errors: true
+  
+  - name: Install msr-tool on RHL
+    yum:
+      name: msr-tools
+      update_cache: true
+    become: true
+    register: yumrc
+    until: yumrc is success
+    retries: 10
+    delay: 10
+    when: ((os.stdout_lines | first) not in ['debian','ubuntu'])
+    ignore_errors: true
+  
+  - name: Add the msr module
+    modprobe:
+      name: msr
+      state: present
+    become: true
+  
+  - name: apply CPU register value
+    include_tasks:
+      file: write.yaml
+  
+  - name: Get full characterization
+    include_tasks:
+      file: read.yaml
+
+  when: os.rc == 0
+

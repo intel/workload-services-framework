@@ -1,0 +1,26 @@
+# resnet50-pytorch-benchmark-24.04
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER="24.04"
+ARG OS_IMAGE="ubuntu"
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt -o Acquire::Check-Date=false update && \
+    apt install -y wget git
+
+ARG IntelAI_BENCHMARK_VER="04f26fb095524dbc9af12547fffebc56484d0d78"
+ARG IntelAI_BENCHMARK_REPO="https://github.com/IntelAI/models"
+
+# Install model zoo benchmark scripts
+RUN cd / && \
+    git clone -b pytorch-r2.3-models ${IntelAI_BENCHMARK_REPO} && \
+    cd models && \
+    sed -i '/hub_model_names/d' models/image_recognition/pytorch/common/main.py && \
+    git reset ${IntelAI_MODELS_VER}

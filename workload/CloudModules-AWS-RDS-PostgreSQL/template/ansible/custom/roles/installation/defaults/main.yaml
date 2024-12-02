@@ -1,0 +1,8 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+hammerdb_ver: "4.4"
+hammerdb_package: https://github.com/TPC-Council/HammerDB/releases/download

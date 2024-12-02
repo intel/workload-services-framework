@@ -1,0 +1,49 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Install module
+  package:
+    name:
+    - python3-lxml
+    - python3-netaddr
+   
+- name: List VXLAN bridge
+  virt_net:
+    command: list_nets
+  register: vxlan_net_list
+
+- name: Remove existing VXLAN bridge and VXLAN
+  include_tasks:
+    file: cleanup.yaml
+  when: kvm_reset
+
+- name: Create VXLAN bridge
+  block:
+
+    - name: Define VXLAN bridge
+      virt_net:
+        name: "{{ kvm_bridge_name }}"
+        command: define
+        xml: "{{ lookup('template', 'network.xml.j2') }}"
+      vars:
+        this_bridge_ip: "{{ kvm_bridge_subnet | ipaddr(((play_hosts|ansible.utils.index_of('eq',inventory_hostname,wantlist=True)|first) + 1) | string) | ipaddr('address') }}"
+
+    - name: Create VXLAN bridge
+      virt_net:
+        name: "{{ kvm_bridge_name }}"
+        command: create
+
+    - name: Autostart VXLAN bridge
+      virt_net:
+        name: "{{ kvm_bridge_name }}"
+        autostart: true
+
+    - name: Create VXLAN devices
+      include_tasks:
+        file: vxlan.yaml
+
+  when: (kvm_bridge_name not in vxlan_net_list.list_nets) or kvm_reset
+

@@ -1,6 +1,6 @@
-#
-# Apache v2 license
-# Copyright (C) 2023 Intel Corporation
-# SPDX-License-Identifier: Apache-2.0
-#
-include(cmake/${PLATFORM}.cmake OPTIONAL)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+    include(cmake/${PLATFORM}.cmake OPTIONAL)
+    include(cmake/${BACKEND}.cmake OPTIONAL)
+else()
+    include(cmake_external/${PLATFORM}.cmake OPTIONAL)
+endif()

@@ -1,0 +1,12 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Restore /etc/environment
+  include_role:
+    name: no-proxy
+    tasks_from: cleanup-win
+  when: (groups.cluster_hosts+groups.off_cluster_hosts)|map('extract',hostvars,['private_ip'])|select('defined')|unique|length>1
+

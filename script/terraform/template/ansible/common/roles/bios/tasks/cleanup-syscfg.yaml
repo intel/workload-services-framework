@@ -1,0 +1,18 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Restore individual BIOS setting
+  shell:
+    cmd: "{{ syscfg_bin }} /bcs '{{ sut_bios_passwd }}' {{ item }}"
+    executable: /bin/bash
+  register: syscfgrc
+  loop: "{{ lookup('file',restore_file) | split('\n') }}"
+  ignore_errors: true
+
+- name: request reboot
+  set_fact:
+    cleanup_reboot_required: "{{ cleanup_reboot_required or ((syscfgrc.results | rejectattr('rc', '==', 0) | length) == 0) }}"
+

@@ -4,17 +4,15 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-k8s_version: '1.26.6'
+k8s_version: '1.30.6'
 
 k8s_repo_key_url: 
-  ubuntu: "https://dl.k8s.io/apt/doc/apt-key.gpg"
-  debian: "https://dl.k8s.io/apt/doc/apt-key.gpg"
-  centos:
-    - "https://packages.cloud.google.com/yum/doc/yum-key.gpg"
-    - "https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg"
+  debian: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_version | regex_replace('[.][0-9]+$','') }}/deb/Release.key"
+  centos: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_version | regex_replace('[.][0-9]+$','') }}/rpm/repodata/repomd.xml.key"
 
 k8s_repo_url: 
-  ubuntu: "http://apt.kubernetes.io/"
-  debian: "http://apt.kubernetes.io/"
-  centos: "https://packages.cloud.google.com/yum/repos/kubernetes-el7-$basearch"
+  debian: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_version | regex_replace('[.][0-9]+$','') }}/deb/ /"
+  centos: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_version | regex_replace('[.][0-9]+$','') }}/rpm/"
+
+k8s_purge: false
 

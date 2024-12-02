@@ -5,7 +5,11 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-/^#svrinfo: / {
+/^#(bom|timestamp|pdu|pcm|uprof|emon|perfspect)[:-] / {
+    next
+}
+
+/^#sutinfo: / {
     name=gensub(/^.*logs-([^/]*)[/].*$/,"\\1",1,$2)
     product=$3
 }
@@ -95,14 +99,14 @@ END {
             print "</Row>"
         }
 
-        if (length(svrinfo_values[ws])>0)
-            add_svrinfo_ex(ws, psp, ith)
+        if (length(sutinfo_values[ws])>0)
+            add_sutinfo_ex(ws, psp, ith)
 
         print "</Table>"
         print "</Worksheet>"
 
-        if (length(svrinfo_values[ws])>0)
-            add_svrinfo(ws)
+        if (length(sutinfo_values[ws])>0)
+            add_sutinfo(ws)
     }
     print "</Workbook>"
 }

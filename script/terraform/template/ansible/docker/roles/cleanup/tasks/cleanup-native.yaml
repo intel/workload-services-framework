@@ -15,7 +15,7 @@
   ignore_errors: true
   become: "{{ sut_sudo | default(true) | bool }}"
   vars:
-    disks: "{{ lookup('file', wl_logs_dir+'/tocleanup.yaml') | from_yaml }}"
+    disks: "{% if (wl_logs_dir+'/tocleanup.yaml') is exists %}{{ lookup('file', wl_logs_dir+'/tocleanup.yaml') | from_yaml | default([],true) }}{% else %}{{ [] }}{% endif %}"
   when: sut_sudo | default(true) | bool
 
 - name: umount /proc, /sys, /dev
@@ -25,6 +25,7 @@
   - proc
   - sys
   - dev
+  - etc/localtime
   ignore_errors: true
   become: "{{ sut_sudo | default(true) | bool }}"
   when: sut_sudo | default(true) | bool
@@ -40,3 +41,4 @@
   ignore_errors: true
   become: "{{ sut_sudo | default(true) | bool }}"
   when: sut_sudo | default(true) | bool
+

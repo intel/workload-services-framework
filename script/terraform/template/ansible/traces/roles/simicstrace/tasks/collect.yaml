@@ -1,0 +1,32 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Fetch simics files
+    fetch:
+      src: "{{ trace_data_path }}/{{ item }}"
+      dest: "{{ trace_data_local_path }}/"
+      flat: true
+    become: false
+    loop:
+    - TRACE_START
+    - TRACE_STOP
+    register: fetchrc
+    until: fetchrc is success
+    retries: 10
+    delay: 10
+
+  - name: Remove any collection files
+    file:
+      path: /tmp/simicstrace
+      state: absent
+    become: true
+
+  delegate_to: "{{ trace_node.1 }}"
+  ignore_errors: true
+  become: false
+

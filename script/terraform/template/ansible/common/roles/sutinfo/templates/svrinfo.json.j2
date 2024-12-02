@@ -1,0 +1,60 @@
+{
+  "Configuration": {
+    "BIOS": [
+      {
+        "Release Date": "{{ ansible_bios_date }}",
+        "Version": "{{ ansible_bios_version }}"
+      }
+    ],
+    "Baseboard": [
+      {
+        "Manufacturer": "{{ ansible_system_vendor }}",
+        "Product Name": "{{ ansible_product_name }}",
+        "Serial #": "{{ ansible_product_serial }}"
+      }
+    ],
+    "CPU": [
+      {
+        "Architecture": "{{ ansible_architecture2 }}",
+        "Microarchitecture": "{{ ansible_architecture }}",
+        "Base Frequency": "{{ ansible_processor[2] | split('@') | last | trim }}",
+        "CPU Model": "{{ ansible_processor[2] }}",
+        "CPUs": "{{ ansible_processor_count*ansible_processor_cores }}",
+        "Cores per Socket": "{{ ansible_processor_cores }}",
+        "Family": "{{ ('Family' in ansible_env.PROCESSOR_IDENTIFIER) | ternary(ansible_env.PROCESSOR_IDENTIFIER|regex_replace('^.*Family ([0-9]*).*$','\\1'),'') }}",
+        "Hyperthreading": "{{ (ansible_processor_vcpus>(ansible_processor_cores*ansible_processor_count)) | ternary('Enabled','Disabled') }}",
+        "Model": "{{ ('Model' in ansible_env.PROCESSOR_IDENTIFIER) | ternary(ansible_env.PROCESSOR_IDENTIFIER|regex_replace('^.*Model ([0-9]*).*$','\\1'),'-') }}",
+        "NUMA Nodes": "{{ numainfo.stdout_lines | first }}",
+        "Sockets": "{{ ansible_processor_count }}",
+        "Stepping": "{{ ('Stepping' in ansible_env.PROCESSOR_IDENTIFIER) | ternary(ansible_env.PROCESSOR_IDENTIFIER|regex_replace('^.*Stepping ([0-9]*).*$','\\1'),'-') }}"
+      }
+    ],
+    "Host": [
+      {
+        "Name": "{{ ansible_hostname }}",
+        "Time": "{{ ansible_date_time.iso8601 }}"
+      }
+    ],
+    "Memory": [
+      {
+        "MemAvailable": "{{ ansible_memfree_mb }} MB",
+        "MemFree": "{{ ansible_memfree_mb }} MB",
+        "MemTotal": "{{ ansible_memtotal_mb }} MB",
+        "Installed Memory": "{{ meminfo.stdout_lines | select('match','^Manufacturer *:.*') | first | split(':') | last | trim }} {{ ((mem_spec_list | unique | length)==1) | ternary((mem_spec_list|first)+'x'+(mem_spec_list|length|string),mem_spec_list|join(',')) }} {{ meminfo.stdout_lines | select('match','^Speed *:.*') | first | split(':') | last | trim }} {{ ((meminfo.stdout_lines | select('match','^Speed *:.*') | first | split(':') | last | trim) == '') | ternary('','MHz') }}"
+      }
+    ],
+    "Operating System": [
+      {
+        "Kernel": "{{ ansible_kernel }}",
+        "OS": "{{ ansible_os_name }}"
+      }
+    ],
+    "System": [
+      {
+        "Manufacturer": "{{ ansible_system_vendor }}",
+        "Product Name": "{{ ansible_product_name }}",
+        "Serial #": "{{ ansible_product_serial }}"
+      }
+    ]
+  }
+}

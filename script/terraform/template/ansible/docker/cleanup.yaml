@@ -1,0 +1,20 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- hosts: workload_hosts
+  become: "{{ sut_sudo | default(true) | bool }}"
+  any_errors_fatal: true
+  gather_facts: false
+  tasks:
+
+    - name: cleanup
+      include_role:
+        name: cleanup
+        tasks_from: "cleanup-{{ native | default(false) | bool | ternary(((ansible_connection|default('ssh'))=='local')|ternary('docker','native'), compose | default(false) | bool | ternary('compose', 'docker')) }}"
+      when:
+      - (ansible_connection|default('ssh')) in ['ssh','local']
+      - (csp | default('static')) == 'static'
+      - ((wl_logs_dir+'/tocleanup.yaml') is exists) or (compose | default(false))
+

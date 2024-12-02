@@ -1,0 +1,52 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Check if the Prometheus endpoint is available at the given url
+    uri:
+      url: "{{ powerstat_prometheus_url }}/status"
+      method: GET
+      status_code: 200
+    register: prometheus_response
+    ignore_errors: true
+  
+  - debug:
+      msg: "{{ prometheus_response }}"
+  
+  - fail:
+      msg: "Prometheus endpoint is unavailable"
+    when: prometheus_response.status != 200
+    ignore_errors: true
+  
+  - name: Find trace node name
+    shell:
+      cmd: |
+        kubectl get nodes -o='custom-columns=name:.metadata.name,ip:.status.addresses[?(@.type=="InternalIP")].address' --no-headers | grep -E "{{ trace_addrs | ipaddr | union(trace_ips|split(',')) | reject('==','') | unqiue | join('|') }}" | cut -f1 -d' '
+      executable: /bin/bash
+    register: trace_nodes
+    ignore_errors: true
+    delegate_to: "{{ ('controller' in groups) | ternary('controller-0','localhost') }}"
+    run_once: true
+    become: false
+    vars:
+      trace_addrs: "{{ groups['trace_hosts'] | map('extract', hostvars, ['private_ip']) | select('defined') | unique }}"
+      trace_ips: "{% for h in (trace_addrs|difference(trace_addrs|ipaddr)) %}{{ query('dig',h)|first }},{% endfor %}"
+  
+  - name: create the trace directory
+    file:
+      path: "{{ trace_script_local_path }}"
+      state: directory
+    delegate_to: localhost
+
+  - name: copy emon edp file
+    copy:
+      src: "{{ role_path + '/files/get-powerstat-metrics.py' }}"
+      dest: "{{ trace_script_local_path }}/"
+    delegate_to: localhost
+
+  delegate_to: "{{ trace_node.1 }}"
+  

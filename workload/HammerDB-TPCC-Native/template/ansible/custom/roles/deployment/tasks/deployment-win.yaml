@@ -1,0 +1,83 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Create the logs directory
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}/worker-0-logs"
+    state: directory
+    recurse: yes
+  delegate_to: localhost
+  
+- name: Run HammerDB build schema
+  win_shell: |
+    .\hammerdbcli.bat auto ..\build.tcl
+    Start-Sleep -Seconds 10
+  args:
+    chdir: "C:\\HammerDB\\HammerDB-4.2"
+  register: results
+
+- name: Write the logs content
+  copy:
+    dest: "{{ wl_logs_dir }}/itr-{{ itr }}/worker-0-logs/build_schema.log"
+    content: |
+        {{ results.stdout }}
+        {{ results.stderr }}
+  delegate_to: localhost
+
+- name: Create Run HammerDB script
+  win_copy:
+    content: |
+      echo "test start" > C:\out.log
+      cd C:\HammerDB\HammerDB-4.2
+      .\hammerdbcli.bat auto ..\run.tcl 2>&1 > output.log
+      Set-Content -Path C:\HammerDB\HammerDB-4.2\status -Value $LastExitCode
+    dest: "C:\\HammerDB\\HammerDB-4.2\\run.ps1"
+
+- name: Run HammerDB testing
+  ansible.windows.win_powershell:
+    script: |
+      Invoke-WmiMethod -Path win32_process -Name create -ArgumentList "powershell -NonInteractive -ExecutionPolicy Unrestricted -File C:\HammerDB\HammerDB-4.2\run.ps1"
+  register: runrc
+
+- name: invoke the trace procedure
+  include_role:
+    name: trace
+  vars:
+    trace_waitproc_pid: "{{ runrc.output[0].ProcessId }}"
+    trace_logs_scripts: ["cat C:\\HammerDB\\HammerDB-4.2\\output.log"]
+
+- name: Install dos2unix
+  win_chocolatey:
+    name: dos2unix
+    state: present
+
+- name: Convert dos to unix
+  win_shell: |
+    dos2unix {{ item }}
+  with_items:
+  - "C:\\HammerDB\\HammerDB-4.2\\status"
+  - "C:\\HammerDB\\HammerDB-4.2\\output.log"
+  ignore_errors: true
+
+- name: Fetch output.log
+  fetch:
+    src: "C:\\HammerDB\\HammerDB-4.2\\output.log"
+    dest: "{{ wl_logs_dir }}/itr-{{ itr }}/worker-0-logs/output.log"
+    flat: true
+  become: false
+  ignore_errors: true
+
+- name: Fetch status
+  fetch:
+    src: "C:\\HammerDB\\HammerDB-4.2\\status"
+    dest: "{{ wl_logs_dir }}/itr-{{ itr }}/worker-0-logs/status"
+    flat: true
+  become: false
+  ignore_errors: true
+
+- name: collect trace data
+  include_role:
+    name: trace
+    tasks_from: collect

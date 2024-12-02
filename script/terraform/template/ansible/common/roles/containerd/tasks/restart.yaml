@@ -5,6 +5,15 @@
 #
 
 
+- name: Abort if containerd must be restarted on a loop-back host
+  fail:
+    msg: |
+      Failed to restart containerd on the dev host.
+      Please manually sudo systemctl restart containerd, and then restart the test.
+  when:
+  - (true in (containerd_restart_required | default([])))
+  - ansible_host in my_ip_list.split(",")
+
 - name: restart containerd
   become: true
   systemd:
@@ -12,3 +21,6 @@
     daemon_reload: yes
     enabled: yes
     state: restarted
+  when: (true in (containerd_restart_required | default([])))
+  no_log: true
+

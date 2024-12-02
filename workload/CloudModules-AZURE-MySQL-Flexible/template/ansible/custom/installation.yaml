@@ -1,0 +1,32 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- hosts: worker-0
+  become: true
+  gather_facts: no
+  vars:
+    DB_TYPE: "mysql"
+  tasks:
+  - name: Install HammerDB dependence
+    include_role:
+      name: packages
+
+- import_playbook: provisioning-playbook.yml
+  vars:
+    TPCC_THREADS_BUILD_SCHEMA: "{{ wl_tunables.TPCC_THREADS_BUILD_SCHEMA }}"
+    TPCC_HAMMER_NUM_VIRTUAL_USERS: "{{ wl_tunables.TPCC_HAMMER_NUM_VIRTUAL_USERS }}"
+    TPCC_WAIT_COMPLETE_MILLSECONDS: "{{ wl_tunables.TPCC_WAIT_COMPLETE_MILLSECONDS }}"
+    TPCC_NUM_WAREHOUSES: "{{ wl_tunables.TPCC_NUM_WAREHOUSES }}"
+    MYSQL_STORAGE_ENGINE: "innodb"
+    TPCC_MINUTES_OF_RAMPUP: "{{ wl_tunables.TPCC_MINUTES_OF_RAMPUP }}"
+    TPCC_MINUTES_OF_DURATION: "{{ wl_tunables.TPCC_MINUTES_OF_DURATION }}"
+    TPCC_TOTAL_ITERATIONS: "{{ wl_tunables.TPCC_TOTAL_ITERATIONS }}"
+    TPCC_RUNTIMER_SECONDS: "{{ wl_tunables.TPCC_RUNTIMER_SECONDS }}"
+    workspace: "/home/tfu"
+    HAMMERDB_INSTALL_DIR: "{{ workspace }}/HammerDB-4.4"
+    TPCC_TCL_SCRIPT_PATH: "{{ workspace }}/tcls"
+    DB_TYPE: "mysql"
+
+

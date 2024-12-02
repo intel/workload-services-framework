@@ -1,0 +1,39 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Add local hosts to no_proxy
+  ansible.windows.win_shell: |
+    $registryPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
+    $proxy=(Get-ItemProperty -Path "$registryPath")
+    if (-Not $proxy.ProxyServer) {
+      $registryPath1 = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
+      $proxy=(Get-ItemProperty -Path "$registryPath1")
+    }
+    $proxyServer=$proxy.ProxyServer
+    if ($proxyServer) {
+      $bypass=$proxy.ProxyOverride
+      $bypass="{{ (addr_list + (ip_list|split(','))) | reject('==','') | unique | join(';') }};$bypass"
+
+      Set-ItemProperty -Path $registryPath -Name ProxyServer -Value "$proxyServer"
+      Set-ItemProperty -Path $registryPath -Name ProxyOverride -Value "$bypass"
+      netsh winhttp set proxy proxy-server="$proxyServer" bypass-list="$bypass"
+
+      $proxyBytes = [system.Text.Encoding]::ASCII.GetBytes("$proxyServer")
+      $bypassBytes = [system.Text.Encoding]::ASCII.GetBytes("$bypass")
+
+      $proxyBytesLength0 = $proxyBytes.Length % 256
+      $proxyBytesLength1 = ($proxyBytes.Length -shr 8) % 256
+      $bypassBytesLength0 = $bypassBytes.Length % 256
+      $bypassBytesLength1 = ($bypassBytes.Length -shr 8) % 256
+
+      $defaultConnectionSettings = [byte[]]@(@(70,0,0,0,0,0,0,0,11,0,0,0,$proxyBytesLength0,$proxyBytesLength1,0,0)+$proxyBytes+@($bypassBytesLength0,$bypassBytesLength1,0,0)+$bypassBytes+ @(1..36 | % {0}))
+      Set-ItemProperty -Path "$registryPath\Connections" -Name DefaultConnectionSettings -Value $defaultConnectionSettings
+    }
+  become: false
+  vars:
+    addr_list: "{{ groups['cluster_hosts'] | union(groups['off_cluster_hosts']) | map('extract', hostvars, ['ansible_host']) | union(groups['cluster_hosts']|union(groups['off_cluster_hosts'])|map('extract',hostvars,['private_ip'])) | select('defined') | unique }}"
+    ip_list: "{% for h in (addr_list|difference(addr_list|ipaddr)) %}{{ query('dig',h)|first }},{% endfor %}"
+

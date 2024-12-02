@@ -1,42 +1,64 @@
 #!/bin/bash -e
 
-emon_options=""
 emon_bin_path="/usr/local/emon"
-emon_edp_config="config/edp/pyedp_config.txt"
 emon_sep_vars="$emon_bin_path/sep/sep_vars.sh"
+emon_pyedp_options="--socket-view --core-view --thread-view"
+
+extract_emon_options () {
+    if [[ "$@" = *"--emon_options="* ]]; then
+        local options="$@"
+        options="${options/*--emon_options=/}"
+        options="${options/ */}"
+        options="${options/edp_file=/"edp_file=$LOGSDIRH/"}"
+        echo "${options//%20/ }"
+    fi
+}
+
+emon_options="$(extract_emon_options $DOCKER_CMAKE_OPTIONS $CTESTSH_OPTIONS)"
 
 emon_start () {
     if [ -e "$emon_sep_vars" ]; then
+        mkdir -p "$1-emon"
+        cd "$1-emon"
+        if is_roi sar $2 ${1##*-} TRACE_START; then
         (
             . "$emon_sep_vars" > /dev/null
-            mkdir -p "$1-emon"
-            emon $emon_options -collect-edp > "$1-emon/emon.dat" 2>&1 &
-            echo $! > "$1-emon/emon.pid"
+            emon -collect-edp $emon_options -f "$1-emon/emon-$2.dat" > emon-$2.logs 2>&1 &
+            disown
+            echo "emon started"
         )
-        echo "emon started"
+        fi
     fi
 }
 
 emon_stop () {
-    if [ -e "$emon_sep_vars" ] && [ -e "$1-emon/emon.pid" ]; then
+    if [ -e "$emon_sep_vars" ] && [ -d "$1-emon" ]; then
+        cd "$1-emon" 
+        if is_roi sar $2 ${1##*-} TRACE_STOP; then
         (
             . "$emon_sep_vars" > /dev/null
-            emon -stop
-            sleep 5s
-            sudo kill -9 $(cat "$1-emon/emon.pid" 2> /dev/null) > /dev/null 2>&1 || true
-            rm -f "$1-emon/emon.pid"
+            emon -stop || true
+            chmod a+r emon-$2.dat || true
+            echo "emon stopped"
         )
-        echo "emon stopped"
+        fi
     fi
 }
 
 emon_collect () {
-    if [ -e "$emon_sep_vars" ]; then
-        (
-            . "$emon_sep_vars" > /dev/null
-            cd "$1-emon"
-            emon -process-pyedp "$emon_bin_path/sep/$emon_edp_config"
-        )
+    if [ -e "$emon_sep_vars" ] && [ -d "$1-emon" ]; then
+    (
+        . "$emon_sep_vars" > /dev/null
+        cd "$1-emon"
+        for dat in emon-*.dat; do
+            [ -r $dat ] || continue
+            mkdir -p ${dat/.dat/-edp}
+            cd ${/.dat/-edp}
+            metric_file="$(head -n200 ../$dat | grep -E '^EDP metric file:' | cut -f2 -d:)"
+            chart_file="$(head -n200 ../$dat | grep -E '^EDP chart file:' | cut -f2 -d:)"
+            python3 -m pyedp.edp $emon_pyedp_options -i ../$dat -o summary.xlsx -m "$emon_bin_path/sep/config/edp/$(basename "$metric_file")" -f "$emon_bin_path/sep/config/edp/$(basename "$chart_file")" > pyedp.logs 2>&1
+        done
+    )
     fi
 }
 

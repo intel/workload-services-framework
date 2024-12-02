@@ -1,0 +1,24 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+  - name: Restart containerd
+    systemd:
+      name: containerd
+      state: restarted
+    when: ansible_host not in (my_ip_list | split(','))
+    become: true
+    no_log: true
+
+  - name: sleep a while
+    shell: sleep 5s
+
+  - name: Restart kubelet
+    systemd:
+      name: kubelet
+      state: restarted
+    become: true
+    no_log: true
+

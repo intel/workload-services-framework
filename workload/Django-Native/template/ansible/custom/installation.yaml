@@ -1,0 +1,39 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- hosts: worker-0
+  gather_facts: yes
+  become: yes
+  tasks:
+    - name: Installing Dependencies
+      include_role:
+        name: installation
+        tasks_from: install_dependencies
+
+    - name: Installing Python
+      include_role:
+        name: installation
+        tasks_from: install_python
+
+    - name: Installing Cassandra
+      include_role:
+        name: installation
+        tasks_from: install_cassandra
+
+    - name: Installing memcached
+      include_role:
+        name: installation
+        tasks_from: install_memcached
+
+    - name: Installing django
+      include_role:
+        name: installation
+        tasks_from: install_django
+    
+    - name: Installing siege
+      include_role:
+        name: installation
+        tasks_from: install_siege
+

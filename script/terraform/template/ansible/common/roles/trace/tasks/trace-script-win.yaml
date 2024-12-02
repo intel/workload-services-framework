@@ -1,0 +1,27 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: "Create the local trace directory"
+    file:
+      path: "{{ trace_script_local_path }}"
+      state: directory
+
+  - name: "Create trace scripts"
+    copy:
+      src: "scripts/{{ item }}"
+      dest: "{{ trace_script_local_path }}/"
+      force: false
+    loop:
+    - start-trace.ps1
+    - stop-trace.ps1
+
+  delegate_to: localhost
+  become: false
+  vars:
+    trace_script_local_path: "{{ trace_tmp_path }}/{{ wl_namespace }}-{{ trace_host }}-trace"
+

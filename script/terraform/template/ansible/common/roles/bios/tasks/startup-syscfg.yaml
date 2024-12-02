@@ -1,0 +1,41 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Check if syscfg is installed
+  stat:
+    path: "{{ syscfg_bin }}"
+  register: syscfg
+
+- name: Install syscfg
+  include_tasks:
+    file: install-syscfg.yaml
+  when: not syscfg.stat.exists
+
+- name: Save BIOS settings
+  shell:
+    cmd: "{{ syscfg_bin }} /s '/tmp/{{ wl_namespace }}-bios/syscfg.ini' /f /b"
+    executable: /bin/bash
+
+- name: Fetch saved BIOS settings
+  fetch:
+    src: "/tmp/{{ wl_namespace }}-bios/syscfg.ini"
+    dest: "{{ wl_logs_dir }}/{{ inventory_hostname }}-bios/"
+    flat: true
+  become: false
+
+- name: Update BIOS settings
+  include_tasks:
+    file: syscfg-cmd.yaml
+  when:
+  - not (sut_bios_probe | bool)
+  - ('\n' + request.key + '=') in bios_settings
+  - ('\n' + request.key + '=' + request.value) not in bios_settings
+  loop: "{{ wl_bios.keys() | select('in',bios_settings.replace('\n','~') | regex_replace('.*~BIOSVersion=([^; ]*).*','\\1')) | sort(true) | first | default([]) | extract(wl_bios) | default({}) | combine(bios_options_dict) | dict2items }}"
+  loop_control:
+    loop_var: request
+  vars:
+    bios_settings: "{{ lookup('file', wl_logs_dir + '/' + inventory_hostname + '-bios/syscfg.ini') }}"
+    

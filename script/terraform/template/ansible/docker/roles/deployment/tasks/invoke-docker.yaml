@@ -4,53 +4,104 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: record timing
-  shell:
-    cmd: |
-      echo "workload_itr{{ itr }}_start: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
-    executable: /bin/bash
-  delegate_to: localhost
-  async: 30
-  poll: 0
+- block:
 
-- name: invoke docker run
-  shell: 
-    cmd: "docker run {{ ('True' in pullalways) | ternary('--pull always','') }} $(compgen -e | sed -nE '/_(proxy|PROXY)$/{s/^/-e /;p}') {{ workload_config.docker_options }} --rm -d {{ workload_config.docker_image }}"
-    executable: /bin/bash
-  register: container
-  vars:
-    pullalways: "x{% for r in (skopeo_sut_accessible_registries | default('') | split(',')) %}{{ ((r!='') and workload_config.docker_image.startswith(r)) }}{% endfor %}x"
+    - include_role:
+        name: timing
+        tasks_from: start-iteration
 
-- name: save container_id for cleanup
-  copy:
-    content: "{{ container | to_yaml }}"
-    dest: "{{ wl_logs_dir }}/tocleanup.yaml"
+    - name: invoke docker run
+      shell:
+        cmd: |
+          docker run {% for r in skopeo_sut_accessible_registries | default('') | split(',') | reject('==','') %}{% if item.image.startswith(r) %}--pull always {% endif %}{% endfor %} --platform={{ workload_config.image_arch }} --rm $(compgen -e | sed -nE '/_(proxy|PROXY)$/{s/^/-e /;p}') -e TZ=$(timedatectl show --va -p Timezone 2> /dev/null || echo $TZ) -e {{ play_hosts | map('replace','-','_') | map('upper') | zip(play_hosts | map('extract',hostvars,['private_ip']) | map('replace','127.0.0.1',my_ip_list|split(',')|first)) | map('join','_HOST=') | join(' -e ') }} -d {% if (item.options|type_debug)=='list' %}{{ item.options|map('string')|join(' ') }}{% else %}{{ item.options|default('',true)|string }}{% endif %} {% if (item.options|type_debug)=='list' %}{% if item.image not in (item.options|map('string')) %}{{ item.image }}{% endif %}{% else %}{% if item.image not in (item.options|default('',true)|split(' ')) %}{{ item.image }}{% endif %}{% endif %} {% if item.command is defined %} {{ item.command }} {% endif %} || (echo "0000";exit 1)
+        executable: /bin/bash
+      register: containers
+      loop: "{{ docker_config[inventory_hostname] | default([]) }}"
+      environment: "{{ lookup('file',wl_logs_dir+'/.workload-secret.yaml') | from_yaml | default({},true) }}"
+      vars:
+        docker_config: "{{ lookup('file',wl_logs_dir+'/docker-config.yaml') | from_yaml }}"
+    
+    - set_fact:
+        WORKLOAD_PROCESSES: "docker:{{ dict(containers.results | map(attribute='stdout_lines') | map('last') | zip(containers.results | map(attribute='item') | map(attribute='traceable') | map('default',true) | map('bool'))) | dict2items | selectattr('value','==',true) | map(attribute='key') | join(' ') }}"
+      when: wl_trace_modules | default('') | split(',') | reject('==','') | reject('match','.*:host.*') | length > 0
+
+  always:
+
+    - name: save container_id for cleanup
+      copy:
+        content: "{{ dict(play_hosts | zip(play_hosts | map('extract',hostvars,['containers']) | map(attribute='results') | map('map',attribute='stdout_lines')|map('map','last'))) | to_yaml }}"
+        dest: "{{ wl_logs_dir }}/tocleanup.yaml"
+      delegate_to: localhost
+      run_once: true
+
+- name: create the iteration direcctory
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ inventory_hostname }}-container{{ cidx }}"
+    state: directory
+  when: item.item['export-logs'] | default(false)
+  loop: "{{ containers.results }}"
+  loop_control:
+    index_var: cidx
   delegate_to: localhost
 
 - name: waitproc to wait for logs complete
   shell:
     cmd: |
-      nohup bash -c 'timeout {{ workload_config.timeout | split(',') | first }}s docker exec {{ container.stdout_lines | first }} sh -c "cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-docker-logs.tar; tar tf /tmp/{{ wl_namespace }}-docker-logs.tar > /dev/null && cat /tmp/{{ wl_namespace }}-docker-logs.tar || tar cf - \$(cat /tmp/{{ wl_namespace }}-docker-logs.tar)" > /tmp/{{ wl_namespace }}-docker-logs.tar; echo $? > /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-waitproc.status' > /dev/null 2>&1 &
+      echo 0 > /tmp/{{ wl_namespace }}-localhost-waitproc.status
+      nohup timeout {{ workload_config.timeout | split(',') | first }}s bash -c '
+        ({% for h in play_hosts %}
+          {% for r in hostvars[h].containers.results %}
+            {% if r.item['export-logs'] | default(false) %}
+              echo "cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-docker-logs.tar; tar tf /tmp/{{ wl_namespace }}-docker-logs.tar > /dev/null 2>&1 && cat /tmp/{{ wl_namespace }}-docker-logs.tar || tar cf - \$(cat /tmp/{{ wl_namespace }}-docker-logs.tar)" | {% if hostvars[h].ansible_connection | default('ssh') != 'local' %} ssh -p {{ hostvars[h].ansible_port | default(22) }} {{ hostvars[h].ansible_user }}@{{ hostvars[h].ansible_host }} {% endif %}docker exec -i {{ r.stdout_lines | last }} sh | tar xf - -C {{ wl_logs_dir }}/itr-{{ itr }}/{{ h }}-container{{ loop.index0 }} > {{ wl_logs_dir }}/itr-{{ itr }}/{{ h }}-container{{ loop.index0 }}/waitproc.logs 2>&1 || echo 1 > /tmp/{{ wl_namespace }}-localhost-waitproc.status &
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+          wait
+        ) &
+        pids=($!)
+        while true; do
+          [ "$(cat /tmp/{{ wl_namespace }}-localhost-waitproc.status)" -eq 0 ] || break
+          sleep 1s
+        done &
+        pids+=($!)
+        wait -n ${pids[@]}
+        kill ${pids[@]} 2> /dev/null
+      ' > {{ wl_logs_dir }}/itr-{{ itr }}/waitproc.logs 2>&1 &
       echo $!
       disown
     executable: /bin/bash
   register: waitproc
+  delegate_to: localhost
+  run_once: true
+
+- name: enable streaming logs
+  shell:
+    cmd: |
+      {% for h in play_hosts %}
+        {% for c in dict(hostvars[h].containers.results | map(attribute='stdout_lines') | map('last') | zip(hostvars[h].containers.results | map(attribute='item') | map(attribute='streaming') | map('default',true) | map('bool'))) | dict2items | selectattr('value','==',true) | map(attribute='key') %}
+          echo "nice -n 19 {% if (hostvars[h].ansible_connection|default('ssh'))!='local' %}ssh -p {{ hostvars[h].ansible_port | default(22) }} {{ hostvars[h].ansible_user }}@{{ hostvars[h].ansible_host }} -i {{ ansible_private_key_file }} nice -n 19 {% endif %}docker logs -f {{ c }} | stdbuf -oL sed 's|^|{{ h }}-c{{ hostvars[h].containers.results | map(attribute='stdout_lines') | map('last') | ansible.utils.index_of('eq',c,wantlist=true) | first }}: |'" > /tmp/streaming-console
+        {% endfor %}
+      {% endfor %}
+    executable: /bin/bash
+  when: docker_streaming_logs|bool
+  delegate_to: localhost
+  run_once: true
+  become: false
 
 - name: invoke the trace procedure
   include_role:
     name: trace
+  run_once: true
   vars:
     trace_waitproc_pid: "{{ waitproc.stdout }}"
-    trace_logs_scripts: ["docker logs {{ container.stdout_lines | first }}"]
+    scripts_str: "{% for h in play_hosts %}{% for r in hostvars[h].containers.results %}{% if r.item['export-logs'] | default(false) %}{% if hostvars[h].ansible_connection | default('ssh') != 'local' %}ssh -p {{ hostvars[h].ansible_port | default(22) }} {{ hostvars[h].ansible_user }}@{{ hostvars[h].ansible_host }} {% endif %}docker logs {{ r.stdout_lines | last }}|{% endif %}{% endfor %}{% endfor %}"
+    trace_logs_scripts: "{{ scripts_str | split('|') | reject('==','') }}"
+    trace_logs_host: localhost
+    trace_status_file: "/tmp/{{ wl_namespace }}-localhost-waitproc.status"
 
-- name: record timing
-  shell:
-    cmd: |
-      echo "workload_itr{{ itr }}_end: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
-    executable: /bin/bash
-  delegate_to: localhost
-  async: 30
-  poll: 0
+- include_role:
+    name: timing
+    tasks_from: stop-iteration
 
 - name: print docker info
   command: "docker version"
@@ -59,50 +110,26 @@
   include_role:
     name: trace
     tasks_from: collect
-  when: wl_trace_modules | default('') | split(',') | reject('==','') | length > 0
+  when:
+  - wl_trace_modules | default('') | split(',') | reject('==','') | length > 0
+  run_once: true
 
 - block:
 
   - name: print docker logs
-    command: "docker logs {{ container.stdout_lines | first }}"
+    command: "docker logs {{ item.stdout_lines | first }}"
+    loop: "{{ containers.results }}"
     ignore_errors: true
 
   - name: stop the docker container
-    command: "docker rm -v -f {{ container.stdout_lines | first }}"
+    command: "docker stop {{ item.stdout_lines | first }}"
+    loop: "{{ containers.results }}"
     when: ((itr |int) < (run_stage_iterations | default(1) | int)) or ('cleanup' not in (stage | default('cleanup')))
     ignore_errors: true
 
-  - name: create the iteration direcctory
-    file:
-      path: "{{ wl_logs_dir }}/itr-{{ itr }}/worker-0"
-      state: directory
-    delegate_to: localhost
-
-  - name: copy logs back to the itr directory
-    fetch:
-      src: "/tmp/{{ wl_namespace }}-docker-logs.tar"
-      dest: "{{ wl_logs_dir }}/itr-{{ itr }}/"
-      flat: yes
-
-  - name: untar the logs
-    unarchive:
-      src: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ wl_namespace }}-docker-logs.tar"
-      dest: "{{ wl_logs_dir}}/itr-{{ itr }}/worker-0"
-    delegate_to: localhost
-    ignore_errors: true
-
-  always:
-
-  - name: remove remote logs
-    file:
-      path: "/tmp/{{ wl_namespace }}-docker-logs.tar"
-      state: absent
-    ignore_errors: true
-
-  - name: remove local logs tarfile
-    file:
-      path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ wl_namespace }}-docker-logs.tar"
-      state: absent
-    delegate_to: localhost
+  - name: force rm the docker container
+    command: "docker rm -v -f {{ item.stdout_lines | first }}"
+    loop: "{{ containers.results }}"
+    when: ((itr |int) < (run_stage_iterations | default(1) | int)) or ('cleanup' not in (stage | default('cleanup')))
     ignore_errors: true
 

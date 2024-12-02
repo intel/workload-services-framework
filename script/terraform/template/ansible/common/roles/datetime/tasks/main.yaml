@@ -4,12 +4,65 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: Set local time
-  shell:
-    cmd: |
-      timedatectl set-timezone '{{ timezone }}'
-      date -Ins -s '{{ datetime }}'
-    executable: /bin/bash
-  vars:
-    timezone: "{{ lookup('pipe', 'cat /etc/timezone') }}"
-    datetime: "{{ lookup('pipe', 'date -Ins') }}"
+- block:
+ 
+  - name: Get datetime from Linux vmhost
+    shell:
+      cmd: |
+        timedatectl show --va -p Timezone 2> /dev/null || echo $TZ
+        date -Ins
+      executable: /bin/bash
+    register: datetime
+    delegate_to: "{{ vmhost_host | default(inventory_hostname) }}"
+
+  - name: Set instance datetime
+    shell:
+      cmd: |
+        timedatectl set-timezone "{{ datetime.stdout_lines | first }}"
+        date -Ins -s "{{ datetime.stdout_lines | last }}"
+      executable: /bin/bash
+
+  when:
+  - vmhost_host is defined
+  - (hostvars[vmhost_host].ansible_connection | default('ssh')) in ['ssh']
+  ignore_errors: true
+
+- block:
+
+  - name: Get datetime from Windows vmhost
+    win_shell: |
+      (Get-TimeZone).StandardName
+      Get-Date -Format "yyyy-MM-ddTHH:mm:ss,fffffffzzz"
+    register: datetime
+    delegate_to: "{{ vmhost_host | default(inventory_hostname) }}"
+    become: false
+
+  - name: Set instance datetime
+    shell:
+      cmd: |
+         timedatectl set-timezone "{{ zones.supplementalData.windowsZones.mapTimezones.mapZone | selectattr('@territory','==','001') | selectattr('@other','match','.*'+(datetime.stdout_lines | first)+'.*') | map(attribute='@type') | first | split(' ') | first }}"
+         date -Ins -s '{{ datetime.stdout_lines | last }}'
+      executable: /bin/bash
+    vars:
+      zones: "{{ lookup('file','windows-zones.xml') | ansible.utils.from_xml('xmltodict') }}"
+
+  when:
+  - vmhost_host is defined
+  - (hostvars[vmhost_host].ansible_connection | default('ssh')) in ['winrm']
+  ignore_errors: true
+
+- block:
+
+  - name: Set instance datetime from local datetime
+    shell:
+      cmd: |
+        timedatectl set-timezone "{{ lookup('pipe', 'timedatectl show --va -p Timezone 2> /dev/null || echo $TZ') }}"
+        date -Ins -s "{{ lookup('pipe', 'date -Ins') }}"
+      executable: /bin/bash
+
+  when:
+  - vmhost_host is not defined
+  - ansible_host not in my_ip_list.split(',')
+  - (ansible_connection | default('ssh')) in ['ssh']
+  ignore_errors: true
+

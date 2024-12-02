@@ -1,0 +1,49 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- hosts: client-0
+  gather_facts: no
+  tasks:
+  - name: Install HammerDB Tool
+    include_role:
+      name: installation
+
+- hosts: worker-0
+  gather_facts: no
+  tasks:
+  - name: Config host Environment
+    include_role:
+      name: config
+
+  - name: Reboot system
+    win_reboot: 
+
+  - name: Wait for system to become reachable
+    wait_for_connection:
+      connect_timeout: 20
+      sleep: 1
+      delay: 1
+      timeout: 1800
+
+  - name: Install Mssql Server
+    block:
+      - name: Install Mssql Server 
+        include_role:
+          name: mssql
+    always:
+      - name: Create the logs directory
+        file:
+          path: "{{ wl_logs_dir }}/worker-0-launch"
+          state: directory
+          recurse: yes
+        delegate_to: localhost
+
+      - name: Cope EC2 launch log to localhost
+        fetch:
+          src: "C:\\ProgramData\\Amazon\\EC2-Windows\\Launch\\Log\\UserdataExecution.log"
+          dest: "{{ wl_logs_dir }}/worker-0-launch/UserdataExecution.log"
+          flat: true
+        ignore_errors: true
+        when: "{{ workload_config.terraform_sut == 'aws'}}"

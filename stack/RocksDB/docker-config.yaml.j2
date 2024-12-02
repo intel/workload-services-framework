@@ -1,0 +1,26 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+worker-0:
+- image: "{{ REGISTRY }}rocksdb-iaa-test{{ RELEASE }}"
+  options:
+{% for NUM_DISK in range(0, NUM_DISKS|int) %}
+{% set NUM_DISK=NUM_DISK+1 %}
+  - -v /mnt/disk{{ NUM_DISK }}:/mnt/disk{{ NUM_DISK }}
+{% endfor %}
+{% if COMPRESSED== 'iaa' %}
+  - -v /dev:/dev
+  - -v /sys:/sys
+{% endif %}
+  - -e COMPRESSED={{ COMPRESSED }}
+  - -e TYPE={{ TYPE }}
+  - -e KEY_SIZE={{ KEY_SIZE }}
+  - -e VALUE_SIZE={{ VALUE_SIZE }}
+  - -e BLOCK_SIZE={{ BLOCK_SIZE }}
+  - -e DB_CPU_LIMIT={{ DB_CPU_LIMIT }}
+  - -e NUM_SOCKETS={{ NUM_SOCKETS }}
+  - -e NUM_DISKS={{ NUM_DISKS }}
+  - --privileged
+  export-logs: true

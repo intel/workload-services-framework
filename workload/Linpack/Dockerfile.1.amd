@@ -1,0 +1,28 @@
+# linpack-amd
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+
+FROM linpack-base-amd${RELEASE} as base
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+COPY --from=base / /
+
+WORKDIR /root
+
+COPY run_test_amd.sh run_test.sh
+
+RUN mkfifo /export-logs
+
+SHELL ["/bin/bash", "-c"]
+CMD  (bash run_test.sh; echo $? > status) 2>&1  | tee output.logs && \
+     if [ `grep -R -i -c 'PASSED' output.logs` == 0 ]; then echo 2 > status; fi && \
+     tar cPf /export-logs status output.logs && \
+     sleep infinity

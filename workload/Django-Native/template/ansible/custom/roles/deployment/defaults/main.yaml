@@ -1,0 +1,16 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+WORKSPACE: "/tmp/django"
+CASSANDRA_INSTALL_DIR: "{{ WORKSPACE }}/cassandra"
+MEMCACHED_WORKING_DIR: "{{ WORKSPACE }}/memcached"
+DJANGO_APP_INSTALL_DIR: "{{ WORKSPACE }}/django"
+PYTHON_VENV_DIR: "{{ WORKSPACE }}/venv"
+SIEGE_WORKING_DIR: "{{ WORKSPACE }}/siege"
+PYTHON_VENV_VER: "3.7"
+CASSANDRA_ENDPOINT: "127.0.0.1"
+MEMCACHED_ENDPOINT: ""
+GRAPHITE_ENDPOINT: ""
+UWSGI_WORKER: ""

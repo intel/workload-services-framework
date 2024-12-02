@@ -7,7 +7,7 @@
 - name: wait for cdn ready
   command: |
      docker run --rm --network host --entrypoint "/bin/sh" curlimages/curl:latest \
-           "-c" "while [ $(curl -k -sw '%{http_code}' -m 5 '{{ wl_tunables.HTTPMODE }}://{{ wl_tunables.NICIP_W1 }}:{{ wl_tunables.HTTPPORT }}' -o /dev/null) -ne 200 ];do echo Waiting...;sleep 1s;done"
+           "-c" "while [ $(curl -k -sw '%{http_code}' -m 5 '{{ wl_tunables.HTTPMODE }}://{{ wl_tunables.NICIP_W1 }}:{{ wl_tunables.PORT }}' -o /dev/null) -ne 200 ];do echo Waiting...;sleep 1s;done"
   register: container0
   delegate_to: "{{ groups['off_cluster_hosts'] | first }}"
   when: wl_tunables.GATED != 'gated'
@@ -26,12 +26,14 @@
           -e NUSERS={{ wl_tunables.NUSERS }} \
           -e NTHREADS={{ wl_tunables.NTHREADS }} \
           -e DURATION={{ wl_tunables.DURATION }} \
-          -e PORT={{ wl_tunables.HTTPPORT }} \
+          -e PORT={{ wl_tunables.PORT }} \
           -e GATED={{ wl_tunables.GATED }} \
           -e STORAGE_MEDIUM={{ wl_tunables.STORAGE_MEDIUM }} \
           -e STATUS_FILE="status1" \
           -e LOG_FILE="output1.log" \
           -e NICIP_W1={{ wl_tunables.NICIP_W1 }} \
+          -e KEEPALIVE={{ wl_tunables.KEEPALIVE }} \
+          -e URL_NUM={{ wl_tunables.URL_NUM }} \
           {{ wrk_image }}
   register: container1
   delegate_to: "{{ groups['off_cluster_hosts'] | first }}"

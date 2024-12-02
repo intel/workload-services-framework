@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-. "$(dirname "$0")"/cleanup-common.sh
+. "$(dirname "$0")"/cleanup-common.sh 
 
 read_regions gcp
 

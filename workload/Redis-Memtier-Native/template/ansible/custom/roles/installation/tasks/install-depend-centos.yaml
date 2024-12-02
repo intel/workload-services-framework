@@ -1,0 +1,62 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Create directory
+  file:
+    path: "{{ WORKSPACE }}"
+    state: directory
+
+- name: Update YUM cache
+  yum: 
+    update_cache: yes
+
+- name: Install additional development packages on centos
+  yum:
+    name: "{{ item }}"
+    state: present
+  loop: 
+    - gcc
+    - gcc-c++
+    - automake
+    - autoconf
+    - libtool
+    - make
+    - net-snmp
+    - wget
+    - nc
+    - net-snmp-utils
+    - numactl
+  register: pkg_install_result
+  become: true  
+
+- name: Install development libraries on centos
+  yum:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - openssl-devel
+    - bzip2-devel
+    - lm_sensors-libs
+    - zlib-devel
+    - libevent-devel
+    - pcre-devel
+  register: lib_install_result
+  become: true
+
+- name: install list
+  shell:
+      cd "{{ WORKSPACE }}" && touch install_list
+
+- name: Record pkg install list
+  shell:
+      cd "{{ WORKSPACE }}" && echo "{{ item.item }}" >> install_list
+  loop: "{{ pkg_install_result.results }}" 
+  when: "{{ item.changed }}"
+
+- name: Record lib install list
+  shell:
+      cd "{{ WORKSPACE }}" && echo "{{ item.item }}" >> install_list
+  loop: "{{ lib_install_result.results }}" 
+  when: "{{ item.changed }}"

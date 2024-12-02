@@ -1,0 +1,79 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Create HammerDB install path
+  file: 
+    path: "/tmp/HammerDB"
+    state: directory
+  
+- name: Download HammerDB package
+  get_url:
+    url: "{{ HAMMERDB_REPO_LINUX }}"
+    dest: "/tmp"
+
+- name: Untar HammerDB package
+  unarchive:
+    src: "/tmp/HammerDB-{{ HAMMERDB_VER }}-Linux.tar.gz"
+    dest: "/tmp/HammerDB"
+    remote_src: yes
+
+# - name: Install the prerequests
+#   yum:
+#     name:
+#     - https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+#     update_cache: true
+#     disable_gpg_check: true
+#   register: yumrc
+#   until: yumrc is success
+#   retries: 10
+#   delay: 10
+#   become: true
+
+- name: Add postgresql apt repo
+  shell: 
+    cmd: |
+      # Import the repository signing key:
+      sudo apt install curl ca-certificates
+      sudo install -d /usr/share/postgresql-common/pgdg
+      sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+
+      # Create the repository configuration file:
+      sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+
+      # Update the package lists:
+      sudo apt update
+  become: true
+
+- name: Install PostgreSQL-client
+  apt:
+    name:
+    - postgresql-client-13
+    update_cache: true
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+  become: true
+
+- name: Install MySQL client
+  apt:
+    name:
+    - libmysqlclient-dev
+    update_cache: true
+  register: aptrc
+  until: aptrc is success
+  retries: 10
+  delay: 10
+  become: true
+
+- name: Copy build.tcl script to client
+  template:
+    src: "build_{{ (wl_tunables.SERVER_VER in ['mysql8033']) | ternary('mysql','pg') }}.tcl.j2"
+    dest: "/tmp/HammerDB/build.tcl"
+
+- name: Copy run.tcl script to client
+  template:
+    src: "run_{{ (wl_tunables.SERVER_VER in ['mysql8033']) | ternary('mysql','pg') }}.tcl.j2"
+    dest: "/tmp/HammerDB/run.tcl"

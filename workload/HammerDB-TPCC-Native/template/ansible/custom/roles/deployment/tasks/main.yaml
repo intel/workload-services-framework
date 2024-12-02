@@ -1,0 +1,9 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Deployment start
+  include_tasks:
+    file: "deployment-{{ (wl_tunables.HOSTOS_VER in ['windows2016','windows2019']) | ternary('win','linux') }}.yaml"
+  

@@ -1,0 +1,92 @@
+# distilbert-pytorch-xeon-public-intel-public-24.04
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+
+FROM ai-common-img${RELEASE} as ai_common
+FROM distilbert-pytorch-xeon-public-dataset-24.04${RELEASE} as inference_data
+FROM distilbert-pytorch-xeon-public-model-24.04${RELEASE} as model
+FROM distilbert-pytorch-xeon-public-benchmark-24.04${RELEASE} as benchmark
+FROM pytorch-intel-public-24.04${RELEASE}
+
+RUN mkdir -p /home/workspace
+
+ARG WORKSPACE="/home/workspace/ai-reference-models/quickstart/language_modeling/pytorch/distilbert_base/inference/cpu"
+
+COPY --from=ai_common /home/ai_common ${WORKSPACE}/ai_common
+COPY --from=inference_data /home/dataset ${WORKSPACE}
+COPY --from=model /home/models /home/models
+COPY --from=benchmark /home/workspace /home/workspace
+COPY enable_ipex_for_transformers.diff /home/workspace
+COPY authentication_token_package_updation.diff /home/workspace
+COPY fix_import_error.diff /home/workspace
+
+RUN mv /root/anaconda3/lib/liblzma.so.5 /root/anaconda3/lib/liblzma.so.5.bak
+
+RUN apt-get update && apt-get install -y bc
+
+RUN mv /root/anaconda3/lib/liblzma.so.5.bak /root/anaconda3/lib/liblzma.so.5
+
+# Dependency ingradient
+ARG DATASETS_VER="2.8.0"
+ARG DATASETS_REPO="pip"
+ARG PYARROW_VER="14.0.1"
+ARG PYARROW_REPO="pip"
+ARG SCIPY_VER="1.7.3"
+ARG SCIPY_REPO="pip"
+ARG SKLEARN_VER="1.0.2"
+ARG SKLEARN_REPO="pip"
+ARG THREADPOOLCTL_VER="3.1.0"
+ARG THREADPOOLCTL_REPO="pip"
+ARG PANDAS_VER="1.3.5"
+ARG PANDAS_REPO="pip"
+
+ARG TRANSFORMERS_VER="v4.36.0"
+ARG TRANSFORMERS_REPO="https://github.com/huggingface/transformers.git"
+ARG FSSPEC_VER=2023.9.2
+RUN --mount=type=secret,id=.netrc,dst=/root/.netrc \
+    cd ${WORKSPACE} && \
+    /bin/bash -c "source activate base" && \
+    git clone  ${TRANSFORMERS_REPO} && \
+    cd transformers && git reset --hard ${TRANSFORMERS_VER} && \
+    git apply ../../../../../../../../enable_ipex_for_transformers.diff && \
+    git apply ../../../../../../../../authentication_token_package_updation.diff && \
+    git apply ../../../../../../../../fix_import_error.diff && \
+    pip install --no-cache-dir -e ./ && \
+    pip install --no-cache-dir datasets==${DATASETS_VER} pyarrow==${PYARROW_VER} fsspec==${FSSPEC_VER} evaluate \
+    scipy==${SCIPY_VER} scikit-learn==${SKLEARN_VER} threadpoolctl==${THREADPOOLCTL_VER} && \
+    cd .. && python ./convert.py && \
+    echo "\nsource activate base" >> ~/.bashrc 
+
+RUN pip install --no-cache-dir pandas==${PANDAS_VER}
+RUN pip install --no-cache-dir accelerate==0.26.0
+RUN pip install --no-cache-dir --upgrade intel-extension-for-pytorch
+RUN pip install --no-cache-dir --upgrade torch==2.5.0 torchvision torchaudio
+RUN pip install --no-cache-dir tqdm
+
+RUN mkdir -p /home/workspace/models/output
+
+ENV OUTPUT_DIR=${WORKSPACE}/output
+ENV DATASET_DIR=${WORKSPACE}
+ENV MODEL_DIR="/home/models/distilbert-base-uncased-finetuned-sst-2-english"
+ENV DNNL_PRIMITIVE_CACHE_CAPACITY=1024
+ENV TOKENIZERS_PARALLELISM=true
+
+WORKDIR ${WORKSPACE}
+
+ARG ACCURACY_VER="71e28fde9dc5c4145f7758f749079b9f"
+ARG ACCURACY_REPO="https://raw.githubusercontent.com/huggingface/datasets/2.0.0/metrics/accuracy/accuracy.py"
+RUN wget -T 5 --tries=inf ${ACCURACY_REPO}
+
+COPY run_test.sh .
+
+RUN mkfifo /export-logs
+
+CMD ( ./run_test.sh; \
+    echo $? > status) 2>&1 | tee benchmark_${MODE}_${TOPOLOGY}_${PRECISION}_${FUNCTION}_${DATA_TYPE}_$(date +"%m-%d-%y-%H-%M-%S").log && \
+    tar cf /export-logs status $(find . -name "*.log") && \
+    sleep infinity

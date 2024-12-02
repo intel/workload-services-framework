@@ -9,6 +9,7 @@ locals {
     "x64": {
       "ubuntu2004": "ubuntu_20_04_x64*alibase*.vhd",
       "ubuntu2204": "ubuntu_22_04_x64*alibase*.vhd",
+      "ubuntu2404": "ubuntu_24_04_x64*alibase*.vhd",
       "debian11": "debian_11_*_x64*alibase*.vhd",
       "debian12": "debian_12_*_x64*alibase*.vhd",
       "anolis86anck":   "anolisos_8_6_x64*anck_alibase*",
@@ -21,6 +22,7 @@ locals {
     "arm64": {
       "ubuntu2004": "ubuntu_20_04_arm64*alibase*.vhd",
       "ubuntu2204": "ubuntu_22_04_arm64*alibase*.vhd",
+      "ubuntu2404": "ubuntu_24_04_arm64*alibase*.vhd",
       "debian11": "debian_11_*_arm64*alibase*.vhd",
       "debian12": "debian_12_*_arm64*alibase*.vhd",
       "anolis86anck": "anolisos_8_6_arm64*anck_alibase*",
@@ -35,6 +37,7 @@ locals {
   os_user_name = {
     "ubuntu2004": "tfu",
     "ubuntu2204": "tfu",
+    "ubuntu2404": "tfu",
     "debian11": "tfu",
     "debian12": "tfu",
     "anolis84anck": "tfu",

@@ -1,0 +1,17 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- set_fact:
+    trace_module_start_block: |
+            export S_TIME_FORMAT=ISO 
+            export S_TIME_DEF_TIME=UTC
+            nohup sar {{ sar_options }} {{ sar_interval }} -o sar-$roi.logs > /dev/null 2>&1 &
+            echo $! > sar.pid
+            disown
+    trace_module_stop_block: |
+            kill $(cat sar.pid)
+            tail -f --pid=$(cat sar.pid) /dev/null
+  

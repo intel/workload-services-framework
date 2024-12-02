@@ -5,4 +5,4 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-. $DIR/build/build_intel.sh
+. $DIR/build/build_intel_pdt.sh

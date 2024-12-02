@@ -1,0 +1,52 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: stop nmi_watchdog
+    shell:
+      cmd: |
+        echo 0 > /proc/sys/kernel/nmi_watchdog
+      executable: /bin/bash
+    failed_when: false
+    become: true
+
+  - name: stop any pending emon session
+    shell: 
+      cmd: |
+        . $(ls -1 {{ emon_bin_path }}/*/sep_vars.sh | head -n1)
+        emon -stop
+      executable: /bin/bash
+    failed_when: false
+    become: true
+
+  - name: copy emon edp file
+    copy:
+      src: "{{ wl_logs_dir }}/{{ emon_options | regex_replace('^.*edp_file=([^ ]*).*$','\\1') }}"
+      dest: "{{ trace_script_local_path }}/"
+    when: ('edp_file=' in emon_options)
+    delegate_to: localhost
+    become: false
+
+  delegate_to: "{{ trace_node.1 }}"
+  when: (hostvars[trace_node.1].ansible_connection | default('ssh')) not in ['local']
+
+- set_fact:
+    trace_module_start_block: |
+      {% if (hostvars[trace_node.1].ansible_connection | default('ssh')) not in ['local'] %}
+        . $(ls -1 {{ emon_bin_path }}/*/sep_vars.sh | head -n1)
+        nohup emon -collect-edp {{ emon_options | replace('edp_file=','edp_file='+edp_file_path) }} -f emon-$roi.dat > emon-$roi.logs 2>&1 &
+        disown
+      {% endif %}
+    trace_module_stop_block: |
+      {% if (hostvars[trace_node.1].ansible_connection | default('ssh')) not in ['local'] %}
+        . $(ls -1 {{ emon_bin_path }}/*/sep_vars.sh | head -n1)
+        emon -stop
+        chmod a+r emon-*.dat
+      {% endif %}
+  vars:
+    edp_file_path: "{{ trace_script_path }}/"
+

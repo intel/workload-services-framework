@@ -22,21 +22,37 @@
       executable: /bin/bash
     register: osver
 
+  - name: remove legacy docker entries
+    include_role:
+      name: legacy-repo
+      tasks_from: remove-centos
+    vars:
+      conflict_repos:
+      - "{{ docker_dist_repo }}/linux/{{ (os.stdout in ['rhel','fedora']) | ternary(os.stdout,'centos') }}/"
+
   - name: Install docker repo
     get_url:
-      url: "{{ docker_dist_repo }}/linux/centos/docker-ce.repo"
+      url: "{{ docker_dist_repo }}/linux/{{ (os.stdout in ['rhel','fedora']) | ternary(os.stdout,'centos') }}/docker-ce.repo"
       dest: "/etc/yum.repos.d/docker-ce.repo"
+      force: true
     become: true
-    when: osver.stdout | int >= 8
+    when: (osver.stdout | int >= 8) or ((csp | default('static')) in ['kvm', 'hyperv'])
     register: getrc
     until: getrc is success
     retries: 10
     delay: 5
 
+  - name: Get versions
+    shell:
+      cmd: "yum list --showduplicates {{ containerd_package_name }}"
+      executable: /bin/bash
+    register: versions
+    become: true
+
   - name: "install {{ containerd_package_name }}"
     yum:
       name:
-      - "{{ containerd_package_name }}-{{ containerd_version | default(containerd_default_version.centos) }}*"
+      - "{{ containerd_package_name }}-{{ 1 | extract(versions.stdout_lines | select('match',containerd_package_name+'[.].*'+(containerd_version|replace('.','[.]'))+'[-].*') | default(versions.stdout_lines | select('match',containerd_package_name+'[.].*'),true) | last | split(' ') | reject('==','')) }}*"
       update_cache: true
     become: true
     register: yumrc

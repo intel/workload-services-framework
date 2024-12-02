@@ -1,0 +1,82 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Create the Logs Directory
+  file:
+    path: "/tmp/HammerDB/itr-{{ itr }}/benchmark"
+    state: directory
+    recurse: yes
+
+- name: Run HammerDB build schema
+  shell: "cd /tmp/HammerDB/HammerDB-4.2; (./hammerdbcli auto ../build.tcl; echo $? > /tmp/HammerDB/itr-{{ itr }}/benchmark/status) | tee /tmp/HammerDB/itr-{{ itr }}/benchmark/build.log"
+  become: true
+
+- name: waitproc to wait for logs complete
+  shell:
+    cmd: |
+      cd /tmp/HammerDB/HammerDB-4.2
+      nohup bash -c '(./hammerdbcli auto ../run.tcl; echo $? > /tmp/HammerDB/itr-{{ itr }}/benchmark/status) | tee /tmp/HammerDB/itr-{{ itr }}/benchmark/output.log' > /dev/null 2>&1 &
+      echo $!
+      disown
+    executable: /bin/bash
+  register: waitproc
+
+- name: invoke the trace procedure
+  include_role:
+    name: trace
+  vars:
+    trace_waitproc_pid: "{{ waitproc.stdout }}"
+    trace_logs_scripts: ["cat /tmp/HammerDB/itr-{{ itr }}/benchmark/output.log"]
+    trace_status_file: "/tmp/HammerDB/itr-{{ itr }}/benchmark/status"
+
+- name: collect trace data
+  include_role:
+    name: trace
+    tasks_from: collect
+  when: wl_trace_modules | default('') | split(',') | reject('==','') | length > 0
+
+- name: Archive Logs
+  archive:
+    path: "/tmp/HammerDB/itr-{{ itr }}/"
+    dest: "/tmp/HammerDB/itr-{{ itr }}.tar.gz"
+
+- name: Fetch Logs to Localhost
+  fetch:
+    src: "/tmp/HammerDB/itr-{{ itr }}.tar.gz"
+    dest: "{{ wl_logs_dir }}/"
+    flat: yes
+    validate_checksum: yes
+
+- name: Create the Logs Directory on Localhost
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}/"
+    state: directory
+    recurse: yes
+    mode: "0777"
+  delegate_to: localhost
+
+- name: UnArchive Logs on Localhost
+  unarchive:
+    src: "{{ wl_logs_dir }}/itr-{{ itr }}.tar.gz"
+    dest: "{{ wl_logs_dir }}/itr-{{ itr }}"
+    mode: "0777"
+  delegate_to: localhost
+
+- name: delete Logs tar file
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}.tar.gz"
+    state: absent
+  delegate_to: localhost
+  ignore_errors: true
+  become: true
+
+- name: copy kpi.sh to the itr directory
+  copy:
+    src: "{{ wl_logs_dir }}/kpi.sh"
+    dest: "{{ wl_logs_dir }}/itr-{{ item }}/"
+    mode: "a+rx"
+  loop: "{{ range(1, run_stage_iterations | default(1) |int+1, 1) | list }}"
+  when: ((wl_logs_dir + '/kpi.sh') is exists)
+  ignore_errors: true

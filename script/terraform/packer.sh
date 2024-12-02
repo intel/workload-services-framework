@@ -22,7 +22,7 @@ if [ "$owner" = "root" ] || [ -z "$owner" ]; then
 fi
 
 this="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
-export NAMESPACE=${NAMESPACE:-$( (git config user.name || id -un) 2> /dev/null | tr 'A-Z' 'a-z' | tr -c -d 'a-z0-9-' | sed 's|^\(.\{12\}\).*$|\1|')-$(cut -f5 -d- /proc/sys/kernel/random/uuid)}
+export NAMESPACE=${NAMESPACE:-$( (git config user.name || id -un) 2> /dev/null | tr 'A-Z' 'a-z' | tr -c -d 'a-z0-9-' | sed 's|^\(.\{12\}\).*$|\1|')-$(flock /dev/urandom cat /dev/urandom | tr -dc '0-9a-z' | head -c 12)}
 
 if [ -z "$PACKER_GITHUB_API_TOKEN" ] && [ -r "$HOME/.netrc" ]; then
     export PACKER_GITHUB_API_TOKEN="$(sed -n '/^\s*machine\s*github.com/,/^\s*machine/{/^\s*password\s*/{s///;p;q}}' $HOME/.netrc)"
@@ -37,21 +37,14 @@ for sut in $TERRAFORM_SUT; do
 
     rm -rf "$LOGSDIRH"
     mkdir -p "$LOGSDIRH"
-
-    TERRAFORM_CONFIG_IN="$TERRAFORM_CONFIG" "$PROJECTROOT"/script/terraform/provision.sh <(cat <<EOF
-cluster:
-- labels: {}
-EOF
-) "$LOGSDIRH"/terraform-config.tf 0
+    cp -f "$TERRAFORM_CONFIG" "$LOGSDIRH"/terraform-config.tf
 
     options=(
         "-v" "$this:/opt/workload:ro"
         "-v" "$LOGSDIRH:/opt/workspace:rw"
-        "-v" "$PROJECTROOT/stack:/opt/stack:ro"
         "-e" "TERRAFORM_OPTIONS"
         "-e" "NAMESPACE"
         "-e" "PLATFORM"
-        "-e" "STACK_TEMPLATE_PATH"
         "-e" "PACKER_GITHUB_API_TOKEN"
         "--name" "$NAMESPACE"
     )
@@ -60,11 +53,14 @@ EOF
             "-v" "$(readlink -e "$HOME/.ssh"):/home/.ssh"
             "-v" "$(readlink -e "$HOME/.ssh"):/root/.ssh"
         )
+        if [ -d /opt/dataset ]; then
+            options+=(
+                "-v" "/opt/dataset:/opt/dataset"
+            )
+        fi
     else
-        options+=(
-            "-v" "$PROJECTROOT/script/csp/ssh_config:/home/.ssh/config:ro"
-            "-v" "$PROJECTROOT/script/csp/ssh_config:/root/.ssh/config:ro"
-        )
+        cat "$PROJECTROOT"/script/csp/ssh_config > "$LOGSDIRH"/ssh_config_csp
+        chmod 600 "$LOGSDIRH"/ssh_config_csp
     fi
 
     project_vars="${csp^^}_PROJECT_VARS[@]"

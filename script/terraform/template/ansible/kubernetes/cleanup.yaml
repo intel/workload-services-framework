@@ -14,5 +14,5 @@
         name: cleanup
       when:
       - (csp | default('static')) == 'static'
-      - (ansible_connection|default('ssh')) == 'ssh'
+      - (ansible_connection|default('ssh')) in ['ssh','local']
 

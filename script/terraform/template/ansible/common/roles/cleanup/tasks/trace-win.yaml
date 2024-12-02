@@ -1,0 +1,12 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Remove trace script
+  ansible.windows.win_shell: |
+    rm "{{ trace_win_tmp_path }}\{{ wl_namespace }}-{{ inventory_host }}-*" -Recurse -Force
+  delegate_to: "{{ item }}"
+  loop: "{{ (((wl_trace_modules|default('')|split(',')|reject('==','')|select('match','.*:host.*')|length>0) | ternary(groups.trace_hosts|map('extract',hostvars,['vmhost_host'])|map('default',[])|flatten,[]))+((wl_trace_modules|default('')|split(',')|reject('==','')|reject('match','.*:host.*')|length>0) | ternary(groups.trace_hosts,[]))) | unique }}"
+  ignore_errors: true

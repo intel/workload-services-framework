@@ -1,0 +1,190 @@
+#!/bin/bash
+
+#sh ./config.sh
+#yes | cp cassandra.yaml conf/
+
+DEPLOY_MODE={{ deploy_mode }}
+NODE_NUM={{ node_num }}
+FILL_DATA={{ fill_data }}
+FILL_DATA_ONLY={{ fill_data_only }}
+INSERT={{ insert }}
+SIMPLE1={{ simple }}
+DURATION={{ duration }}
+cassandra_server_addr={{ cassandra_server_addr }}
+THREADS={{ threads }}
+CL={{ cl }}
+RETRIES={{ retries }}
+INSTANCE_NUM={{ client_instance_num }}
+STRESS_NUM={{ stress_number }}
+SERVER_PORT={{ server_port }}
+POP_MIN={{ pop_min }}
+POP_MAX={{ pop_max }}
+POP_PERFORMANCE_DIV={{ pop_performance_div }}
+CHUNK_LENGTH={{ data_chunk_size }}
+COMPACTION={{ data_compaction }}
+COMPRESSION={{ data_compression }}
+REPLICATE_NUM={{ replicate_num }}
+CLEAN_PORT={{ clean_port }}
+KERNEL_TUNE={{ kernel_tune }}
+workspace={{ WORKSPACE }}
+cassandra_home={{ CASSANDRA_HOME }}
+
+
+NODE=${cassandra_server_addr}
+
+#set cqlstress-insanity-example.yaml
+file_cqlstress_insanity="${cassandra_home}/tools/cqlstress-insanity-example.yaml"
+compact_line=`sed -n '/'")\s*WITH\s*compaction\s*=\s*{"'/=' $file_cqlstress_insanity`
+compaction_conf="\\  \\) WITH compaction = { 'class':'$COMPACTION' }"
+compression_conf="\\    \\AND compression = { 'class' : '$COMPRESSION', 'chunk_length_in_kb' : $CHUNK_LENGTH }"
+sed -i "${compact_line}c $compaction_conf" $file_cqlstress_insanity
+sed -i "${compact_line}a $compression_conf" $file_cqlstress_insanity
+
+kernel_param_set() {
+    if [ "${KERNEL_TUNE}" == "True" ]; then
+        ${workspace}/kernel_tune.sh "client"
+    fi
+}
+
+wait_server_nodes_started() {
+    port=$cassandra_native_transport_port
+    server_node=""
+
+    for ((;;)); do
+        count=0
+        for ((i = 1; i <= $NODE_NUM; i++)); do
+            server_node="${hostname_prefix}$i"
+            state=`nmap -p $SERVER_PORT $server_node | grep "$SERVER_PORT" | grep open || [[ $? == 1 ]]`
+            if [ -z "$state" ]; then
+                echo "Port $SERVER_PORT on $server_node has not started."
+                sleep 5
+            else
+                echo "Port $SERVER_PORT on $server_node started successfully."
+                ((count++))
+            fi
+        done
+        if [ $count -eq $NODE_NUM ]; then
+            break
+        fi
+    done
+}
+
+wait_server_nodes_started_standalone() {
+
+     for ((;;)); do
+        count=0
+        for ((i = 0; i < $INSTANCE_NUM; i++)); do
+            port=$(( SERVER_PORT + i )) #9042, 9043, ...
+            state=`nmap -p $port $NODE | grep "$port" | grep open || [[ $? == 1 ]]`
+            if [ -z "$state" ]; then
+                echo "Port $port on $NODE has not started."
+                sleep 5
+            else
+                echo "Port $port on $NODE started successfully."
+                ((count++))
+            fi
+        done
+        if [ $count -eq $INSTANCE_NUM ]; then
+            break
+        fi
+    done
+
+}
+
+#call kernel param set function
+kernel_param_set
+
+POP_MAX_TEST=$(($POP_MAX / $POP_PERFORMANCE_DIV ))
+if [ "$DEPLOY_MODE" == "cluster" ]; then
+    #set the essential parameters for cluster
+    if [ $REPLICATE_NUM -gt $NODE_NUM ]; then
+        REPLICATE_NUM=$NODE_NUM
+    fi
+    replication_line=`sed -n '/'"CREATE KEYSPACE stresscql WITH replication\s*=\s*{"'/=' $file_cqlstress_insanity`
+    replication_conf="\\  \\CREATE KEYSPACE stresscql WITH replication = {'class': 'SimpleStrategy', 'replication_factor': $REPLICATE_NUM};"
+    sed -i "${replication_line}c $replication_conf" $file_cqlstress_insanity
+    INSTANCE_NUM=1
+    CL=QUORUM
+    echo "POP_MAX:$POP_MAX, POP_MAX_TEST:$POP_MAX_TEST, div:$POP_PERFORMANCE_DIV"
+    echo "Waiting for server nodes started"
+    wait_server_nodes_started
+fi
+
+if [ "$DEPLOY_MODE" == "standalone" ]; then
+    wait_server_nodes_started_standalone
+fi
+
+#Prepare work to create database and fill data
+echo "Begin to prepare data"
+if [ "${FILL_DATA}" == "True" ]; then
+    if [ "$DEPLOY_MODE" == "cluster" ]; then
+        fill_round=1
+        port=$SERVER_PORT
+        NODE="${hostname_prefix}1"
+    else
+        fill_round=$INSTANCE_NUM
+    fi
+    for ((i=0;i<fill_round;i++))
+    do
+    {
+        port=$(($SERVER_PORT+$i))
+        ${cassandra_home}/tools/bin/cassandra-stress user profile=${cassandra_home}/tools/cqlstress-insanity-example.yaml \
+        ops\(insert=1\) no-warmup cl=$CL n=$POP_MAX -mode native cql3 \
+        -pop seq=1..$POP_MAX -node $NODE -port native=$port \
+        -rate threads=$THREADS  > {{ WORKSPACE }}/itr-{{ itr }}/benchmark/fill_data_output_${i}_${port}.log
+    } &
+        sleep 1
+    done
+wait
+fi
+
+#Need to wait data compaction finished before performance testing
+python3 ${workspace}/clean_data_client.py "compact_wait" ${NODE} ${CLEAN_PORT} > clean_data_client_output.log
+
+echo "End preparing data"
+
+if [ "${FILL_DATA_ONLY}" == "True" ]; then 
+    echo "Only prepare data and exit."
+    exit_status=0
+    echo $exit_status > {{ WORKSPACE }}/itr-{{ itr }}/benchmark/status
+    #Send message to server to delete DB data
+    python3 ${workspace}/clean_data_client.py "clean" ${NODE} ${CLEAN_PORT} >> clean_data_client_output.log
+    exit 0
+fi
+
+#Do performance testing
+echo "Begin performance testing"
+#In cluster node INSTANCE_NUM always 1
+for ((i=0;i<INSTANCE_NUM;i++))
+do
+    if [ "$DEPLOY_MODE" == "cluster" ]; then
+        port=$SERVER_PORT
+    else
+        port=$(($SERVER_PORT+$i))
+    fi
+
+    for ((n=0;n<STRESS_NUM;n++))
+    do
+    {
+        if [ "$DEPLOY_MODE" == "cluster" ]; then
+            NODE="${hostname_prefix}$(($n+1))"
+        fi
+        ${cassandra_home}/tools/bin/cassandra-stress user profile=${cassandra_home}/tools/cqlstress-insanity-example.yaml \
+        ops\(insert=$INSERT,simple1=$SIMPLE1\) no-warmup cl=$CL duration=$DURATION \
+        -mode native cql3 -pop dist=uniform\($POP_MIN..$POP_MAX_TEST\) -node $NODE -port native=$port \
+        -rate threads=$THREADS > {{ WORKSPACE }}/itr-{{ itr }}/benchmark/benchmark_output_${i}_${port}_${n}.log
+    } &
+        sleep 1
+    done
+done
+
+wait $!
+exit_status=$?
+
+### print status info
+echo $exit_status > {{ WORKSPACE }}/itr-{{ itr }}/benchmark/status
+
+echo "End performance testing"
+
+#Send message to server to delete DB data
+python3 ${workspace}/clean_data_client.py "clean" ${NODE} ${CLEAN_PORT} >> clean_data_client_output.log

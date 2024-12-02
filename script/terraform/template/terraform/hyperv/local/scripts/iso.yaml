@@ -1,0 +1,89 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- hosts: all
+  gather_facts: no
+  tasks:
+
+  - name: copy file to remote
+    ansible.windows.win_file:
+      path: "{{ dest }}"
+      state: absent
+    register: filerc
+    until: filerc is success
+    retries: 10
+    delay: 10
+    ignore_errors: true
+    tags:
+    - create
+    - destroy
+
+  - block:
+
+    - name: create a temp folder
+      tempfile:
+        state: directory
+      register: tmp
+      delegate_to: localhost
+      become: false
+  
+    - name: create a file for user-data
+      copy:
+        content: "{{ lookup('env','USER_DATA') | b64decode }}"
+        dest: "{{ tmp.path }}/user-data"
+      delegate_to: localhost
+      become: false
+          
+    - name: create a file for meta-data
+      copy:
+        content: "{{ lookup('env','META_DATA') | b64decode }}"
+        dest: "{{ tmp.path }}/meta-data"
+      delegate_to: localhost
+      become: false
+          
+    - name: create a file for network_config
+      copy:
+        content: "{{ network_config | b64decode }}"
+        dest: "{{ tmp.path }}/network-config"
+      delegate_to: localhost
+      become: false
+      when: network_config | length > 0
+      vars:
+        network_config: "{{ lookup('env','NETWORK_CONFIG') }}"
+          
+    - name: create iso
+      shell:
+        cmd: |
+          mkisofs -output dvd.iso -volid cidata -joliet -rock user-data meta-data {% if network_config | length > 0 %}network-config{% endif %}
+        chdir: "{{ tmp.path }}"
+        executable: /bin/bash
+      delegate_to: localhost
+      become: false
+      vars:
+        network_config: "{{ lookup('env','NETWORK_CONFIG') }}"
+  
+    - name: make sure the dest directory exists
+      ansible.windows.win_file:
+        path: "{{ lookup('env','DEST') | win_dirname }}"
+        state: directory
+  
+    - name: copy file to remote
+      ansible.windows.win_copy:
+        src: "{{ tmp.path }}/dvd.iso"
+        dest: "{{ dest }}"
+  
+    - name: remove local folder
+      file:
+        path: "{{ tmp.path }}"
+        state: absent
+      delegate_to: localhost
+      become: false
+  
+    tags:
+    - create
+
+  vars:
+    dest: "{{ lookup('env','DEST') }}"

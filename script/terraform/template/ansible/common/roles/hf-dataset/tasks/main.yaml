@@ -1,0 +1,185 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: delete folder {{ DEST_DIR }}.wip
+  file:
+    path: "{{ DEST_DIR }}.wip"
+    state: absent
+
+- name: get proxy values
+  shell:
+    cmd: |
+      echo "$http_proxy|$https_proxy|$no_proxy"
+    executable: /bin/bash
+  register: proxy_values
+  become: false
+
+- name: check model
+  block:
+
+    - name: Check miniforge
+      shell:
+        cmd: conda -V
+        executable: /bin/bash
+      environment: 
+        CONDA_PREFIX: /opt/dataset/.miniforge
+        PATH: /opt/dataset/.miniforge/bin:/usr/local/bin:/bin:/usr/bin
+      register: condarc
+      ignore_errors: true
+
+    - name: Check env 
+      shell:
+        cmd: "conda env list | grep {{ HF_DATASET_ENV_NAME }}"
+        executable: /bin/bash
+      environment: 
+        CONDA_PREFIX: /opt/dataset/.miniforge
+        PATH: /opt/dataset/.miniforge/bin:/usr/local/bin:/bin:/usr/bin
+      register: envrc
+      ignore_errors: true
+
+    - name: Download and install miniforge
+      block:
+
+        - name: Get architecture using uname -m
+          command: uname -m
+          register: uname_m_output
+          changed_when: false
+
+        - name: Download miniforge
+          get_url:
+            url: "{{ HF_DATASET_MINIFORGE_REPO }}/{{ HF_DATASET_MINIFORGE_VER }}/Mambaforge-{{ HF_DATASET_MINIFORGE_VER }}-Linux-{{ uname_m_output.stdout }}.sh"
+            dest: "/tmp/miniforge.sh"
+          become: false
+
+        - name: Run the installer
+          shell: 
+            cmd: "bash /tmp/miniforge.sh -b -u -p /opt/dataset/.miniforge"
+            executable: /bin/bash
+          environment:
+            http_proxy: "{{ 0 | extract(proxy_values.stdout | split('|')) }}"
+            https_proxy: "{{ 1 | extract(proxy_values.stdout | split('|')) }}"
+            no_proxy: "{{ 2 | extract(proxy_values.stdout | split('|')) }}"
+
+      when: 
+        - condarc is failed
+
+    - name: Install huggingface_hub in container
+      block: 
+
+        - name: Install huggingface_hub in container with new environment
+          shell:
+            cmd: "conda create --name {{ HF_DATASET_ENV_NAME }} python=3.10 -y && \
+                  source activate {{ HF_DATASET_ENV_NAME }} && \
+                  pip3 install -U huggingface_hub[cli]"
+            executable: /bin/bash
+          become: true
+          environment: 
+            CONDA_PREFIX: /opt/dataset/.miniforge
+            PATH: "/opt/dataset/.miniforge/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin"
+            http_proxy: "{{ 0 | extract(proxy_values.stdout | split('|')) }}"
+            https_proxy: "{{ 1 | extract(proxy_values.stdout | split('|')) }}"
+            no_proxy: "{{ 2 | extract(proxy_values.stdout | split('|')) }}"
+          when:
+            - envrc.stdout|length == 0
+    
+        - name: Install huggingface_hub in container 
+          shell:
+            cmd: "source activate {{ HF_DATASET_ENV_NAME }} && \
+                  pip3 install -U huggingface_hub[cli]"
+            executable: /bin/bash
+          become: true
+          environment: 
+            CONDA_PREFIX: /tmp/miniforge
+            PATH: "/opt/dataset/.miniforge/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin"
+            http_proxy: "{{ 0 | extract(proxy_values.stdout | split('|')) }}"
+            https_proxy: "{{ 1 | extract(proxy_values.stdout | split('|')) }}"
+            no_proxy: "{{ 2 | extract(proxy_values.stdout | split('|')) }}"
+          when:
+            - envrc.stdout|length != 0
+
+    - name: delete dir "{{ DEST_DIR }}"
+      file:
+        path: "{{ DEST_DIR }}"
+        state: absent
+
+    - name: Get disk space of sut /opt/dataset
+      shell:
+        cmd: "df -BG --output=avail /opt/dataset | sed '1{d};s/.$//'"
+        executable: /bin/bash
+      register: free_space_sut
+
+    - name: Check free space of sut /opt/dataset
+      fail:
+        msg: "Free space of /opt is less than {{ DATASET_SIZE }}G on SUT. Can not finish downloading required dataset. Exiting."
+      when: free_space_sut.stdout | int < DATASET_SIZE
+
+- name: downloading dataset
+  block:
+
+    - name: download {{MODEL_ID}} cache from huggingface in container
+      shell:
+        cmd: "source activate {{ HF_DATASET_ENV_NAME }} && \
+          huggingface-cli login --token {{ ai_config['hf_token'] }} && \
+          huggingface-cli download {{ MODEL_ID }} {{ exclude_option }} {{ revision_option }}"
+        executable: /bin/bash
+      become: true
+      vars:
+        ai_config: "{{ lookup('file','/home/.ai/config.json') | from_json }}"
+        exclude_option: "{{ '--exclude ' + (exclude | map('regex_replace', '^(.*)$', '*.' ~ '\\1') | join(' ')) if exclude | length > 0 else '' }}"
+        revision_option: "{{ '--revision ' + revision if revision | length > 0 else '' }}"
+      environment:
+        CONDA_PREFIX: "/opt/dataset/.miniforge"
+        PATH: "/opt/dataset/.miniforge/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
+        HF_HUB_CACHE: "{{DEST_DIR}}.wip"
+        http_proxy: "{{ 0 | extract(proxy_values.stdout | split('|')) }}"
+        https_proxy: "{{ 1 | extract(proxy_values.stdout | split('|')) }}"
+        no_proxy: "{{ 2 | extract(proxy_values.stdout | split('|')) }}"
+
+    - name: move wip folder to {{ DEST_DIR }}
+      shell:
+        cmd: mv {{ DEST_DIR }}.wip {{ DEST_DIR }}
+        executable: /bin/bash
+      register: move_folder_sut
+
+  always:
+    - name: delete folder {{ DEST_DIR }}.wip
+      file:
+        path: "{{ DEST_DIR }}.wip"
+        state: absent
+
+  when: HF_LOGIN | bool
+
+- name: downloading dataset
+  block:
+
+    - name: download {{MODEL_ID}} cache from huggingface in container
+      shell:
+        cmd: "source activate {{ HF_DATASET_ENV_NAME }} && \
+          huggingface-cli download {{ MODEL_ID }} {{ exclude_option }} {{ revision_option }}"
+        executable: /bin/bash
+      become: true
+      vars:
+        exclude_option: "{{ '--exclude ' + (exclude | map('regex_replace', '^(.*)$', '*.' ~ '\\1') | join(' ')) if exclude | length > 0 else '' }}"
+        revision_option: "{{ '--revision ' + revision if revision | length > 0 else '' }}"
+      environment:
+        CONDA_PREFIX: "/opt/dataset/.miniforge"
+        PATH: "/opt/dataset/.miniforge/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
+        HF_HUB_CACHE: "{{DEST_DIR}}.wip"
+        http_proxy: "{{ 0 | extract(proxy_values.stdout | split('|')) }}"
+        https_proxy: "{{ 1 | extract(proxy_values.stdout | split('|')) }}"
+        no_proxy: "{{ 2 | extract(proxy_values.stdout | split('|')) }}"
+    
+    - name: move wip folder to {{ DEST_DIR }}
+      command: "mv {{ DEST_DIR }}.wip {{ DEST_DIR }}"
+
+  always:
+
+    - name: delete folder {{ DEST_DIR }}.wip
+      file:
+        path: "{{ DEST_DIR }}.wip"
+        state: absent
+
+  when: not HF_LOGIN | bool
+

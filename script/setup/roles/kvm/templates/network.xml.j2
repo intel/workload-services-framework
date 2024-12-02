@@ -1,0 +1,15 @@
+<network>
+  <name>{{ kvm_bridge_name }}</name>
+  <bridge name="{{ kvm_bridge_name }}" stp='on' delay='0'/>
+  <mtu size="{{ kvm_vxlan_mtu }}"/>
+  <dns enable="no"/>
+  <ip address='{{ this_bridge_ip }}' prefix='{{ kvm_bridge_subnet | ipaddr("prefix") }}'>
+{% if inventory_hostname == groups['kvm_hosts'][0] %}
+    <dhcp>
+      <range start='{{ kvm_bridge_subnet | ipaddr(kvm_bridge_dhcp_start) | ipaddr("address") }}' end='{{ kvm_bridge_subnet | ipaddr(kvm_bridge_dhcp_end) | ipaddr("address") }}'>
+        <lease expiry='0'/>
+      </range>
+    </dhcp>
+{% endif %}
+  </ip>
+</network>

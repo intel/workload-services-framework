@@ -6,38 +6,42 @@
 
 - hosts: cluster_hosts
   any_errors_fatal: true
-  gather_facts: no
+  gather_facts: false
+  become: false
   tasks:
-
-    - name: check for essentials
-      include_role:
-        name: check
 
     - name: check for essentials
       include_role:
         name: check
         tasks_from: check-host
+      when: inventory_hostname in dict(play_hosts | map('extract',hostvars,['private_ip']) | zip(play_hosts)).values()
 
-- name: 
-  import_playbook: ../terraform/template/ansible/kubernetes/installation.yaml
+- hosts: controller
+  gather_facts: false
+  become: false
+  tasks:
+
+    - name: check if docker is functional
+      command: docker ps
+      register: is_docker_working
+      ignore_errors: true
+
+- import_playbook: ../terraform/template/ansible/kubernetes/installation.yaml
   vars:
-    k8s_enable_registry: false
     k8s_node_labels: []
-    k8s_enable_nfd: true
-    k8s_cni: "flannel"
     wl_enable_reboot: true
     wl_namespace: "install-k8s"
 
-- hosts: cluster_hosts
-  any_errors_fatal: true
-  become: yes
-  gather_facts: no
+- hosts: controller
+  gather_facts: false
+  become: true
   tasks:
 
-    - name: Intall Intel Certificate
-      include_role:
-        name: intel-ca
-      when:
-      - install_intelca | bool
-      - (playbook_dir + '/roles/intel-ca') is exists
+  - name: Restore docker
+    include_role:
+      name: docker
+    when: is_docker_working is success
+    vars:
+      docker_install_containerd: false
+      wl_namespace: "install-k8s"
 

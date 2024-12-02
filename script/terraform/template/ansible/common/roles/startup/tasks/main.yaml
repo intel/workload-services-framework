@@ -4,19 +4,34 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+- name: Comment out incompatible /etc/hosts entries
+  include_tasks:
+    file: hosts.yaml
+  when: ((ansible_connection|default('ssh')) == 'ssh')
+
 - name: Turn off incompatible services
   include_tasks:
     file: service.yaml
+  when: ((ansible_connection|default('ssh')) == 'ssh')
+
+- name: remove legacy repos
+  include_role:
+    name: legacy-repo
+  when: ((ansible_connection|default('ssh')) == 'ssh')
 
 - name: set no_proxy
   include_role:
     name: no-proxy
-  when: (groups.cluster_hosts+groups.off_cluster_hosts)|map('extract',hostvars,['private_ip'])|select('defined')|unique|length>1
+  when:
+  - ((ansible_connection|default('ssh')) == 'ssh')
+  - (groups.cluster_hosts+groups.off_cluster_hosts)|map('extract',hostvars,['private_ip'])|select('defined')|unique|length>1
 
 - name: set timezone and datetime
   include_role:
     name: datetime
-  when: sut_update_datetime | bool
+  when:
+  - sut_update_datetime | bool
+  - ((ansible_connection|default('ssh')) == 'ssh')
 
 - name: Create a local sav folder
   file:
@@ -36,6 +51,7 @@
   when:
     - label_name.startswith('HAS-SETUP-')
     - label_roles | select('in',label_name|lower) | length > 0
+    - ((ansible_connection|default('ssh')) == 'ssh')
   loop: "{{ k8s_node_labels }}"
   loop_control:
     loop_var: label_name
@@ -45,24 +61,30 @@
 - name: apply kernel args
   include_tasks:
     file: kernel-args.yaml
-  when: not ansible_host in my_ip_list.split(',')
+  when:
+  - not ansible_host in my_ip_list.split(',')
+  - sut_update_kernel_args | bool
+  - ((ansible_connection|default('ssh')) == 'ssh')
 
 - name: apply BIOS settings
   include_role:
     name: bios
     tasks_from: startup
   when:
-  - sut_reboot | default(true) | bool
-  - sut_update_bios | default(false) | bool
+  - sut_reboot | bool
+  - sut_update_bios | bool
   - not ansible_host in my_ip_list.split(',')
   - (playbook_dir + '/roles/bios') is exists
+  - inventory_hostname in groups.workload_hosts
+  - ((ansible_connection|default('ssh')) == 'ssh')
 
 - name: reboot
   include_tasks:
     file: reboot.yaml
   when:
-  - sut_reboot | default(true) | bool
+  - sut_reboot | bool
   - startup_reboot_required
+  - ((ansible_connection|default('ssh')) == 'ssh')
 
 - name: auto-provision labels
   include_role:
@@ -70,7 +92,7 @@
     tasks_from: install
   when:
     - label_name.startswith('HAS-SETUP-')
-    - sut_reboot | default('true') | bool
+    - sut_reboot | bool
     - label_roles | select('in',label_name|lower) | length > 0
   loop: "{{ k8s_node_labels }}"
   loop_control:
@@ -81,27 +103,39 @@
 - name: process kernel modules
   include_tasks:
     file: kernel-modules.yaml
+  when:
+  - sut_update_kernel_modules|bool
+  - ((ansible_connection|default('ssh')) == 'ssh')
 
 - name: process sysctls
   include_tasks:
     file: sysctl.yaml
+  when: sut_update_sysctls|bool
 
 - name: process sysfs
   include_tasks:
     file: sysfs.yaml
+  when: sut_update_sysfs|bool
 
 - name: install burncpu package
   include_role:
     name: burn-cpu
     tasks_from: install
-  when:
-  - sut_sudo | default(true) | bool
-  - burn_cpu_seconds is defined
+  when: burn_cpu_seconds is defined
 
 - name: apply MSR settings
   include_role:
     name: msr
   when:
-  - ((ansible_connection|default('ssh')) == 'ssh')
-  - sut_update_msr | default(false) | bool
+  - sut_update_msr | bool
   - (playbook_dir + '/roles/msr/tasks/main.yaml') is exists
+
+- name: apply tpmi settings
+  include_role:
+    name: tpmi
+    tasks_from: startup
+  when:
+  - sut_update_tpmi | bool
+  - ((ansible_connection|default('ssh')) == 'ssh')
+  - (playbook_dir + '/roles/tpmi') is exists
+  - inventory_hostname in groups.workload_hosts

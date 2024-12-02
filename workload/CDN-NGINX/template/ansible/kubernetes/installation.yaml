@@ -21,7 +21,8 @@
 
   - name: Transfer client image
     include_role:
-      name: image-to-daemon
+      name: docker-image
+      tasks_from: to-daemon
     vars:
       images:
       - key: "{{ wrk_image }}"
@@ -30,3 +31,4 @@
         value: false
       wl_docker_images: "{{ images | items2dict }}"
     when: wl_tunables.GATED != 'gated'
+

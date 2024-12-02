@@ -1,0 +1,13 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Restore tpmi default config
+  shell:
+    cmd: |
+      bash bhs-power-mode.sh --{{ tpmi_default }}
+    executable: /bin/bash
+    chdir: "/tmp/{{ wl_namespace }}-tpmi"
+  vars: 
+    tpmi_default: "{{ lookup('file',restore_file) }}"

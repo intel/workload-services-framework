@@ -1,0 +1,9 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+LLAMA2_7B_VERSION: "meta-llama/Llama-2-7b-chat-hf"
+LLAMA2_7B_REPOSITORY: "huggingface"
+

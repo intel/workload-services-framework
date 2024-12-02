@@ -1,0 +1,22 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: wait until execution complete
+  ansible.windows.win_shell: |
+    Wait-Process -Id {{ trace_waitproc_pid }} -ErrorAction SilentlyContinue
+    exit 0
+  delegate_to: "{{ trace_logs_host | default(inventory_hostname) }}"
+  register: waitrc
+  ignore_unreachable: true
+  ignore_errors: true
+  become: false
+
+- name: fail if host is unreachable
+  command: "sleep {{ sut_unreachable_delay }}"
+  delegate_to: localhost
+  failed_when: true
+  when: waitrc is unreachable
+

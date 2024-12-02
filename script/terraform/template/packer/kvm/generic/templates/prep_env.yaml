@@ -1,0 +1,22 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Prepare ansible execution 
+  hosts: all
+  gather_facts: false
+  tasks:
+
+  - name: copy ansible.cfg
+    copy:
+      src: /opt/terraform/template/ansible/ansible.cfg
+      dest: /opt/workspace/ansible.cfg
+    delegate_to: localhost
+
+  - name: write ssh configuration
+    template:
+      src: "{{ template_path }}/ssh_config.j2"
+      dest: /opt/workspace/ssh_config
+    delegate_to: localhost

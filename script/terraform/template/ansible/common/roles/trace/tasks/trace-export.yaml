@@ -1,0 +1,21 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: "Invoke {{ trace_module_name }} export function"
+  include_role:
+    name: "{{ trace_module_name }}"
+    tasks_from: export
+  when:
+  - (roi.0 != '---') and (roi.1 != '---')
+  - (playbook_dir+'/../traces/roles/'+trace_module_name+'/tasks/export.yaml') is exists
+  loop: "{{ lookup('file',trace_data_stop|replace('TRACE_STOP','TRACE_START')) | split('\n') | zip(lookup('file',trace_data_stop) | split('\n')) }}"
+  loop_control:
+    loop_var: roi
+    index_var: roi_index
+  vars:
+    trace_data_path: "{{ trace_data_stop | dirname }}"
+    trace_module_name: "{{ trace_data_path | basename | split('-') | last }}"
+

@@ -1,0 +1,73 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+apiVersion: v1
+kind: Service
+metadata:
+  name: originnginxurl
+  labels:
+    app: origin-nginx
+spec:
+  ports:
+  - port: 18080
+    targetPort: 18080
+    protocol: TCP
+  selector:
+    app: origin-nginx
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: origin-nginx
+  labels:
+     app: origin-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: origin-nginx
+  template:
+    metadata:
+      labels:
+        app: origin-nginx
+    spec:
+{{- if ne .Values.GATED "gated" }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+{{- end }}
+      initContainers:
+      - name: wait-for-cdn-ready
+        image: curlimages/curl:latest
+        imagePullPolicy: {{ include "imagepolicy" .Values }}
+        command: ["/bin/sh","-c","while [ $(curl -k -sw '%{http_code}' -m 5 'http://contentserverurl:8888' -o /dev/null) -ne 200 ];do echo Waiting...;sleep 1s;done"]
+      containers:
+      - name: origin-nginx
+        image: {{ .Values.REGISTRY }}cdn-nginx-original{{ .Values.RELEASE }}
+        imagePullPolicy: {{ include "imagepolicy" .Values }}
+        ports:
+        - containerPort: 18080
+        command: [ "/home/cdn/sbin/nginx", "-c", "/home/cdn/etc/nginx/nginx-origin.conf" ]
+        volumeMounts:
+        - mountPath: /mnt/content-cache0
+          name: content-cache0
+        - mountPath: /etc/localtime
+          name: timezone
+          readOnly: true
+      volumes:
+      - name: content-cache0
+        emptyDir:
+          medium: Memory
+          sizeLimit: 10G
+      - name: timezone
+        hostPath:
+          path: /etc/localtime
+          type: File
+{{- if ne .Values.GATED "gated" }}
+      affinity:
+        {{- $args := list "content-server" }}
+        {{- include "podAffinity" $args }}
+{{- end }}

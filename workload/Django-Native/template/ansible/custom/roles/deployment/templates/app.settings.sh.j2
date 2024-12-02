@@ -1,0 +1,46 @@
+#!/bin/bash
+
+#IP_ADDR=$(grep "$1" /etc/hosts | awk '{print $1}')
+IP_ADDR={{ app_ip }}
+cassandra_endpoint={{ cassandra_endpoint }}
+memcached_endpoint={{ memcached_endpoint }}
+graphite_endpoint={{ graphite_endpoint }}
+uwsgi_worker={{ uwsgi_worker }}
+tls={{ tls }}
+if [ -z "${cassandra_endpoint}" ]; then
+    cassandra_endpoint="127.0.0.1"
+fi
+if [ -z "${memcached_endpoint}" ]; then
+    memcached_endpoint="127.0.0.1:11811"
+fi
+if [ -z "${graphite_endpoint}" ]; then
+    graphite_endpoint="localhost"
+fi
+if [ -z "${uwsgi_worker}" ]; then
+    uwsgi_worker="$(grep -c processor /proc/cpuinfo)"
+fi
+if [ -z "${tls}" ]; then
+    tls="0"
+fi
+
+cd {{ DJANGO_APP_INSTALL_DIR }}/django-workload || exit 1
+
+cp -f cluster_settings_template.py cluster_settings.py
+cp -f uwsgi.ini uwsgi_benchmark.ini
+
+sed -e "s/DATABASES\['default'\]\['HOST'\] = 'localhost'/DATABASES\['default'\]\['HOST'\] = '$cassandra_endpoint'/g"                                  \
+    -e "s/CACHES\['default'\]\['LOCATION'\] = '127.0.0.1:11811'/CACHES\['default'\]\['LOCATION'\] = '$memcached_endpoint'/g"                          \
+    -e "s/ALLOWED_HOSTS = \[/ALLOWED_HOSTS = \['$IP_ADDR','frontend', /g" \
+    -e "s/STATSD_HOST = 'localhost'/STATSD_HOST = '$graphite_endpoint'/g"                                                                             \
+    -i cluster_settings.py
+
+sed -i "/processes =/s/.*/processes = $uwsgi_worker/" uwsgi_benchmark.ini
+sed -i '$ a listen = 1024' uwsgi_benchmark.ini
+
+if [ "$tls" == "1" ]; then
+    openssl genrsa -out django.key 2048
+    openssl req -new -key django.key -batch -out django.csr -subj "/" 
+    openssl x509 -req -days 365 -in django.csr -signkey django.key -out django.crt
+    sed -i "s/^http = .*//g" uwsgi_benchmark.ini
+    sed -i '$ a https-socket = %(hostname),django.crt,django.key' uwsgi_benchmark.ini
+fi

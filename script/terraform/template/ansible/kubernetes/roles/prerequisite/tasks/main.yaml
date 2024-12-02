@@ -29,6 +29,7 @@
       state: restarted
     ignore_errors: yes
     when: ((csp | default('static')) == 'alicloud')
+    no_log: true
 
   - name: Disable SWAP
     command: swapoff -a
@@ -82,3 +83,4 @@
       name: "cni-{{ k8s_cni }}"
       tasks_from: prerequisite.yaml
     when: (playbook_dir + '/roles/cni-' + k8s_cni + '/tasks/prerequisite.yaml') is exists
+

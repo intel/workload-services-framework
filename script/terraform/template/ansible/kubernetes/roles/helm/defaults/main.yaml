@@ -1,0 +1,9 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+helm_version: "v3.12.3"
+helm_repository: "https://get.helm.sh"
+

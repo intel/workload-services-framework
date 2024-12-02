@@ -23,13 +23,13 @@
 
 - name: Install OpenSSL
   include_tasks:
-    file: "openssl-{{ (os.stdout == 'rhel') | ternary('centos', os.stdout) }}.yaml"
+    file: "openssl-{{ (os.stdout in ['ubuntu','debian']) | ternary('debian', 'centos') }}.yaml"
   when: (not cert.stat.exists) or (dev_cert_replace | bool)
 
 - name: Create self-generated certificates
   shell: 
     cmd: |
-      openssl req -newkey rsa:4096 -nodes -sha256 -keyout {{ dev_cert_conf_dir }}/{{ dev_cert_host }}:{{ dev_registry_port }}.key --addext "subjectAltName = $(echo {{ dev_cert_host }} | grep -q -E '[0-9]*[.][0-9]*[.][0-9]*[.][0-9]*' && echo IP || echo DNS):{{ dev_cert_host }}" -x509 -days 365 -out {{ dev_cert_conf_dir }}/{{ dev_cert_host }}:{{ dev_registry_port }}.crt -subj /CN={{ dev_cert_host }}
+      openssl req -newkey rsa:4096 -nodes -sha256 -keyout {{ dev_cert_conf_dir }}/{{ dev_cert_host }}:{{ dev_registry_port }}.key --addext "subjectAltName = {% if (dev_cert_host|ipaddr) %}IP{% else %}DNS{% endif %}:{{ dev_cert_host }}" -x509 -days 365 -out {{ dev_cert_conf_dir }}/{{ dev_cert_host }}:{{ dev_registry_port }}.crt -subj /CN={{ dev_cert_host }}
     executable: /bin/bash
   when: (not cert.stat.exists) or (dev_cert_replace | bool)
 

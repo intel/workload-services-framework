@@ -70,3 +70,9 @@ locals {
   subnet_name = var.subnet_name!=null?var.subnet_name:azurerm_subnet.default.0.name
   subnet_id = var.subnet_name!=null?data.azurerm_subnet.default.0.id:azurerm_subnet.default.0.id
 }
+
+locals {
+  is_windows = {
+    for k,v in local.vms : k => strcontains(v.os_type,"windows")
+  }
+}

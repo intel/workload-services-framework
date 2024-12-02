@@ -7,14 +7,17 @@
 - name: set reboot false
   set_fact:
     cleanup_reboot_required: false
+    cleanup_poweroff_required: false
 
 - name: Restore services
   systemd:
     name: "{{ item }}"
     enabled: true
     state: started
+  when: (ansible_connection | default('ssh')) in ['ssh']
   loop: "{{ sut_restore_services | split(',') | reject('==','') }}"
   failed_when: false
+  no_log: true
 
 - name: Restore sysctls
   include_tasks:
@@ -31,8 +34,9 @@
   when:
   - sut_reboot | bool
   - sut_restore_bios | bool
-  - not ansible_host in my_ip_list.split(',')
+  - ansible_host not in my_ip_list.split(',')
   - (playbook_dir+'/roles/bios') is exists
+  - (ansible_connection | default('ssh')) in ['ssh']
 
 - name: Remove restore path
   file:
@@ -56,6 +60,7 @@
 - name: Restore kernel modules
   include_tasks:
     file: kernel-modules.yaml
+  when: (ansible_connection | default('ssh')) in ['ssh']
 
 - name: Restore kernel args
   include_tasks:
@@ -63,12 +68,15 @@
   when: 
   - sut_reboot | bool
   - not ansible_host in my_ip_list.split(',')
+  - (ansible_connection | default('ssh')) in ['ssh']
 
 - name: Restore /etc/environment
   include_role:
     name: no-proxy
     tasks_from: cleanup
-  when: (groups.cluster_hosts+groups.off_cluster_hosts)|map('extract',hostvars,['private_ip'])|select('defined')|unique|length>1
+  when:
+  - (ansible_connection | default('ssh')) in ['ssh']
+  - (groups.cluster_hosts+groups.off_cluster_hosts)|map('extract',hostvars,['private_ip'])|select('defined')|unique|length>1
 
 - name: Restore MSR
   include_role:
@@ -77,11 +85,16 @@
   when:
   - (playbook_dir + '/roles/msr/tasks/cleanup.yaml') is exists
 
-- name: reboot
-  command: "reboot"
-  async: 10
-  poll: 0
-  ignore_errors: yes
+- name: Restore tpmi
+  include_role:
+    name: tpmi
+    tasks_from: cleanup
   when:
-  - cleanup_reboot_required
-  - sut_reboot | bool
+  - (playbook_dir + '/roles/tpmi/tasks/cleanup.yaml') is exists
+  - (ansible_connection | default('ssh')) in ['ssh']
+
+- name: poweroff or reboot sut
+  include_tasks:
+    file: poweroff-reboot.yaml
+  when: (ansible_connection | default('ssh')) in ['ssh']
+

@@ -6,9 +6,40 @@
 #
 
 copy_template () {
-    echo copy template $1 to $2
     mkdir -p "$2" || true
     cp -rL $3 "$1"/* "$2"/
+}
+
+terraform_log_level () {
+    if   [[ "$@ " = *"--dev_log_level=ERROR "* ]]; then
+      echo "ERROR"
+    elif [[ "$@ " = *"--dev_log_level=WARN "*  ]]; then
+      echo "WARN"
+    elif [[ "$@ " = *"--dev_log_level=INFO "*  ]]; then
+      echo "INFO"
+    elif [[ "$@ " = *"--dev_log_level=DEBUG "* ]]; then
+      echo "DEBUG"
+    elif [[ "$@ " = *"--dev_log_level=TRACE "* ]]; then
+      echo "TRACE"
+    else
+      echo "ERROR"
+    fi
+}
+
+ansible_log_level () {
+    if   [[ "$@ " = *"--dev_log_level=ERROR "* ]]; then
+      echo ""
+    elif [[ "$@ " = *"--dev_log_level=WARN "*  ]]; then
+      echo "-v"
+    elif [[ "$@ " = *"--dev_log_level=INFO "*  ]]; then
+      echo "-vv"
+    elif [[ "$@ " = *"--dev_log_level=DEBUG "* ]]; then
+      echo "-vvv"
+    elif [[ "$@ " = *"--dev_log_level=TRACE "* ]]; then
+      echo "-vvvv"
+    else
+      echo "-vv"
+    fi
 }
 
 destroy () {
@@ -21,27 +52,35 @@ destroy () {
     cd /opt/workspace
 
     if [[ "$stages" = *"--stage=cleanup"* ]]; then
-        if [ -r cleanup.yaml ]; then
-            echo "Restore SUT settings..." | tee -a tfplan.logs
-            run_playbook -vv cleanup.yaml >> tfplan.logs 2>&1 || true
+        if [ -r cleanup.yaml ] && [ -r inventory.yaml ]; then
+            echo "Restore SUT settings..." | tee -a cleanup.logs tfplan.logs
+            run_playbook -vv cleanup.yaml >> cleanup.logs 2>&1 || true
         fi
 
-        echo "Destroy SUT resources..." | tee -a tfplan.logs
-        TF_LOG=ERROR terraform destroy -refresh -auto-approve -input=false -no-color -parallelism=$(nproc) -lock-timeout=300s >> tfplan.logs 2>&1 ||
-        TF_LOG=ERROR terraform destroy -refresh -auto-approve -input=false -no-color -parallelism=$(nproc) -lock=false >> tfplan.logs 2>&1
+        if [ -r tfplan ]; then
+            echo "Destroy SUT resources..." | tee -a cleanup.logs tfplan.logs
+            TF_LOG=ERROR terraform destroy -refresh -auto-approve -input=false -no-color -parallelism=$(nproc) -lock-timeout=300s >> cleanup.logs 2>&1 ||
+            TF_LOG=ERROR terraform destroy -refresh -auto-approve -input=false -no-color -parallelism=$(nproc) -lock=false >> cleanup.logs 2>&1
+        fi
 
         rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup tfplan .ssh .netrc
     fi 
       
-    if [[ "$stages" = *"--stage=validation"* ]]; then
+    if [[ "$stages" = *"--stage=validation"* ]] && [ -e export.yaml ]; then
+        echo "Export TRACE data..." | tee -a telemetry.logs tfplan.logs
+        run_playbook -vv export.yaml $@ >> telemetry.logs 2>&1 &
+        wait
+    fi
+
+    if [[ "$stages" = *"--stage=validation"* ]] || [[ "$stages" = *"--stage=provision"* ]]; then
         for publisher in "$DIR"/publish-*.py; do
             publisher="${publisher#*publish-}"
             publisher="${publisher%.py}"
             # create KPI and publish KPI
             if [[ "$stages" = *"--${publisher}_publish"* ]]; then
-                echo "Publish to datalake..." | tee -a tfplan.logs
-                sed -e 's/_password":"[^"]*/_password":"string/g' -e 's/_password\\": *\\"[^"]*/_password\\":\\"XYZXYZ\\/g' .tfplan.json > tfplan.json
-                "$DIR"/publish-$publisher.py $stages < tfplan.json 2>&1 | tee publish.logs
+                echo "Publish to datalake..." | tee -a publish.logs tfplan.logs
+                sed -e 's/_password":"[^"]*/_password":"string/g' -e 's/_password\\": *\\"[^"]*/_password\\":\\"XYZXYZ\\/g' .tfplan.json > tfplan.json 2> /dev/null
+                "$DIR"/publish-$publisher.py $stages < tfplan.json 2>&1 | tee -a publish.logs
             fi
         done
     fi
@@ -86,15 +125,17 @@ run_playbook () {
     done
     [ "$playbook" = "cluster.yaml" ] && [[ "$stages" != *"--stage=provision"* ]] && return
     cp -f /opt/terraform/template/ansible/ansible.cfg .
-    (set -ex; ANSIBLE_FORKS=$(nproc) ANSIBLE_ROLES_PATH="$ANSIBLE_ROLES_PATH:template/ansible/common/roles:template/ansible/traces/roles:/opt/collections/ansible_collections/cek/share/roles" ansible-playbook --flush-cache $options -i "$DIR"/create-inventory.py --private-key "$keyfile" $playbook)
+    ANSIBLE_FORKS=$(nproc) ANSIBLE_ROLES_PATH="$ANSIBLE_ROLES_PATH:template/ansible/common/roles:template/ansible/traces/roles:/opt/collections/ansible_collections/cek/share/roles" ansible-playbook --flush-cache $options -i "$DIR"/create-inventory.py --private-key "$keyfile" $playbook
 }
 
 check_docker_image () {
     missing=0
     echo
     for image in $("$DIR"/get-image-list.py); do
-        if ALL_PROXY= all_proxy= skopeo inspect --tls-verify=false --raw docker://$image > /dev/null 2>&1; then
+        if ALL_PROXY= all_proxy= skopeo inspect --retry-times 10 --tls-verify=false --raw docker://$image > /dev/null 2>&1; then
             echo -e "\033[0;32mOK\033[0m: $image"
+        elif docker inspect $image > /dev/null 2>&1; then
+            echo -e "\033[0;31mLOCAL\033[0m: $image"
         else
             echo -e "\033[0;31mMISSING\033[0m: $image"
             missing=1
@@ -104,6 +145,16 @@ check_docker_image () {
     return $missing
 }
 
+inspect_docker_image () {
+    echo
+    for image in $("$DIR"/get-image-list.py); do
+        echo "Inspecting $image: ${1:-ls -l}"
+        docker run --rm $image sh -c "${1:-ls -l}" 2> /dev/null || true
+    done
+    echo "inspection completed"
+    exit 0
+}
+
 push_docker_image () {
     echo
     registry="$(sed -n '/^registry:/{s/.*"\(.*\)".*/\1/;p}' workload-config.yaml)"
@@ -111,17 +162,23 @@ push_docker_image () {
         image1t="${1%/}/${image1s/${registry/\//\\\/}/}"
         echo "Pushing $image1s to $image1t..."
         if [[ "$image1t" = *".dkr.ecr."*".amazonaws.com/"* ]]; then
-            /opt/csp/script/push-to-ecr.sh $image1t --create-only
+            /opt/project/script/csp/opt/script/push-to-ecr.sh $image1t --create-only
         fi
         ALL_PROXY= all_proxy= skopeo copy --src-tls-verify=false --dest-tls-verify=false docker://$image1s docker://$image1t
     done
     echo
+    exit 0
 }
 
 DIR="$(dirname "$0")"
 cd /opt/workspace
+if [ ! -e ssh_config_all ]; then
+    cat /opt/terraform/ssh_config > ssh_config_all
+    chmod 600 ssh_config_all
+fi
 
 [[ "$@ " != *"--check-docker-image "* ]] || check_docker_image || exit 3
+[[ " $@" != *" --inspect-docker-image="* ]] || inspect_docker_image "$(echo "x$@" | sed -e 's/.*--inspect-docker-image=\([^ ]*\).*/\1/' | base64 -d 2> /dev/null)"
 [[ " $@" != *" --push-docker-image="* ]] || push_docker_image "$(echo "x$@" | sed 's/.*--push-docker-image=\([^ ]*\).*/\1/')"
 [[ "$@ " != *"--dry-run "* ]] || exit 0
 
@@ -129,7 +186,7 @@ stages="$@"
 if [[ "$stages" != *"--stage="* ]]; then
     stages="$@ --stage=provision --stage=validation --stage=cleanup"
 fi
-    
+
 tf_pathes=($(grep -E 'source\s*=.*/template/terraform/' terraform-config.tf | cut -f2 -d'"'))
 if [ ${#tf_pathes[@]} -ge 1 ]; then
     keyfile="ssh_access.key"
@@ -138,7 +195,7 @@ else
 fi
 
 if [[ "$stages" = *"--stage=provision"* ]]; then
-    echo "Create the provisioning plan..."
+    echo "Provision SUT resources..." | tee -a tfplan.logs
     echo "provision_start: \"$(date -Ins)\"" >> timing.yaml
 
     # copy shared stack templates
@@ -148,7 +205,7 @@ if [[ "$stages" = *"--stage=provision"* ]]; then
 
     # copy templates over
     for tfp in "${tf_pathes[@]}"; do
-        if [ -d "/opt/workload/template/terraform" ]; then
+        if [ -d "/opt/workload/$tfp" ]; then
             copy_template "/opt/workload/$tfp" "$tfp"
         elif [ -d "/opt/terraform/$tfp" ]; then
             copy_template "/opt/terraform/$tfp" "$tfp"
@@ -160,39 +217,59 @@ if [[ "$stages" = *"--stage=provision"* ]]; then
     
     # Create SG white list
     if [ ${#tf_pathes[@]} -ge 1 ]; then
-        "$DIR"/get-ip-list.sh /opt/csp/etc/proxy-ip-list.txt > proxy-ip-list.txt
+        "$DIR"/get-ip-list.sh /opt/project/script/csp/opt/etc/proxy-ip-list.txt > proxy-ip-list.txt
         # Create key pair
         ssh-keygen -m PEM -q -f $keyfile -t rsa -N ''
     fi
 
-    trap destroy SIGTERM SIGINT SIGKILL ERR EXIT
-
     # provision VMs
     cp -f /opt/terraform/template/ansible/ansible.cfg .
-    (set -xeo pipefail; terraform init -input=false -no-color 2>&1 | tee -a tfplan.logs) &
-    wait -n %1
+    if [[ "$@ " = *"--dev_log_level=NONE "* ]]; then
+        TF_LOG=ERROR terraform init -input=false -no-color >> tfplan.logs 2>&1 &
+    else
+        set -o pipefail
+        TF_LOG=$(terraform_log_level "$@") terraform init -input=false -no-color 2>&1 | tee -a tfplan.logs &
+        set +o pipefail
+    fi
 
-    terraform_retries="$(echo "x $@" | sed -n '/--terraform_retries=/{s/.* --terraform_retries=\([0-9,]*\).*/\1/;p}')"
-    terraform_retries="${terraform_retries:-10,3}"
-    terraform_delay="$(echo "x $@" | sed -n '/--terraform_delay=/{s/.* --terraform_delay=\([0-9,.smh]*\).*/\1/;p}')"
-    terraform_delay="${terraform_delay:-10s,0}"
+    trap destroy ERR
+    wait -n
+
+    dev_terraform_retries="$(echo "x $@" | sed -n '/--dev_terraform_retries=/{s/.* --dev_terraform_retries=\([0-9,]*\).*/\1/;p}')"
+    dev_terraform_retries="${dev_terraform_retries:-10,3}"
+    dev_terraform_delay="$(echo "x $@" | sed -n '/--dev_terraform_delay=/{s/.* --dev_terraform_delay=\([0-9,.smh]*\).*/\1/;p}')"
+    dev_terraform_delay="${dev_terraform_delay:-10s,0}"
 
     terraform_replace=()
     terraform_refresh=""
     sts=1
-    terraform_log_level="$(echo "x $@" | sed -n '/--terraform_log_level=/{s/.*--terraform_log_level=\([^[:space:]]*\).*/\1/;p}')"
-    for i in $(seq ${terraform_retries%,*}); do
-        for j in $(seq ${terraform_retries#*,}); do
-            (set -xeo pipefail; TF_LOG=${terraform_log_level:-ERROR} terraform plan -input=false -no-color --parallelism=$(nproc) "${terraform_replace[@]}" $terraform_refresh -out tfplan 2>&1 | tee -a tfplan.logs) &
-            wait -n $! || break
-            terraform_refresh="-refresh"
+    for i in $(seq ${dev_terraform_retries%,*}); do
+        for j in $(seq ${dev_terraform_retries#*,}); do
+            trap - SIGTERM SIGINT SIGKILL ERR EXIT
 
-            (set -xeo pipefail; TF_LOG=${terraform_log_level:-ERROR} terraform apply -input=false --auto-approve -no-color --parallelism=$(nproc) tfplan 2>&1 | tee -a tfplan.logs) &
-            if wait -n $!; then
+            if [[ "$@ " = *"--dev_log_level=NONE "* ]]; then
+                TF_LOG=ERROR terraform plan -input=false -no-color --parallelism=$(nproc) "${terraform_replace[@]}" $terraform_refresh -out tfplan >> tfplan.logs 2>&1 &
+            else
+                set -o pipefail
+                TF_LOG=$(terraform_log_level "$@") terraform plan -input=false -no-color --parallelism=$(nproc) "${terraform_replace[@]}" $terraform_refresh -out tfplan 2>&1 | tee -a tfplan.logs &
+                set +o pipefail
+            fi
+            wait -n || break
+
+            trap destroy SIGTERM SIGINT SIGKILL ERR EXIT
+            terraform_refresh="-refresh"
+            if [[ "$@ " = *"--dev_log_level=NONE "* ]]; then
+                TF_LOG=ERROR terraform apply -input=false --auto-approve -no-color --parallelism=$(nproc) tfplan >> tfplan.logs 2>&1 &
+            else
+                set -o pipefail
+                TF_LOG=$(terraform_log_level "$@") terraform apply -input=false --auto-approve -no-color --parallelism=$(nproc) tfplan 2>&1 | tee -a tfplan.logs &
+                set +o pipefail
+            fi
+            if wait -n; then
                 sts=0
                 break
             fi
-            sleep ${terraform_delay#*,}
+            sleep ${dev_terraform_delay#*,}
         done
 
         [ $sts -eq 0 ] || break
@@ -200,7 +277,7 @@ if [[ "$stages" = *"--stage=provision"* ]]; then
         terraform_replace=($(sed -n '/"terraform_replace":/{s/.*"terraform_replace":{"sensitive":false,"value":{"command":"\([^"]*\)".*/\1/;p}' .tfplan.json | sed 's/[[]\([^]]*\)[]]/["\1"]/g' | tr ' ' '\n'))
         sts=${#terraform_replace[@]}
         [ $sts -gt 0 ] || break
-        sleep ${terraform_delay%,*}
+        sleep ${dev_terraform_delay%,*}
     done
 
     echo "provision_end: \"$(date -Ins)\"" >> timing.yaml
@@ -212,22 +289,47 @@ fi
 echo "host_setup_start: \"$(date -Ins)\"" >> timing.yaml
 locate_trace_modules $@
 cat .tfplan.json | $DIR/create-cluster.py $@ $trace_modules_options
-(set -eo pipefail; run_playbook -vv cluster.yaml $@ 2>&1 | tee -a tfplan.logs) &
-wait -n %1
+echo "Setup SUT settings..." | tee -a tfplan.logs
+if [[ "$@ " = *"--dev_log_level=NONE "* ]]; then
+    run_playbook -vv cluster.yaml $@ >> tfplan.logs 2>&1 &
+    wait -n
+    grep -E '^\[.*\]: Host .*[+-] ' tfplan.logs || true
+else
+    set -o pipefail
+    run_playbook $(ansible_log_level "$@") cluster.yaml $@ 2>&1 | tee -a tfplan.logs &
+    set +o pipefail
+    wait -n
+fi
 echo "host_setup_end: \"$(date -Ins)\"" >> timing.yaml
 
+rc=0
 if [[ "$stages" = *"--stage=validation"* ]]; then
     # create deployment with ansible
-    echo "Create the deployment plan..." | tee -a tfplan.logs
+    echo "Deploy workload on SUT..." | tee -a tfplan.logs
     echo "deployment_start: \"$(date -Ins)\"" >> timing.yaml
 
     trap destroy SIGTERM SIGINT SIGKILL ERR EXIT
 
     locate_trace_modules $@
     cat .tfplan.json | $DIR/create-deployment.py $@ $trace_modules_options
-    (set -eo pipefail; run_playbook -vv deployment.yaml $@ 2>&1 | tee -a tfplan.logs) &
-    wait -n %1
+    mkfifo /tmp/streaming-console
+    while true; do
+        while read cmd; do
+          eval "$cmd" 2>&1 | tee -a tfplan.logs &
+        done < /tmp/streaming-console
+    done &
+
+    if [[ "$@ " = *"--dev_log_level=NONE "* ]]; then
+        run_playbook -vv deployment.yaml $@ >> tfplan.logs 2>&1 &
+    else
+        set -o pipefail
+        run_playbook $(ansible_log_level "$@") deployment.yaml $@ 2>&1 | tee -a tfplan.logs &
+        set +o pipefail
+    fi
+
+    wait -n || rc=3
+    kill %1 || true
     echo "deployment_end: \"$(date -Ins)\"" >> timing.yaml
 fi
 
-destroy 0
+destroy $rc

@@ -1,7 +1,7 @@
 # test-config-spr.yaml
 # Overwrite the test cases for performance tunning on SPR 8490H.
 ######################### BKM for Workload Performance#######################
-# INSTANCE_NUM: The nummer of Cassandra server and client instance to run concurrently.
+# INSTANCE_NUM: The nummer of Cassandra server and client instance to run concurrently.               
 #
 # JVM_HEAP_SIZE: JVM configure for '-Xms' and '-Xmx'. Here set min (-Xms) and max (-Xmx) 
 #                heap sizes to the same value to avoid stop-the-world GC pauses during resize.
@@ -30,8 +30,8 @@
   CLIENT_DURATION: 15m
   INSTANCE_NUM: 8
   JVM_HEAP_SIZE: 31
-  CASSANDRA_DISK_MOUNT: true
-  HOST_NETWORK_ENABLE: true
+  CASSANDRA_DISK_MOUNT: true 
+  HOST_NETWORK_ENABLE: true 
   CLIENT_POP_MAX: 360000000
   CLIENT_THREADS: 240
   CASSANDRA_CONCURENT_READS: 90

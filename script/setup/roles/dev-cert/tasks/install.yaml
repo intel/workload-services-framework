@@ -4,12 +4,24 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+- block:
+
   - name: find all certificates
     find:
       paths: "{{ dev_cert_conf_dir }}"
       patterns: "*.crt"
     register: certs
-    delegate_to: localhost
+    delegate_to: reg_host
+    run_once: true
+
+  - name: fetch cert from reg host
+    slurp:
+      src: "{{ item.path }}"
+    register: certs_content
+    loop: "{{ certs.files }}"
+    delegate_to: reg_host
+    run_once: true
+    no_log: true
 
   - name: Detect OS
     shell: 
@@ -19,21 +31,37 @@
 
   - name: Install cert
     include_tasks:
-      file: "install-{{ (os.stdout == 'rhel') | ternary('centos', os.stdout) }}.yaml"
+      file: "install-{{ (os.stdout in ['debian','ubuntu']) | ternary('debian', 'centos') }}.yaml"
+
+- block:
+
+  - name: add cluster proxy list to no-proxy
+    blockinfile:
+      path: /etc/environment
+      marker: "# {mark} WSF Setup"
+      state: absent
 
   - name: proxy
     shell:
       cmd: |
-        echo "$http_proxy"
-        echo "$https_proxy"
-        echo "$no_proxy"
+        . /etc/environment > /dev/null
+        echo "$http_proxy|$https_proxy|$no_proxy|"
       executable: /bin/bash
     register: proxies
 
-  - name: "add {{ dev_cert_host }} to containerd/docker proxies"
-    shell: |
-      mkdir -p {{ containerd_proxy_conf | dirname }} {{ docker_proxy_conf | dirname }}
-      printf "[Service]\nEnvironment=\"HTTP_PROXY={{ proxies.stdout_lines[0] }}\" \"HTTPS_PROXY={{ proxies.stdout_lines[1] }}\" \"NO_PROXY={{ proxies.stdout_lines[2] | split(',') | union([ dev_cert_host ]) | unique | join(',') }}\"\n" | tee {{ containerd_proxy_conf }} {{ docker_proxy_conf }}
+  - name: overwrite with dev setup
+    blockinfile:
+      path: /etc/environment
+      marker: "# {mark} WSF Dev Setup"
+      block: |
+        http_proxy="{{ 0 | extract(proxies.stdout | split('|')) }}"
+        https_proxy="{{ 1 | extract(proxies.stdout | split('|')) }}"
+        no_proxy="{{ 2 | extract(proxies.stdout | split('|')) | split(',') | union([dev_cert_host]) | join(',') }}"
+
+  - name: Add proxy
+    include_role:
+      name: containerd
+      tasks_from: proxy
 
   - name: restart containerd
     systemd:
@@ -41,19 +69,28 @@
       state: restarted
       daemon_reload: true
     ignore_errors: true
+    no_log: true
 
   - name: sleep a while
     command: sleep 20s
+
+  - name: Add proxy
+    include_role:
+      name: docker
+      tasks_from: proxy
 
   - name: restart docker
     systemd:
       name: docker
       state: restarted
+      daemon_reload: true
     ignore_errors: true
+    no_log: true
 
   - name: restart kubelet
     systemd:
       name: kubelet
       state: restarted
     ignore_errors: true
+    no_log: true
 

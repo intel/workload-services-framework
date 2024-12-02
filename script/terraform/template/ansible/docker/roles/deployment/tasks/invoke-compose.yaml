@@ -4,14 +4,13 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: record timing
-  shell:
-    cmd: |
-      echo "workload_itr{{ itr }}_start: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
-    executable: /bin/bash
-  delegate_to: localhost
-  async: 30
-  poll: 0
+- fail:
+    msg: "The compose module only supports a single SUT."
+  when: groups.workload_hosts | length > 1
+
+- include_role:
+    name: timing
+    tasks_from: start-iteration
 
 - name: create a workspace folder
   file:
@@ -24,12 +23,20 @@
     dest: "/tmp/{{ wl_namespace }}-compose/docker-compose.yaml"
 
 - name: invoke docker compose up
-  shell:
-    cmd: "docker compose up {{ ('True' in pullalways) | ternary('--pull always','') }} --detach --force-recreate"
+  shell: 
+    cmd: |
+      echo "TZ=$(timedatectl show --va -p Timezone 2> /dev/null || echo $TZ)" > .env
+      chown 600 .env
+      {% for k in workload_secrets.keys() %}
+        echo "{{ k }}=${{ k }}" >> .env
+      {% endfor %}
+      docker compose up {% for s in compose_config.services %}{% for r in skopeo_sut_accessible_registries | default('') | split(',') | reject('==','') %}{% if compose_config.services[s]['image'].startswith(r) %}--pull always {% endif %}{% endfor %}{% endfor %} --detach --force-recreate
     chdir: "/tmp/{{ wl_namespace }}-compose"
+    executable: /bin/bash
+  environment: "{{ workload_secrets }}"
   vars:
     compose_config: "{{ lookup('file', wl_logs_dir+'/compose-config.yaml') | from_yaml }}"
-    pullalways: "x{% for s in compose_config.services %}{% for r in (skopeo_sut_accessible_registries | default('') | split(',')) %}{{ ((r!='') and compose_config.services[s]['image'].startswith(r)) }}{% endfor %}{% endfor %}x"
+    workload_secrets: "{{ lookup('file', wl_logs_dir+'/.workload-secret.yaml') | from_yaml | default({},true) }}"
 
 - name: waitproc to wait for logs complete
   shell:
@@ -46,16 +53,12 @@
     name: trace
   vars:
     trace_waitproc_pid: "{{ waitproc.stdout }}"
-    trace_logs_scripts: ["docker compose logs {{ workload_config.job_filter.split(',')[0].split('=')[-1] }}"]
+    trace_logs_scripts: ["docker compose -f /tmp/{{ wl_namespace }}-compose/docker-compose.yaml logs {{ workload_config.job_filter.split(',')[0].split('=')[-1] }}"]
+    trace_status_file: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-waitproc.status"
 
-- name: record timing
-  shell:
-    cmd: |
-      echo "workload_itr{{ itr }}_end: \"$(date -Ins)\"" >> {{ wl_logs_dir }}/timing.yaml
-    executable: /bin/bash
-  delegate_to: localhost
-  async: 30
-  poll: 0
+- include_role:
+    name: timing
+    tasks_from: stop-iteration
 
 - name: retrieve additional service logs
   shell:
@@ -108,7 +111,7 @@
     loop: "{{ workload_config.job_filter.split(',') }}"
 
   always:
-
+  
   - name: remove local logs tarfile
     file:
       path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ item.split('=')[-1] }}-logs.tar"

@@ -1,0 +1,14 @@
+
+- hosts: worker-0
+  gather_facts: no
+  vars:
+    jsondata: "{{ lookup('file', '/opt/workspace/.tfplan.json') | from_json }}"
+    DB_HOST: "{{ jsondata['values']['outputs']['instances']['value']['dbinstance']['address'] }}"
+    DB_PORT: "{{ jsondata['values']['outputs']['instances']['value']['dbinstance']['port'] }}"
+    ROOT_USER: "{{ jsondata['values']['outputs']['instances']['value']['dbinstance']['user_name'] }}"
+    ROOT_PASSWORD: "{{ jsondata['values']['outputs']['instances']['value']['dbinstance']['password'] }}"
+    DATABASE: "{{ jsondata['values']['outputs']['instances']['value']['dbinstance']['database'] }}"
+  tasks:
+  - name: Install HammerDB
+    include_role:
+      name: installation
