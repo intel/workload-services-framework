@@ -102,8 +102,8 @@ where, if Kubernetes is used, the SUT hosts are assumed to form a Kubernetes clu
 
 Use the following setup steps:
 - Run the [`setup-dev.sh`][setup-dev.sh-self] script to setup the dev host. 
-- Completely optional in this setup, run the [`setup-reg.sh`][setup-reg.sh-self] script (on the dev host), if you plan to setup a local docker registry for building workloads and storing the built images.   
-- Depending on the workload types, you can run either the [`setup-sut-native.sh`][setup-sut-native.sh-self], [`setup-sut-docker.sh`][setup-sut-docker.sh-self] script or the [`setup-sut-k8s.sh`][setup-sut-k8s.sh-self] script to setup the SUT hosts. The native setup can run any baremetal native workloads. The docker setup can run most of the single-node containerized workloads (docker or docker compose). The Kubernetes setup can run all containerized workloads (not tied to any Cloud services) on premises. 
+- Completely optional in this setup, run the [`setup-reg.sh`][setup-reg.sh-self] script (**on the dev host**), if you plan to setup a local docker registry for building workloads and storing the built images.
+- Depending on the workload types, you can run either the [`setup-sut-native.sh`][setup-sut-native.sh-self], [`setup-sut-docker.sh`][setup-sut-docker.sh-self] script or the [`setup-sut-k8s.sh`][setup-sut-k8s.sh-self] script (**on the dev host**) to setup the SUT hosts. The native setup can run any baremetal native workloads. The docker setup can run most of the single-node containerized workloads (docker or docker compose). The Kubernetes setup can run all containerized workloads (not tied to any Cloud services) on premises.
 
 ---
 

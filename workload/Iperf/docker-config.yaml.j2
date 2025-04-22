@@ -1,0 +1,41 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+worker-0:
+- image: "{{ REGISTRY }}{{ WORKLOAD }}{{ IMAGESUFFIX }}{{ RELEASE }}"
+  options:
+  - --network host
+  - "-e IPERF_VER={{ IPERF_VER }}"
+  - "-e PROTOCOL={{ PROTOCOL }}"
+  - "-e SERVER_POD_PORT={{ SERVER_POD_PORT }}"
+  - "-e SERVER_CORE_COUNT={{ SERVER_CORE_COUNT }}"
+  - "-e SERVER_CORE_LIST={{ SERVER_CORE_LIST }}"
+  - "-e SERVER_OPTIONS={{ SERVER_OPTIONS }}"
+  - "-e ONLY_USE_PHY_CORE={{ ONLY_USE_PHY_CORE }}"
+  - "-e PARALLEL_NUM={{ PARALLEL_NUM }}"
+  - "-e SERVER_PING_PORT={{ SERVER_PING_PORT }}"
+  - "-e CLIENT_OR_SERVER=server"
+  export-logs: true
+
+worker-1:
+- image: "{{ REGISTRY }}{{ WORKLOAD }}{{ IMAGESUFFIX }}{{ RELEASE }}"
+  options:
+  - --network host
+  - "-e IPERF_VER={{ IPERF_VER }}"
+  - "-e MODE={{ MODE }}"
+  - "-e PROTOCOL={{ PROTOCOL }}"
+  - "-e SERVER_POD_PORT={{ SERVER_POD_PORT }}"
+  - "-e CLIENT_CORE_COUNT={{ CLIENT_CORE_COUNT }}"
+  - "-e CLIENT_CORE_LIST={{ CLIENT_CORE_LIST }}"
+  - "-e CLIENT_OPTIONS={{ CLIENT_OPTIONS }}"
+  - "-e ONLY_USE_PHY_CORE={{ ONLY_USE_PHY_CORE }}"
+  - "-e PARALLEL_NUM={{ PARALLEL_NUM }}"
+  - "-e CLIENT_TRANSMIT_TIME={{ CLIENT_TRANSMIT_TIME }}"
+  - "-e BUFFER_SIZE={{ BUFFER_SIZE }}"
+  - "-e UDP_BANDWIDTH={{ UDP_BANDWIDTH }}"
+  - "-e SERVER_PING_PORT={{ SERVER_PING_PORT }}"
+  - "-e CLIENT_OR_SERVER=client"
+  export-logs: true

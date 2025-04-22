@@ -66,6 +66,7 @@ variable "worker_profile" {
     instance_type = "ecs.g6.large"
     cpu_model_regex = null
     vm_count = 1
+    accelerators = null
 
     os_image = null
     os_type = "ubuntu2204"
@@ -83,6 +84,7 @@ variable "client_profile" {
     instance_type = "ecs.g6.large"
     cpu_model_regex = null
     vm_count = 1
+    accelerators = null
 
     os_image = null
     os_type = "ubuntu2204"
@@ -100,6 +102,7 @@ variable "controller_profile" {
     instance_type = "ecs.g6.large"
     cpu_model_regex = null
     vm_count = 1
+    accelerators = null
 
     os_image = null
     os_type = "ubuntu2204"
@@ -153,6 +156,7 @@ output "options" {
     docker_dist_repo: "https://mirrors.aliyun.com/docker-ce",
     containerd_pause_registry: "registry.aliyuncs.com/google_containers",
 
+    k8s_version: "1.28.2",
     k8s_repo_key_url: {
       "debian": "http://mirrors.aliyun.com/kubernetes/apt/doc/apt-key.gpg",
       "centos": ["http://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg","https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg"],
@@ -170,6 +174,7 @@ output "options" {
     k8s_calico_cni_repo: "public.ecr.aws/metakube/calico",
     k8s_cni: "calico",
     k8s_enable_nfd: false,
+    k8s_qat_push_images: true,
   }
 }
 

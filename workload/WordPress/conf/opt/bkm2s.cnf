@@ -1,0 +1,116 @@
+#MySQL configuation BKM (/etc/mysql/my.cnf):
+# this is read by the standalone daemon and embedded servers
+[server]
+
+# this is only for the mysqld standalone daemon
+[mysqld]
+
+#
+# * Basic Settings
+#
+user        = mysql
+pid-file    = /var/run/mysqld/mysqld.pid
+socket        = /var/run/mysqld/mysqld.sock
+port = 3306
+basedir        = /usr
+datadir        = /var/lib/mysql
+tmpdir        = /tmp
+lc-messages-dir    = /usr/share/mysql
+skip-external-locking
+
+
+# Instead of skip-networking the default is now to listen only on
+# localhost which is more compatible and is not less secure.
+log_error = /var/log/mysql/error.log
+expire_logs_days    = 10
+max_binlog_size   = 100M
+character-set-server  = utf8mb4
+collation-server      = utf8mb4_general_ci
+
+#
+# * Unix socket authentication plugin is built-in since 10.0.22-6
+#
+# Needed so the root database user can authenticate without a password but
+# only when running as the unix root user.
+#
+# Also available for other users if required.
+# See https://mariadb.com/kb/en/unix_socket-authentication-plugin/
+
+# this is only for embedded server
+[embedded]
+
+# This group is only read by MariaDB servers, not by MySQL.
+# If you use the same .cnf file for MySQL and MariaDB,
+# you can put MariaDB-only options here
+[mariadb]
+
+# This group is only read by MariaDB-10.0 servers.
+# If you use the same .cnf file for MariaDB of different versions,
+# use this group for options that older servers don't understand
+[mariadb-10.0]
+
+
+
+[mysqld_safe]
+# This will be passed to all mysql clients
+# It has been reported that passwords should be enclosed with ticks/quotes
+# escpecially if they contain "#" chars...
+# Remember to edit /etc/mysql/debian.cnf when changing the socket location.
+socket        = /var/run/mysqld/mysqld.sock
+nice        = 0
+skip_log_error
+syslog
+[client-server]
+
+# this is only for the mysqld standalone daemon
+[mysqld]
+# Disabling symbolic-links is recommended to prevent assorted security risks
+symbolic-links=0
+
+# Settings user and group are ignored when systemd is used.
+# If you need to run mysqld under a different user or group,
+# customize your systemd unit file for mariadb according to the
+# instructions in http://fedoraproject.org/wiki/Systemd
+open_files_limit=4000
+# Having the query cache on makes mysql threads wait for acquiring
+# the query cache lock, making the system manifest low CPU utilization
+query_cache_limit=0
+query_cache_size=0
+query_cache_type=0
+#Enable networking
+bind-address = 0.0.0.0
+#Fine tuning
+key_buffer              = 16M # TODO: This should actually be key_buffer_size
+max_allowed_packet      = 16M
+thread_stack            = 192K
+thread_cache_size       = 2048
+#thread_handling=pool_of_threads
+skip-external-locking
+key_buffer_size = 384M
+max_allowed_packet = 1M
+table_open_cache = 512 # TODO: Find the optimal value for this
+sort_buffer_size = 2M
+read_buffer_size = 2M
+read_rnd_buffer_size = 8M
+myisam_sort_buffer_size = 64M
+
+innodb_buffer_pool_size = 8G
+innodb_buffer_pool_instances = 8
+aria_pagecache_buffer_size = 128M
+tmp_table_size = 1G
+max_heap_table_size = 1G
+#innodb_thread_concurrency = 80
+#innodb_adaptive_hash_index = OFF
+# The thread_concurrency is deprecated, no need to use it
+# thread_concurrency = 72
+# Increase number of maximum connections (used by oss-performance)
+max_connections        = 1000
+# Make sure you have query logging OFF or you will bump into low cpu utilization
+# and performance will drop
+#general-log
+#general-log-file=/var/log/mariadb/queries.log
+#log-output=file
+# This replaces the startup script and checks MyISAM tables if needed
+# the first time they are touched
+myisam-recover         = BACKUP
+#table_cache = 64

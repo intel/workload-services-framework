@@ -1,0 +1,7 @@
+
+https://media.xiph.org/video/derf/ElFuente/Netflix_Tango_4096x2160_60fps_10bit_420.y4m,Netflix_Tango_4096x2160_60fps_10bit_420,4096,2160,60,20M,5,600,10
+https://media.xiph.org/video/derf/y4m/crowd_run_1080p50.y4m,crowd_run_1080p50,1920,1080,50,6M,5,600,8
+https://media.xiph.org/video/derf/twitch/y4m/CSGO.y4m,CSGO,1920,1080,60,6M,5,600,8
+https://media.xiph.org/video/derf/y4m/crowd_run_2160p50.y4m,crowd_run_2160p50,4096,2160,50,20M,5,600,8
+https://media.xiph.org/video/derf/y4m/dinner_1080p30.y4m,dinner_1080p30,1920,1080,30,6M,5,600,8
+https://media.xiph.org/video/derf/twitch/y4m/GTAV.y4m,GTAV,1920,1080,60,6M,5,600,8

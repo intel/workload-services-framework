@@ -5,6 +5,6 @@
 #
 gprofiler: false
 gprofiler_options: "--profiling-frequency=11 --profiling-duration=2"
-gprofiler_version: "1.28.0"
-gprofiler_package: "https://github.com/Granulate/gprofiler/releases/download/{{ gprofiler_version }}"
+gprofiler_version: "1.51.0"
+gprofiler_package: "https://github.com/intel/gprofiler/releases/download/{{ gprofiler_version }}"
 

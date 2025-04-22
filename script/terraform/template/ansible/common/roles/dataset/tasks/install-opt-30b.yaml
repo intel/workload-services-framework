@@ -3,12 +3,12 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
-- include_role:
-    name: hf-dataset
+- include_tasks:
+    file: download-hf.yaml
   vars:
-    DEST_DIR: "/opt/dataset/opt/30b"
-    MODEL_ID: "facebook/opt-30b"
-    DATASET_SIZE: 66
-    exclude: ['msgpack','h5']
-    revision: []
-    HF_LOGIN: false
+    dataset_model_path: "opt/30b"
+    hfcli_model_id: "facebook/opt-30b"
+    dataset_size: 66
+    hfcli_exclude: ['msgpack','h5']
+    hfcli_revision: []
+    hfcli_login: false

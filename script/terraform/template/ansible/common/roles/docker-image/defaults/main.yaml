@@ -8,8 +8,10 @@ local_registry_url: "localhost:16666"
 k8s_remote_registry_url: ""
 k8s_enable_registry: true
 k8s_enable_csp_registry: false
-skopeo_sut_accessible_registries: ""
-skopeo_insecure_registries: ""
+skopeo_sut_accessible_registries: "" # deprecated
+sut_accessible_registries: ""
+skopeo_insecure_registries: "" # deprecated
+sut_insecure_registries: ""
 skopeo_inspect_options: ""
 skopeo_copy_options: "--preserve-digests"
 skopeo_copy_retries: "5"

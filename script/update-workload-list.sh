@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 #
 # Apache v2 license
 # Copyright (C) 2023 Intel Corporation
@@ -13,85 +13,57 @@ format_name () {
 }
 
 calc_nimages () {
-    batch=$(( $(nproc) / 2 ))
+    batch=$(( $(nproc) / 4 ))
 
     cd "$BUILD_DIR"
-    mkdir -p nimages.raw cluster-config kubernetes-config docker-config compose-config lock
+    mkdir -p nimages.raw cluster-config kubernetes-config docker-config compose-config
     for p in $(cat "$DIR"/../workload/platforms); do
         for w in "$DIR"/../workload/*/build.sh; do
             w="${w/\/build.sh/}"
             w="$(basename "$w")"
-            (
-                mkdir -p "$BUILD_DIR/$w.$p"
-                touch "$BUILD_DIR/lock/$w.$p"
+            echo " CMAKE PLATFORM=$p WORKLOAD=$w" 1>&2
+            ( 
+                mkdir -p "$BUILD_DIR/$w"
+                cd "$BUILD_DIR/$w"
+                cmake -DPLATFORM=$p -DACCEPT_LICENSE=ALL -DREGISTRY= -DRELEASE=updateworkload -DBACKEND=terraform -DTERRAFORM_OPTIONS=--nosutinfo -DTERRAFORM_SUT='static aws gcp azure tencent alicloud' -DBENCHMARK=workload/$w/ ../..
             ) &
             if [ $(jobs -p | wc -w) -ge $batch ]; then
                 wait -n || true
             fi
         done
+        wait
+
+        for w in "$DIR"/../workload/*/build.sh; do
+            w="${w/\/build.sh/}"
+            w="$(basename "$w")"
+            echo " PLATFORM=$p WORKLOAD=$w" 1>&2
+            (
+                cd "$BUILD_DIR/$w"
+                make bom > "$BUILD_DIR"/nimages.raw/$w.$p
+
+                ./ctest.sh -j $batch --dry-run --docker --nobomlist --nosutinfo --nodockerconf 2>&1 | grep Failed
+                cat workload/$w/logs-*/cluster-config.yaml >> "$BUILD_DIR"/cluster-config/$w.$p 2> /dev/null || true
+                cat workload/$w/logs-*/docker-config.yaml >> "$BUILD_DIR"/docker-config/$w.$p 2> /dev/null || true
+                find workload/$w -maxdepth 1 -type d -name "logs-*" | xargs rm -rf
+
+                ./ctest.sh -j $batch --dry-run --compose --nobomlist --nosutinfo --nodockerconf 2>&1 | grep Failed
+                cat workload/$w/logs-*/cluster-config.yaml >> "$BUILD_DIR"/cluster-config/$w.$p 2> /dev/null || true
+                cat workload/$w/logs-*/compose-config.yaml >> "$BUILD_DIR"/compose-config/$w.$p 2> /dev/null || true
+                find workload/$w -maxdepth 1 -type d -name "logs-*" | xargs rm -rf
+
+                ./ctest.sh -j $batch --dry-run --kubernetes --nobomlist --nosutinfo --nodockerconf 2>&1 | grep Failed
+                cat workload/$w/logs-*/cluster-config.yaml >> "$BUILD_DIR"/cluster-config/$w.$p 2> /dev/null || true
+                cat workload/$w/logs-*/kubernetes-config.yaml >> "$BUILD_DIR"/kubernetes-config/$w.$p 2> /dev/null || true
+                find workload/$w -maxdepth 1 -type d -name "logs-*" | xargs rm -rf
+
+            ) &
+            if [ $(jobs -p | wc -w) -ge $batch ]; then
+                wait -n || true
+            fi
+        done
+        wait
     done
-    wait
-    for p in $(cat "$DIR"/../workload/platforms); do
-        for w in "$DIR"/../workload/*/build.sh; do
-            w="${w/\/build.sh/}"
-            w="$(basename "$w")"
-            ( 
-                flock -e 8
-                cd "$BUILD_DIR/$w.$p"
-                cmake -j 1 -DPLATFORM=$p -DACCEPT_LICENSE=ALL -DREGISTRY= -DRELEASE=updateworkload -DBACKEND=terraform -DTERRAFORM_OPTIONS=--nosutinfo -DTERRAFORM_SUT= -DBENCHMARK=workload/$w/ ../..
-                make -j 1 bom > "$BUILD_DIR"/nimages.raw/$w.$p
-            ) 8< "$BUILD_DIR/lock/$w.$p" &
-            if [ $(jobs -p | wc -w) -ge $batch ]; then
-                wait -n || true
-            fi
-        done
-        for w in "$DIR"/../workload/*/build.sh; do
-            w="${w/\/build.sh/}"
-            w="$(basename "$w")"
-            (
-                flock -e 8
-                cd "$BUILD_DIR/$w.$p"
-                ./ctest.sh -j 1 --dry-run --options="--docker --nobomlist --nosutinfo --nodockerconf"
-                cat workload/$w/logs-*/cluster-config.yaml >> "$BUILD_DIR"/cluster-config/$w.$p || true
-                cat workload/$w/logs-*/docker-config.yaml >> "$BUILD_DIR"/docker-config/$w.$p || true
-                rm -rf workload/$w/logs-*
-            ) 8< "$BUILD_DIR/lock/$w.$p" &
-            if [ $(jobs -p | wc -w) -ge $batch ]; then
-                wait -n || true
-            fi
-        done
-        for w in "$DIR"/../workload/*/build.sh; do
-            w="${w/\/build.sh/}"
-            w="$(basename "$w")"
-            (
-                flock -e 8
-                cd "$BUILD_DIR/$w.$p"
-                ./ctest.sh -j 1 --dry-run --options="--kubernetes --nobomlist --nosutinfo --nodockerconf"
-                cat workload/$w/logs-*/cluster-config.yaml >> "$BUILD_DIR"/cluster-config/$w.$p || true
-                cat workload/$w/logs-*/kubernetes-config.yaml >> "$BUILD_DIR"/kubernetes-config/$w.$p || true
-                rm -rf workload/$w/logs-*
-            ) 8< "$BUILD_DIR/lock/$w.$p" &
-            if [ $(jobs -p | wc -w) -ge $batch ]; then
-                wait -n || true
-            fi
-        done
-        for w in "$DIR"/../workload/*/build.sh; do
-            w="${w/\/build.sh/}"
-            w="$(basename "$w")"
-            (
-                flock -e 8
-                cd "$BUILD_DIR/$w.$p"
-                ./ctest.sh -j 1 --dry-run --options="--compose --nobomlist --nosutinfo --nodockerconf"
-                cat workload/$w/logs-*/cluster-config.yaml >> "$BUILD_DIR"/cluster-config/$w.$p || true
-                cat workload/$w/logs-*/compose-config.yaml >> "$BUILD_DIR"/compose-config/$w.$p || true
-                rm -rf workload/$w/logs-*
-            ) 8< "$BUILD_DIR/lock/$w.$p" &
-            if [ $(jobs -p | wc -w) -ge $batch ]; then
-                wait -n || true
-            fi
-        done
-    done
-    wait
+
     awk '
 /^BOM of/ {
     p1=gensub(/\/.*/,"",1,$3)
@@ -265,6 +237,9 @@ write_table () {
                                 GENOA)
                                   p1="GA"
                                   ;;
+                                TURIN)
+                                  p1="TR"
+                                  ;;
                                 ARMv*)
                                   p1="${p1/ARMv/R}"
                                   ;;
@@ -351,7 +326,8 @@ END {
 
 find "$DIR"/../workload "$DIR"/../image "$DIR"/../stack \( -name "build.sh" -o -name "validate.sh" -o -name "kpi.sh" \) -exec chmod a+rx {} \; 
 
-rm -rf "$BUILD_DIR"
+echo "rm -rf $BUILD_DIR"
+find "$BUILD_DIR" -maxdepth 1 | xargs rm -rf
 mkdir -p "$BUILD_DIR"
 
 COLORS="#a73107 #e24b6e #16ade4 #ade416 #16e4b4 #2b5969 #e4c916 #716f6e #ad5907 #adad07"

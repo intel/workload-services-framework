@@ -93,6 +93,14 @@
   - (playbook_dir + '/roles/tpmi/tasks/cleanup.yaml') is exists
   - (ansible_connection | default('ssh')) in ['ssh']
 
+- name: cleanup cgroups
+  include_role:
+    name: cgroup
+    tasks_from: cleanup
+  when:
+  - sut_use_cgroup | default(false) | bool
+  - (ansible_connection | default('ssh')) in ['ssh']
+
 - name: poweroff or reboot sut
   include_tasks:
     file: poweroff-reboot.yaml

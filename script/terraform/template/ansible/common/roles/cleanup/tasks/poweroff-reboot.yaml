@@ -3,17 +3,30 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
-- name: reboot
-  command: "reboot"
-  async: 10
-  poll: 0
-  ignore_errors: yes
+- block:
+
+  - name: reboot
+    command: "reboot"
+    register: rebootrc
+    async: "{{ sut_reboot_timeout }}"
+    poll: 0
+
+  - name: sleep
+    shell: "sleep 5s"
+    delegate_to: localhost
+
+  - name: cleanup after reboot
+    async_status:
+      jid: "{{ rebootrc.ansible_job_id }}"
+      mode: cleanup
+
   when:
-  - cleanup_reboot_required
+  - cleanup_reboot_required | bool
   - sut_reboot | bool
-  - not cleanup_poweroff_required
+  - not (cleanup_poweroff_required | bool)
 
 - block:
+
   - name: power off sut
     ipmi_power:
       name: "{{ bmc_ip }}"
@@ -21,12 +34,9 @@
       password: "{{ bmc_password }}"
       port: "{{ bmc_port }}"
       state: 'off'
-    delegate_to: localhost
-    ignore_errors: yes
 
   - name: sleep
     shell: "sleep 120s"
-    delegate_to: localhost
   
   - name: power on sut
     ipmi_power:
@@ -35,11 +45,12 @@
       password: "{{ bmc_password }}"
       port: "{{ bmc_port }}"
       state: 'on'
-    delegate_to: localhost
-    ignore_errors: yes
+
+  delegate_to: localhost
+  ignore_errors: true
   when: 
   - sut_reboot | bool
-  - cleanup_poweroff_required
-  - cleanup_reboot_required
+  - cleanup_poweroff_required | bool
+  - cleanup_reboot_required | bool
   - bmc_ip is defined and bmc_ip != ''
   - bmc_password is defined and bmc_password != ''

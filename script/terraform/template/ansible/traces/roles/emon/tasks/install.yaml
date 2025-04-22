@@ -21,12 +21,14 @@
         executable: /bin/bash
       register: os
   
-    - set_fact:
-        emon_gcc_options: ''
-
     - name: Install prerequisites and emon
-      include_tasks:
-        file: "install-{{ ((os.stdout_lines | first) in ['debian','ubuntu']) | ternary('debian','rhel') }}.yaml"
+      include_role:
+        name: kernel-compiler
+      vars:
+        kernel_driver_build_pkgs:
+          debian: ['pkg-config','bzip2']
+          centos: ['pkgconfig','bzip2' ]
+        kernel_driver_host: "{{ trace_node.1 }}"
 
     - name: "Create an {{ emon_group }} group"
       group:
@@ -93,7 +95,7 @@
     - name: Install emon
       shell:
         cmd: |
-          . $(ls -1 ./*-installer.sh | head -n1) -u -C {{ emon_bin_path }} --accept-license -ni -i -g {{ emon_group }} --install-boot-script {{ emon_gcc_options | default('--c-compiler $(which gcc)',true) }}
+          . $(ls -1 ./*-installer.sh | head -n1) -u -C {{ emon_bin_path }} --accept-license -ni -i -g {{ emon_group }} --install-boot-script --c-compiler $(which {{ kernel_gcc_version }})
         executable: /bin/bash
         chdir: "{{ emon_src_path }}"
 

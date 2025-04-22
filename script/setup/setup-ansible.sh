@@ -69,6 +69,7 @@ is_debian_10 () {
   [ "$VERSION_ID" = "10" ]
 }
 
+PYTHON3=/usr/bin/python3
 if ! check_ansible_version; then
   if apt-get --version > /dev/null 2>&1; then
     remove_legacy_repo_apt http://apt.kubernetes.io/ https://dl.k8s.io/apt/doc/apt-key.gpg/
@@ -86,10 +87,10 @@ if ! check_ansible_version; then
     if is_debian_10; then
       eval "$sudo -E apt-get remove -y ansible" || true
       eval "$sudo -E apt-get remove -y ansible-core" || true
-      eval "$sudo -H -E python3 -m pip uninstall -y ansible" | true
-      eval "$sudo -H -E python3 -m pip uninstall -y ansible-core" | true
+      eval "$sudo -H -E $PYTHON3 -m pip uninstall -y ansible" | true
+      eval "$sudo -H -E $PYTHON3 -m pip uninstall -y ansible-core" | true
       eval "$sudo -E apt-get install -y python3-pip"
-      eval "$sudo -H -E python3 -m pip install ansible==4.10.0"
+      eval "$sudo -H -E $PYTHON3 -m pip install ansible==4.10.0"
     else
       (eval "$sudo -E apt-add-repository -u -y ppa:ansible/ansible" 2>&1 || echo E:) | grep -q -E '^(E|Err):' && eval "$sudo -E apt-add-repository --remove -y ppa:ansible/ansible" || true
       eval "$sudo -E apt-get install -y ansible"
@@ -115,14 +116,14 @@ if ! check_ansible_version; then
   fi
 fi
 
-if ! python3 -c 'import dns.resolver
+if ! $PYTHON3 -c 'import dns.resolver
 import netaddr' 2> /dev/null; then
   if apt-get --version > /dev/null 2>&1; then
     eval "$sudo -E apt-get install -y python3-dnspython python3-netaddr"
   elif yum --version > /dev/null 2> /dev/null; then
     eval "$sudo -E yum install -y python3-dns python3-netaddr"
   fi
-  if ! python3 -c 'import dns.resolver
+  if ! $PYTHON3 -c 'import dns.resolver
 import netaddr' 2> /dev/null; then
     echo -e "\033[31mFailed to install python3-dnspython!\033[0m"
     exit 3

@@ -16,25 +16,21 @@
 - set_fact:
     trace_module_start_block: |
       {% if ['0','host'] | intersect(trace_node.0|split(':')) | length == 0 %}
-        case "$1" in
-        docker:*)
-          i=0
-          for c in ${@/docker:/}; do
-            docker exec $c nsys start {{ nsys_options }} --force-overwrite=true --output=/tmp/nsys-c${i}r$roi > nsys-c${i}r$roi.logs 2>&1 &
+        i=0
+        for c in $@; do
+          if [[ "$c" = "docker:"* ]]; then
+            docker exec {{ docker_exec_options }} ${c#docker:} nsys start {{ nsys_options }} --force-overwrite=true --output=/tmp/nsys-c${i}r$roi > nsys-c${i}r$roi.logs 2>&1 &
             let i++
-          done
-          ;;
-        esac
+          fi
+        done
       {% endif %}
     trace_module_stop_block: |
       {% if ['0','host'] | intersect(trace_node.0|split(':')) | length == 0 %}
-        case "$1" in
-        docker:*)
-          i=0
-          for c in ${@/docker:/}; do
-            docker exec $c nsys stop >> nsys-c${i}r$roi.logs 2>&1 &
+        i=0
+        for c in $@; do
+          if [[ "$c" = "docker:"* ]]; then
+            docker exec {{ docker_exec_options }} ${c#docker:} nsys stop >> nsys-c${i}r$roi.logs 2>&1 &
             let i++
-          done
-          ;;
-        esac
+          fi
+        done
       {% endif %}

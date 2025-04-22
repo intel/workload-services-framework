@@ -23,7 +23,13 @@ worker-0:
 where
 - The top level keys are the SUT hostnames. The number of the SUT hosts must match what is specified in `cluster-config.yaml`. The SUT hosts are named against their SUT workgroup. For example, for the workers, the SUT hosts are named as `worker-0`, `worker-1`, etc. For clients, the SUT hosts are named as `client-0`, `client-1`, etc.  
 - The value of each SUT host is a list of containers to be scheduled on the SUT host. The list order is not enforced.  
-- Each container is described as a dictionary of `image` (the full docker image name), `options` (the docker run command line arguments, as a string or a list), `command` (optional, will overwrite commands inside container if defined) and `export-logs` (whether logs should be collected on the container).   
+- Each container is described as a dictionary of
+  - `image`: Specify the full docker image name
+  - `options`: Specify the docker run command line arguments, as a string or a list.
+  - `command`: Optional. Specify any startup command. This will overwrite whatever is defined in the docker image.
+  - `export-logs` or `service-logs`: Optional. Specify whether logs should be collected on the container.
+
+> The script will first collect logs on containers whose `export-logs` is true, which also signals that the workload execution is completed. Then collect logs on containers whose `service-logs` is `true`. `export-logs` and `service-logs` are exclusive options and can not both be true.
 
 # Test Time Considerations
 

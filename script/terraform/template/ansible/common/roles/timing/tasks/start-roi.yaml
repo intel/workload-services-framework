@@ -12,6 +12,4 @@
   delegate_to: localhost
   run_once: true
   become: false
-  async: 30
-  poll: 0
 

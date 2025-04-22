@@ -1,0 +1,19 @@
+# media-dataset-v44-ubuntu2404
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+FROM ${OS_IMAGE}:${OS_VER}
+RUN apt update && apt -y install curl
+
+RUN  mkdir -p /home/archive
+
+ARG CLIP_NAME=Mixed_40sec_3840x2160_60fps_10bit_420_crf23_veryslow.mp4
+RUN curl --noproxy '' -fsSL https://repositories.intel.com/media/${CLIP_NAME} -o /home/archive/${CLIP_NAME}
+
+ARG CLIP_NAME=Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+RUN curl --noproxy '' -fsSL https://repositories.intel.com/media/${CLIP_NAME} -o /home/archive/${CLIP_NAME}

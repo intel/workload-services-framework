@@ -29,6 +29,7 @@ print_help () {
     echo "--testset <yaml>      Use a testset definition yaml file."
     echo "--attach <file>       Attached a file to be under the logs directory."
     echo "--describe-params     Show workload parameter descriptions."
+    echo "--novalidate          Do not validate ansible options."
     echo ""
     echo "<vars> accepts the following formats:"
     echo "VAR=str1 str2 str3    Enumerate the variable values."
@@ -43,9 +44,10 @@ print_help () {
 }
 
 validate_ansible_option () {
+  [ $validate -eq 1 ] || return 0
   if [ ${#valid_ansible_options[@]} -eq 0 ]; then
       DIRPATH="$(dirname "$(readlink -f "$0")")"
-      valid_ansible_options=(run_stage_iterations)
+      valid_ansible_options=(run_stage_iterations dockerconf bomlist)
       valid_ansible_options+=($(find "$DIRPATH"/../terraform/template/ansible -ipath '*/defaults/*' -name '*.yaml' -exec grep -E '^[a-zA-Z_0-9][a-zA-Z_0-9]*:' {} \; | cut -f1 -d:))
       valid_ansible_options+=($(find "$DIRPATH"/../terraform/script -name 'publish-*.py' -print | sed -e 's|.*/publish-||' -e 's|.py|_publish|'))
   fi
@@ -56,6 +58,7 @@ validate_ansible_option () {
 }
 
 validate_options () {
+  [ $validate -eq 1 ] || return 0
   for opt1 in $@; do
     opt1k="${opt1#--}"
     case "$opt1" in
@@ -385,12 +388,16 @@ reuse_sut=0
 dry_run=0
 run_as_ctest=1
 empty_vars=()
+validate=1
 last_var=""
 export CTESTSH_OPTIONS=""
 attach_files=()
 valid_ansible_options=()
 for var in "$@"; do
     case "$var" in
+    --novalidate)
+        validate=0
+        ;;
     --describe-params)
         export CTESTSH_OPTIONS="$CTESTSH_OPTIONS --describe_workload_params"
         ;;

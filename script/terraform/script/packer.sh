@@ -121,10 +121,11 @@ fi
 
 mkdir -p /opt/workspace/template/terraform/$CSP
 
+pids=()
 destroy () {
     trap - ERR EXIT
     trap " " SIGTERM
-    kill -- -$BASHPID 2> /dev/null
+    kill -- -$BASHPID ${pids[@]} 2> /dev/null
     wait
 
     if [ -d /opt/workspace/template/terraform/$CSP/packer ]; then
@@ -202,7 +203,7 @@ fi
 trap destroy SIGINT SIGKILL ERR EXIT
 
 cd /opt/workspace/template/packer/$CSP/$PROJECT_NAME
-ssh-keygen -m PEM -q -f ssh_access.key -t rsa -N ''
+ssh-keygen -t rsa -m PEM -q -f ssh_access.key -N ''
 if [ "$CSP" = "static" ] && [ "$PUBLIC_IP" = "127.0.0.1" ]; then
     echo "AuthorizedKeysFile $(readlink -e ssh_access.key.pub)" | sudo tee -a /etc/ssh/sshd_config
     sudo service ssh start
@@ -222,7 +223,16 @@ for argv in $@; do
     fi
 done
 
+mkfifo /tmp/streaming-console
+while true; do
+    while read cmd; do
+      eval "$cmd" 2>&1 | tee -a tfplan.logs &
+      pids+=($!)
+    done < /tmp/streaming-console
+done &
+pids+=($!)
 (set -x; PACKER_LOG=1 PACKER_LOG_PATH=/opt/workspace/packer.logs packer build -force .) &
-wait -n $!
+pids+=($!)
+wait -n
 
 destroy 0

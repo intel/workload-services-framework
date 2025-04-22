@@ -5,3 +5,4 @@
 #
 hlprof: false
 hlprof_options: "--hw-trace on --host-perf-mode on -g 1-2 -b 250"
+docker_exec_options: "--user=root"

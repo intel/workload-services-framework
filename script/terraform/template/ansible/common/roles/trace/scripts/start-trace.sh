@@ -18,7 +18,7 @@ delegate_to () {
   case "$node" in
 {% for h in groups.trace_hosts|union(groups.controller|default([]))|unique %}
   {{ h }})
-    ssh -p {{ hostvars[h]['ansible_port'] | default(22) }} {{ hostvars[h]['ansible_user'] }}@{{ hostvars[h]['ansible_host'] }} -i {{ ansible_private_key_file }} "$@"
+    ssh -p {{ hostvars[h]['ansible_port'] | default(22) }} {{ hostvars[h]['ansible_user'] }}@{{ hostvars[h]['ansible_host'] }} {% if ansible_private_key_file is defined %}-i {{ ansible_private_key_file }}{% endif %} "$@"
     ;;
 {% endfor %}
   esac

@@ -1,0 +1,68 @@
+# yolov7-pytorch-public-2404
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+FROM ${OS_IMAGE}:${OS_VER} as build
+
+FROM pytorch-oob-24.04${RELEASE}
+
+WORKDIR /home/workspace
+
+COPY yolov7-ipex-and-inductor.patch .
+
+ARG YOLOV7_VER="a207844"
+ARG YOLOV7_REPO="https://github.com/WongKinYiu/yolov7"
+RUN git clone ${YOLOV7_REPO} && \
+    cd yolov7 && \
+    git reset --hard ${YOLOV7_VER} && \
+    git apply ../yolov7-ipex-and-inductor.patch
+
+WORKDIR /home/workspace/yolov7
+
+## dataset download
+RUN apt update && apt install -y wget unzip curl
+ARG YOLO_DIR="/home/workspace/yolov7/"
+ARG YOLO_DATASET_VER="v1.0"
+ARG YOLO_FILE_LABEL="coco2017labels-segments.zip"  # or 'coco2017labels.zip', 68 MB
+ARG YOLO_DATASET_PKG="https://github.com/ultralytics/yolov5/releases/download/${YOLO_DATASET_VER}/${YOLO_FILE_LABEL}"
+# download, unzip, remove in background
+RUN curl -L ${YOLO_DATASET_PKG} -o tmp.zip && unzip -q tmp.zip -d ${YOLO_DIR} && rm tmp.zip
+
+ARG COCO_IMAGE_DIR="/home/workspace/yolov7/coco/images"
+ARG COCO_IMAGE_DATA_TRAIN_VER="2017"
+ARG COCO_IMAGE_DATA_TRAIN_PKG="http://images.cocodataset.org/zips/train${COCO_IMAGE_DATA_TRAIN_VER}.zip"# 1G, 5k images
+ARG COCO_IMAGE_DATA_VAL_VER="2017"
+ARG COCO_IMAGE_DATA_VAL_PKG="http://images.cocodataset.org/zips/val${COCO_IMAGE_DATA_VAL_VER}.zip" # 7G, 41k images (optional)
+ARG COCO_IMAGE_DATA_TEST_VER="2017"
+ARG COCO_IMAGE_DATA_TEST_PKG="http://images.cocodataset.org/zips/test${COCO_IMAGE_DATA_TEST_VER}.zip"
+# download, unzip, remove in background
+RUN curl -L ${COCO_IMAGE_DATA_VAL_PKG} -o tmp.zip && unzip -q tmp.zip -d ${COCO_IMAGE_DIR} && rm tmp.zip
+
+ARG YOLOV7_MODEL_VER="v0.1"
+ARG YOLOV7_MODEL_REPO="https://github.com/WongKinYiu/yolov7/releases/download/${YOLOV7_MODEL_VER}/yolov7.pt"
+RUN wget ${YOLOV7_MODEL_REPO}
+
+WORKDIR /home/workspace/yolov7
+
+# install deps
+RUN apt install libgl1 libglx-mesa0 libglib2.0-0 libsm6 libxrender1 libxext6 -y
+## Base
+RUN pip install tqdm PyYAML matplotlib opencv-python scipy pycocotools transformers pandas seaborn ninja
+
+RUN python hub_help.py --weights yolov7.pt --data data/coco.yaml
+
+COPY run_test.sh .
+
+RUN mkfifo /export-logs
+
+CMD (chmod +x run_test.sh && ./run_test.sh; echo $? > status ) 2>&1 | tee benchmark_${MODE}_${TOPOLOGY}_${PRECISION}_${FUNCTION}_${DATA_TYPE}_$(date +"%m-%d-%y-%H-%M-%S").log \
+&& if [ `grep -c '^Throughput' benchmark_*.log` -eq 0 ];then echo 1 > status; fi \
+&& tar cPf /export-logs status $(find . -name "*.log") \
+&& sleep infinity

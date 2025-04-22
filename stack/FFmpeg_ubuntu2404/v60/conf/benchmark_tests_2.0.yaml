@@ -1,0 +1,405 @@
+##########################################################################################
+#
+# ffmpeg_benchmark_tests.yaml -- The default ffmpeg benchmark test configuration file
+#
+# See the README file in this directory for details about the format of this file.
+#
+##########################################################################################
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+all:
+  description: 'Run all ffmpeg benchmark tests'
+  group: >-
+    x264
+    x265
+    svthevc
+    vod
+
+x264:
+  description: 'Run all ffmpeg benchmark tests that use the x264 codec'
+  group: >-
+    x264-medium-1to1-live-1080p
+    x264-fast-1to1-live-1080p
+
+x265:
+  description: 'Run all ffmpeg benchmark tests that use the x265 codec'
+  group: >-
+    x265-medium-1to1-live-1080p
+    x265-fast-1to1-live-1080p
+    x265-medium-1to1-live-4k
+    x265-fast-1to1-live-4k
+
+svthevc:
+  description: 'Run all ffmpeg benchmark tests that use the svthevc codec'
+  group: >-
+    svthevc-preset1-1to1-live-1080p
+    svthevc-preset5-1to1-live-1080p
+    svthevc-preset9-1to1-live-1080p
+    svthevc-preset1-1to1-live-4k
+    svthevc-preset5-1to1-live-4k
+    svthevc-preset9-1to1-live-4k
+
+svtav1:
+  description: 'Run all ffmpeg benchmark tests that use the svthevc codec'
+  group: >-
+    svtav1-preset5-1to1-live-1080p
+    svtav1-preset8-1to1-live-1080p
+    svtav1-preset12-1to1-live-1080p
+    svtav1-preset8-1to1-live-4k
+    svtav1-preset12-1to1-live-4k
+
+development:
+  description: 'Run development test'
+  group: >-
+    x264-medium-1to1-live-1080p
+    x265-medium-1to1-live-1080p
+    svthevc-preset9-1to1-live-1080p
+    svtav1-preset8-1to1-live-1080p
+
+vod:
+  description: 'Run all VOD benchmark tests'
+  group: >-
+    x264-veryslow-1to1-VOD-1080p
+    x265-veryslow-1to1-VOD-1080p
+    x265-veryslow-1to1-VOD-4k
+    svthevc-0-1to1-VOD-1080p
+    svthevc-4-1to1-VOD-1080p
+    svthevc-0-1to1-VOD-4k
+    svthevc-4-1to1-VOD-4k
+
+x264-medium-1to1-live-1080p:
+  description: '1080p input to 1080P output using x264/medium'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+
+x264-fast-1to1-live-1080p:
+  description: '1080p input to 1080P output using x264/fast'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: fast
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+
+x265-medium-1to1-live-1080p:
+  description: '1080p input to 1080p output using x265/medium'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x265
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=60 -y 1080p.mp4
+
+x265-fast-1to1-live-1080p:
+  description: '1080p input to 1080p output using x265/fast'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x265
+    preset: fast
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=60 -y 1080p.mp4
+
+x265-medium-1to1-live-4k:
+  description: '4k input to 4k output using x265/medium'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x265
+    preset: medium
+    #tune:
+    args: -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60 -y 4k.mp4
+
+x265-fast-1to1-live-4k:
+  description: '4k input to 4k output using x265/fast'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x265
+    preset: fast
+    #tune:
+    args: -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60 -y 4k.mp4
+
+svthevc-preset1-1to1-live-1080p:
+  description: '1080p input to 1080P output using hevc/6'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 1
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -g 60 -sc_detection 0 1080P.mp4
+
+svthevc-preset5-1to1-live-1080p:
+  description: '1080p input to 1080P output using hevc/6'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    #tune:
+    preset: 5
+    args: >-
+      -filter_scale_threads 4
+      -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -g 60 -sc_detection 0 1080P.mp4
+
+svthevc-preset9-1to1-live-1080p:
+  description: '1080p input to 1080P output using hevc/9'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 9
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -g 60 -sc_detection 0 1080P.mp4
+
+svthevc-preset1-1to1-live-4k:
+  description: '4k input to 4k output using hevc/6'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 1
+    #tune:
+    args: -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -g 60 -sc_detection 0 4k.mp4
+
+svthevc-preset5-1to1-live-4k:
+  description: '4k input to 4k output using hevc/6'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -g 60 -sc_detection 0 4k.mp4
+
+svthevc-preset10-1to1-live-4k:
+  description: '4k input to 4k output using hevc/10'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 10
+    #tune:
+    args: -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -g 60 -sc_detection 0 4k.mp4
+
+svtav1-preset5-1to1-live-1080p:
+  description: '1080p input to 1080P output using av1/6'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-AV1
+    preset: 5
+    args: >-
+      -filter_scale_threads 4
+      -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -g 60 1080P.mp4
+
+svtav1-preset8-1to1-live-1080p:
+  description: '1080p input to 1080P output using av1/8'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-AV1
+    preset: 8
+    args: >-
+      -filter_scale_threads 4
+      -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -g 60 1080P.mp4
+
+svtav1-preset12-1to1-live-1080p:
+  description: '1080p input to 1080P output using av1/8'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-AV1
+    preset: 12
+    args: >-
+      -filter_scale_threads 4
+      -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -g 60 1080P.mp4
+
+svtav1-preset5-1to1-live-4k:
+  description: '4k input to 4k output using av1/6'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-AV1
+    preset: 5
+    args: -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -g 60 4k.mp4
+
+svtav1-preset8-1to1-live-4k:
+  description: '4k input to 4k output using av1/8'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-AV1
+    preset: 8
+    args: -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -g 60 4k.mp4
+
+svtav1-preset12-1to1-live-4k:
+  description: '4k input to 4k output using av1/8'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-AV1
+    preset: 12
+    args: -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -g 60 4k.mp4
+
+x264-veryslow-1to1-VOD-1080p:
+  description: '1080P input to 1080P output using x264/veryslow'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: x264
+    preset: veryslow
+    #tune:
+    args: -x264-params asm=62463 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 5.5M -maxrate 5.5M -bufsize 11M -sc_threshold 0 -r 60 -y 1080p.mp4
+
+x265-veryslow-1to1-VOD-1080p:
+  description: '1080P input to 1080P output using x265/veryslow'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: -x265-params asm=62463:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=60 -y 1080p.mp4
+
+x265-veryslow-1to1-VOD-4k:
+  description: '4K input to 4K output using x265/veryslow'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: -x265-params asm=62463:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60 -y 4k.mp4
+
+svthevc-0-1to1-VOD-1080p:
+  description: '1080P input to 1080P output using SVT-HEVC/0/2'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: SVT-HEVC
+    preset: 0
+    tune: 1
+    args: -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -g 120 1080P.mp4
+
+svthevc-4-1to1-VOD-1080p:
+  description: '1080P input to 1080P output using SVT-HEVC/4/2'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: SVT-HEVC
+    preset: 4
+    tune: 1
+    args: -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -g 120 1080P.mp4
+
+svthevc-0-1to1-VOD-4k:
+  description: '4k input to 4k output using SVT-HEVC/0/2'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: SVT-HEVC
+    preset: 0
+    tune: 1
+    args: -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -g 120 4k.mp4
+
+svthevc-4-1to1-VOD-4k:
+  description: '4k input to 4k output using SVT-HEVC/4/2'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: SVT-HEVC
+    preset: 4
+    tune: 1
+    args: -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -g 120 4k.mp4
+

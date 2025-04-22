@@ -50,7 +50,7 @@ resource "aws_subnet" "private2" {
 }
 
 resource "aws_eip" "gw" {
-  vpc        = true
+  domain        = "vpc"
   depends_on = [aws_internet_gateway.igw]
   tags = var.common_tags
 }

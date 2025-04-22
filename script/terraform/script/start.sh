@@ -46,8 +46,8 @@ destroy () {
     set +e
     trap - ERR EXIT
     trap " " SIGTERM
-    kill -- -$BASHPID 2> /dev/null
-    wait
+    kill -- -$BASHPID ${pids[@]} 2> /dev/null
+    wait -f
 
     cd /opt/workspace
 
@@ -69,7 +69,7 @@ destroy () {
     if [[ "$stages" = *"--stage=validation"* ]] && [ -e export.yaml ]; then
         echo "Export TRACE data..." | tee -a telemetry.logs tfplan.logs
         run_playbook -vv export.yaml $@ >> telemetry.logs 2>&1 &
-        wait
+        wait -f
     fi
 
     if [[ "$stages" = *"--stage=validation"* ]] || [[ "$stages" = *"--stage=provision"* ]]; then
@@ -80,7 +80,7 @@ destroy () {
             if [[ "$stages" = *"--${publisher}_publish"* ]]; then
                 echo "Publish to datalake..." | tee -a publish.logs tfplan.logs
                 sed -e 's/_password":"[^"]*/_password":"string/g' -e 's/_password\\": *\\"[^"]*/_password\\":\\"XYZXYZ\\/g' .tfplan.json > tfplan.json 2> /dev/null
-                "$DIR"/publish-$publisher.py $stages < tfplan.json 2>&1 | tee -a publish.logs
+                "$DIR"/publish-$publisher.py $stages < tfplan.json 2>&1 | tee -a publish.logs || true
             fi
         done
     fi
@@ -125,7 +125,8 @@ run_playbook () {
     done
     [ "$playbook" = "cluster.yaml" ] && [[ "$stages" != *"--stage=provision"* ]] && return
     cp -f /opt/terraform/template/ansible/ansible.cfg .
-    ANSIBLE_FORKS=$(nproc) ANSIBLE_ROLES_PATH="$ANSIBLE_ROLES_PATH:template/ansible/common/roles:template/ansible/traces/roles:/opt/collections/ansible_collections/cek/share/roles" ansible-playbook --flush-cache $options -i "$DIR"/create-inventory.py --private-key "$keyfile" $playbook
+    ANSIBLE_FORKS=$(nproc) ANSIBLE_ROLES_PATH="$ANSIBLE_ROLES_PATH:template/ansible/common/roles:template/ansible/traces/roles:/opt/collections/ansible_collections/cek/share/roles" ansible-playbook --flush-cache $options -i "$DIR"/create-inventory.py ${keyfile/-f/--private-key} $playbook &
+    wait -f -n $!
 }
 
 check_docker_image () {
@@ -170,6 +171,7 @@ push_docker_image () {
     exit 0
 }
 
+set -o pipefail
 DIR="$(dirname "$0")"
 cd /opt/workspace
 if [ ! -e ssh_config_all ]; then
@@ -187,13 +189,14 @@ if [[ "$stages" != *"--stage="* ]]; then
     stages="$@ --stage=provision --stage=validation --stage=cleanup"
 fi
 
-tf_pathes=($(grep -E 'source\s*=.*/template/terraform/' terraform-config.tf | cut -f2 -d'"'))
+tf_pathes=($(grep -E 'source\s*=.*/template/terraform/' terraform-config.tf | cut -f2 -d'"' || true))
 if [ ${#tf_pathes[@]} -ge 1 ]; then
-    keyfile="ssh_access.key"
+    keyfile="-f ssh_access.key"
 else
-    keyfile="$HOME/.ssh/id_rsa"
+    keyfile=""
 fi
 
+pids=()
 if [[ "$stages" = *"--stage=provision"* ]]; then
     echo "Provision SUT resources..." | tee -a tfplan.logs
     echo "provision_start: \"$(date -Ins)\"" >> timing.yaml
@@ -219,21 +222,18 @@ if [[ "$stages" = *"--stage=provision"* ]]; then
     if [ ${#tf_pathes[@]} -ge 1 ]; then
         "$DIR"/get-ip-list.sh /opt/project/script/csp/opt/etc/proxy-ip-list.txt > proxy-ip-list.txt
         # Create key pair
-        ssh-keygen -m PEM -q -f $keyfile -t rsa -N ''
+        ssh-keygen -t rsa -m PEM -q $keyfile -N ''
     fi
 
     # provision VMs
     cp -f /opt/terraform/template/ansible/ansible.cfg .
     if [[ "$@ " = *"--dev_log_level=NONE "* ]]; then
-        TF_LOG=ERROR terraform init -input=false -no-color >> tfplan.logs 2>&1 &
+        TF_LOG=ERROR terraform init -input=false -no-color >> tfplan.logs 2>&1
     else
-        set -o pipefail
-        TF_LOG=$(terraform_log_level "$@") terraform init -input=false -no-color 2>&1 | tee -a tfplan.logs &
-        set +o pipefail
+        TF_LOG=$(terraform_log_level "$@") terraform init -input=false -no-color 2>&1 | tee -a tfplan.logs
     fi
 
     trap destroy ERR
-    wait -n
 
     dev_terraform_retries="$(echo "x $@" | sed -n '/--dev_terraform_retries=/{s/.* --dev_terraform_retries=\([0-9,]*\).*/\1/;p}')"
     dev_terraform_retries="${dev_terraform_retries:-10,3}"
@@ -248,24 +248,19 @@ if [[ "$stages" = *"--stage=provision"* ]]; then
             trap - SIGTERM SIGINT SIGKILL ERR EXIT
 
             if [[ "$@ " = *"--dev_log_level=NONE "* ]]; then
-                TF_LOG=ERROR terraform plan -input=false -no-color --parallelism=$(nproc) "${terraform_replace[@]}" $terraform_refresh -out tfplan >> tfplan.logs 2>&1 &
+                TF_LOG=ERROR terraform plan -input=false -no-color --parallelism=$(nproc) "${terraform_replace[@]}" $terraform_refresh -out tfplan >> tfplan.logs 2>&1 || break
             else
-                set -o pipefail
-                TF_LOG=$(terraform_log_level "$@") terraform plan -input=false -no-color --parallelism=$(nproc) "${terraform_replace[@]}" $terraform_refresh -out tfplan 2>&1 | tee -a tfplan.logs &
-                set +o pipefail
+                TF_LOG=$(terraform_log_level "$@") terraform plan -input=false -no-color --parallelism=$(nproc) "${terraform_replace[@]}" $terraform_refresh -out tfplan 2>&1 | tee -a tfplan.logs || break
             fi
-            wait -n || break
 
             trap destroy SIGTERM SIGINT SIGKILL ERR EXIT
             terraform_refresh="-refresh"
             if [[ "$@ " = *"--dev_log_level=NONE "* ]]; then
                 TF_LOG=ERROR terraform apply -input=false --auto-approve -no-color --parallelism=$(nproc) tfplan >> tfplan.logs 2>&1 &
             else
-                set -o pipefail
                 TF_LOG=$(terraform_log_level "$@") terraform apply -input=false --auto-approve -no-color --parallelism=$(nproc) tfplan 2>&1 | tee -a tfplan.logs &
-                set +o pipefail
             fi
-            if wait -n; then
+            if wait -f -n $!; then
                 sts=0
                 break
             fi
@@ -274,7 +269,7 @@ if [[ "$stages" = *"--stage=provision"* ]]; then
 
         [ $sts -eq 0 ] || break
         terraform show -json > .tfplan.json
-        terraform_replace=($(sed -n '/"terraform_replace":/{s/.*"terraform_replace":{"sensitive":false,"value":{"command":"\([^"]*\)".*/\1/;p}' .tfplan.json | sed 's/[[]\([^]]*\)[]]/["\1"]/g' | tr ' ' '\n'))
+        terraform_replace=($(sed -n '/"terraform_replace":/{s/.*"terraform_replace":{"sensitive":false,"value":{"command":"\([^"]*\)".*/\1/;p}' .tfplan.json 2> /dev/null | sed 's/[[]\([^]]*\)[]]/["\1"]/g' | tr ' ' '\n' || true))
         sts=${#terraform_replace[@]}
         [ $sts -gt 0 ] || break
         sleep ${dev_terraform_delay%,*}
@@ -284,21 +279,28 @@ if [[ "$stages" = *"--stage=provision"* ]]; then
     [ $sts -eq 0 ] || destroy 3
 fi
 
+mkfifo /tmp/streaming-console
+while true; do
+    while read cmd; do
+      eval "$cmd" 2>&1 | tee -a tfplan.logs &
+      pids+=($!)
+    done < /tmp/streaming-console
+done &
+pids+=($!)
+
 # create cluster with ansible
 # for validation only, we still want to prepare cluster.yaml but not execute it.
 echo "host_setup_start: \"$(date -Ins)\"" >> timing.yaml
 locate_trace_modules $@
-cat .tfplan.json | $DIR/create-cluster.py $@ $trace_modules_options
+cat .tfplan.json 2> /dev/null | $DIR/create-cluster.py $@ $trace_modules_options || true
 echo "Setup SUT settings..." | tee -a tfplan.logs
 if [[ "$@ " = *"--dev_log_level=NONE "* ]]; then
     run_playbook -vv cluster.yaml $@ >> tfplan.logs 2>&1 &
-    wait -n
+    wait -f -n $!
     grep -E '^\[.*\]: Host .*[+-] ' tfplan.logs || true
 else
-    set -o pipefail
     run_playbook $(ansible_log_level "$@") cluster.yaml $@ 2>&1 | tee -a tfplan.logs &
-    set +o pipefail
-    wait -n
+    wait -f -n $!
 fi
 echo "host_setup_end: \"$(date -Ins)\"" >> timing.yaml
 
@@ -311,24 +313,15 @@ if [[ "$stages" = *"--stage=validation"* ]]; then
     trap destroy SIGTERM SIGINT SIGKILL ERR EXIT
 
     locate_trace_modules $@
-    cat .tfplan.json | $DIR/create-deployment.py $@ $trace_modules_options
-    mkfifo /tmp/streaming-console
-    while true; do
-        while read cmd; do
-          eval "$cmd" 2>&1 | tee -a tfplan.logs &
-        done < /tmp/streaming-console
-    done &
+    cat .tfplan.json 2> /dev/null | $DIR/create-deployment.py $@ $trace_modules_options || true
 
     if [[ "$@ " = *"--dev_log_level=NONE "* ]]; then
         run_playbook -vv deployment.yaml $@ >> tfplan.logs 2>&1 &
     else
-        set -o pipefail
         run_playbook $(ansible_log_level "$@") deployment.yaml $@ 2>&1 | tee -a tfplan.logs &
-        set +o pipefail
     fi
+    wait -f -n $! || rc=3
 
-    wait -n || rc=3
-    kill %1 || true
     echo "deployment_end: \"$(date -Ins)\"" >> timing.yaml
 fi
 

@@ -23,7 +23,7 @@ spec:
       containers:
       - name: dummy-benchmark
         image: "{{ REGISTRY }}dummy{{ IMAGESUFFIX }}{{ RELEASE }}"
-        imagePullPolicy: "{{ IMAGEPULLPOLICY }}"
+        imagePullPolicy: Always
         env:
         - name: SCALE
           value: "{{ SCALE }}"

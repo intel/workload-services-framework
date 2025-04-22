@@ -11,7 +11,7 @@ FROM terraform-csp-base${RELEASE}
 ARG AZURE_CLI_VER=2.60.0
 ARG AZURE_CLI_PKG=https://github.com/Azure/azure-cli/archive/refs/tags/azure-cli-${AZURE_CLI_VER}.tar.gz
 RUN apt-get update && apt-get install -y --no-install-recommends python3-pip python3-distutils-extra pipx python3-colorama && \
-    curl -L ${AZURE_CLI_PKG} -o - | tar xvfz - && \
+    curl --netrc-optional --retry 10 --retry-connrefused -fsSL ${AZURE_CLI_PKG} -o - | tar xvfz - && \
     cd azure-cli-azure-cli-${AZURE_CLI_VER}/src/azure-cli && \
     PIPX_HOME=/opt/pipxhome PIPX_BIN_DIR=/usr/local/bin PIPX_MAN_DIR=/opt/pipxman pipx install --include-deps --system-site-packages --pip-args . azure-cli && \
     rm -rf /azure-cli-azure-cli-${AZURE_CLI_VER} /opt/pipxman && \

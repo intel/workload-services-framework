@@ -6,9 +6,34 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 ARG RELEASE
+
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+
+FROM ${OS_IMAGE}:${OS_VER} as provider
+RUN apt-get update && apt-get install -y git curl make zip
+
+ARG GO_VER=1.24.1
+ARG GO_PKG=https://go.dev/dl/go${GO_VER}.linux-amd64.tar.gz
+RUN curl --netrc-optional --retry 10 --retry-connrefused -fsSL ${GO_PKG} | tar xfz - -C /usr/local
+COPY script/cpuoptions.patch /
+
+ARG ALICLOUD_PROVIDER_VER=1.244.0
+ARG ALICLOUD_PROVIDER_REPO=https://github.com/aliyun/terraform-provider-alicloud
+RUN git clone ${ALICLOUD_PROVIDER_REPO} && \
+    cd terraform-provider-alicloud && \
+    git checkout tags/v${ALICLOUD_PROVIDER_VER} && \
+    cat /cpuoptions.patch | git apply --whitespace=fix && \
+    PATH=/usr/local/go/bin:$PATH make linux
+
+RUN cd terraform-provider-alicloud/bin && \
+    tar xvfz terraform-provider-alicloud_linux-amd64.tgz && \
+    mv bin/terraform-provider-alicloud terraform-provider-alicloud_${ALICLOUD_PROVIDER_VER} && \
+    zip terraform-provider-alicloud_${ALICLOUD_PROVIDER_VER}_linux_amd64.zip terraform-provider-alicloud_${ALICLOUD_PROVIDER_VER}
+
 FROM terraform-csp-base${RELEASE}
 
-ARG ALIYUN_CLI_VER=3.0.177
+ARG ALIYUN_CLI_VER=3.0.264
 ARG ALIYUN_CLI_PACKAGE=https://github.com/aliyun/aliyun-cli/releases/download/v${ALIYUN_CLI_VER}/aliyun-cli-linux-${ALIYUN_CLI_VER}-amd64.tgz
 RUN curl --netrc-optional --retry 10 --retry-connrefused -fsSL ${ALIYUN_CLI_PACKAGE} | tar -xz -C /usr/local/bin
 
@@ -21,3 +46,6 @@ RUN mkdir -p /usr/local/share/terraform/plugins; \
     for dir in /opt/terraform/template/terraform/alicloud/*; do \
       (cd $dir; terraform providers mirror /usr/local/share/terraform/plugins) \
     done
+
+# Overwrite with the patched plugin
+COPY --from=provider /terraform-provider-alicloud/bin/*.zip /usr/local/share/terraform/plugins/registry.terraform.io/aliyun/alicloud/

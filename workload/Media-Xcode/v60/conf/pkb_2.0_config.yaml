@@ -1,0 +1,541 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ffmpeg-all:
+  description: 'All avx2 and avx3 tests'
+  group: >-
+    all-avx2
+    all-avx3
+
+all-avx2:
+  description: 'All avx2 tests'
+  group: >-
+    SVT-AV1-1080p-12-avx2
+    SVT-AV1-1080p-10-avx2
+    SVT-AV1-1080p-8-avx2
+    SVT-AV1-1080p-6-avx2
+    SVT-AV1-1080p-5-avx2
+    SVT-AV1-1080p-3-avx2
+    SVT-AV1-4k-12-avx2
+    SVT-AV1-4k-10-avx2
+    SVT-AV1-4k-8-avx2
+    SVT-HEVC-1080p-preset9-avx2
+    SVT-HEVC-1080p-preset5-avx2
+    SVT-HEVC-1080p-preset1-avx2
+    SVT-HEVC-4k-preset9-avx2
+    SVT-HEVC-4k-preset5-avx2
+    AVC-1080p-fast-avx2
+    AVC-1080p-medium-avx2
+    AVC-1080p-veryslow-avx2
+    x265-1080p-medium-avx2
+    x265-1080p-slow-avx2
+    x265-4k-veryslow-avx2
+    SVT-HEVC-1080p-preset7-avx2
+
+all-avx3:
+  description: 'All the avx3 tests'
+  group: >-
+    SVT-AV1-1080p-12-avx3
+    SVT-AV1-1080p-10-avx3
+    SVT-AV1-1080p-8-avx3
+    SVT-AV1-1080p-6-avx3
+    SVT-AV1-1080p-5-avx3
+    SVT-AV1-4k-12-avx3
+    SVT-AV1-4k-10-avx3
+    SVT-AV1-4k-8-avx3
+    SVT-HEVC-1080p-preset5-avx3
+    SVT-HEVC-4k-preset9-avx3
+    SVT-HEVC-4k-preset5-avx3
+    SVT-HEVC-4k-preset1-avx3
+    x265-1080p-medium-avx3
+    x265-1080p-slow-avx3
+    x265-4k-veryslow-avx3
+    SVT-HEVC-1080p-preset7-avx3
+
+
+SVT-AV1-1080p-12-avx2:
+  description: '1080p input transcoded to SVT-AV1 using preset 12 and avx2'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 12
+      args: -profile:v main -g 119 -svtav1-params "rc=1:scd=0" -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+SVT-AV1-1080p-12-avx3:
+  description: '1080p input transcoded to SVT-AV1 using preset 12 and avx512'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 12
+      args: -profile:v main -g 119 -svtav1-params "rc=1:scd=0" -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+SVT-AV1-1080p-8-avx2:
+  description: '1080p input transcoded to SVT-AV1 using preset 8 and avx2'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 8
+      args: -profile:v main -g 119 -svtav1-params "rc=1:scd=0" -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+SVT-AV1-1080p-8-avx3:
+  description: '1080p input transcoded to SVT-AV1 using preset 8 and avx512'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 8
+      args: -profile:v main -g 119 -svtav1-params "rc=1:scd=0" -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+SVT-AV1-1080p-5-avx2:
+  description: '1080p input transcoded to SVT-AV1 using preset 5 and avx2'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 5
+      args: -profile:v main -g 119 -svtav1-params "rc=1:scd=0" -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+SVT-AV1-1080p-5-avx3:
+  description: '1080p input transcoded to SVT-AV1 using preset 5 and avx512'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 5
+      args: -profile:v main -g 119 -svtav1-params "rc=1:scd=0" -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+SVT-AV1-1080p-10-avx2:
+  description: '1080p input transcoded to SVT-AV1 using preset 10 and avx2'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 10
+      args: -profile:v main -g 119 -svtav1-params "rc=1:scd=0" -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+SVT-AV1-1080p-10-avx3:
+  description: '1080p input transcoded to SVT-AV1 using preset 10 and avx512'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 10
+      args: -profile:v main -g 119 -svtav1-params "rc=1:scd=0" -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+SVT-AV1-1080p-6-avx2:
+  description: '1080p input transcoded to SVT-AV1 using preset 6 and avx2'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 6
+      args: -profile:v main -g 119 -svtav1-params "rc=1:scd=0" -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+SVT-AV1-1080p-6-avx3:
+  description: '1080p input transcoded to SVT-AV1 using preset 6 and avx512'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 6
+      args: -profile:v main -g 119 -svtav1-params "rc=1:scd=0" -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+SVT-AV1-1080p-3-avx2:
+  description: '1080p input transcoded to SVT-AV1 using preset 3 and avx2'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 3
+      args: -profile:v main -g 119 -svtav1-params "rc=1:scd=0" -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+
+SVT-AV1-4k-12-avx2:
+  description: '4k input transcoded to SVT-AV1 using preset 5 and avx2'
+  input_files: Mixed_40sec_3840x2160_60fps_10bit_420_crf23_veryslow.mp4
+  input_format: 4k-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-AV1
+    preset: 12
+    args: -profile:v main -g 119 -svtav1-params "rc=1:scd=0" -b:v 9M -maxrate 18M -bufsize 36M -y 4k.mp4
+
+SVT-AV1-4k-12-avx3:
+  description: '4k input transcoded to SVT-AV1 using preset 5 and avx2'
+  input_files: Mixed_40sec_3840x2160_60fps_10bit_420_crf23_veryslow.mp4
+  input_format: 4k-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-AV1
+    preset: 12
+    args: -profile:v main -g 119 -svtav1-params "rc=1:scd=0" -b:v 9M -maxrate 18M -bufsize 36M -y 4k.mp4
+
+SVT-AV1-4k-10-avx2:
+  description: '4k input transcoded to SVT-AV1 using preset 5 and avx2'
+  input_files: Mixed_40sec_3840x2160_60fps_10bit_420_crf23_veryslow.mp4
+  input_format: 4k-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-AV1
+    preset: 10
+    args: -profile:v main -g 119 -svtav1-params "rc=1:scd=0" -b:v 9M -maxrate 18M -bufsize 36M -y 4k.mp4
+
+SVT-AV1-4k-10-avx3:
+  description: '4k input transcoded to SVT-AV1 using preset 5 and avx2'
+  input_files: Mixed_40sec_3840x2160_60fps_10bit_420_crf23_veryslow.mp4
+  input_format: 4k-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-AV1
+    preset: 10
+    args: -profile:v main -g 119 -svtav1-params "rc=1:scd=0" -b:v 9M -maxrate 18M -bufsize 36M -y 4k.mp4
+
+SVT-AV1-4k-8-avx2:
+  description: '4k input transcoded to SVT-AV1 using preset 5 and avx2'
+  input_files: Mixed_40sec_3840x2160_60fps_10bit_420_crf23_veryslow.mp4
+  input_format: 4k-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-AV1
+    preset: 8
+    args: -profile:v main -g 119 -svtav1-params "rc=1:scd=0" -b:v 9M -maxrate 18M -bufsize 36M -y 4k.mp4
+SVT-AV1-4k-8-avx3:
+  description: '4k input transcoded to SVT-AV1 using preset 5 and avx2'
+  input_files: Mixed_40sec_3840x2160_60fps_10bit_420_crf23_veryslow.mp4
+  input_format: 4k-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-AV1
+    preset: 8
+    args: -profile:v main -g 119 -svtav1-params "rc=1:scd=0" -b:v 9M -maxrate 18M -bufsize 36M -y 4k.mp4
+
+
+
+SVT-HEVC-1080p-preset9-avx2:
+  description: '1080P input to 1080P output using SVT-HEVC/0/2'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 9
+    args: -profile:v 1 -rc 1 -g 119 -sc_detection 0 -b:v 5M -maxrate 10M -bufsize 20M -y 1080P.mp4
+SVT-HEVC-1080p-preset7-avx2:
+  description: '1080P input to 1080P output using SVT-HEVC/0/2'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 7
+    args: -profile:v 1 -rc 1 -g 119 -sc_detection 0 -b:v 5M -maxrate 10M -bufsize 20M -y 1080P.mp4
+SVT-HEVC-1080p-preset7-avx3:
+  description: '1080P input to 1080P output using SVT-HEVC/0/2'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx3
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 7
+    args: -profile:v 1 -rc 1 -g 119 -sc_detection 0 -b:v 5M -maxrate 10M -bufsize 20M -y 1080P.mp4
+SVT-HEVC-1080p-preset5-avx2:
+  description: '1080P input to 1080P output using SVT-HEVC/0/2'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    args: -profile:v 1 -rc 1 -g 119 -sc_detection 0 -b:v 5M -maxrate 10M -bufsize 20M -y 1080P.mp4
+SVT-HEVC-1080p-preset5-avx3:
+  description: '1080P input to 1080P output using SVT-HEVC/0/2'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    args: -profile:v 1 -rc 1 -g 119 -sc_detection 0 -b:v 5M -maxrate 10M -bufsize 20M -y 1080P.mp4
+SVT-HEVC-1080p-preset1-avx2:
+  description: '1080P input to 1080P output using SVT-HEVC/0/2'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 1
+    tune: 1
+    args: -profile:v 1 -rc 1 -g 119 -sc_detection 0 -b:v 5M -maxrate 10M -bufsize 20M -y 1080P.mp4
+
+
+SVT-HEVC-4k-preset9-avx2:
+  description: '4k input to 4k output using hevc/6'
+  input_files: Mixed_40sec_3840x2160_60fps_10bit_420_crf23_veryslow.mp4
+  input_format: 4k-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 9
+    #tune:
+    args: -profile:v 2 -rc 1 -g 119 -sc_detection 0 -b:v 12M -maxrate 24M -bufsize 48M -r 60 -y  4k.mp4
+SVT-HEVC-4k-preset9-avx3:
+  description: '4k input to 4k output using hevc/6'
+  input_files: Mixed_40sec_3840x2160_60fps_10bit_420_crf23_veryslow.mp4
+  input_format: 4k-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 9
+    #tune:
+    args: -profile:v 2 -rc 1 -g 119 -sc_detection 0 -b:v 12M -maxrate 24M -bufsize 48M -r 60 -y  4k.mp4
+SVT-HEVC-4k-preset5-avx3:
+  description: '4k input to 4k output using hevc/6'
+  input_files: Mixed_40sec_3840x2160_60fps_10bit_420_crf23_veryslow.mp4
+  input_format: 4k-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: -profile:v 2 -rc 1 -g 119 -sc_detection 0 -b:v 12M -maxrate 24M -bufsize 48M -r 60 -y  4k.mp4
+SVT-HEVC-4k-preset5-avx2:
+  description: '4k input to 4k output using hevc/6'
+  input_files: Mixed_40sec_3840x2160_60fps_10bit_420_crf23_veryslow.mp4
+  input_format: 4k-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: -profile:v 2 -rc 1 -g 119 -sc_detection 0 -b:v 12M -maxrate 24M -bufsize 48M -r 60 -y  4k.mp4
+SVT-HEVC-4k-preset1-avx3:
+  description: '4k input to 4k output using hevc/6'
+  input_files: Mixed_40sec_3840x2160_60fps_10bit_420_crf23_veryslow.mp4
+  input_format: 4k-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 1
+    #tune:
+    args: -profile:v 2 -rc 1 -g 119 -sc_detection 0 -b:v 12M -maxrate 24M -bufsize 48M -r 60 -y  4k.mp4
+
+
+
+
+AVC-1080p-veryfast-avx2:
+  description: '1080p x264 encode prioritizing encode speed.'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: x264
+    preset: veryfast
+    args: >-
+      -x264-params "keyint=120:min-keyint=120:sliced-threads=0:scenecut=0:asm=avx2:threads=8" -tune psnr -profile:v high -b:v 6M -maxrate 12M -bufsize 24M -r 60  -y 1080p.mp4
+AVC-1080p-fast-avx2:
+  description: '1080p x264 encode prioritizing encode speed.'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: x264
+    preset: fast
+    args: >-
+      -x264-params "keyint=120:min-keyint=120:sliced-threads=0:scenecut=0:asm=avx2:threads=8" -tune psnr -profile:v high -b:v 6M -maxrate 12M -bufsize 24M -r 60  -y 1080p.mp4
+AVC-1080p-medium-avx2:
+  description: '1080p x264 encode balances speed and quality.'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: x264
+    preset: medium
+    args: >-
+       -x264-params "keyint=120:min-keyint=120:sliced-threads=0:scenecut=0:asm=avx2:threads=8" -tune psnr -profile:v high -b:v 6M -maxrate 12M -bufsize 24M -r 60  -y 1080p.mp4
+#REAL TEST
+AVC-1080p-veryslow-avx2:
+  description: '1080p x264 encode prioritizing encode speed.'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: x264
+    preset: veryslow
+    args: >-
+      -x264-params "keyint=240:min-keyint=240:sliced-threads=0:scenecut=0:asm=avx2:threads=8" -tune psnr -profile:v high -b:v 5M -maxrate 10M -bufsize 20M -r 60  -y 1080p.mp4
+
+
+x265-1080p-medium-avx2:
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 30
+  video_codec:
+    codec: x265
+    preset: medium
+    #tune:
+    args: >-
+      -x265-params "keyint=120:min-keyint=120:scenecut=0:asm=avx2:pools=4" -tune psnr -profile:v main -b:v 5M -maxrate 10M -bufsize 20M -r 60  -y 1080p.mp4
+x265-1080p-medium-avx3:
+  description: '1080p input to 1080p output using x265/medium'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x265
+    preset: medium
+    #tune:
+    args: >-
+      -x265-params "keyint=120:min-keyint=120:scenecut=0:asm=avx512:pools=4" -tune psnr -profile:v main -b:v 6M -maxrate 12M -bufsize 24M -r 60  -y 1080p.mp4
+
+x265-1080p-slow-avx2:
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 30
+  video_codec:
+    codec: x265
+    preset: slow
+    #tune:
+    args: >-
+      -x265-params "keyint=120:min-keyint=120:scenecut=0:asm=avx2:pools=16" -tune psnr -profile:v main -b:v 5M -maxrate 10M -bufsize 20M -r 60  -y 1080p.mp4
+
+x265-1080p-slow-avx3:
+  description: '1080p input to 1080p output using x265/medium'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x265
+    preset: slow
+    #tune:
+    args: >-
+      -x265-params "keyint=120:min-keyint=120:scenecut=0:asm=avx512:pools=16" -tune psnr -profile:v main -b:v 6M -maxrate 12M -bufsize 24M -r 60  -y 1080p.mp4
+
+x265-4k-veryslow-avx2:
+  description: '1080P input to 1080P output using x265/veryslow'
+  input_files: Mixed_40sec_3840x2160_60fps_10bit_420_crf23_veryslow.mp4
+  input_format: 4k-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: -x265-params "keyint=240:min-keyint=240:scenecut=0:asm=avx2:pools=32" -tune psnr -profile:v main10 -b:v 12M -maxrate 24M -bufsize 48M -r 60  -y 4k.mp4
+
+x265-4k-veryslow-avx3:
+  description: '1080P input to 1080P output using x265/veryslow'
+  input_files: Mixed_40sec_3840x2160_60fps_10bit_420_crf23_veryslow.mp4
+  input_format: 4k-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: -x265-params "keyint=240:min-keyint=240:scenecut=0:asm=avx512:pools=32" -tune psnr -profile:v main10 -b:v 12M -maxrate 24M -bufsize 48M -r 60  -y 4k.mp4
+
+
+
+#-----------Development---------#
+
+development:
+  description: 'Test cases to run before commiting'
+  group: >-
+    AVC-1080p-fast-avx2
+    SVT-HEVC-1080p-preset9-avx2
+    x265-1080p-medium-avx3
+    SVT-AV1-1080p-8-avx2

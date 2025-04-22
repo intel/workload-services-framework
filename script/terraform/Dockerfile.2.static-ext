@@ -8,3 +8,7 @@
 ARG RELEASE
 FROM terraform-base${RELEASE}
 
+# Pre-install perfspect
+ARG PERFSPECT_VER=3.4.0
+ARG PERFSPECT_PKG=https://github.com/intel/PerfSpect/releases/download/v${PERFSPECT_VER}/perfspect.tgz
+RUN curl --netrc-optional --retry 10 --retry-connrefused -fsSL -o /tmp/perfspect-${PERFSPECT_VER}.tgz ${PERFSPECT_PKG}

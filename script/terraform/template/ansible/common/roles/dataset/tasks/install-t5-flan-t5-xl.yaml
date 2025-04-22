@@ -3,12 +3,12 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
-- include_role:
-    name: hf-dataset
+- include_tasks:
+    file: download-hf.yaml
   vars:
-    DEST_DIR: "/opt/dataset/t5/flan-t5-xl"
-    MODEL_ID: "google/flan-t5-xl"
-    DATASET_SIZE: 27
-    exclude: []
-    revision: []
-    HF_LOGIN: false
+    dataset_model_path: "t5/flan-t5-xl"
+    hfcli_model_id: "google/flan-t5-xl"
+    dataset_size: 27
+    hfcli_exclude: []
+    hfcli_revision: []
+    hfcli_login: false

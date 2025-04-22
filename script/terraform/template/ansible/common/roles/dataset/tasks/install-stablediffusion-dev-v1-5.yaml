@@ -4,13 +4,13 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- include_role:
-    name: hf-dataset
+- include_tasks:
+    file: download-hf.yaml
   vars:
-    DEST_DIR: "/opt/dataset/stablediffusion-dev/v1-5/stable-diffusion-v1-5"
-    MODEL_ID: "runwayml/stable-diffusion-v1-5"
-    DATASET_SIZE: 100
-    exclude: []
-    revision: []
-    HF_LOGIN: false
+    dataset_model_path: "stablediffusion-dev/v1-5/stable-diffusion-v1-5"
+    hfcli_model_id: "runwayml/stable-diffusion-v1-5"
+    dataset_size: 100
+    hfcli_exclude: []
+    hfcli_revision: []
+    hfcli_login: false
 

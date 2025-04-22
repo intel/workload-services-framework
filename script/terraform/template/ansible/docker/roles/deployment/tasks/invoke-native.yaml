@@ -14,7 +14,9 @@
   when: not (sut_sudo | default(true) | bool)
 
 - set_fact:
-    docker_config1: "{{ inventory_hostname | extract(lookup('file',wl_logs_dir+'/docker-config.yaml') | from_yaml) }}"
+    docker_config1: "{{ docker_config[inventory_hostname] }}"
+  vars:
+    docker_config: "{% if (wl_logs_dir+'/docker-config.yaml') is exists %}{{ lookup('file',wl_logs_dir+'/docker-config.yaml') | from_yaml }}{% else %}{{ {'worker-0':[{'image':workload_config.docker_image,'options':workload_config.docker_options,'export-logs':true}]} }}{% endif %}"
 
 - name: test if single container
   fail:
@@ -64,7 +66,7 @@
 
     - name: invoke docker create
       shell:
-        cmd: "docker create {{ (wl_registry_map == ',') | ternary('','--pull always') }} --platform={{ workload_config.image_arch }} {% if (docker_config1[0].options|type_debug)=='list' %}{{ docker_config1[0].options|map('string')|join(' ') }}{% else %}{{ docker_config1[0].options|default('',true)|string }}{% endif %} {% if (docker_config1[0].options|type_debug)=='list' %}{% if docker_config1[0].image not in (docker_config1[0].options|map('string')) %}{{ docker_config1[0].image }}{% endif %}{% else %}{% if docker_config1[0].image not in (docker_config1[0].options|default('',true)|split(' ')) %}{{ docker_config1[0].image }}{% endif %}{% endif %} {% if docker_config1[0].command is defined %} {{ docker_config1[0].command }} {% endif %}"
+        cmd: "docker create {% for r in sut_accessible_registries | default(skopeo_sut_accessible_registries|default(''),true) | split(',') | reject('==','') %}{% if item.image.startswith(r) %}--pull always {% endif %}{% endfor %} --platform={{ workload_config.image_arch }} {% if (((ansible_connection|default('ssh')) in ['local']) or (ansible_host in (my_ip_list|split(',')))) and ('/' in workload_config.registry) %}--pull always{% endif %} --platform={{ workload_config.image_arch }} {% if (docker_config1[0].options|type_debug)=='list' %}{{ docker_config1[0].options|map('string')|join(' ') }}{% else %}{{ docker_config1[0].options|default('',true)|string }}{% endif %} {% if (docker_config1[0].options|type_debug)=='list' %}{% if docker_config1[0].image not in (docker_config1[0].options|map('string')) %}{{ docker_config1[0].image }}{% endif %}{% else %}{% if docker_config1[0].image not in (docker_config1[0].options|default('',true)|split(' ')) %}{{ docker_config1[0].image }}{% endif %}{% endif %} {% if docker_config1[0].command is defined %} {{ docker_config1[0].command }} {% endif %}"
         executable: /bin/bash
       register: container_id
       delegate_to: localhost
@@ -84,7 +86,7 @@
     - name: copy the workload file system
       shell:
         cmd: |
-          sudo -E -H docker container export {{ container_id.stdout }} | gzip | ssh -i {{ ansible_private_key_file }} -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} sudo tar xfz - -p -C {{ workspace }}
+          sudo -E -H docker container export {{ container_id.stdout }} | gzip | ssh {% if ansible_private_key_file is defined %}-i {{ ansible_private_key_file }}{% endif %} -p {{ ansible_port | default(22) }} {{ ansible_user }}@{{ ansible_host }} sudo tar xfz - -p -C {{ workspace }}
         executable: /bin/bash
       delegate_to: localhost
 
@@ -156,7 +158,7 @@
       become: true
       environment: "{{ workload_secrets }}"
       vars:
-        workload_secrets: "{{ lookup('file',wl_logs_dir+'/.workload-secret.yaml') | from_yaml | default({},true) }}"
+        workload_secrets: "{% if (wl_logs_dir+'/.workload-secret.yaml') is exists %}{{ lookup('file',wl_logs_dir+'/.workload-secret.yaml') | from_yaml | default({},true) }}{% else %}{{ {} }}{% endif %}"
         sq: "'"
         dq: '"'
         nl: "\n"
@@ -199,8 +201,6 @@
       command: "kill {{ pid.stdout }}"
       become: true
       ignore_errors: true
-      async: 30
-      poll: 0
 
 - name: collect trace data
   include_role:

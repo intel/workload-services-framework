@@ -188,7 +188,7 @@
       - name: Copy trace script for VM Windows hosts
         include_role:
           name: trace
-          tasks_from: trace-script-win-copy
+          tasks_from: trace-script-copy-win
         vars:
           trace_host: "{{ vmhost_host | default(inventory_hostname) }}"
         when:

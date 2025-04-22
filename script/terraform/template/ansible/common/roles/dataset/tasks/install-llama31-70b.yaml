@@ -3,12 +3,12 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
-- include_role:
-    name: hf-dataset
+- include_tasks:
+    file: download-hf.yaml
   vars:
-    DEST_DIR: "/opt/dataset/llama31/70b"
-    MODEL_ID: "meta-llama/Meta-Llama-3.1-70B-Instruct"
-    DATASET_SIZE: 265
-    exclude: []
-    revision: []
-    HF_LOGIN: true
+    dataset_model_path: "llama31/70b"
+    hfcli_model_id: "meta-llama/Meta-Llama-3.1-70B-Instruct"
+    dataset_size: 265
+    hfcli_exclude: []
+    hfcli_revision: []
+    hfcli_login: true

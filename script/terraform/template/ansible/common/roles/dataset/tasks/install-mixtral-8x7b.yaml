@@ -3,12 +3,12 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
-- include_role:
-    name: hf-dataset
+- include_tasks:
+    file: download-hf.yaml
   vars:
-    DEST_DIR: "/opt/dataset/mixtral/8x7b"
-    MODEL_ID: "mistralai/Mixtral-8x7B-v0.1"
-    DATASET_SIZE: 100
-    exclude: ['pt']
-    revision: []
-    HF_LOGIN: true
+    dataset_model_path: "mixtral/8x7b"
+    hfcli_model_id: "mistralai/Mixtral-8x7B-v0.1"
+    dataset_size: 100
+    hfcli_exclude: ['pt']
+    hfcli_revision: []
+    hfcli_login: true

@@ -18,7 +18,7 @@
       src: "{{ trace_data_path }}/{{ item }}"
       dest: "{{ trace_data_local_path }}/"
       flat: true
-    loop: "{{ igt_files.stdout_lines | reject('==','igt.pid') }}"
+    loop: "{{ igt_files.stdout_lines | reject('match','igt-.*.pid') }}"
   
   delegate_to: "{{ trace_node.1 }}"
   ignore_errors: yes

@@ -1,5 +1,5 @@
 define(`IMAGENAME',`defn(`REGISTRY')regexp(esyscmd(`im="$(echo|head -n 2 $1 2>/dev/null|grep -E "^# "|tail -n 1|cut -f2 -d" ")" && test -z "$im" && echo "$1" || echo "$im"'),`\(.*\)',`\1')`'ifelse(defn(`IMAGEARCH'),`linux/amd64',,-patsubst(defn(`IMAGEARCH'),`.*/',`'))`'defn(`RELEASE')')dnl
-define(`IMAGEPOLICY',`ifelse(defn(`REGISTRY'),`',`IfNotPresent',$1)')dnl
+define(`IMAGEPOLICY',`Always')dnl
 define(`PODANTIAFFINITY',`affinity:
 ifelse($#,3,`      ',$4)  podAntiAffinity:
 ifelse($1,`preferred',`dnl

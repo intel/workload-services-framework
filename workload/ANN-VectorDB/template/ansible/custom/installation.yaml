@@ -1,0 +1,13 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- hosts: worker-0
+  gather_facts: no
+    #become: yes
+  tasks:
+    - name: Installing applications
+      include_role:
+        name: installation
+        tasks_from: install_app

@@ -49,42 +49,21 @@ if [ -d "/usr/local/etc/wsf" ]; then
     )
 fi
 
-if [ -r "$HOME"/.gitconfig ]; then
-    gitconfig_path="$(readlink -e "$HOME/.gitconfig")"
-    options+=(
-        "-v" "$gitconfig_path:/home/.gitconfig:ro"
-        "-v" "$gitconfig_path:/root/.gitconfig:ro"
-    )
-fi
-
-if [ -d "$HOME/.docker" ]; then
-    dockerconfig_path="$(readlink -e "$HOME/.docker")"
-    options+=(
-        "-v" "$dockerconfig_path:/home/.docker"
-        "-v" "$dockerconfig_path:/root/.docker"
-    )
-fi
-
-if [ -d "$HOME/.ssh" ]; then
-    sshconfig_path="$(readlink -e "$HOME/.ssh")"
-    options+=(
-        "-v" "$sshconfig_path:/home/.ssh"
-        "-v" "$sshconfig_path:/root/.ssh"
-    )
-fi
-
-if [ -r "$HOME/.netrc" ]; then
-    netrconfig_path="$(readlink -e "$HOME/.netrc")"
-    options+=(
-        "-v" "$netrconfig_path:/home/.netrc:ro"
-        "-v" "$netrconfig_path:/root/.netrc:ro"
-    )
-    if [ -n "$(find "$netrconfig_path" -perm /177 2>/dev/null)" ]; then
-        echo "The ~/.netrc permission is too permissive."
-        echo "Consider chmod 600 ~/.netrc instead."
-        exit 3
+for d in .gitconfig .docker .ssh .netrc; do
+    if [ -r "$HOME"/$d ]; then
+        config_path="$(readlink -e "$HOME/$d")"
+        options+=("-v" "$config_path:/home/$d" "-v" "$config_path:/root/$d")
+        case "$d" in
+        .netrc)
+            if [ -n "$(find "$config_path" -perm /177 2>/dev/null)" ]; then
+                echo "The ~/.netrc permission is too permissive."
+                echo "Consider chmod 600 ~/.netrc instead."
+                exit 3
+            fi
+            ;;
+        esac
     fi
-fi
+done
 
 terraform_image="${TERRAFORM_REGISTRY:-$REGISTRY}terraform-${cloud}${TERRAFORM_RELEASE:-$RELEASE}"
 docker run "${options[@]}" -e TERRAFORM_IMAGE=$terraform_image $terraform_image "$@"

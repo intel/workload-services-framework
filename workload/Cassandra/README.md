@@ -57,14 +57,6 @@ This workload is measuring Apache Cassandra performance by using cassandra-stres
   - This code can be run on aws, gcp, azure and ali cloud.
 
 
-### Known issues
-Not supprot run Cassandra with Java OpenJdk14 on ARM platform.
-
-
-### Performance Report
-Please refer to PDT report [ `Apache Cassandra Database gen to gen comparison on Ali Cloud` ](https://intel.sharepoint.com/:p:/r/sites/IAGS-DPGPerformanceProgram/_layouts/15/Doc.aspx?sourcedoc=%7BED72816C-1144-43D9-8B53-308277C58501%7D&file=2023Q2042_Apache%20Cassandra%20SPROnAliCloud.pptx&action=edit&mobileredirect=true)
-
-
 ### Customize Test Configurations
 Refer to [`ctest.md`](../../doc/user-guide/executing-workload/ctest.md#Customize%20Configurations) to customize test parameters.
 
@@ -146,7 +138,7 @@ med	    Median latency in milliseconds for each operation during that run.
 ### Index Info
 - Name: `Cassandra`  
 - Category: `DataServices`  
-- Platform: `SPR`, `ICX`, `EMR`, `SRF`
+- Platform: `SPR`, `ICX`, `EMR`, `SRF` , `GNR`
 - Keywords:   
 - Permission:   
 

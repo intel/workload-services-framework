@@ -1,0 +1,82 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Set ANN-VectorDB Parameters
+  set_fact:
+    algorithm: "{{ wl_tunables['ALGORITHM'] }}"
+
+- name: "Check if git ANN exists"
+  stat:
+    path: "{{ ANN_HOME }}"
+  register: dir_git_ANN
+
+- name: "Check if python venv exists"
+  stat:
+    path: "{{ ANN_HOME }}/venv"
+  register: dir_python_venv
+
+- name: Create Workspace
+  file:
+    path: "{{ WORKSPACE }}"
+    state: directory
+
+- name: git ANN
+  shell:
+    cmd: |
+      cd "{{ WORKSPACE }}"
+      git clone  {{ANN_REPOSITORY}} {{ANN_HOME}}
+      cd "{{ ANN_HOME }}"
+      git checkout {{ANN_VERSION}}
+    executable: /bin/bash
+  when: not dir_git_ANN.stat.exists
+  register: git_clone_ann
+  until: git_clone_ann is succeeded
+  retries: 10
+  delay: 10
+
+- name: pip requirement
+  shell:
+    cmd: |
+      cd "{{ ANN_HOME }}"
+      sed -i 's/docker==6\.1\.3/docker/g' requirements.txt
+      sed -i 's/h5py==3\.8\.0/h5py/g' requirements.txt
+      sed -i 's/matplotlib==3\.6\.3/matplotlib/g' requirements.txt
+      sed -i 's/numpy==1\.24\.2/numpy/g' requirements.txt
+      sed -i 's/pyyaml==6\.0/pyyaml/g' requirements.txt
+      sed -i 's/scikit-learn==1\.2\.1/scikit-learn/g' requirements.txt
+      sudo apt install python3 -y
+      sudo apt install python3-pip -y
+      sudo apt install python3-venv -y
+      python3 -m venv venv
+    executable: /bin/bash
+  when: not dir_python_venv.stat.exists
+
+- name: pip3 requirement
+  shell:
+    cmd: |
+      cd "{{ ANN_HOME }}"
+      source venv/bin/activate
+      pip3 install -r requirements.txt
+      deactivate
+    executable: /bin/bash
+  when: not dir_python_venv.stat.exists
+
+- name: update dockerfile
+  shell:
+    cmd: |
+      cd "{{ ANN_HOME }}"
+      sed -i '3i\ENV https_proxy={{ lookup('env', 'https_proxy') }}' ann_benchmarks/algorithms/{{ algorithm }}/Dockerfile
+      sed -i '4i\ENV http_proxy={{ lookup('env', 'http_proxy') }}' ann_benchmarks/algorithms/{{ algorithm }}/Dockerfile
+      sed -i '3i\ENV https_proxy={{ lookup('env', 'https_proxy') }}' ann_benchmarks/algorithms/base/Dockerfile
+      sed -i '4i\ENV http_proxy={{ lookup('env', 'http_proxy') }}' ann_benchmarks/algorithms/base/Dockerfile
+    executable: /bin/bash
+
+- name: build image on worker
+  shell:
+    cmd: |
+      cd "{{ ANN_HOME }}"
+      source venv/bin/activate
+      python3 install.py --algorithm={{ algorithm }}
+    executable: /bin/bash

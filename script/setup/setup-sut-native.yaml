@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- hosts: cluster_hosts
+- hosts: all
   any_errors_fatal: true
   gather_facts: false
   become: true
@@ -38,18 +38,3 @@
 
       when: inventory_hostname in dict(play_hosts | map('extract',hostvars,['private_ip']) | zip(play_hosts)).values()
 
-- hosts: trace_hosts
-  any_errors_fatal: true
-  become: true
-  gather_facts: false
-  tasks:
-
-    - name: Install trace programs
-      include_role:
-        name: "{{ trace_node.0 }}"
-        tasks_from: install
-      when:
-      - hostvars[trace_node.1][trace_node.0 | basename] | default(false) | bool
-      loop: "{{ lookup('pipe','find ../terraform/template/ansible/traces/roles -mindepth 3 -maxdepth 3 -name install.yaml -print') | split('\n') | map('regex_replace','.*/roles/([^/]*)/.*','\\1') | zip_longest([], fillvalue=inventory_hostname) }}"
-      loop_control:
-        loop_var: trace_node

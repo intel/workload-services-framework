@@ -5,22 +5,20 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-/^#(pdu|pcm|uprof|emon|perfspect)[:-] / {
-    next
-}
-
-/^#sutinfo: / {
-    product=$3
-}
-
-/^(stack|image|workload)\// {
+/^#logsdir: / {
+    workload="default"
+    testcase="default"
     status="failed"
 }
 
 /^(workload|image|stack)\/.*\/itr-[0-9]*:$/ {
-    split($1,columns,"/")
+    nc=split($1,columns,"/")
     workload=columns[2]
-    testcase=gensub(/^.*[/]([^/]*logs-[^/]*)[/].*$/,"\\1",1)
+    for (i=3;i<=nc-1;i++)
+      if (columns[i]~/logs-/) break
+    testcase=columns[i]
+    iteration=gensub(/itr-([0-9]*):/,"\\1",1,columns[i+1])*1
+    print testcase > "/dev/stderr"
 }
 
 /^# status: (passed|failed)/ {
@@ -30,17 +28,8 @@
 /^[^#].*: *[0-9.-][0-9.e+-]* *#?.*$/ && status=="passed" {
     k=gensub(/^(.*): *[0-9.-]+.*$/, "\\1", 1)
     v=gensub(/^.*: *([0-9.-]+).*/, "\\1", 1)
-    if (workload in kpis_u) {
-        if (k in kpis_u[workload]) {
-            j=kpis_u[workload][k]
-        } else {
-            kpis_u[workload][k]=j=length(kpis_u[workload])+1
-        }
-    } else {
-        kpis_u[workload][k]=j=1
-    }
-    kpis_k[workload][j]=k
-    kpis_v[workload][testcase][product][j][++kpis_v_ct[workload][testcase][product][j]]=v
+    kk=add_prefix(k, kpis_uniq, workload)
+    kpis_v[workload][testcase][kk][iteration]=v
 }
 
 /^#bom- / && status=="passed" {
@@ -51,23 +40,207 @@
         v1=""
         if (length(bom[workload])>0)
           if (length(bom[workload][testcase])>0)
-            if (length(bom[workload][testcase][product])>0)
-              if (length(bom[workload][testcase][product][k1])>0) 
-                v1=bom[workload][testcase][product][k1]
+            if (length(bom[workload][testcase])>0)
+              if (length(bom[workload][testcase][k1])>0)
+                v1=bom[workload][testcase][k1]
         v=gensub(/.*[$][{][a-zA-Z0-9_]*[}].*/,v1,1,v)
     }
-    bom[workload][testcase][product][k]=v
-    bom_uniq[workload][k]=1
+    kk=add_prefix(k,bom_uniq,workload)
+    bom[workload][testcase][kk][1]=v
 }
 
 /^# [a-zA-Z0-9_]*:/ && status=="passed" {
     k=gensub(/^# ([a-zA-Z0-9_]*):.*/,"\\1",1)
     v=gensub(/["]/,"","g",gensub(/^# [a-zA-Z0-9_]*: /,"",1))
     if (k!="status" && k!="testcase") {
-        tunables[workload][testcase][product][k]=v
-        tunables_uniq[workload][k]=1
+        kk=add_prefix(k,tunables_uniq,workload)
+        tunables[workload][testcase][kk][1]=v
     }
 }
+
+/^# portal: / && status=="passed" {
+    portal[workload][testcase]=$3
+}
+
+/^#terraform-config: / {
+    nc=split($2,columns,"/")
+    tc_workload=columns[2]
+    for(i=3;i<=nc;i++)
+      if(columns[i]~/logs-/) break
+    tc_testcase=columns[i]
+}
+
+/^#terraform-config- variable *"worker_profile" *{/ {
+    worker_profile_config[tc_workload][tc_testcase]=1
+}
+/^#terraform-config-  *} *$/ {
+    worker_profile_config[tc_workload][tc_testcase]=0
+}
+/^#terraform-config-  *instance_type *= *".*"/ && worker_profile_config[tc_workload][tc_testcase]==1 {
+    split($0,columns,"\"")
+    instance_type[tc_workload][tc_testcase]=columns[2]
+}
+/^#terraform-config-  *cpu_core_count *= */ && worker_profile_config[tc_workload][tc_testcase]==1 {
+    split($0,columns,"=")
+    cpu_core_count[tc_workload][tc_testcase]=columns[2]*1
+}
+/^#terraform-config-  *memory_size *= */ && worker_profile_config[tc_workload][tc_testcase]==1 {
+    split($0,columns,"=")
+    memory_size[tc_workload][tc_testcase]=columns[2]*1
+}
+/^#terraform-config- *csp *= *".*",* *$/ {
+    split($0,columns,"\"")
+    csp[tc_workload][tc_testcase]=columns[2]
+    if (columns[2] ~ /kvm|hyperv/)
+        instance_type[tc_workload][tc_testcase]="c"cpu_core_count[tc_workload][tc_testcase]"m"memory_size[tc_workload][tc_testcase]
+}
+
+/^#(pcm|pdu|uprof|emon|perfspect|sar|collectd|igt): / {
+    trace_file=$2
+    nc=split($2,columns,"/")
+    for(i=3;i<=nc-1;i++)
+      if(columns[i]~/logs-/)break
+    trace_tc=columns[i]
+    split(columns[i+1],fields,"-")
+    trace_host=fields[1]"-"fields[2]
+    trace_itr=fields[3]
+    detected_profile_records=0
+    detected_record_id=0
+    trace_roi="*"
+}
+/^#(pcm|uprof|perfspect): / {
+    trace_roi=columns[i+2]
+}
+/^#(pdu|emon): / {
+    patsplit(columns[i+2],fields,/[0-9][0-9]*/)
+    trace_roi="roi-"fields[1]
+}
+/^#sar: / {
+    trace_roi="roi-"gensub(/^.*sar-([0-9]*)[.]logs[.]txt$/,"\\1",1,$2)
+}
+/^#igt: / {
+    split(columns[i+2],fields,"-")
+    trace_roi="roi-"gensub(/.logs/,"",1,fields[3])
+    igt_card=fields[2]
+    igt_layer=0
+}
+/^#pcm- S[0-9][0-9]*; Consumed energy units:/ {
+    socket=gensub(/S([0-9]*);/,"\\1",1,$2)
+    pcm_power[trace_tc][trace_host"/"trace_roi][trace_itr][++pcm_count[trace_tc][trace_host"/"trace_roi][trace_itr][socket]]+=gensub(/;/,"","g",$11)*1
+}
+/^#pdu- [0-9][0-9]*,[0-9][0-9.]*/ {
+    split($0,tp,",")
+    pdu_power[trace_tc][trace_host"/"trace_roi][trace_itr][++pdu_count[trace_tc][trace_host"/"trace_roi][trace_itr]]=tp[2]
+}
+/^#uprof- PROFILE RECORDS/ && !detected_profile_records {
+    detected_profile_records=1
+    split("",uprof_sockets)
+}
+/^#uprof- .*,.*/ && detected_profile_records && detected_record_id && length(uprof_sockets)>0 {
+    split($0,fields,",")
+    p=0
+    for (s in uprof_sockets)
+        p+=fields[uprof_sockets[s]]
+    if (p>0)
+        uprof_power[trace_tc][trace_host"/"trace_roi][trace_itr][++uprof_count[trace_tc][trace_host"/"trace_roi][trace_itr]]+=p
+}
+/^#uprof- RecordId,/ && detected_profile_records && !detected_record_id {
+    split($0,fields,",")
+    socket_count=0
+    for (i in fields) {
+        if (fields[i] ~ /^socket[0-9][0-9]*-package-power$/)
+            uprof_sockets[++socket_count]=i
+    }
+    detected_record_id=1
+}
+/^#emon- [0-9][0-9]*,/ && length(emon_sockets)>0 && (trace_file~/socket_view/) {
+    split($0,fields,",")
+    p=0
+    for (s in emon_sockets)
+        p+=fields[emon_sockets[s]]
+    if (p>0)
+        emon_power[trace_tc][trace_host"/"trace_roi][trace_itr][++emon_socket_count[trace_tc][trace_host"/"trace_roi][trace_itr]]+=p
+}
+/^#emon- #sample/ && (trace_file~/socket_view/) {
+    split($0,fields,",")
+    socket_count=0
+    for (i in fields) {
+        if (fields[i] ~ /metric_package power/)
+            emon_sockets[++socket_count]=i
+    }
+}
+/^#emon- [0-9][0-9]*,/ && (trace_file~/system_view/) {
+    split($0,fields,",")
+    emon_cpu_util[trace_tc][trace_host"/"trace_roi][trace_itr][++emon_system_count[trace_tc][trace_host"/"trace_roi][trace_itr]]=fields[emon_cpu_util_column]*1
+}
+/^#emon- #sample/ && (trace_file~/system_view/) {
+    split($0,fields,",")
+    for (i in fields)
+        if (fields[i] == "metric_CPU utilization %")
+            emon_cpu_util_column=i
+}
+/^#perfspect- .*,package power [(]watts[)],/ {
+    split($0,fields,",")
+    for (i in fields) {
+        if (fields[i] == "package power (watts)")
+            perfspect_package_power_column=i
+        if (fields[i] == "CPU utilization %")
+            perfspect_cpu_util_column=i
+    }
+    next
+}
+/^#perfspect- / {
+    split($0,fields,",")
+    perfspect_power[trace_tc][trace_host"/"trace_roi][trace_itr][++perfspect_count[trace_tc][trace_host"/"trace_roi][trace_itr]]+=fields[perfspect_package_power_column]
+    perfspect_cpu_util[trace_tc][trace_host"/"trace_roi][trace_itr][perfspect_count[trace_tc][trace_host"/"trace_roi][trace_itr]]=fields[perfspect_cpu_util_column]
+}
+/^#sar- *$/ {
+    sar_section=""
+}
+/^#sar- [0-9:][0-9:]*  *CPU  *%usr / {
+    sar_section="CPU"
+}
+/^#sar- [0-9:][0-9:]*  *all / && sar_section=="CPU" {
+    sar_cpu_util[trace_tc][trace_host"/"trace_roi][trace_itr][++sar_count[trace_tc][trace_host"/"trace_roi][trace_itr]]=$4*1
+}
+/^#collectd- [0-9][0-9.]*,[0-9.e+-][0-9.e+-]*/ {
+    split($2,fields,",")
+    collectd_cpu_util[trace_tc][trace_host"/"trace_roi][trace_itr][++collectd_count[trace_tc][trace_host"/"trace_roi][trace_itr]]=fields[2]*1
+}
+/^#igt- .*[{]/ {
+    igt_layer++
+}
+/^#igt- .*[}]/ {
+    igt_layer--
+}
+/^#igt- / && $3=="{" {
+    igt_section[igt_layer]=gensub(/\/[0-9]*$/,"",1,gensub(/[":]/,"","g",$2))
+    igt_component=($2 ~ /\/[0-9]*"/)?gensub(/^.*\/([0-9]*)".*$/,"\\1",1,$2)*1:0
+    if (igt_component == 0)
+      igt_section_count[igt_section[igt_layer]][trace_tc][trace_host"/"igt_card"/"trace_roi][trace_itr]++
+}
+/^#igt- / && igt_section[2]=="power" && $2=="\"Package\":" {
+    igt_package_power[trace_tc][trace_host"/"igt_card"/"trace_roi][trace_itr][igt_section_count[igt_section[2]][trace_tc][trace_host"/"igt_card"/"trace_roi][trace_itr]]=gensub(/,/,"",1,$3)*1
+}
+/^#igt- / && igt_section[2]=="engines" && igt_section[3]=="Render/3D" && $2=="\"busy\":" {
+    igt_render3d_busy[trace_tc][trace_host"/"igt_card"/"trace_roi][trace_itr][igt_section_count[igt_section[3]][trace_tc][trace_host"/"igt_card"/"trace_roi][trace_itr]]+=gensub(/,/,"",1,$3)*1
+}
+/^#igt- / && igt_section[2]=="engines" && igt_section[3]=="Blitter" && $2=="\"busy\":" {
+    igt_blitter_busy[trace_tc][trace_host"/"igt_card"/"trace_roi][trace_itr][igt_section_count[igt_section[3]][trace_tc][trace_host"/"igt_card"/"trace_roi][trace_itr]]+=gensub(/,/,"",1,$3)*1
+}
+/^#igt- / && igt_section[2]=="engines" && igt_section[3]=="Video" && $2=="\"busy\":" {
+    igt_video_busy[trace_tc][trace_host"/"igt_card"/"trace_roi][trace_itr][igt_section_count[igt_section[3]][trace_tc][trace_host"/"igt_card"/"trace_roi][trace_itr]]+=gensub(/,/,"",1,$3)*1
+}
+/^#igt- / && igt_section[2]=="engines" && igt_section[3]=="VideoEnhance" && $2=="\"busy\":" {
+    igt_video_enhance_busy[trace_tc][trace_host"/"igt_card"/"trace_roi][trace_itr][igt_section_count[igt_section[3]][trace_tc][trace_host"/"igt_card"/"trace_roi][trace_itr]]+=gensub(/,/,"",1,$3)*1
+}
+/^#igt- / && igt_section[2]=="engines" && igt_section[3]=="Compute" && $2=="\"busy\":" {
+    igt_compute_busy[trace_tc][trace_host"/"igt_card"/"trace_roi][trace_itr][igt_section_count[igt_section[3]][trace_tc][trace_host"/"igt_card"/"trace_roi][trace_itr]]+=gensub(/,/,"",1,$3)*1
+}
+/^#igt- / && igt_section[2]=="engines" && igt_section[3]=="[unknown]" && $2=="\"busy\":" {
+    igt_unknown_busy[trace_tc][trace_host"/"igt_card"/"trace_roi][trace_itr][igt_section_count[igt_section[3]][trace_tc][trace_host"/"igt_card"/"trace_roi][trace_itr]]+=gensub(/,/,"",1,$3)*1
+}
+
 
 function empty_lines (lines) {
     for(k=1;k<=lines;k++) {
@@ -75,102 +248,131 @@ function empty_lines (lines) {
     }
 }
 
-END {
-    add_xls_header(1)
+function has_data(data, workload, tcsp    ,itc,ntc) {
+    ntc=length(tcsp)
+    if (length(data[workload])>0)
+        for (itc=1;itc<=ntc;itc++)
+            if (length(data[workload][tcsp[itc]])>0)
+                return 1
+    return 0
+}
 
-    nws=asorti(kpis_u, wssp, "@ind_str_asc")
-    for (iws=1;iws<=nws;iws++) {
-        nk=length(kpis_u[wssp[iws]])
+# sort by prioritizing worker-0
+function host_compare(ia,va,ib,vb) {
+    if (ia == ib) return 0
+    if (ia ~ /worker-/) {
+        if (ib ~ /worker-/) return (ia<ib)?-1:1
+        return -1
+    }
+    if (ib ~ /worker-/) return 1
+    return (ia<ib)?-1:1
+}
 
-        print "<Worksheet ss:Name=\"" ws_name2(wssp[iws]) "\">"
-        print "<Table>"
-
-        th=2
-        ntc=asorti(kpis_v[wssp[iws]], tcsp, "@ind_str_asc")
-        for (itc=1;itc<=ntc;itc++) {
-            npt[itc]=asorti(kpis_v[wssp[iws]][tcsp[itc]], tmp, "@ind_str_asc")
-            for (ipt=1;ipt<=npt[itc];ipt++) {
-                ptsp[itc][ipt]=tmp[ipt]
-                ith[itc][ipt]=th++
-
-                nk1=0
-                for (k=1;k<=nk;k++) {
-                    nk1n=length(kpis_v[wssp[iws]][tcsp[itc]][ptsp[itc][ipt]][k])
-                    if (nk1n>nk1) nk1=nk1n
-                }
-                if (nk1>1)
-                    for (k=1;k<=nk1;k++)
-                        print "<Column ss:Index=\"" (th++) "\" ss:Hidden=\"1\" ss:AutoFitWidth=\"0\"/>"
-            }
-            ith[itc][ipt]=th
+# sort by value in logs folder name
+function testcase_compare(ia,va,ib,vb  ,ta,tb) {
+    if (ia == ib) return 0
+    if ((ia ~ /^[0-9]{4}-[0-9]{6}-/) && (ib ~ /^[0-9]{4}-[0-9]{6}-/)) {
+      ta=mktime(gensub(/^([0-9]{2})([0-9]{2})-([0-9]{2})([0-9]{2})([0-9]{2}).*/,"1970 \\1 \\2 \\3 \\4 \\5",1,ia))
+      tb=mktime(gensub(/^([0-9]{2})([0-9]{2})-([0-9]{2})([0-9]{2})([0-9]{2}).*/,"1970 \\1 \\2 \\3 \\4 \\5",1,ib))
+      if (ta<tb) return -1
+      if (ta>tb) return 1
+      if ((ia ~ /^[0-9]{4}-[0-9]{6}-[lb][0-9][0-9]*/) && (ib ~ /^[0-9]{4}-[0-9]{6}-[lb][0-9][0-9]*/)) {
+        ta=gensub(/[0-9]{4}-[0-9]{6}-[lb]([0-9]*).*/,"\\1",1,ia)*1
+        tb=gensub(/[0-9]{4}-[0-9]{6}-[lb]([0-9]*).*/,"\\1",1,ib)*1
+        if (ta<tb) return -1
+        if (ta>tb) return 1
+        if ((ia ~ /^[0-9]{4}-[0-9]{6}-l[0-9][0-9]*b[0-9][0-9]*/) && (ib ~ /^[0-9]{4}-[0-9]{6}-l[0-9][0-9]*b[0-9][0-9]*/)) {
+          ta=gensub(/[0-9]{4}-[0-9]{6}-l[0-9]*b([0-9]*).*/,"\\1",1,ia)*1
+          tb=gensub(/[0-9]{4}-[0-9]{6}-l[0-9]*b([0-9]*).*/,"\\1",1,ib)*1
+          if (ta<tb) return -1
+          if (ta>tb) return 1
         }
-        
-        add_sutinfo_brief(tcsp, ptsp, ith)
+      }
+    }
+    return (ia<ib)?-1:1
+}
 
-        if (length(bom_uniq[wssp[iws]])>0) {
-            empty_lines(2)
-            nbom=asorti(bom_uniq[wssp[iws]], bomsp, "@ind_str_asc")
-            for (ib=1;ib<=nbom;ib++) {
-                print "<Row>"
-                print "<Cell><Data ss:Type=\"String\">" escape(bomsp[ib]) "</Data></Cell>"
-                for (itc=1;itc<=ntc;itc++)
-                    for (ipt=1;ipt<=npt[itc];ipt++) {
-                        print "<Cell ss:Index=\"" ith[itc][ipt] "\" ss:StyleID=\"border\"><Data ss:Type=\"String\">" escape(bom[wssp[iws]][tcsp[itc]][ptsp[itc][ipt]][bomsp[ib]]) "</Data></Cell>"
-                    }
-                print "</Row>"
-            }
-        }
-
-        if (length(tunables_uniq[wssp[iws]])>0) {
-            empty_lines(2)
-            ntunables=asorti(tunables_uniq[wssp[iws]], tunablessp, "@ind_str_asc")
-            for (itu=1;itu<=ntunables;itu++) {
-                print "<Row>"
-                print "<Cell><Data ss:Type=\"String\">" escape(tunablessp[itu]) "</Data></Cell>"
-                for (itc=1;itc<=ntc;itc++)
-                    for (ipt=1;ipt<=npt[itc];ipt++) {
-                        print "<Cell ss:Index=\"" ith[itc][ipt] "\" ss:StyleID=\"border\"><Data ss:Type=\"String\">" escape(tunables[wssp[iws]][tcsp[itc]][ptsp[itc][ipt]][tunablessp[itu]]) "</Data></Cell>"
-                    }
-                print "</Row>"
+function summarize_data(data,data_summary,    tc,h,itr) {
+    for (tc in data) {
+        for (hr in data[tc]) {
+            for (itr in data[tc][hr]) {
+                data_summary[tc][hr"/avg"][itr]=calc_avg(data[tc][hr][itr])
+                data_summary[tc][hr"/med"][itr]=calc_median(data[tc][hr][itr])
+                data_summary[tc][hr"/max"][itr]=calc_max(data[tc][hr][itr])
             }
         }
+    }
+}
 
+function write_2d_data(title, tcsp, data, data_type, portal, ith, sortfunc, hiddenrow    ,kl_uniq,ksp,dn,dii,itc,k,i,nk) {
+    if (length(data)==0) return
+    split("", kl_uniq)
+    ntc=length(tcsp)
+    for (itc=1;itc<=ntc;itc++)
+        if (length(data[tcsp[itc]])>0)
+            for (k in data[tcsp[itc]])
+                kl_uniq[k]=1
+    nk=asorti(kl_uniq,ksp,sortfunc)
+    if (nk>0) {
         empty_lines(2)
+        print "<Row>"
+        print "<Cell ss:StyleID=\"border\"><Data ss:Type=\"String\">"escape(title)"</Data></Cell>"
+        print "</Row>"
 
-        # calculate median
-        split("",kn)
-        split("",kii)
-        for (itc=1;itc<=ntc;itc++) {
-            for (ipt=1;ipt<=npt[itc];ipt++) {
-                for(k=1;k<=nk;k++) {
-                    kn[itc][ipt][k]=length(kpis_v[wssp[iws]][tcsp[itc]][ptsp[itc][ipt]][k])
-                    kii[itc][ipt][k]=0
-                    if (kn[itc][ipt][k]>0) {
-                        m=median(kpis_v[wssp[iws]][tcsp[itc]][ptsp[itc][ipt]][k])
-                        for (i=1;i<=kn[itc][ipt][k];i++)
-                            if (m==kpis_v[wssp[iws]][tcsp[itc]][ptsp[itc][ipt]][k][i]) 
-                                kii[itc][ipt][k]=i
+        if (data_type == "Number") {
+            # calculate median
+            split("", dn)
+            split("", dii)
+            dn[0][0]=0
+            dii[0][0]=0
+            for (itc=1;itc<=ntc;itc++) {
+                if (length(data[tcsp[itc]])>0) {
+                    for (k in data[tcsp[itc]]) {
+                        if (length(data[tcsp[itc]][k])>0) {
+                            m=calc_median(data[tcsp[itc]][k])
+                            for (i in data[tcsp[itc]][k]) {
+                                dn[itc][k]=i*1
+                                dii[itc][k]=i
+                                break
+                            }
+                            for (i in data[tcsp[itc]][k]) {
+                                if (i*1 > dn[itc][k]*1) dn[itc][k]=i*1
+                                if (int(m*100)==int(data[tcsp[itc]][k][i]*100))
+                                    dii[itc][k]=i
+                            }
+                        }
                     }
                 }
             }
         }
-            
-        # kpis
+
         for(k=1;k<=nk;k++) {
-            print "<Row>"
-            print "<Cell ss:StyleID=\"border\"><Data ss:Type=\"String\">" escape(kpis_k[wssp[iws]][k]) "</Data></Cell>"
+            if (hiddenrow!="" && ksp[k] !~ hiddenrow) {
+                print "<Row ss:Hidden=\"1\">"
+            } else {
+                print "<Row>"
+            }
+            print "<Cell ss:StyleID=\"border\"><Data ss:Type=\"String\">" escape(remove_prefix(ksp[k])) "</Data></Cell>"
             for (itc=1;itc<=ntc;itc++) {
-                for(ipt=1;ipt<=npt[itc];ipt++) {
-                    if (length(kpis_v[wssp[iws]][tcsp[itc]][ptsp[itc][ipt]][k])>0) {
-                        print "<Cell ss:Index=\"" ith[itc][ipt] "\" ss:StyleID=\"border\"><Data ss:Type=\"Number\">" kpis_v[wssp[iws]][tcsp[itc]][ptsp[itc][ipt]][k][kii[itc][ipt][k]]*1 "</Data></Cell>"
+                if (data_type=="String") {
+                    if (length(data[tcsp[itc]][ksp[k]])>0) {
+                        print "<Cell ss:Index=\"" ith[itc] "\" ss:StyleID=\"border\"><Data ss:Type=\"String\">" escape(data[tcsp[itc]][ksp[k]][1]) "</Data></Cell>"
                     } else {
-                        print "<Cell ss:Index=\"" ith[itc][ipt] "\" ss:StyleID=\"border\"><Data ss:Type=\"Number\"></Data></Cell>"
+                        print "<Cell ss:Index=\"" ith[itc] "\" ss:StyleID=\"border\"><Data ss:Type=\"String\"></Data></Cell>"
                     }
-                    if (kn[itc][ipt][k]>1) {
-                        for(i=1;i<=kn[itc][ipt][k];i++) {
-                            style=(i==kii[itc][ipt][k])?"-median":""
-                            if (length(kpis_v[wssp[iws]][tcsp[itc]][ptsp[itc][ipt]][k])>0) {
-                                print "<Cell ss:StyleID=\"border" style "\"><Data ss:Type=\"Number\">" kpis_v[wssp[iws]][tcsp[itc]][ptsp[itc][ipt]][k][i]*1 "</Data></Cell>"
+                }
+                if (data_type=="Number") {
+                    if (length(data[tcsp[itc]])>0 && length(data[tcsp[itc]][ksp[k]])>0 && length(data[tcsp[itc]][ksp[k]][dii[itc][ksp[k]]])>0) {
+                        href=((remove_prefix(ksp[k]) ~ /^[*]/) && length(portal)>0 && length(portal[tcsp[itc]])>0)?" ss:HRef=\""portal[tcsp[itc]]"\"":""
+                        print "<Cell ss:Index=\"" ith[itc] "\" ss:StyleID=\"border\""href"><Data ss:Type=\"Number\">" data[tcsp[itc]][ksp[k]][dii[itc][ksp[k]]]*1 "</Data></Cell>"
+                    } else {
+                        print "<Cell ss:Index=\"" ith[itc] "\" ss:StyleID=\"border\"><Data ss:Type=\"Number\"></Data></Cell>"
+                    }
+                    if (dn[itc][ksp[k]]>1) {
+                        for(i=1;i<=dn[itc][ksp[k]];i++) {
+                            style=(i==dii[itc][ksp[k]])?"-median":""
+                            if (length(data[tcsp[itc]][ksp[k]][i])>0) {
+                                print "<Cell ss:StyleID=\"border" style "\"><Data ss:Type=\"Number\">" data[tcsp[itc]][ksp[k]][i]*1 "</Data></Cell>"
                             } else {
                                 print "<Cell ss:StyleID=\"border" style "\"><Data ss:Type=\"Number\"></Data></Cell>"
                             }
@@ -180,11 +382,106 @@ END {
             }
             print "</Row>"
         }
+    }
+}
+
+END {
+    summarize_data(pcm_power, pcm_power_summary)
+    summarize_data(pdu_power, pdu_power_summary)
+    summarize_data(emon_power, emon_power_summary)
+    summarize_data(uprof_power, uprof_power_summary)
+    summarize_data(perfspect_power, perfspect_power_summary)
+    summarize_data(emon_cpu_util, emon_cpu_util_summary)
+    summarize_data(perfspect_cpu_util, perfspect_cpu_util_summary)
+    summarize_data(sar_cpu_util, sar_cpu_util_summary)
+    summarize_data(collectd_cpu_util, collectd_cpu_util_summary)
+    summarize_data(igt_package_power, igt_package_power_summary)
+    summarize_data(igt_render3d_busy, igt_render3d_busy_summary)
+    summarize_data(igt_blitter_busy, igt_blitter_busy_summary)
+    summarize_data(igt_video_busy, igt_video_busy_summary)
+    summarize_data(igt_video_enhance_busy, igt_video_enhance_busy_summary)
+    summarize_data(igt_compute_busy, igt_compute_busy_summary)
+    summarize_data(igt_unknown_busy, igt_unknown_busy_summary)
+
+    add_xls_header(1)
+
+    nwl=asorti(kpis_v, wlsp, "@ind_str_asc")
+    for (iwl=1;iwl<=nwl;iwl++) {
+        print "<Worksheet ss:Name=\"" ws_name2(wlsp[iwl]) "\">"
+        print "<Table>"
+
+        th=2
+        ntc=asorti(kpis_v[wlsp[iwl]], tcsp, "testcase_compare")
+        split("", hssp)
+        for (itc=1;itc<=ntc;itc++) {
+            ith[itc]=th++
+
+            nk1=length(sutinfo_values[tcsp[itc]])
+            if (nk1>0) {
+                asorti(sutinfo_values[tcsp[itc]], tmp, "host_compare")
+                for (ih=1;ih<=nk1;ih++)
+                    hssp[itc][ih]=tmp[ih]
+                nk1--
+            }
+
+            for (k in kpis_v[wlsp[iwl]][tcsp[itc]])
+                for (itr in kpis_v[wlsp[iwl]][tcsp[itc]][k])
+                    if (itr>nk1) nk1=itr
+
+            for (k=1;k<=nk1;k++)
+                print "<Column ss:Index=\"" (th++) "\" ss:Hidden=\"1\" ss:AutoFitWidth=\"0\"/>"
+        }
+        ith[ntc+1]=th
+
+        if (has_data(csp, wlsp[iwl], tcsp)==1) {
+            print "<Row>"
+            add_sutinfo_cell("CSP")
+            for (itc=1;itc<=ntc;itc++) {
+                if (length(csp[wlsp[iwl]][tcsp[itc]])>0) {
+                    add_sutinfo_cell_ex(ith[itc], csp[wlsp[iwl]][tcsp[itc]])
+                } else {
+                    add_sutinfo_cell_ex(ith[itc], "")
+                }
+            }
+            print "</Row>"
+            print "<Row>"
+            add_sutinfo_cell("Instance Type")
+            for (itc=1;itc<=ntc;itc++) {
+                if (length(instance_type[wlsp[iwl]][tcsp[itc]])>0) {
+                    add_sutinfo_cell_ex(ith[itc], instance_type[wlsp[iwl]][tcsp[itc]])
+                } else {
+                    add_sutinfo_cell_ex(ith[itc], "")
+                }
+            }
+            print "</Row>"
+        }
+
+        add_sutinfo_brief(tcsp, ith, hssp)
+
+        write_2d_data("Workload Ingredients:", tcsp, bom[wlsp[iwl]], "String", portal[wlsp[iwl]], ith, "@ind_str_asc", "")
+        write_2d_data("Workload Parameters:", tcsp, tunables[wlsp[iwl]], "String", portal[wlsp[iwl]], ith, "@ind_str_asc", "")
+        write_2d_data("Workload KPI:", tcsp, kpis_v[wlsp[iwl]], "Number", portal[wlsp[iwl]], ith, "@ind_str_asc", "")
+        write_2d_data("pcm socket power (W):", tcsp, pcm_power_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
+        write_2d_data("uprof socket power (W):", tcsp, uprof_power_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
+        write_2d_data("pdu power (W):", tcsp, pdu_power_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
+        write_2d_data("emon packet power (W):", tcsp, emon_power_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
+        write_2d_data("perfspect packet power (W):", tcsp, perfspect_power_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
+        write_2d_data("emon cpu util (%):", tcsp, emon_cpu_util_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
+        write_2d_data("perfspect cpu util (%):", tcsp, perfspect_cpu_util_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
+        write_2d_data("sar cpu util (%):", tcsp, sar_cpu_util_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
+        write_2d_data("collectd cpu util (%):", tcsp, collectd_cpu_util_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
+        write_2d_data("igt package power (W):", tcsp, igt_package_power_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
+        write_2d_data("igt render3d busy (%):", tcsp, igt_render3d_busy_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
+        write_2d_data("igt blitter busy (%):", tcsp, igt_blitter_busy_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
+        write_2d_data("igt video busy (%):", tcsp, igt_video_busy_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
+        write_2d_data("igt video enhance busy (%):", tcsp, igt_video_enhance_busy_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
+        write_2d_data("igt compute busy (%):", tcsp, igt_compute_busy_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
+        write_2d_data("igt unknown busy (%):", tcsp, igt_unknown_busy_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
 
         print "</Table>"
         print "</Worksheet>"
     }
-    if (nws<1)
+    if (nwl<1)
         print "<Worksheet ss:Name=\"Sheet1\"></Worksheet>"
     print "</Workbook>"
 }

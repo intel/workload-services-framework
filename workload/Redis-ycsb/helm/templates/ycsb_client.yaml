@@ -1,0 +1,127 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+{{- range $i, $e := until (int $.Values.CLIENT_COUNT) -}}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: benchmark-{{ $i }}
+spec:
+  template:
+    metadata:
+      labels:
+        name: benchmark
+    spec: 
+{{- if $.Values.HOST_NETWORK_ENABLE }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+{{- end }}
+      containers:
+      - name: benchmark
+        image: {{ $.Values.REGISTRY }}redis-ycsb-client-ubuntu{{ $.Values.UBUNTU_OS }}{{ $.Values.IMAGE_ARCH }}{{ $.Values.RELEASE }}
+        imagePullPolicy: {{ include "imagepolicy" $.Values }}
+        resources:
+          requests:
+            cpu: "0.5"
+        env:
+        - name: CLIENT_COUNT
+          value: "{{ $.Values.CLIENT_COUNT }}"
+        - name: INSTANCE_NUM
+          value: "{{ $.Values.INSTANCE_NUM }}"
+        - name: REDIS_SERVICE
+          value: "{{ $.Values.REDIS_SERVICE }}"
+        - name: REDIS_NATIVE_TRANSPORT_PORT
+          value: "{{ $.Values.REDIS_NATIVE_TRANSPORT_PORT }}"
+        - name: CONFIG_CENTER_SERVICE
+          value: "{{ $.Values.CONFIG_CENTER_SERVICE }}"
+        - name: CONFIG_CENTER_PORT
+          value: "{{ $.Values.CONFIG_CENTER_PORT }}"
+        - name: REDIS_NUMACTL_STRATEGY
+          value: "{{ $.Values.REDIS_NUMACTL_STRATEGY }}"
+        - name: NUMA_NODE_FOR_REDIS_SERVER
+          value: "{{ $.Values.NUMA_NODE_FOR_REDIS_SERVER }}"
+        - name: PERFORMANCE_PHASE_MODE
+          value: "{{ $.Values.PERFORMANCE_PHASE_MODE }}"
+        - name: WORKLOAD_FILE
+          value: "{{ $.Values.WORKLOAD_FILE }}"
+        - name: THREADS
+          value: "{{ $.Values.THREADS }}"
+        - name: OPERATION_COUNT
+          value: "{{ $.Values.OPERATION_COUNT }}"
+        - name: RECORD_COUNT
+          value: "{{ $.Values.RECORD_COUNT }}"
+        - name: INSERT_START
+          value: "{{ $.Values.INSERT_START }}"
+        - name: INSERT_COUNT
+          value: "{{ $.Values.INSERT_COUNT }}"
+        - name: INSERT_ORDER
+          value: "{{ $.Values.INSERT_ORDER }}"
+        - name: READ_PROPORTION
+          value: "{{ $.Values.READ_PROPORTION }}"
+        - name: UPDATE_PROPORTION
+          value: "{{ $.Values.UPDATE_PROPORTION }}"
+        - name: INSERT_PROPORTION
+          value: "{{ $.Values.INSERT_PROPORTION }}"
+        - name: SCAN_PROPORTION
+          value: "{{ $.Values.SCAN_PROPORTION }}"
+        - name: TARGET
+          value: "{{ $.Values.TARGET }}"
+        - name: FIELD_COUNT
+          value: "{{ $.Values.FIELD_COUNT }}"
+        - name: FIELD_LENGTH
+          value: "{{ $.Values.FIELD_LENGTH }}" 
+        - name: MIN_FIELD_LENGTH
+          value: "{{ $.Values.MIN_FIELD_LENGTH }}"
+        - name: READ_ALL_FIELDS
+          value: "{{ $.Values.READ_ALL_FIELDS }}"
+        - name: WRITE_ALL_FIELDS
+          value: "{{ $.Values.WRITE_ALL_FIELDS }}"
+        - name: READ_MODIFY_WRITE_PROPORTION
+          value: "{{ $.Values.READ_MODIFY_WRITE_PROPORTION }}"
+        - name: REQUEST_DISTRIBUTION
+          value: "{{ $.Values.REQUEST_DISTRIBUTION }}"
+        - name: MIN_SCANLENGTH
+          value: "{{ $.Values.MIN_SCANLENGTH }}"
+        - name: MAX_SCANLENGTH
+          value: "{{ $.Values.MAX_SCANLENGTH }}"
+        - name: SCAN_LENGTH_DISTRIBUTION
+          value: "{{ $.Values.SCAN_LENGTH_DISTRIBUTION }}"
+        - name: ZERO_PADDING
+          value: "{{ $.Values.ZERO_PADDING }}"
+        - name: FIELD_NAME_PREFIX
+          value: "{{ $.Values.FIELD_NAME_PREFIX }}"
+        - name: MAX_EXECUTION_TIME
+          value: "{{ $.Values.MAX_EXECUTION_TIME }}"
+        - name: JVM_ARGS
+          value: "{{ $.Values.JVM_ARGS }}"
+        - name: YCSB_MEASUREMENT_TYPE
+          value: "{{ $.Values.YCSB_MEASUREMENT_TYPE }}"
+      restartPolicy: Never
+{{- if ne $.Values.CLIENT_COUNT 0 }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - {key: job-name, operator: In, values: [redis-ycsb-server,{{ range $j := until (int $.Values.CLIENT_COUNT) }}{{if ne $i $j}}benchmark-{{ $j }},{{end}}{{end}}]}
+            topologyKey: kubernetes.io/hostname
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: name
+                  operator: In
+                  values:
+                  - REDIS-YCSB-CLIENT
+              topologyKey: kubernetes.io/hostname
+      {{- $args2 := dict "nkey" "VM-GROUP" "nvalue" "client" }}
+      {{- include "nodeAffinity" $args2 }}
+{{- end }}
+---
+{{- end }}

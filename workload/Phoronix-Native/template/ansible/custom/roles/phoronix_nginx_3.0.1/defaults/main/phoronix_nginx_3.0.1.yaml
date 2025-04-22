@@ -1,0 +1,10 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+WORKSPACE: "/tmp/phoronix"
+PHORONIX_INSTALL_DIR: "{{ WORKSPACE }}/phoronix"
+BENCHMARK_WL: "pts/nginx-3.0.1"
+PTS_NGINX301_DURATION: "90s"
+PTS_NGINX301_CONNECTIONS: "300"

@@ -8,6 +8,8 @@
   yum:
     name: 
       - intel-gpu-tools
+      - moreutils
+    update_cache: true
     state: present
   become: yes
   delegate_to: "{{ trace_node.1 }}"

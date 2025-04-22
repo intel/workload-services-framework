@@ -1,0 +1,40 @@
+# {{ WORKLOAD | regex_replace('-.*','') }}
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+
+FROM ${OS_IMAGE}:${OS_VER} AS build
+RUN  apt-get update -y && apt-get install -y gcc g++ automake make wget procps
+
+# IPERF_VER can be overwrite when building image
+ARG IPERF_VER="2"
+
+ARG IPERF2_VER="2.1.7"
+ARG IPERF2_PACKAGE=https://sourceforge.net/projects/iperf2/files/iperf-${IPERF2_VER}.tar.gz
+
+ARG IPERF3_VER="3.9"
+ARG IPERF3_PACKAGE=https://downloads.es.net/public/iperf/iperf-${IPERF3_VER}.tar.gz
+
+RUN IPERF_PACKAGE=$(eval echo \$IPERF${IPERF_VER}_PACKAGE) \
+    && IPERF_CHOSEN_VERSION=$(eval echo \$IPERF${IPERF_VER}_VER) \
+    && wget ${IPERF_PACKAGE} -O - | tar xfz - \
+    && cd iperf-${IPERF_CHOSEN_VERSION} \
+    && ./configure \
+    && make -j \
+    && make install
+
+FROM ${OS_IMAGE}:${OS_VER}
+RUN apt-get update -y && apt-get install -y psmisc dnsutils util-linux netcat-openbsd && apt-get clean
+
+COPY --from=build /usr/local/bin/iperf /usr/local/bin/
+COPY script/run_iperf* /
+
+RUN mkfifo /export-logs
+CMD (/run_iperf.sh; echo $? > status) && \
+    tar cf /export-logs status $(ls -1 output.logs 2> /dev/null || true) && \
+    sleep infinity

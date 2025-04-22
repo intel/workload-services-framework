@@ -27,6 +27,7 @@
                 fi
               ) &
           delegate_to: localhost
+          when: (trace_module_start_block|regex_replace('[a-zA-Z0-9]',''))!=trace_module_start_block
           become: false
 
         - name: Append the stop script
@@ -42,6 +43,7 @@
                 fi
               ) &
           delegate_to: localhost
+          when: (trace_module_stop_block|regex_replace('[a-zA-Z0-9]',''))!=trace_module_stop_block
           become: false
 
       when:
@@ -76,6 +78,7 @@
                 } -ArgumentList $roi,$itr
               }
           delegate_to: localhost
+          when: (trace_module_start_block|regex_replace('[a-zA-Z0-9]',''))!=trace_module_start_block
           become: false
 
         - name: Append the stop script
@@ -93,6 +96,7 @@
                 } -ArgumentList $roi,$itr
               }
           delegate_to: localhost
+          when: (trace_module_stop_block|regex_replace('[a-zA-Z0-9]',''))!=trace_module_stop_block
           become: false
 
       when:

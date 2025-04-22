@@ -11,6 +11,7 @@ locals {
         profile = profile.name
         instance_type = profile.instance_type
         cpu_model_regex = profile.cpu_model_regex
+        accelerators = profile.accelerators
         os_image = profile.os_image
         os_type = profile.os_type
         os_disk_type = profile.os_disk_type
@@ -27,6 +28,7 @@ locals {
     for vm in local.instances_flat : "${vm.profile}-${vm.index}" => {
       instance_type = vm.instance_type
       cpu_model_regex = vm.cpu_model_regex
+      accelerators = vm.accelerators
       os_image = vm.os_image
       profile = vm.profile
       os_type = vm.os_type

@@ -4,57 +4,84 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: get os and processor info
-  shell:
-    cmd: |
-      . /etc/os-release; echo $ID
-      grep -q -F GenuineIntel /proc/cpuinfo
-    executable: /bin/bash
-  register: os
-  failed_when: false
+- name: check rdmsr
+  command: rdmsr --version
+  register: msrrc
+  ignore_errors: true
 
 - block:
 
-  - name: Install msr-tool on Debian
-    apt:
+  - name: Install msr-tool
+    package:
       name: msr-tools
-      update_cache: true
-    become: true
-    when: ((os.stdout_lines | first) in ['debian','ubuntu'])
-    register: aptrc
-    until: aptrc is success
+    register: pkgrc
+    until: pkgrc is success
+    ignore_errors: true
     retries: 10
     delay: 10
     environment:
       DEBIAN_FRONTEND: noninteractive
       ACCEPT_EULA: Y
-    ignore_errors: true
   
-  - name: Install msr-tool on RHL
-    yum:
-      name: msr-tools
-      update_cache: true
-    become: true
-    register: yumrc
-    until: yumrc is success
-    retries: 10
-    delay: 10
-    when: ((os.stdout_lines | first) not in ['debian','ubuntu'])
-    ignore_errors: true
-  
-  - name: Add the msr module
+  - name: Install the msr module
     modprobe:
       name: msr
       state: present
-    become: true
   
-  - name: apply CPU register value
-    include_tasks:
-      file: write.yaml
-  
-  - name: Get full characterization
-    include_tasks:
-      file: read.yaml
+  when: msrrc is failed
 
-  when: os.rc == 0
+- name: Set global msr options from the workload
+  set_fact:
+    msr_options_dict: "{{ cluster_config.cluster | zip_longest([],fillvalue={'vm_group':'worker','msr':{}}) | map('last') | map('dict2items') | zip(cluster_config.cluster | map('dict2items')) | map('flatten') | map('items2dict') | selectattr('vm_group','in',group_names) | map(attribute='msr') | map('dict2items') | flatten | items2dict }}"
+  vars:
+    cluster_config: "{{ lookup('file',wl_logs_dir+'/cluster-config.yaml') | from_yaml }}"
 
+- name: Overwrite global msr options from user
+  set_fact:
+    msr_options_dict: "{{ msr_options_dict | combine(dict(sut_msr_options | split(',') | map('trim') | select('match',item+':.*') | map('regex_replace','^[^:]*:','') | map('trim') | reject('==','') | map('split','=') | map('map','trim'))) }}"
+  loop: "{{ group_names }}"
+
+- name: save msr existing values
+  shell:
+    cmd: |
+      {% if item.key is match('^0x0*620$') %}[ -e {{ msr_sysfs_uncore00_path }}/min_freq_khz ] && printf "0x%04x\n" $(( $(cat {{ msr_sysfs_uncore00_path }}/min_freq_khz) / 100000 * 256 + $(cat {{ msr_sysfs_uncore00_path }}/max_freq_khz) / 100000 )) || {% endif %}rdmsr -p 0 -c {{ item.key }} || echo 0x0
+    executable: /bin/bash
+  loop: "{{ msr_options_dict | dict2items }}"
+  register: saved_values
+  ignore_errors: true
+
+- name: set new msr values
+  shell:
+    cmd: |
+      {% for req in msr_options_dict | dict2items %}
+        {% if req.key is match('^0x0*620$') %}
+          for uncore_path in {{ msr_sysfs_uncore00_path | dirname }}/uncore*; do
+            if [ -e $uncore_path/min_freq_khz ]; then
+              echo "{{ ((req.value | int(base=16)) % 256) * 100000 }}" > $uncore_path/max_freq_khz
+              echo "{{ (((req.value | int(base=16)) / 256) | int) * 100000 }}" > $uncore_path/min_freq_khz
+            fi
+          done
+        {% endif %}
+        wrmsr -a {{ req.key }} {{ req.value }}
+      {% endfor %}
+    executable: /bin/bash
+  ignore_errors: true
+
+- name: Print out MSR changes
+  debug:
+    msg: "[{{ inventory_hostname }}]: Host MSR+ {{ item.key }}={{ item.value }}"
+  loop: "{{ msr_options_dict | dict2items }}"
+
+- name: Create the msrinfo folder
+  file:
+    path: "{{ wl_logs_dir }}/{{ inventory_hostname }}-msrinfo"
+    state: directory
+  delegate_to: localhost
+  become: false
+
+- name: Create a restore file
+  copy:
+    dest: "{{ wl_logs_dir }}/{{ inventory_hostname }}-msrinfo/saved.json"
+    content: "{{ dict(saved_values.results | map(attribute='item') | map(attribute='key') | zip(saved_values.results | map(attribute='stdout') | map('default',''))) | to_nice_json }}"
+  delegate_to: localhost
+  become: false

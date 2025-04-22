@@ -1,0 +1,106 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Set App Parameters
+  set_fact:
+    BENCHMARK_WL: "{{ wl_tunables['BENCHMARK_WL'] }}"
+
+- name: Ensure the working directory exists
+  file:
+    path: "{{ PHORONIX_INSTALL_DIR }}"
+    state: directory
+    mode: '0755'
+
+- name: Install Python 3 if not present
+  become: yes
+  package:
+    name: python3
+    state: present
+
+- name: Install required dependencies for Debian/Ubuntu
+  when: ansible_facts['os_family'] == 'Debian'
+  become: yes
+  apt:
+    name:
+      - build-essential
+      - git
+      - wget
+      - unzip
+      - libtool
+      - automake
+      - pkg-config
+      - libssl-dev
+      - zlib1g-dev
+      - libcurl4-openssl-dev
+      - php-cli
+      - php-xml
+      - openssl
+    state: present
+
+- name: Install required dependencies for RedHat/CentOS/Fedora
+  when: ansible_facts['os_family'] == 'RedHat'
+  become: yes
+  yum:
+    name:
+      - gcc
+      - make
+      - git
+      - wget
+      - unzip
+      - libtool
+      - automake
+      - pkgconfig
+      - openssl-devel
+      - zlib-devel
+      - libcurl-devel
+      - php-cli
+      - php-xml
+      - openssl
+    state: present
+
+- name: Download Phoronix Test Suite source code
+  git:
+    repo: "{{ PHORONIX_REPO }}"
+    version: "{{ PHORONIX_VER }}"
+    dest: "{{ PHORONIX_INSTALL_DIR }}/phoronix-test-suite"
+    force: yes
+
+- name: Ensure the phoronix directory exists
+  file:
+    path: "~/.phoronix-test-suite"
+    state: directory
+    mode: '0755'
+
+- name: Ensure the phoronix result directory exists
+  file:
+    path: "{{ PHORONIX_INSTALL_DIR }}/test-results/{{ BENCHMARK_WL }}"
+    state: directory
+    mode: '0755'
+
+- name: Extract domain from https_proxy
+  set_fact:
+    proxy_domain: "{{ ansible_env.https_proxy | regex_replace('^(https?://)?([^:/]+).*', '\\2') | default('not set') }}"
+
+- name: Extract port from https_proxy
+  set_fact:
+    proxy_port: "{{ ansible_env.https_proxy | regex_replace('^.*:(\\d+)(/|$)', '\\1') | default('not set') }}"
+
+- name: Show the extracted domain and port
+  debug:
+    msg: "Proxy domain is {{ proxy_domain }} and port is {{ proxy_port }}"
+
+- name: Install Template of user settings
+  template:
+    src: "user-config.xml.j2"
+    dest: "~/.phoronix-test-suite/user-config.xml"
+    mode: "0755"
+
+- name: check phoronix version
+  shell: |
+    {{ PHORONIX_INSTALL_DIR }}/phoronix-test-suite/phoronix-test-suite version
+
+- name: install benchmark
+  shell: |
+    {{ PHORONIX_INSTALL_DIR }}/phoronix-test-suite/phoronix-test-suite force-install {{ BENCHMARK_WL }}

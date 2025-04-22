@@ -15,11 +15,6 @@ variable "ssh_port" {
   type = string
 }
 
-variable "ssh_pri_key_file" {
-  type = string
-  default = "~/.ssh/id_rsa"
-}
-
 variable "ssh_localhost_pub_key_file" {
   type = string
   default = "ssh_access.key.pub"

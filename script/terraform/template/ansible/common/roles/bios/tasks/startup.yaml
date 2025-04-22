@@ -18,14 +18,20 @@
   vars:
     bios_options_dict: {}
 
+- name: Overwrite by workload settings
+  set_fact:
+    bios_options_wl_dict: "{{ cluster_config.cluster | zip_longest([],fillvalue={'vm_group':'worker','bios':{}}) | map('last') | map('dict2items') | zip(cluster_config.cluster | map('dict2items')) | map('flatten') | map('items2dict') | selectattr('vm_group','in',group_names) | map(attribute='bios') | map('dict2items') | flatten | items2dict }}"
+  vars:
+    cluster_config: "{{ lookup('file',wl_logs_dir+'/cluster-config.yaml') | from_yaml }}"
+
 - name: create BIOS workspace
   file:
     path: "/tmp/{{ wl_namespace }}-bios"
     state: directory
-  when: (wl_bios.keys() | length > 0) or (bios_options_dict.keys() | length > 0) or (sut_bios_probe | bool)
+  when: (bios_options_wl_dict.keys() | length > 0) or (bios_options_dict.keys() | length > 0) or (sut_bios_probe | bool)
 
 - name: "dispatch to {{ sut_bios_tool }} tasks"
   include_tasks:
     file: startup-{{ sut_bios_tool }}.yaml
-  when: (wl_bios.keys() | length > 0) or (bios_options_dict.keys() | length > 0) or (sut_bios_probe | bool)
+  when: (bios_options_wl_dict.keys() | length > 0) or (bios_options_dict.keys() | length > 0) or (sut_bios_probe | bool)
 

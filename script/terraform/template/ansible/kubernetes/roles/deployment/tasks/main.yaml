@@ -48,7 +48,7 @@
     executable: /bin/bash
   environment: "{{ workload_secrets }}"
   vars:
-    workload_secrets: "{{ lookup('file',wl_logs_dir+'/.workload-secret.yaml') | from_yaml | default({},true) }}"
+    workload_secrets: "{% if (wl_logs_dir+'/.workload-secret.yaml') is exists %}{{ lookup('file',wl_logs_dir+'/.workload-secret.yaml') | from_yaml | default({},true) }}{% else %}{{ {} }}{% endif %}"
 
 - block:
   
@@ -59,13 +59,13 @@
 
   rescue:
 
-    - name: debugging
-      include_role: 
+    - include_role:
         name: debug
+      vars:
+        debug_options: "--namespace={{ wl_namespace }}"
 
-    - name: abort
-      fail:
-        msg: "abort due to scheduling failure"
+    - fail:
+        msg: "Failed to schedule workload pods"
 
 - include_role:
     name: timing
@@ -89,6 +89,8 @@
 - name: print debug info 
   include_role:
     name: debug
+  vars:
+    debug_options: "--namespace={{ wl_namespace }}"
 
 - name: delete namespace
   include_role:

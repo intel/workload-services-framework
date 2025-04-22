@@ -76,3 +76,20 @@
     command: "curl --netrc-optional -fsSL -I {{ item }}"
     loop: "{{ check_connectivity_urls }}"
 
+- name: get proxy settings from /etc/environment
+  shell:
+    cmd: ". /etc/environment;echo :$http_proxy:$https_proxy:$no_proxy:"
+    executable: /bin/bash
+  register: proxies_1
+
+- name: get proxy settings from shell
+  shell:
+    cmd: "bash -l -c 'echo :$http_proxy:$https_proxy:$no_proxy:'"
+    executable: /bin/bash
+  register: proxies_2
+
+- name: fail if two proxy values are not the same
+  fail:
+    msg: "Proxy values defined in /etc/environment different from those from login shell."
+  when: proxies_1.stdout != proxies_2.stdout
+

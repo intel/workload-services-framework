@@ -50,7 +50,7 @@
       - name: download dlb_zip
         shell: 
           cmd: |
-            [ -e /usr/local/src/dlb.tgz ] || curl --retry 5 -o /usr/local/src/dlb.tgz {{ dlb_zip_url }}
+            [ -e /usr/local/src/dlb.tgz ] || curl --netrc-optional --retry 5 -o /usr/local/src/dlb.tgz {{ dlb_zip_url }}
           executable: /bin/bash
         ignore_errors: true
         delegate_to: localhost

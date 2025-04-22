@@ -3,12 +3,12 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
-- include_role:
-    name: hf-dataset
+- include_tasks:
+    file: download-hf.yaml
   vars:
-    DEST_DIR: "/opt/dataset/qwen/7b"
-    MODEL_ID: "Qwen/Qwen-7B-Chat"
-    DATASET_SIZE: 25
-    exclude: []
-    revision: []
-    HF_LOGIN: false
+    dataset_model_path: "qwen/7b"
+    hfcli_model_id: "Qwen/Qwen-7B-Chat"
+    dataset_size: 25
+    hfcli_exclude: []
+    hfcli_revision: []
+    hfcli_login: false

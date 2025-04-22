@@ -35,5 +35,5 @@
   when: ('=required' in label_name)
   vars:
     label_name_items: "{{ label_name | split('=') | first | split('-') }}"
-    disk_path_items: "{% if (label_name | split('=') | first | split('-') | length)==5 %}{% if (wl_logs_dir+'/kubernetes-config.yaml') is exists %}{{ 'var/lib/kubelet' | split('/') }}{% elif ((wl_logs_dir+'/compose-config.yaml') is exists) or (((wl_logs_dir+'/docker-config.yaml') is exists) and (not (native|default(false)|bool))) %}{{ 'var/lib/docker' | split('/') }}{% else %}{{ 'tmp' | split('/') }}{% endif %}{% else %}{{ label_name_items[5:] }}{% endif %}"
+    disk_path_items: "{% if (label_name | split('=') | first | split('-') | length)==5 %}{% if (wl_logs_dir+'/kubernetes-config.yaml') is exists %}{{ 'var/lib/kubelet' | split('/') }}{% elif ((wl_logs_dir+'/compose-config.yaml') is exists) or ((((wl_logs_dir+'/docker-config.yaml') is exists) or (workload_config.docker_image!='')) and (not (native|default(false)|bool))) %}{{ 'var/lib/docker' | split('/') }}{% else %}{{ 'tmp' | split('/') }}{% endif %}{% else %}{{ label_name_items[5:] }}{% endif %}"
 

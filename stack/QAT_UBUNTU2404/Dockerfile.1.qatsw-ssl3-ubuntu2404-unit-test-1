@@ -1,0 +1,15 @@
+# qatsw-crypto-base-ssl3-ubuntu2404-tc1
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+FROM qatsw-crypto-base-ssl3-ubuntu2404${RELEASE}
+
+RUN  mkfifo /export-logs
+CMD  (ldd /usr/local/lib64/engines-3/qatengine.so | grep -v -q -F found; echo $? > status) 2>&1 | tee output.logs && \
+     tar cf /export-logs status output.logs && \
+     sleep infinity
+

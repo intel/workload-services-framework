@@ -6,13 +6,19 @@
 
 - name: reboot
   command: reboot
-  async: 10
-  poll: 0
+  register: rebootrc
   become: true
+  async: "{{ sut_reboot_timeout }}"
+  poll: 0
 
 - name: wait for the machine to come back
   wait_for_connection:
     connect_timeout: 20
     sleep: 1
     delay: 15
-    timeout: 1800
+    timeout: "{{ sut_reboot_timeout }}"
+
+- name: cleanup after reboot
+  async_status:
+    jid: "{{ rebootrc.ansible_job_id }}"
+    mode: cleanup

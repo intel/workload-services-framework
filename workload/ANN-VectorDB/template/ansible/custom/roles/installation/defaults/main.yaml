@@ -1,0 +1,11 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+WORKSPACE: "/tmp/ann"
+ANN_HOME: "/tmp/ann/benchmark"
+ANN_REPOSITORY: "https://github.com/erikbern/ann-benchmarks.git"
+ANN_VERSION: "3e3e26929242a6c9e33336e0f2da0498b7cf5aac"
+
+algorithm: "faiss"

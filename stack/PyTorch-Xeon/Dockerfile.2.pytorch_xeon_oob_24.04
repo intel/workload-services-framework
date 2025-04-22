@@ -1,0 +1,84 @@
+# pytorch-oob-24.04
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+
+FROM ${OS_IMAGE}:${OS_VER} as build
+
+# Key components for OOB stack
+ARG PYTORCH_VER="2.3.0+cpu"
+ARG IPEX_VER="2.3.0"
+ARG TORCHVISION_VER="0.18.0+cpu"
+ARG TORCHAUDIO_VER="2.3.0+cpu"
+ARG PYTHON_VER="3.9"
+ARG MINIFORGE_VER="24.1.2-0-Linux-x86_64"
+ARG MKL_VER="2023.1.0"
+ARG JEMALLOC_VER="5.2.1"
+ARG GPERFTOOLS_VER="2.10"
+ARG PIP_VER="23.2.1"
+
+ARG PYTORCH_REPO="https://download.pytorch.org/whl/cpu"
+ARG IPEX_REPO="pip"
+ARG TORCHVISION_REPO="https://download.pytorch.org/whl/cpu"
+ARG TORCHAUDIO_REPO="https://download.pytorch.org/whl/cpu"
+ARG PYTHON_REPO="conda"
+ARG MINIFORGE_PKG="https://github.com/conda-forge/miniforge/releases/download/24.1.2-0/Miniforge3-24.1.2-0-Linux-x86_64.sh"
+ARG MKL_REPO="miniforge"
+ARG JEMALLOC_REPO="miniforge"
+ARG GPERFTOOLS_REPO="miniforge"
+ARG PIP_REPO="pip"
+
+SHELL ["/bin/bash", "-c"]
+
+WORKDIR /root/installs/
+
+RUN apt -o Acquire::Check-Date=false update && \
+    DEBIAN_FRONTEND=noninteractive && \
+    apt install -y \
+    unzip \
+    ca-certificates \
+    git \
+    bc \
+    wget \
+    bsdmainutils \
+    autoconf \
+    build-essential \
+    cmake \
+    numactl \
+    tar \
+    patch && \
+    apt autoremove -y
+
+# Prepare the Conda environment
+ARG CONDA_DIR="/root/anaconda3"
+RUN wget ${MINIFORGE_PKG} -O anaconda3.sh && \
+    chmod +x anaconda3.sh && \
+    ./anaconda3.sh -b -p ${CONDA_DIR} && \
+    rm ./anaconda3.sh
+ENV PATH="${CONDA_DIR}/bin/:${PATH}"
+ENV CONDA_PREFIX=${CONDA_DIR}
+
+# Install mkl & jemalloc
+RUN source activate base && \
+    conda install python=${PYTHON_VER}
+
+RUN source activate base && \
+    pip install pip==${PIP_VER} && \
+    conda install mkl==${MKL_VER} mkl-include==${MKL_VER} -y && \
+    conda install jemalloc==${JEMALLOC_VER} -c conda-forge -y && \
+    conda install gperftools==${GPERFTOOLS_VER} -c conda-forge -y
+
+# Install PyTorch, TorchVision and TorchAudio from official release
+RUN source activate base && \
+    pip uninstall torch torchvision -y && \
+    pip install torch==${PYTORCH_VER} --extra-index-url ${PYTORCH_REPO} && \
+    pip install intel_extension_for_pytorch==${IPEX_VER} && \
+    pip install torchvision==${TORCHVISION_VER} --extra-index-url ${TORCHVISION_REPO} && \
+    pip install torchaudio==${TORCHAUDIO_VER} --extra-index-url ${TORCHAUDIO_REPO}
+
+WORKDIR /root

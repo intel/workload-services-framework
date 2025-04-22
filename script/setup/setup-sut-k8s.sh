@@ -17,6 +17,7 @@ print_help () {
   echo "--worker       Specify the worker group."  
   echo "--client       Specify the client group."
   echo "--controller   Specify the controller group."
+  echo "--sut <file>   Specify the sut configuration file."
   echo ""
   exit 3
 }
@@ -25,10 +26,7 @@ if [ ${#@} -lt 2 ]; then
   print_help
 fi
 
-ssh_port=22
-controller_hosts=()
-worker_hosts=()
-client_hosts=()
+parse_host_args --controller "$@"
 setup_ansible_options=()
 setup_native_options=()
 ansible_options=(
@@ -38,28 +36,10 @@ ansible_options=(
 )
 [ ! -e vars.yaml ] || ansible_options+=(-e "@vars.yaml")
 last=""
-vm_group="controller"
-for v in $@; do
+for v in ${args[@]}; do
   k1="$(echo "${v#--}" | cut -f1 -d=)"
   v1="$(echo "${v#--}" | cut -f2- -d= | sed 's/%20/ /g')"
   case "$v" in
-  --help)
-    print_help
-    ;;
-  --worker)
-    vm_group=worker
-    ;;
-  --client)
-    vm_group=client
-    ;;
-  --controller)
-    vm_group=controller
-    ;;
-  --port=*)
-    ssh_port="${v#--port=}"
-    ;;
-  --port)
-    ;;
   --nointelcert)
     setup_native_options+=("$v")
     ;;
@@ -83,25 +63,8 @@ for v in $@; do
     ansible_options+=("-e" "$k1=true")
     ;;
   *)
-    if [ "$last" = "--port" ]; then
-      ssh_port="$v"
-    elif [[ "$v" = *"@"* ]]; then
-      case "$vm_group" in
-      controller)
-        controller_hosts+=("$v")
-        vm_group=worker
-        ;;
-      worker)
-        worker_hosts+=("$v")
-        ;;
-      client)
-        client_hosts+=("$v")
-        ;;
-      esac
-    else
-      echo "Unsupported argument: $v"
-      exit 3
-    fi
+    echo "Unsupported argument: $v"
+    exit 3
     ;;
   esac
   last="$v"
@@ -110,77 +73,38 @@ done
 ./setup-ansible.sh "${setup_ansible_options[@]}" 2>&1 | tee setup-sut-k8s.logs
 ./setup-sut-native.sh --port $ssh_port --controller ${controller_hosts[@]} --worker ${worker_hosts[@]} --client ${client_hosts[@]} "${setup_native_options[@]}" 2>&1 | tee -a setup-sut-k8s.logs
 
-controller=${controller_hosts[0]}
-controller_hh="${controller/*@/}"
-controller_h1="${controller_hh/:*/}"
-controller_h2="${controller_hh/*:/}"
-
-workers="$(
-  i=0
-  for h in ${worker_hosts[@]}; do 
-    hh="${h/*@/}"
-    h1="${hh/:*/}"
-    h2="${hh/*:/}"
-    cat <<EOF
-        worker-$i: &worker-$i
-          ansible_host: "${h1}"
-          ansible_user: "${h/@*/}"
-          private_ip: "${h2:-$h1}"
-          ansible_port: "$ssh_port"
-EOF
-i=$((i+1));done)"
-workers_ref="$(i=0;for h in ${worker_hosts[@]}; do cat <<EOF
-        worker-$i: *worker-$i
-EOF
-i=$((i+1));done)"
-
-clients="$(
-  i=0
-  for h in ${client_hosts[@]}; do 
-    hh="${h/*@/}"
-    h1="${hh/:*/}"
-    h2="${hh/*:/}"
-    cat <<EOF
-        client-$i: &client-$i
-          ansible_host: "${h1}"
-          ansible_user: "${h/@*/}"
-          private_ip: "${h2:-$h1}"
-          ansible_port: "$ssh_port"
-EOF
-i=$((i+1));done)"
-clients_ref="$(i=0;for h in ${client_hosts[@]}; do cat <<EOF
-        client-$i: *client-$i
-EOF
-i=$((i+1));done)"
-
 . <(sed '/^# BEGIN WSF Setup/,/^# END WSF Setup/{d}' /etc/environment)
 export http_proxy https_proxy no_proxy
 rm -f /tmp/wsf-setup-ssh-* 2> /dev/null || true
-ANSIBLE_ROLES_PATH=../terraform/template/ansible/kubernetes/roles:../terraform/template/ansible/common/roles:../terraform/template/ansible/traces/roles ANSIBLE_INVENTORY_ENABLED=yaml ansible-playbook --flush-cache -vv -e wl_logs_dir="$DIR" -e my_ip_list=1.1.1.1 "${ansible_options[@]}" --inventory <(cat <<EOF
-all:
-  children:
-    cluster_hosts:
-      hosts:
-        controller-0: &controller-0
-          ansible_host: "${controller_h1}"
-          ansible_user: "${controller/@*/}"
-          private_ip: "${controller_h2:-$controller_h1}"
-          ansible_port: "$ssh_port"
-$workers
-$clients
-    controller:
-      hosts:
-        controller-0: *controller-0
-    workload_hosts:
-      hosts:
-$workers_ref
-$clients_ref
-    trace_hosts:
-      hosts:
-$workers_ref
-$clients_ref
-    off_cluster_hosts:
-      hosts:
-EOF
-) ./setup-sut-k8s.yaml 2>&1 | tee -a setup-sut-k8s.logs
+ANSIBLE_ROLES_PATH=../terraform/template/ansible/kubernetes/roles:../terraform/template/ansible/common/roles:../terraform/template/ansible/traces/roles ANSIBLE_INVENTORY_ENABLED=yaml ansible-playbook --flush-cache -vv -e wl_logs_dir="$DIR" -e my_ip_list=1.1.1.1 "${ansible_options[@]}" --inventory <(create_inventory) ./setup-sut-k8s.yaml 2>&1 | tee -a setup-sut-k8s.logs
 rm -f cluster-info.json timing.yaml
+
+create_tf_file 2>&1 | tee -a setup-sut-k8s.logs
+
+is_controller_on_dev_host () {
+  for h in ${controller_hosts[@]/:*/}; do
+    [[ " $@ " != *" ${h/*@/} "* ]] || echo true
+  done
+}
+
+if [[ "$(is_controller_on_dev_host $(hostname) $(hostname -f) $(hostname -i))" = *"true"* ]]; then
+  (
+    echo
+    echo "Kubernetes requires to use a docker REGISTRY to serve images. If you use only official release images,"
+    echo "then no more setup is required. Otherwise you must create a private registry (setup-reg.sh) and set it"
+    echo "as follows:"
+    echo "  cd build"
+    echo "  cmake -DREGISTRY=<value> .."
+  ) 2>&1 | tee -a setup-sut-k8s.logs
+else
+  (
+    echo
+    echo "Kubernetes requires to use a docker REGISTRY to serve images. If you use only official release images,"
+    echo "then no more setup is required. Otherwise do one of the following setup steps:"
+    echo "(1) Setup a private registry (setup-reg.sh) and activate it as follows:"
+    echo "  cd build"
+    echo "  cmake -DREGISTRY=<value> .."
+    echo "(2) Set 'k8s_enable_registry: true' in script/terraform/$(basename "$sutfile"). An in-cluster registry"
+    echo "will be created to serve images."
+  ) 2>&1 | tee -a setup-sut-k8s.logs
+fi

@@ -5,13 +5,56 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-function median(v) {
-    n=asort(v, v_sorted, "@val_num_asc")
-    if (n%2 == 0) {
-        return v_sorted[n/2]
-    } else {
-        return v_sorted[(n+1)/2]
+BEGIN {
+    split("", prefixes)
+    split("abcdefghijklmnopqrstuvwxyz",ps,"")
+    i=0
+    for (x in ps)
+       for (y in ps)
+           prefixes[++i]=ps[x]ps[y]
+}
+
+function add_prefix(k,k_uniq,tc  ,kk) {
+    kk=""
+    k_uniq[tc][""]=""
+    if (length(k_uniq[tc][k])>0) kk=k_uniq[tc][k]
+    if (kk=="") {
+      kk=prefixes[length(k_uniq[tc])]","k
+      k_uniq[tc][k]=kk
     }
+    return kk
+}
+
+function remove_prefix(k) {
+    return gensub(/^[a-z][a-z][,]/,"",1,k)
+}
+
+function calc_median(values   ,m,n,v_sorted) {
+    m=0
+    if (length(values)>0) {
+        n=asort(values, v_sorted, "@val_num_asc")
+        m=(n%2 == 0)?v_sorted[n/2]:v_sorted[(n+1)/2]
+    }
+    return int(m*100)/100
+}
+
+function calc_avg(values      ,s,v) {
+    s=0
+    if (length(values)>0) {
+        for (v in values)
+            s=s+values[v]
+        s=s/length(values)
+    }
+    return int(s*100)/100
+}
+
+function calc_max(values      ,m,v) {
+    m=0
+    if (length(values)>0)
+        for (v in values)
+            if (values[v]>m || m==0)
+                m=values[v]
+    return int(m*100)/100
 }
 
 function escape(text) {

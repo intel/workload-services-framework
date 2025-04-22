@@ -6,5 +6,10 @@
 
 svrinfo: true
 sutinfo: true
-sutinfo_tool: perfspect
 
+sutinfo_uncore: false
+sutinfo_sysfs_uncore00_path: "/sys/devices/system/cpu/intel_uncore_frequency/uncore00"
+sutinfo_uncore_records:
+  LLC: "0x0c90"
+  L2C: "0x0d10"
+  UNCORE: "0x620"

@@ -28,5 +28,5 @@
 #
 
 igt: false
-igt_options: "-o -"
+igt_options: ""
 #igt_options: "-J -s 500 -o -"

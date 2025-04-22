@@ -8,5 +8,5 @@
     src: igt-charts.html.j2
     dest: "{{ trace_data_path }}/roi-{{ roi_index }}.html"
   vars:
-    igtstat_data: "{{ lookup('pipe', 'gawk -f ' + ((role_path + '/scripts/parse-igt.awk') | quote) + ' ' + ((trace_data_path + '/igt-' + (roi_index | string) + '.logs') | quote)) }}"
+    igtstat_data: "{{ lookup('pipe', 'gawk -v time_spec=' + (roi[0] | quote) + ' -f ' + ((role_path + '/scripts/parse-igt.awk') | quote) + ' ' + (trace_data_path|quote) + '/igt-*-' + (roi_index | string) + '.logs') }}"
   ignore_errors: true

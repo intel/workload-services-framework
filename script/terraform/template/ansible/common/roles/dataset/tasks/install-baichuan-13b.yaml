@@ -3,12 +3,12 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
-- include_role:
-    name: hf-dataset
+- include_tasks:
+    file: download-hf.yaml
   vars:
-    DEST_DIR: "/opt/dataset/baichuan/13b"
-    MODEL_ID: "baichuan-inc/Baichuan-13B-Chat"
-    DATASET_SIZE: 30
-    exclude: []
-    revision: []
-    HF_LOGIN: false
+    dataset_model_path: "baichuan/13b"
+    hfcli_model_id: "baichuan-inc/Baichuan-13B-Chat"
+    dataset_size: 30
+    hfcli_exclude: []
+    hfcli_revision: []
+    hfcli_login: false

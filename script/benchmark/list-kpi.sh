@@ -13,11 +13,8 @@ print_help () {
     echo "--all                 List all KPIs."
     echo "--params              Print out all configuration parameters."
     echo "--sutinfo             Print out sutinfo."
-    echo "--outlier <n>         Drop samples beyond N-stdev."
-    echo "--format <format>     Specify the output format: list, xls-ai, xls-inst, or xls-table."
-    echo "--var[1-9] value      Specify spreadsheet variables."
+    echo "--format <format>     Specify the output format: list, xls-list."
     echo "--file filename       Specify the spreadsheet filename."
-    echo "--filter filter       Specify the trim filter to shorten the worksheet name."
     echo "--uri                 Show WSF portal URI."
     echo "--intel_publish       Publish logs to the WSF dashboard."
     echo "--export-trace        Re-run the trace export routines."
@@ -53,19 +50,13 @@ get_recent_logs () {
 }
 
 prefixes=()
-primary=1
-outlier=0
+primary=0
 printvar=0
 format="list"
 xlsfile="kpi-report.xls"
 params=0
 sutinfo=0
-var1="default"
-var2="default"
-var3="default"
-var4="default"
 uri=0
-filter="_(tensorflow|throughput|inference|benchmark|real)"
 last_var=""
 intel_publish=0
 trace_export=0
@@ -83,9 +74,6 @@ for var in "$@"; do
     --all)
         primary=0
         ;;
-    --outlier=*)
-        outlier="${var#--outlier=}"
-        ;;
     --params|--params=true)
         params=1
         ;;
@@ -94,21 +82,6 @@ for var in "$@"; do
         ;;
     --format=*)
         format="${var#--format=}"
-        ;;
-    --var1=*)
-        var1="${var#--var1=}"
-        ;;
-    --var2=*)
-        var2="${var#--var2=}"
-        ;;
-    --var3=*)
-        var3="${var#--var3=}"
-        ;;
-    --var4=*)
-        var4="${var#--var4=}"
-        ;;
-    --filter=*)
-        filter="${var#--filter=}"
         ;;
     --file=*)
         xlsfile="${var#--file=}"
@@ -134,33 +107,15 @@ for var in "$@"; do
     --pretag=*)
         pretag="${var#--pretag=}"
         ;;
-    --var1|--var2|--var3|--var4|--filter|--file|--format|--outlier|--owner|--tags|--pretag)
+    --file|--format|--owner|--tags|--pretag)
         ;;
     --recent)
         IFS=$'\n' prefixes+=($(get_recent_logs))
         ;;
     *)
         case "$last_var" in
-        --outlier)
-            outlier="$var"
-            ;;
         --format)
             format="$var"
-            ;;
-        --var1)
-            var1="$var"
-            ;;
-        --var2)
-            var2="$var"
-            ;;
-        --var3)
-            var3="$var"
-            ;;
-        --var4)
-            var4="$var"
-            ;;
-        --filter)
-            filter="$var"
             ;;
         --file)
             xlsfile="$var"
@@ -182,10 +137,6 @@ for var in "$@"; do
     last_var="$var"
 done
 
-if [ "$outlier" = "-1" ]; then
-    outlier=0
-fi
-
 if [ "$format" != "list" ]; then
     primary=0
     params=1
@@ -201,6 +152,8 @@ if [ $trace_export = 1 ]; then
             echo "Export trace data from $logsdir1..."
             RELEASE="$(sed -n '/^release:/{s/.*\"\(.*\)\".*/\1/;p}' "$logsdir1"/workload-config.yaml)"
             REGISTRY="$(sed -n '/^registry:/{s/.*\"\(.*\)\".*/\1/;p}' "$logsdir1"/workload-config.yaml)"
+            TERRAFORM_RELEASE="$(sed -n '/^terraform_release:/{s/.*\"\(.*\)\".*/\1/;p}' "$logsdir1"/workload-config.yaml)"
+            TERRAFORM_REGISTRY="$(sed -n '/^terraform_registry:/{s/.*\"\(.*\)\".*/\1/;p}' "$logsdir1"/workload-config.yaml)"
             BACKEND="$(sed -n '/^backend:/{s/.*\"\(.*\)\".*/\1/;p}' "$logsdir1"/workload-config.yaml)"
             csp="$(grep -E '^\s*csp\s*=' "$logsdir1/terraform-config.tf" | cut -f2 -d'"' | tail -n1)"
             ansible_options=()
@@ -219,7 +172,7 @@ if [ $trace_export = 1 ]; then
                     ;;
                 esac
             done
-            RELEASE="$RELEASE" REGISTRY="$REGISTRY" "$DIR"/../terraform/shell.sh ${csp:-static} -v "$(readlink -f "$logsdir1"):/opt/workspace" -- bash -c "ANSIBLE_ROLES_PATH=/opt/terraform/template/ansible/traces/roles:/opt/terraform/template/ansible/common ANSIBLE_CONFIG=/opt/terraform/template/ansible/ansible.cfg ANSIBLE_INVENTORY_ENABLED=host_list ansible-playbook ${ansible_options[*]} -vv -c local -i 127.0.0.1, -e wl_logs_dir=/opt/workspace /opt/terraform/template/ansible/common/export.yaml"
+            TERRAFORM_RELEASE="$TERRAFORM_RELEASE" TERRAFORM_REGISTRY="$TERRAFORM_REGISTRY" RELEASE="$RELEASE" REGISTRY="$REGISTRY" "$DIR"/../terraform/shell.sh ${csp:-static} -v "$(readlink -f "$logsdir1"):/opt/workspace" -- bash -c "ANSIBLE_ROLES_PATH=/opt/terraform/template/ansible/traces/roles:/opt/terraform/template/ansible/common ANSIBLE_CONFIG=/opt/terraform/template/ansible/ansible.cfg ANSIBLE_INVENTORY_ENABLED=host_list ansible-playbook ${ansible_options[*]} -vv -c local -i 127.0.0.1, -e wl_logs_dir=/opt/workspace /opt/terraform/template/ansible/common/export.yaml"
         fi
     done
 fi
@@ -232,6 +185,8 @@ if [ $intel_publish = 1 ]; then
             BACKEND_OPTIONS="$(sed -n "/^${BACKEND}_options:/{s/.*\"\(.*\)\".*/\1/;p}" "$logsdir1"/workload-config.yaml | tr '\n' ' ') $(sed -n '/^ctestsh_options:/{s/.*\"\(.*\)\".*/\1/;p}' "$logsdir1"/workload-config.yaml | tr '\n' ' ')"
             RELEASE="$(sed -n '/^release:/{s/.*\"\(.*\)\".*/\1/;p}' "$logsdir1"/workload-config.yaml)"
             REGISTRY="$(sed -n '/^registry:/{s/.*\"\(.*\)\".*/\1/;p}' "$logsdir1"/workload-config.yaml)"
+            TERRAFORM_RELEASE="$(sed -n '/^terraform_release:/{s/.*\"\(.*\)\".*/\1/;p}' "$logsdir1"/workload-config.yaml)"
+            TERRAFORM_REGISTRY="$(sed -n '/^terraform_registry:/{s/.*\"\(.*\)\".*/\1/;p}' "$logsdir1"/workload-config.yaml)"
             csp="$(grep -E '^\s*csp\s*=' "$logsdir1/terraform-config.tf" | cut -f2 -d'"' | tail -n1)"
 
             if [ -r "$logsdir1"/terraform-config.tf ]; then
@@ -248,58 +203,33 @@ if [ $intel_publish = 1 ]; then
                 BACKEND_OPTIONS="$BACKEND_OPTIONS --pretag=$pretag"
             fi
 
-            TERRAFORM_OPTIONS="$BACKEND_OPTIONS" RELEASE="$RELEASE" REGISTRY="$REGISTRY" "$DIR"/../terraform/shell.sh ${csp:-static} -v "$(readlink -f "$logsdir1"):/opt/workspace" -- bash -c "/opt/terraform/script/publish-intel.py $BACKEND_OPTIONS < <(cat tfplan.json 2> /dev/null || cat .tfplan.json 2> /dev/null || echo)" | tee "$logsdir1/publish.logs"
+            TERRAFORM_OPTIONS="$BACKEND_OPTIONS" TERRAFORM_RELEASE="$TERRAFORM_RELEASE" TERRAFORM_REGISTRY="$TERRAFORM_REGISTRY" RELEASE="$RELEASE" REGISTRY="$REGISTRY" "$DIR"/../terraform/shell.sh ${csp:-static} -v "$(readlink -f "$logsdir1"):/opt/workspace" -- bash -c "/opt/terraform/script/publish-intel.py $BACKEND_OPTIONS < <(cat tfplan.json 2> /dev/null || cat .tfplan.json 2> /dev/null || echo)" | tee "$logsdir1/publish.logs"
         fi
     done
 fi
 
 for logsdir1 in "${prefixes[@]}"; do
     if [ -r "$logsdir1/kpi.sh" ] && [ -r "$logsdir1"/workload-config.yaml ]; then
-        instv=($(
-          (
-            for file in "$logsdir1"/terraform-config.tf "$logsdir1"/inventory.yaml; do 
-                [ -r "$file" ] && cat "$file"
-            done 
-            for file in "$logsdir1"/*-sutinfo/*.json "$logsdir1"/*-svrinfo/*.json; do
-                [ -r "$file" ] && sed 's/^/#sutinfo- /' "$file"
-            done
-          ) | awk -f "$DIR"/sutinfo-json.awk -f "$DIR"/sutinfo-inst.awk
-        ))
+        echo "#logsdir: $logsdir1"
+        for config in "$logsdir1"/terraform-config.tf; do
+            if [ -r "$config" ]; then
+                echo "#terraform-config: $config"
+                sed 's/^/#terraform-config- /' "$config"
+            fi
+        done
         for sutinfo in "$logsdir1"/*-sutinfo/*.json "$logsdir1"/*-svrinfo/*.json; do
             if [ -r "$sutinfo" ]; then
-                echo "#sutinfo: $sutinfo ${instv[@]}"
+                echo "#sutinfo: $sutinfo"
                 sed 's/^/#sutinfo- /' "$sutinfo"
                 echo
             fi
         done
-        for power in "$logsdir1"/*-pcm/roi-*/power.records; do
-            if [ -r "$power" ]; then
-                echo "#pcm: $(echo "$power" | sed 's|^.*/\([^/]*\)-pcm/.*$|\1|') $(echo "$power" | sed 's|^.*/\(roi-[0-9]*\)/.*$|\1|')"
-                sed 's/^/#pcm- /' "$power"
-            fi
-        done
-        for power in "$logsdir1"/*-pdu/pdu-*.logs; do
-            if [ -r "$power" ]; then
-                echo "#pdu: $(echo "$power" | sed 's|^.*/\([^/]*\)-pdu/.*$|\1|') $(echo "$power" | sed 's|^.*/pdu-\([0-9]*\).logs$|roi-\1|')"
-                sed 's/^/#pdu- /' "$power"
-            fi
-        done
-        for power in "$logsdir1"/*-uprof/roi-*/timechart.csv; do
-            if [ -r "$power" ]; then
-                echo "#uprof: $(echo "$power" | sed 's|^.*/\([^/]*\)-uprof/.*$|\1|') $(echo "$power" | sed 's|^.*/\(roi-[0-9]*\).*$|\1|')"
-                sed 's/^/#uprof- /' "$power"
-            fi
-        done
-        for power in "$logsdir1"/*-emon/emon-*-edp/__mpp_socket_view_details.csv; do
-            if [ -r "$power" ]; then
-                echo "#emon: $(echo "$power" | sed 's|^.*/\([^/]*\)-emon/.*$|\1|') $(echo "$power" | sed 's|^.*/emon-\([0-9]*\)-edp/.*$|roi-\1|')"
-                sed 's/^/#emon- /' "$power"
-            fi
-        done
-        for power in "$logsdir1"/*-perfspect/roi-*/*_metrics.csv; do
-            if [ -r "$power" ]; then
-                echo "#perfspect: $(echo "$power" | sed 's|^.*/\([^/]*\)-perfspect/.*$|\1|') $(echo "$power" | sed 's|^.*/\(roi-[0-9]*\)/.*$|\1|')"
-                sed 's/^/#perfspect- /' "$power"
+        for trace_file in "$logsdir1"/*-pcm/roi-*/power.records "$logsdir1"/*-pdu/pdu-*.logs "$logsdir1"/*-uprof/roi-*/timechart.csv "$logsdir1"/*-emon/emon-*-edp/__mpp_socket_view_details.csv "$logsdir1"/*-emon/emon-*-edp/__mpp_system_view_details.csv "$logsdir1"/*-perfspect/roi-*/*_metrics.csv "$logsdir1"/*-sar/sar-*.logs.txt "$logsdir1"/*-collectd/aggregation-cpu-average/cpu-user-* "$logsdir1"/*-igt/igt-card*-*.logs; do
+            if [ -r "$trace_file" ]; then
+                trace_module="$(echo "$trace_file" | sed -E 's|^.*/([^/]+[-])?logs[-][^/]+/[a-z]+[-][0-9]+([-][0-9]+)?[-]([a-z-]+)/.*$|\3|')"
+                echo "#$trace_module: $trace_file"
+                sed "s/^/#$trace_module- /" "$trace_file"
+                echo "#$trace_module- "
             fi
         done
         script_args="$(sed -n '/^script_args:/{s/script_args: "\(.*\)"$/\1/;p}' "$logsdir1/workload-config.yaml")"
@@ -315,7 +245,7 @@ for logsdir1 in "${prefixes[@]}"; do
                     sed -n '/^tunables:/,/^[^ ]/{/^ /{s/^ */## /;p}}' "$logsdir1/workload-config.yaml"
                     cd "$itrdir1"
                     bash ./kpi.sh $script_args
-                ) 2> /dev/null | awk -v pr=$primary -v pm=$params '
+                ) 2> /dev/null | gawk -v pr=$primary -v pm=$params '
                 BEGIN {
                     split("",kpis_u)
                 }
@@ -364,19 +294,10 @@ for logsdir1 in "${prefixes[@]}"; do
 done | (
     case "$format" in
     list)
-        awk -v sutinfo=$sutinfo -v outlier=$outlier -f "$DIR/kpi-list.awk" 
+        gawk -v sutinfo=$sutinfo -f "$DIR/xlsutil.awk" -f "$DIR/kpi-list.awk"
         ;;
     xls-list)
-        awk -f "$DIR/xlsutil.awk" -f "$DIR/sutinfo-json.awk" -f "$DIR/sutinfo-xls.awk" -f "$DIR/kpi-xls-list.awk" > "$xlsfile"
-        ;;
-    xls-ai)
-        awk -v outlier=$outlier -v var1="$var1" -v var2="$var2" -v var3="$var3" -v var4="$var4" -v filter="$filter" -f "$DIR/xlsutil.awk" -f "$DIR/sutinfo-json.awk" -f "$DIR/sutinfo-xls.awk" -f "$DIR/kpi-xls-ai.awk" > "$xlsfile"
-        ;;
-    xls-inst)
-        awk -v var1="$var1" -v filter="$filter" -f "$DIR/xlsutil.awk" -f "$DIR/sutinfo-json.awk" -f "$DIR/sutinfo-xls.awk" -f "$DIR/kpi-xls-inst.awk" > "$xlsfile"
-        ;;
-    xls-table)
-        awk -v var1="$var1" -v var2="$var2" -v var3="$var3" -v var4="$var4" -v filter="$filter" -f "$DIR/xlsutil.awk" -f "$DIR/sutinfo-json.awk" -f "$DIR/sutinfo-xls.awk" -f "$DIR/kpi-xls-table.awk" > "$xlsfile"
+        gawk -f "$DIR/xlsutil.awk" -f "$DIR/sutinfo-json.awk" -f "$DIR/sutinfo-xls.awk" -f "$DIR/kpi-xls-list.awk" > "$xlsfile"
         ;;
     esac
 )

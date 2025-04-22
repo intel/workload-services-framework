@@ -1,0 +1,14 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Remove phoronix test-result directory
+  file:
+    path: "{{ PHORONIX_INSTALL_DIR }}/test-results/{{ BENCHMARK_WL }}"
+    state: absent
+  ignore_errors: true
+
+- name: Set App Parameters
+  set_fact:
+    BENCHMARK_WL: "{{ wl_tunables['BENCHMARK_WL'] }}"

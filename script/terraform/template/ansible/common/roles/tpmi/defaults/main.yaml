@@ -10,5 +10,4 @@ tpmi_package: "https://github.com/intel/pcm.git"
 # format: <group>:key=value[,...]
 sut_tpmi_options: ''
 
-wl_tpmi: ""
 sut_update_tpmi: false

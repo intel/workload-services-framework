@@ -33,6 +33,14 @@
   become: true
   ignore_errors: true
 
+- name: reset iptables
+  shell: |
+    iptables-save | sed -n '/^[*]/{p};/COMMIT/{p};/^:[A-Z][A-Z]* [^-]/{s/ .*$/ ACCEPT/;p}' | iptables-restore
+    ipvsadm --clear 2> /dev/null || true
+  when: k8s_reset_iptables | bool
+  ignore_errors: true
+  become: true
+
 - name: restart containerd
   include_role:
     name: containerd

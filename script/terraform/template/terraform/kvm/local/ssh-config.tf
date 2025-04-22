@@ -12,7 +12,6 @@ resource "local_file" "default" {
     remote_user = var.kvm_host.user
     remote_host = var.kvm_host.host
     remote_port = var.kvm_host.port
-    identity_file = var.ssh_pri_key_file
   })
 
   filename = "${path.root}/ssh_config_${var.kvm_index}"

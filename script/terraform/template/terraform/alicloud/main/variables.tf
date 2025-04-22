@@ -62,6 +62,7 @@ variable "instance_profiles" {
     vm_count = number
     instance_type = string
     cpu_model_regex = string
+    accelerators = string
 
     os_type = string
     os_disk_type = string

@@ -4,5 +4,5 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-perfspect_public_repository: "https://github.com/intel/PerfSpect/releases/download/v{{ perfspect_version }}/perfspect_{{ perfspect_version }}.tgz"
+perfspect_public_repository: "https://github.com/intel/PerfSpect/releases/download/v{{ perfspect_version }}/perfspect.tgz"
 

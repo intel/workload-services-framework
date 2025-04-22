@@ -3,11 +3,25 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
-- name: Restore individual MSR setting
-  include_tasks:
-    file: cleanup-msr.yaml
+
+- name: Write msr register
+  shell:
+    cmd: |
+      {% for item in lookup('file',restore_file) | from_json | dict2items %}
+        {% if item.key is match('^0x0*620$') %}
+          for uncore_path in {{ msr_sysfs_uncore00_path | dirname }}/uncore*; do
+            if [ -d $uncore_path ]; then
+              echo "{{ ((item.value | int(base=16)) % 256) * 100000 }}" > $uncore_path/max_freq_khz
+              echo "{{ (((item.value | int(base=16)) / 256) |int) * 100000 }}" > $uncore_path/min_freq_khz
+            fi
+          done
+        {% endif %}
+        wrmsr -a {{ item.key }} {{ item.value }}
+      {% endfor %}
+    executable: /bin/bash
   when:
   - sut_update_msr | bool
   - restore_file is exists
   vars:
-    restore_file: "{{ wl_logs_dir }}/{{ inventory_hostname }}-msrinfo/restore"
+    restore_file: "{{ wl_logs_dir }}/{{ inventory_hostname }}-msrinfo/saved.json"
+

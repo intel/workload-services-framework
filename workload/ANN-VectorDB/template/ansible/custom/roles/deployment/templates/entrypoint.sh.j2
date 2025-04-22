@@ -1,0 +1,124 @@
+#!/bin/bash
+
+ALGORITHM={{ algorithm }}
+DATASET={{ dataset }}
+BATCH={{ batch }}
+CPU_LIMIT={{ cpu_limit }}
+MEM_LIMIT={{ mem_limit }}
+
+MILVUS_M={{ milvus_m }}
+MILVUS_QUERY_ARGS={{ milvus_query_args }}
+
+FAISS_NAME={{ faiss_name }}
+FAISS_ARGS={{ faiss_args }}
+FAISS_QUERY_ARGS={{ faiss_query_args }}
+FAISS_QUERY_ARGS2={{ faiss_query_args2 }}
+
+REDISEARCH_ARG_GROUP={{ redisearch_arg_group }}
+REDISEARCH_QUERY_ARGS={{ redisearch_query_args }}
+
+HNSWLIB_ARG_GROUP={{ hnswlib_arg_group }}
+HNSWLIB_QUERY_ARGS={{ hnswlib_query_args }}
+
+workspace={{ WORKSPACE }}
+ann_home={{ ANN_HOME }}
+
+
+# ANN will leave a core for benchmark running. if not enough, could chang it here (hardcoded)
+total_core=$(grep -c ^processor /proc/cpuinfo)
+available_cpu=$((total_core - 1))
+if [ "${available_cpu}" -lt "${CPU_LIMIT}" ]; then
+    echo "Error: The number of available CPU cores ${available_cpu} is less than the required cores number ${CPU_LIMIT}"
+    echo 1 > ${workspace}/itr-1/benchmark/status
+    exit 1
+else
+    echo "The number of available CPU cores ${available_cpu} is greater than or equal to the required cores number ${CPU_LIMIT}"
+fi
+sed -i "s/^\([[:space:]]*\)cpu_limit = str(cpu) if not args.batch else f.*/\1cpu_limit = f\"1-${CPU_LIMIT}\" if not args.batch else f\"0-\${multiprocessing.cpu_count() - 1}\"/" ${ann_home}/ann_benchmarks/main.py
+
+available_mem_kb=$(awk '/MemAvailable/ {print $2}' /proc/meminfo)
+available_mem=$((available_mem_kb * 1024))
+# change the input memory_limit from GB to B
+request_mem=$((MEM_LIMIT * 1024 * 1024 *1024))
+if [ "${available_mem}" -lt "${request_mem}" ]; then
+    echo "Error: The number of available memory ${available_mem} is less than the required memory ${request_mem}"
+    echo 1 > ${workspace}/itr-1/benchmark/status
+    exit 1
+else
+    echo "The number of available memory ${available_mem} is greater than or equal to the required memory ${request_mem}"
+fi
+sed -i "s/mem_limit = int((psutil.virtual_memory().available - memory_margin) \/ args.parallelism)/mem_limit = int(${request_mem})/" ${ann_home}/ann_benchmarks/main.py
+
+
+algorithm_config_file="${ann_home}/ann_benchmarks/algorithms/${ALGORITHM}/config.yml"
+algorithm_run="$(grep -m1 'name: .*' ${algorithm_config_file} | sed -e 's/name: \(.*\)/\1/' -e 's/^[ \t]*//' -e 's/[ \t]*$//')"
+echo "In the '${algorithm_config_file}', '${algorithm_run}' is selected for '${ALGORITHM}' requested on '${DATASET}'"
+
+case ${ALGORITHM} in
+    "milvus")
+        echo "update '${algorithm_config_file}' M to '${MILVUS_M}' and query_args to '${MILVUS_QUERY_ARGS}'"
+        sed -i "s/^\([[:space:]]*\)M: \[.*/\1M: [${MILVUS_M}]/" ${algorithm_config_file}
+        sed -i "/query_args: \[\[/,/]]/c\        query_args: [[${MILVUS_QUERY_ARGS}]]" ${algorithm_config_file}
+        ;;
+    "faiss")
+        echo "update '${algorithm_config_file}'"
+        find config -type f -name "${FAISS_NAME}.yml" -print0 | xargs  -0 -I {} mv {} ${algorithm_config_file}
+        case ${FAISS_NAME} in
+            "bit_faiss_ivf" | "float_faiss_ivf")
+                sed -i "s/^\([[:space:]]*\)args: \[\[.*/\1args: [[${FAISS_ARGS}]]/" ${algorithm_config_file}
+                sed -i "s/^\([[:space:]]*\)query_args: \[\[.*/\1query_args: [[${FAISS_QUERY_ARGS}]]/" ${algorithm_config_file}
+                ;;
+            "float_faiss_ivfpqfs")
+                sed -i "s/^\([[:space:]]*\)args: \[\[.*/\1args: [[${FAISS_ARGS}]]/" ${algorithm_config_file}
+                sed -i "s/^\([[:space:]]*\)query_args: \[\[.*/\1query_args: [[${FAISS_QUERY_ARGS}], [${FAISS_QUERY_ARGS2}]]/" ${algorithm_config_file}
+                ;;
+            "float_faiss_lsh")
+                sed -i "s/^\([[:space:]]*\)args: \[\[.*/\1args: [[${FAISS_ARGS}]]/" ${algorithm_config_file}
+                ;;
+            *)
+                echo "Error: Unsupported FAISS algorithm"
+                echo 1 > ${workspace}/itr-1/benchmark/status
+                exit 1
+                ;;
+        esac
+        ;;
+    "redisearch")
+        echo "update '${algorithm_config_file}' arg_group to '${REDISEARCH_ARG_GROUP}' and query_args to '${REDISEARCH_QUERY_ARGS}'"
+        sed -i "s/^\([[:space:]]*\)arg_groups: \[\[.*/\1arg_groups: [[${REDISEARCH_ARG_GROUP}]]/" ${algorithm_config_file}
+        sed -i "s/^\([[:space:]]*\)query_args: \[\[.*/\1query_args: [[${REDISEARCH_QUERY_ARGS}]]/" ${algorithm_config_file}
+        ;;
+    "hnswlib")
+        echo "update '${algorithm_config_file}'"
+        find config -type f -name "${algorithm_run}.yml" -print0 | xargs  -0 -I {} mv {} ${algorithm_config_file}
+        sed -i '$a\      M-'"${HNSWLIB_ARG_GROUP}"':\n        arg_groups: [{M: '"${HNSWLIB_ARG_GROUP}"', efConstruction: 500}]\n        args: {}\n        query_args: [['"${HNSWLIB_QUERY_ARGS}"']]' ${algorithm_config_file}
+        ;;
+    *)
+        echo "other algorithm"
+        ;;
+esac
+
+
+echo "Begin performance testing"
+cd ${ann_home}
+if [[ "${BATCH}" == "True" ]]; then
+    #In ann function main.py::create_workers_and_execute(),
+    # Batch mode uses all available CPU resources, --parallelism should be set to 1
+    python3 run.py --algorithm=${algorithm_run} --dataset=${DATASET} --batch --runs=1
+elif [[ "${BATCH}" == "False" ]]; then
+    python3 run.py --algorithm=${algorithm_run} --dataset=${DATASET}  --runs=1
+else
+    echo "Error: Invalid input BATCH: '${BATCH}'. Please provide 'True' or 'False'."
+    echo "End performance testing"
+    echo 1 > ${workspace}/itr-1/benchmark/status
+fi
+echo 0 > ${workspace}/itr-1/benchmark/status
+echo "End performance testing"
+
+#Deal with the result
+python3 data_export.py --out ${workspace}/itr-1/benchmark/result.csv
+cat ${workspace}/itr-1/benchmark/result.csv > ${workspace}/itr-1/benchmark/result.txt
+#The output format like below:
+#  Milvus(Knowhere), "Milvus(Knowhere)(index_M:96,index_ef:500,search_ef=800)",10,0.919609,
+#  redisearch, "Redisearch(M=96, ef=800)", 10, 0.99853, 0.99978,  1.0, 0.0857483, 334.6364165,
+#In order to parse the output in kpi conveniently, remove ',' in '()'
+sed -i ':a; s/\(([^,()]*\),/\1 /g; ta' ${workspace}/itr-1/benchmark/result.txt

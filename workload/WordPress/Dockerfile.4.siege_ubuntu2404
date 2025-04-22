@@ -1,0 +1,87 @@
+# wordpress-siege-ubuntu2404
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+
+FROM ${OS_IMAGE}:${OS_VER} as build
+ENV TZ=America/Los_Angeles
+ENV DEBIAN_FRONTEND noninteractive
+
+# Install packages glibc and siege need.
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    unzip \
+    automake \
+    zlib1g-dev \
+    gcc g++ \
+    make \
+    wget \
+    gawk \
+    bison \
+    texinfo \
+    python3 \
+    openssl \
+    libssl-dev \
+    git && \
+    rm -rf /var/lib/apt/lists
+
+# # Build glibc from source code
+# WORKDIR /app
+# # This patch fixes siege hang issue, see: https://sourceware.org/pipermail/libc-alpha/2023-April/147654.html
+# COPY files/0001-__check_pf-Add-a-cancellation-cleanup-handler-BZ-209.patch .
+# ARG GLIBC_VER=2.31
+# ARG GLIBC_PKG=glibc-${GLIBC_VER}.tar.gz
+# ARG GLIBC_SOURCE_URL=https://ftp.gnu.org/gnu/glibc
+# RUN wget ${GLIBC_SOURCE_URL}/glibc-${GLIBC_VER}.tar.gz && \
+#     tar zxvf ${GLIBC_PKG} && \
+#     mv glibc-${GLIBC_VER} glibc && \
+#     cd glibc && \
+#     git apply ../0001-__check_pf-Add-a-cancellation-cleanup-handler-BZ-209.patch && \
+#     mkdir build && \
+#     cd build && \
+#     ../configure --prefix=/usr/local/glibc && \
+#     make -j && \
+#     make install
+
+
+WORKDIR /app
+ARG SIEGE_VER=v4.1.5
+ARG SIEGE_REPO=https://github.com/JoeDog/siege.git
+RUN git clone --depth 1 -b ${SIEGE_VER} ${SIEGE_REPO} && \
+    cd siege && \
+    sed -i "s|limit = 255|limit = 1024|" ./doc/siegerc.in && \
+    sed -i "s|parser = true|parser = false|" ./doc/siegerc.in && \
+    sed -i "s|verbose = true|verbose = false|" ./doc/siegerc.in && \
+    sed -i "s|logging = true|logging = false|" ./doc/siegerc.in && \
+    utils/bootstrap && \
+    CFLAGS="-g -O2" \
+    ./configure --with-ssl=/usr/bin/openssl && \
+    make -j && \
+    make install
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+ENV TZ=America/Los_Angeles
+ENV DEBIAN_FRONTEND noninteractive
+RUN apt-get update && apt-get install -y \
+    openssl \
+    libssl-dev \
+    numactl \
+    curl \
+    bc vim
+COPY --from=build /usr/local/ /usr/local/
+COPY scripts/siege-script.sh scripts/run_siege.sh files/WordpressTarget.urls /
+RUN cp /WordpressTarget.urls /WordpressTarget.url
+
+RUN mkdir -p /usr/local/var/log && \
+    mkfifo /export-logs
+
+CMD (/run_siege.sh;echo $? >status) 2>&1 | tee output.log && \
+    tar cf /export-logs status *.log && \
+    sleep infinity

@@ -1,0 +1,99 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Install prerequisites
+    yum:
+      name: "{{ ['@Development Tools'] | union(kernel_driver_build_pkgs.centos) }}"
+      update_cache: true
+    register: yumrc
+    until: yumrc is success
+    retries: 10
+    delay: 10
+
+  - name: Check if kernel header is already installed
+    stat:
+      path: "/usr/src/kernels/{{ kernel_version.stdout }}"
+    register: kernel_header
+    no_log: true
+
+  - block:
+
+    - name: Install prerequisites
+      yum:
+        name: "kernel-devel-{{ kernel_version.stdout }}"
+        state: present
+      register: yumrc
+      until: yumrc is success
+      retries: 10
+      delay: 10
+
+    rescue:
+
+    - name: Install prerequisites
+      yum:
+        name: kernel-devel
+        state: present
+      register: yumrc
+      until: yumrc is success
+      retries: 10
+      delay: 10
+
+    when: not kernel_header.stat.exists
+
+  - name: kernel gcc version
+    set_fact:
+      kernel_gcc_version: "{{ proc_version.stdout | regex_replace('^.*gcc \\(GCC\\) (\\d+\\.\\d+\\.\\d+).*$', 'gcc-\\1') }}"
+    when: (proc_version.stdout is match('^.*gcc \\(GCC\\).*$'))
+
+  - name: kernel gcc version
+    set_fact:
+      kernel_gcc_version: "{{ proc_version.stdout | regex_replace('^.*gcc version (\\d+\\.\\d+\\.\\d+).*$', 'gcc-\\1') }}"
+    when: (proc_version.stdout is match('^.*gcc version (\\d+\\.\\d+\\.\\d+).*$'))
+
+  - name: Get all gcc packages in yum repo
+    shell: "dnf provides '*bin/gcc'"
+    register: gcc_pkg_list
+
+  - name: Find matched gcc packages
+    set_fact:
+      gcc_pkg_matched: "{{ gcc_pkg_list.stdout_lines | select('match','.*'+(kernel_gcc_version|split('/')|last|replace('-','[-]')|replace('.','[.]'))) | last | regex_replace('[ :].*$','') }}"
+#
+# There are two scenarios
+# 1. The default version of gcc installed on the system is equal to the version of gcc used to compile the kernel, so use the system gcc directly.
+# 2. The default gcc version installed by the system is not equal to the kernel gcc version compiled, which is divided into two scenarios here
+#  a. The name of the gcc that compiles the kernel does not contain the word toolset in the dnf, so the gcc is installed in the bin directory after installation.
+#  b. If the name of the gcc that compiles the kernel in the dnf contains the word toolset, then the gcc is installed in the directory /opt/rh/gcc-toolset-xx, with xx representing the major version number of the gcc.
+#
+  - name: Get installed gcc version
+    shell: "gcc --version"
+    register: gcc_version
+
+  - block:
+
+    - name: Install kernel gcc version
+      yum:
+        name: "{{ gcc_pkg_matched }}"
+      register: yumrc
+      until: yumrc is success
+      retries: 10
+      delay: 10
+
+    rescue:
+
+    - name: Revert back to gcc
+      set_fact:
+        gcc_pkg_matched: "gcc"
+
+    when: (gcc_version.stdout_lines | first | split(' '))[2] is version(kernel_gcc_version|split('/')|last|replace('gcc-',''),'!=')
+
+  - name: Use gcc if version matches
+    set_fact:
+      kernel_gcc_version: "{% if 'gcc-toolset' in gcc_pkg_matched %}/opt/rh/gcc-toolset-{{ kernel_gcc_version | regex_replace('^.*(\\d+)(\\.\\d+\\.\\d+).*$', '\\1') }}/root/bin/gcc{% else %}gcc{% endif %}"
+
+  delegate_to: "{{ kernel_driver_host }}"
+  become: true

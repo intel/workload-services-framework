@@ -1,0 +1,674 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+PKB2.0:
+  description: 'Run all ffmpeg benchmark tests'
+  group: >-
+    AVC
+    x265
+    SVT-HEVC
+    SVT-AV1
+1080p:
+  description: 'All 1080p test cases'
+  group: >-
+    AVC-1080p
+    x265-1080p
+    SVT-HEVC-1080p
+    SVT-AV1-1080p
+4k:
+  description: 'All 4k test cases'
+  group: >-
+    x265-4k
+    SVT-HEVC-4k
+    SVT-AV1-4k
+fast:
+  description: 'All fast test cases'
+  group: >-
+    AVC-fast
+    SVT-HEVC-fast
+    SVT-AV1-fast
+medium:
+  description: 'All medium test cases'
+  group: >-
+    AVC-medium
+    x265-medium
+    SVT-HEVC-medium
+    SVT-AV1-medium
+slow:
+  description: 'All slow test cases'
+  group: >-
+    AVC-veryslow
+    x265-veryslow
+    SVT-HEVC-veryslow
+
+
+AVC:
+  description: 'x264 is very common. Different customers use x264 accross different presets. Measure acrsoss bookends common useage'
+  group: >-
+    AVC-1080p
+AVC-1080p:
+  description: 'Currently this is the same as AVC. Use "AVC" group until use for more modular grouping arises. '
+  group: >-
+    AVC-1080p-fast-avx2
+    AVC-1080p-medium-avx2
+    AVC-1080p-veryslow-avx2
+AVC-fast:
+  description: 'All the fast AVC tests'
+  group: >-
+    AVC-1080p-fast-avx2
+AVC-medium:
+  description: 'All the medium AVC tests'
+  group: >-
+    AVC-1080p-medium-avx2
+AVC-veryslow:
+  description: 'All the veryslow AVC tests'
+  group: >-
+    AVC-1080p-veryslow-avx2
+AVC-avx2:
+  description: 'All the avx2 AVC tests'
+  group: >-
+    AVC-1080p-fast-avx2
+    AVC-1080p-medium-avx2
+    AVC-1080p-veryslow-avx2
+
+
+x265:
+  description: 'Contains all x265 benchmarks. Please refer to specific x265 benchmarks for more apt descriptions'
+  group: >-
+    x265-1080p
+    x265-4k
+x265-1080p:
+  description: 'Used as visual quality baseline'
+  group: >-
+    x265-1080p-slow-avx2
+    x265-1080p-slow-avx3
+
+x265-4k:
+  description: 'Common(ish) for VOD (video on demand. Prioritze high quality and the cost of encode time'
+  group: >-
+    x265-4k-veryslow-avx3
+#x265-medium:
+#  description: 'All the medium AVC tests'
+#  group: >-
+#    x265-1080p-medium-avx2
+#    x265-1080p-medium-avx3
+
+x265-veryslow:
+  description: 'All the veryslow AVC tests'
+  group: >-
+    x265-4k-veryslow-avx3
+
+
+
+SVT-HEVC:
+  description: 'Currently no broad explanation provided for SVT-HEVC. Please refer to SVT-HEVC-4k'
+  group: >-
+    SVT-HEVC-1080p
+    SVT-HEVC-4k
+SVT-HEVC-1080p:
+  description: 'No description provided for SVT-HEVC-1080p. Provides a mixture of speeds for encoding with SVT-HEVC at 1080p, rising in speed from 1 to 9'
+  group: >-
+    SVT-HEVC-1080p-preset9-avx2
+    SVT-HEVC-1080p-preset5-avx2
+    SVT-HEVC-1080p-preset5-avx3
+    SVT-HEVC-1080p-preset1-avx2
+SVT-HEVC-4k:
+  description: 'Measure performance across 1080p and 4k for HEVC workloads that sclae on compute and memory requirements'
+  group: >-
+    SVT-HEVC-4k-preset9-avx2
+    SVT-HEVC-4k-preset9-avx3
+    SVT-HEVC-4k-preset5-avx3
+    SVT-HEVC-4k-preset1-avx3
+SVT-HEVC-fast:
+  description: 'All the fast SVT-HEVCVC tests'
+  group: >-
+    SVT-HEVC-1080p-preset9-avx2
+    SVT-HEVC-4k-preset9-avx2
+    SVT-HEVC-4k-preset9-avx3
+SVT-HEVC-medium:
+  description: 'All the medium SVT-HEVC tests'
+  group: >-
+    SVT-HEVC-1080p-preset5-avx2
+    SVT-HEVC-1080p-preset5-avx3
+    SVT-HEVC-4k-preset5-avx3
+    SVT-HEVC-4k-preset5-avx2
+SVT-HEVC-veryslow:
+  description: 'All the veryslow SVT-HEVC tests'
+  group: >-
+    SVT-HEVC-1080p-preset1-avx2
+    SVT-HEVC-4k-preset1-avx3
+
+
+
+SVT-AV1:
+  description: 'No description provided for SVT-AV1. Please refer to SVT-AV1-4k'
+  group: >-
+    SVT-AV1-1080p
+    SVT-AV1-4k
+SVT-AV1-1080p:
+  description: 'No description provided for SVT-AV1-1080p'
+  group: >-
+    SVT-AV1-1080p-3-avx2
+    SVT-AV1-1080p-6-avx2
+    SVT-AV1-1080p-6-avx3
+    SVT-AV1-1080p-10-avx2
+    SVT-AV1-1080p-10-avx3
+ 
+
+SVT-AV1-4k:
+  description: 'Same as SVT-HEVC + emerging standard'
+  group: >-
+    SVT-AV1-4k-10-avx2
+    SVT-AV1-4k-10-avx3
+ 
+SVT-AV1-fast:
+  description: 'All the fast SVT-AV1 tests'
+  group: >-
+    SVT-AV1-1080p-10-avx2
+    SVT-AV1-1080p-10-avx3
+    SVT-AV1-4k-10-avx2
+    SVT-AV1-4k-10-avx3
+
+SVT-AV1-medium:
+  description: 'All the medium SVT-AV1 tests'
+  group: >-
+    SVT-AV1-1080p-6-avx2
+    SVT-AV1-1080p-6-avx3
+    SVT-AV1-1080p-3-avx2
+#All use cases#
+# May need to place the preset in the args field
+#------------AVC/x264 commands-----------------#
+#    AVC-1080p-fast-avx2
+#    AVC-1080p-medium-avx2
+#    AVC-1080p-veryslow-avx2
+AVC-1080p-fast-avx2:
+  description: '1080p x264 encode prioritizing encode speed.'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: x264
+    preset: fast
+    args: >-
+      -x264-params "keyint=120:min-keyint=120:sliced-threads=0:scenecut=0:asm=avx2:threads=8" -tune psnr -profile:v high -b:v 6M -maxrate 12M -bufsize 24M -r 60  -y 1080p.mp4
+AVC-1080p-medium-avx2:
+  description: '1080p x264 encode balances speed and quality.'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: x264
+    preset: medium
+    args: >-
+       -x264-params "keyint=120:min-keyint=120:sliced-threads=0:scenecut=0:asm=avx2:threads=8" -tune psnr -profile:v high -b:v 6M -maxrate 12M -bufsize 24M -r 60  -y 1080p.mp4
+#REAL TEST
+AVC-1080p-veryslow-avx2:
+  description: '1080p x264 encode prioritizing encode speed.'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: x264
+    preset: veryslow
+    args: >-
+      -x264-params "keyint=240:min-keyint=240:sliced-threads=0:scenecut=0:asm=avx2:threads=8" -tune psnr -profile:v high -b:v 5M -maxrate 10M -bufsize 20M -r 60  -y 1080p.mp4
+#---------------x265 commands----------#
+#   x265-1080p-medium-avx2
+#   x265-1080p-medium-avx3
+#   x265-4k-veryslow-avx2
+
+x265-1080p-medium-avx2:
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 30
+  video_codec:
+    codec: x265
+    preset: medium
+    #tune:
+    args: >-
+      -x265-params "keyint=120:min-keyint=120:scenecut=0:asm=avx2:pools=16" -tune psnr -profile:v main -b:v 5M -maxrate 10M -bufsize 20M -r 60  -y 1080p.mp4
+x265-1080p-medium-avx3:
+  description: '1080p input to 1080p output using x265/medium'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x265
+    preset: medium
+    #tune:
+    args: >-
+      -x265-params "keyint=120:min-keyint=120:scenecut=0:asm=avx512:pools=16" -tune psnr -profile:v main -b:v 6M -maxrate 12M -bufsize 24M -r 60  -y 1080p.mp4
+
+x265-4k-veryslow-avx3:
+  description: '1080P input to 1080P output using x265/veryslow'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k-avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: -x265-params "keyint=240:min-keyint=240:scenecut=0:asm=avx512:pools=32" -tune psnr -profile:v main10 -b:v 12M -maxrate 24M -bufsize 48M -r 60  -y 4k.mp4
+
+
+############
+x265-1080p-slow-avx2:
+  input_files:  crowd_run_1080p50.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 30
+  video_codec:
+    codec: x265
+    preset: slow
+    #tune:
+    args: >-
+      -x265-params "keyint=120:min-keyint=120:scenecut=0:asm=avx2:pools=16" -tune psnr -profile:v main -b:v 5M -maxrate 10M -bufsize 20M -r 60  -y 1080p.mp4
+
+x265-1080p-slow-avx3:
+  description: '1080p input to 1080p output using x265/medium'
+  input_files:  crowd_run_1080p50.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x265
+    preset: slow
+    #tune:
+    args: >-
+      -x265-params "keyint=120:min-keyint=120:scenecut=0:asm=avx512:pools=16" -tune psnr -profile:v main -b:v 6M -maxrate 12M -bufsize 24M -r 60  -y 1080p.mp4
+
+
+x265-4k-veryslow-avx3:
+  description: '1080P input to 1080P output using x265/veryslow'
+  input_files:  crowd_run_2160p50.mp4
+  input_format: 4k-avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: -x265-params "keyint=240:min-keyint=240:scenecut=0:asm=avx512:pools=32" -tune psnr -profile:v main10 -b:v 12M -maxrate 24M -bufsize 48M -r 60  -y 4k.mp4
+###########
+
+#------------SVT-HEVC commands----------------#######
+#   SVT-HEVC-1080p-preset9-avx2
+#   SVT-HEVC-1080p-preset5-avx2
+#   SVT-HEVC-1080p-preset5-avx3
+#   SVT-HEVC-1080p-preset1-avx2
+#   SVT-HEVC-4k-preset9-avx2
+#   SVT-HEVC-4k-preset9-avx3
+#   SVT-HEVC-4k-preset5-avx3
+#   SVT-HEVC-4k-preset5-avx2
+#   SVT-HEVC-4k-preset1-avx3
+SVT-HEVC-1080p-preset9-avx2:
+  description: '1080P input to 1080P output using SVT-HEVC/0/2'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 9
+    args: -profile:v 1 -rc 1 -g 119 -sc_detection 0 -b:v 5M -maxrate 10M -bufsize 20M -y 1080P.mp4
+SVT-HEVC-1080p-preset5-avx2:
+  description: '1080P input to 1080P output using SVT-HEVC/0/2'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    args: -profile:v 1 -rc 1 -g 119 -sc_detection 0 -b:v 5M -maxrate 10M -bufsize 20M -y 1080P.mp4
+SVT-HEVC-1080p-preset5-avx3:
+  description: '1080P input to 1080P output using SVT-HEVC/0/2'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    args: -profile:v 1 -rc 1 -g 119 -sc_detection 0 -b:v 5M -maxrate 10M -bufsize 20M -y 1080P.mp4
+SVT-HEVC-1080p-preset1-avx2:
+  description: '1080P input to 1080P output using SVT-HEVC/0/2'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 1
+    tune: 1
+    args: -profile:v 1 -rc 1 -g 119 -sc_detection 0 -b:v 5M -maxrate 10M -bufsize 20M -y 1080P.mp4
+
+#------
+SVT-HEVC-4k-preset9-avx2:
+  description: '4k input to 4k output using hevc/6'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 9
+    #tune:
+    args: -profile:v 2 -rc 1 -g 119 -sc_detection 0 -b:v 12M -maxrate 24M -bufsize 48M -r 60 -y  4k.mp4
+SVT-HEVC-4k-preset9-avx3:
+  description: '4k input to 4k output using hevc/6'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 9
+    #tune:
+    args: -profile:v 2 -rc 1 -g 119 -sc_detection 0 -b:v 12M -maxrate 24M -bufsize 48M -r 60 -y  4k.mp4
+SVT-HEVC-4k-preset5-avx3:
+  description: '4k input to 4k output using hevc/6'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: -profile:v 2 -rc 1 -g 119 -sc_detection 0 -b:v 12M -maxrate 24M -bufsize 48M -r 60 -y  4k.mp4
+SVT-HEVC-4k-preset5-avx2:
+  description: '4k input to 4k output using hevc/6'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: -profile:v 2 -rc 1 -g 119 -sc_detection 0 -b:v 12M -maxrate 24M -bufsize 48M -r 60 -y  4k.mp4
+SVT-HEVC-4k-preset1-avx3:
+  description: '4k input to 4k output using hevc/6'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 1
+    #tune:
+    args: -profile:v 2 -rc 1 -g 119 -sc_detection 0 -b:v 12M -maxrate 24M -bufsize 48M -r 60 -y  4k.mp4
+
+SVT-HEVC-4k-preset5-avx2-encoder:
+  description: '4k input to 4k output using hevc/5'
+  input_files: crowd_run_2160p50_x264.mp4
+  input_format: 4k-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: -s:v 3840x2160 -pix_fmt yuv420p -profile:v 2 -rc 0 -g 119 -sc_detection 0 -qp 30 -refs 2 -r 60 -y  4k.mp4
+
+SVT-HEVC-4k-preset5-avx3-encoder:
+  description: '4k input to 4k output using hevc/5'
+  input_files: crowd_run_2160p50_x264.mp4 
+  input_format: 4k-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: -s:v 3840x2160 -pix_fmt yuv420p -profile:v 2 -rc 0 -g 119 -sc_detection 0 -qp 30 -refs 2 -r 60 -y  4k.mp4
+
+#-----------SVT-AV1------#
+#     SVT-AV1-1080p-8-avx2
+#     SVT-AV1-1080p-8-avx3
+#     SVT-AV1-1080p-5-avx2
+#     SVT-AV1-1080p-5-avx3
+#     SVT-AV1-4k-8-avx2
+#     SVT-AV1-4k-8-avx2
+SVT-AV1-1080p-12-avx2:
+  description: '1080p input transcoded to SVT-AV1 using preset 12 and avx2'
+  input_files: Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 12
+      args: -profile:v main -rc 1 -g 119 -sc_detection 0 -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+SVT-AV1-1080p-12-avx3:
+  description: '1080p input transcoded to SVT-AV1 using preset 12 and avx512'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 12
+      args: -profile:v main -rc 1 -g 119 -sc_detection 0 -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+SVT-AV1-1080p-8-avx2:
+  description: '1080p input transcoded to SVT-AV1 using preset 8 and avx2'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 8
+      args: -profile:v main -rc 1 -g 119 -sc_detection 0 -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+SVT-AV1-1080p-8-avx3:
+  description: '1080p input transcoded to SVT-AV1 using preset 8 and avx512'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 8
+      args: -profile:v main -rc 1 -g 119 -sc_detection 0 -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+SVT-AV1-1080p-5-avx2:
+  description: '1080p input transcoded to SVT-AV1 using preset 5 and avx2'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 5
+      args: -profile:v main -rc 1 -g 119 -sc_detection 0 -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+SVT-AV1-1080p-5-avx3:
+  description: '1080p input transcoded to SVT-AV1 using preset 5 and avx512'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 5
+      args: -profile:v main -rc 1 -g 119 -sc_detection 0 -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+#####
+SVT-AV1-1080p-10-avx2:
+  description: '1080p input transcoded to SVT-AV1 using preset 10 and avx2'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 10
+      args: -profile:v main -rc 1 -g 119 -sc_detection 0 -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+SVT-AV1-1080p-10-avx3:
+  description: '1080p input transcoded to SVT-AV1 using preset 10 and avx512'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 10
+      args: -profile:v main -rc 1 -g 119 -sc_detection 0 -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+SVT-AV1-1080p-6-avx2:
+  description: '1080p input transcoded to SVT-AV1 using preset 6 and avx2'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 6
+      args: -profile:v main -rc 1 -g 119 -sc_detection 0 -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+SVT-AV1-1080p-6-avx3:
+  description: '1080p input transcoded to SVT-AV1 using preset 6 and avx512'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 6
+      args: -profile:v main -rc 1 -g 119 -sc_detection 0 -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+SVT-AV1-1080p-3-avx2:
+  description: '1080p input transcoded to SVT-AV1 using preset 3 and avx2'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+      codec: SVT-AV1
+      preset: 3
+      args: -profile:v main -rc 1 -g 119 -sc_detection 0 -b:v 4M -maxrate 8M -bufsize 16M -y 1080p.mp4
+
+
+#############
+
+SVT-AV1-4k-12-avx2:
+  description: '4k input transcoded to SVT-AV1 using preset 5 and avx2'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-AV1
+    preset: 12
+    args: -profile:v main -rc 1 -g 119 -sc_detection 0 -b:v 9M -maxrate 18M -bufsize 36M -y 4k.mp4
+
+SVT-AV1-4k-12-avx3:
+  description: '4k input transcoded to SVT-AV1 using preset 5 and avx2'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-AV1
+    preset: 12
+    args: -profile:v main -rc 1 -g 119 -sc_detection 0 -b:v 9M -maxrate 18M -bufsize 36M -y 4k.mp4
+
+
+SVT-AV1-4k-10-avx2:
+  description: '4k input transcoded to SVT-AV1 using preset 5 and avx2'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-AV1
+    preset: 10
+    args: -profile:v main -rc 1 -g 119 -sc_detection 0 -b:v 9M -maxrate 18M -bufsize 36M -y 4k.mp4
+
+SVT-AV1-4k-10-avx3:
+  description: '4k input transcoded to SVT-AV1 using preset 5 and avx2'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-AV1
+    preset: 10
+    args: -profile:v main -rc 1 -g 119 -sc_detection 0 -b:v 9M -maxrate 18M -bufsize 36M -y 4k.mp4
+
+SVT-AV1-4k-8-avx2:
+  description: '4k input transcoded to SVT-AV1 using preset 5 and avx2'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k-avx2
+  assembly: avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-AV1
+    preset: 8
+    args: -profile:v main -rc 1 -g 119 -sc_detection 0 -b:v 9M -maxrate 18M -bufsize 36M -y 4k.mp4
+SVT-AV1-4k-8-avx3:
+  description: '4k input transcoded to SVT-AV1 using preset 5 and avx2'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k-avx512
+  assembly: avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: SVT-AV1
+    preset: 8
+    args: -profile:v main -rc 1 -g 119 -sc_detection 0 -b:v 9M -maxrate 18M -bufsize 36M -y 4k.mp4
+
+
+#-----------Development---------#
+
+development:
+  description: 'Test cases to run before commiting'
+  group: >-
+    AVC-1080p-fast-avx2
+    SVT-HEVC-1080p-preset9-avx2
+    x265-1080p-medium-avx3
+    SVT-AV1-1080p-8-avx2

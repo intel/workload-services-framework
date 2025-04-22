@@ -65,8 +65,6 @@
   file:
     path: /tmp/{{ wl_namespace }}-flannel.yaml
     state: absent
-  async: 10
-  poll: 0
 
 - name: Wait for controller flannel pod ready
   include_tasks:

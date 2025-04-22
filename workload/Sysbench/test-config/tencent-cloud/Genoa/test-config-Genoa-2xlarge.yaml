@@ -1,0 +1,20 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+*sysbench_cpu_pkm:
+  TENCENT_WORKER_INSTANCE_TYPE: SA4.2XLARGE32
+  THREADS: 8
+  TIME: 120
+  CPU_MAX_PRIME: 20000
+
+*sysbench_memory_pkm:
+  TENCENT_WORKER_INSTANCE_TYPE: SA4.2XLARGE32
+  THREADS: 8
+  TIME: 120
+  MEMORY_BLOCK_SIZE: 4K
+  MEMORY_TOTAL_SIZE: 32G
+  MEMORY_SCOPE: global
+  MEMORY_OPER: read
+  MEMORY_ACCESS_MODE: seq

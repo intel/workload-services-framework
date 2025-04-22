@@ -5,6 +5,14 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+if [ -z "$CTESTSH_OPTIONS" ]; then
+    echo -e "\033[31m=====================================================\033[0m" 1>&2
+    echo -e "\033[31mInvoking testcases via ctest directly is discouraged.\033[0m" 1>&2
+    echo -e "\033[31mPlease use ./ctest.sh to invoke WSF testcases.       \033[0m" 1>&2
+    echo -e "\033[31m=====================================================\033[0m" 1>&2
+    exit 3
+fi
+
 # default settings
 LOGSDIRH="${LOGSDIRH:-$(pwd)}"
 KUBERNETES_CONFIG_M4="${KUBERNETES_CONFIG_M4:-$SOURCEROOT/kubernetes-config.yaml.m4}"
@@ -35,7 +43,7 @@ detect_user () {
     if [[ "$options" = *--owner=* ]]; then
         echo "$(echo "x$options" | sed 's|.*--owner=\([^ ]*\).*|\1|' | tr 'A-Z' 'a-z' | tr -c -d 'a-z0-9-')"
     else
-        echo "$(cd "$PROJECTROOT";(flock .git git config user.name 2> /dev/null || id -un) | tr 'A-Z' 'a-z' | tr -c -d 'a-z0-9-')"
+        echo "$(cd "$PROJECTROOT";(flock "$PROJECTROOT" git config user.name 2> /dev/null || id -un) | tr 'A-Z' 'a-z' | tr -c -d 'a-z0-9-')"
     fi
 }
 
@@ -61,14 +69,6 @@ image_name () {
     )
 }
 
-image_pull_policy () {
-    if [ -z "$REGISTRY" ]; then
-        echo "IfNotPresent"
-    else
-        echo "Always"
-    fi
-}
-
 # args: yaml
 rebuild_config () {
     (   
@@ -79,7 +79,7 @@ rebuild_config () {
             -DPLATFORM=$PLATFORM \
             -DIMAGEARCH=$IMAGEARCH \
             -DIMAGESUFFIX=$IMAGESUFFIX \
-            -DIMAGEPULLPOLICY=$(image_pull_policy) \
+            -DIMAGEPULLPOLICY=Always \
             -DWORKLOAD=$WORKLOAD \
             -DBACKEND=$BACKEND \
             -DREGISTRY=$REGISTRY \
@@ -101,7 +101,7 @@ rebuild_config_j2 () {
             -e PLATFORM=$PLATFORM \
             -e IMAGEARCH=$IMAGEARCH \
             -e IMAGESUFFIX=$IMAGESUFFIX \
-            -e IMAGEPULLPOLICY=$(image_pull_policy) \
+            -e IMAGEPULLPOLICY=Always \
             -e WORKLOAD=$WORKLOAD \
             -e BACKEND=$BACKEND \
             -e REGISTRY=$REGISTRY \
@@ -115,7 +115,7 @@ rebuild_config_j2 () {
             -e PLATFORM=$PLATFORM \
             -e IMAGEARCH=$IMAGEARCH \
             -e IMAGESUFFIX=$IMAGESUFFIX \
-            -e IMAGEPULLPOLICY=$(image_pull_policy) \
+            -e IMAGEPULLPOLICY=Always \
             -e WORKLOAD=$WORKLOAD \
             -e BACKEND=$BACKEND \
             -e REGISTRY=$REGISTRY \
@@ -206,7 +206,7 @@ rebuild_kubernetes_config () {
             --set PLATFORM=$PLATFORM \
             --set IMAGEARCH=$IMAGEARCH \
             --set IMAGESUFFIX=$IMAGESUFFIX \
-            --set IMAGEPULLPOLICY=$(image_pull_policy) \
+            --set IMAGEPULLPOLICY=Always \
             --set WORKLOAD=$WORKLOAD \
             --set BACKEND=$BACKEND \
             --set REGISTRY=$REGISTRY \
@@ -329,12 +329,12 @@ save_workload_params () {
     fi 
 
     if git --version > /dev/null 2>&1; then
-        local commit_id="$(cd "$PROJECTROOT";GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo flock .git git rev-parse HEAD 2> /dev/null || true)"
+        local commit_id="$(cd "$PROJECTROOT";GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo flock "$PROJECTROOT" git rev-parse HEAD 2> /dev/null || true)"
         if [ -n "$commit_id" ]; then
             echo "git_commit: \"$commit_id\""
         fi
         local branch_id=""
-        local show_ref="$(cd "$PROJECTROOT";GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo flock .git git show-ref 2> /dev/null | grep -F $commit_id 2> /dev/null || true)"
+        local show_ref="$(cd "$PROJECTROOT";GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo flock "$PROJECTROOT" git show-ref 2> /dev/null | grep -F $commit_id 2> /dev/null || true)"
         if [[ "$RELEASE" = :v* ]]; then
             branch_id="$(echo "$show_ref" | grep -m1 -E "refs/tags/${RELEASE#:}\$" | cut -f2- -d/)"
             [ -n "$branch_id" ] || branch_id="$(echo "$show_ref" | grep -m1 -E "refs/remotes/.*/${RELEASE#:v}\$" | cut -f3- -d/)"
@@ -342,6 +342,10 @@ save_workload_params () {
         [ -n "$branch_id" ] || branch_id="$(echo "$show_ref" | grep -m1 -E "refs/tags/" | cut -f2- -d/)"
         [ -n "$branch_id" ] || branch_id="$(echo "$show_ref" | grep -m1 -E "refs/remotes/" | cut -f3- -d/)"
         [ -z "$branch_id" ] || echo "git_branch: \"$branch_id\""
+    fi
+
+    if [ -r "$PROJECTROOT/.hybrid_release" ]; then
+        cat "$PROJECTROOT/.hybrid_release"
     fi
 }
 
@@ -356,8 +360,11 @@ save_git_history () {
     if [[ "$CTESTSH_OPTIONS " != *"--dry-run "* ]]; then
         if git --version > /dev/null 2>&1; then
             mkdir -p "$LOGSDIRH/git-history"
-            (cd "$PROJECTROOT";GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo flock .git git show HEAD 2> /dev/null | sed  '/^diff/{q}' 2> /dev/null > "$LOGSDIRH/git-history/HEAD" || true)
-            (cd "$PROJECTROOT";GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo flock .git git diff HEAD 2> /dev/null > "$LOGSDIRH/git-history/DIFF" || true)
+            (
+                cd "$PROJECTROOT"
+                GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo flock "$PROJECTROOT" git log HEAD -n 1 > "$LOGSDIRH/git-history/HEAD"
+                GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo flock "$PROJECTROOT" git diff HEAD > "$LOGSDIRH/git-history/DIFF"
+            ) 2> /dev/null || echo -e "\033[31mWARNING: Failed to save git history\033[0m"
         fi
     fi
 }
@@ -394,14 +401,6 @@ EOF
     echo ""
     echo "Workload Logs: $LOGSDIRH"
 }
-
-if [ -z "$CTESTSH_OPTIONS" ]; then
-    echo -e "\033[31m=====================================================\033[0m" 1>&2
-    echo -e "\033[31mInvoking testcases via ctest directly is discouraged.\033[0m" 1>&2
-    echo -e "\033[31mPlease use ./ctest.sh to invoke WSF testcases.       \033[0m" 1>&2
-    echo -e "\033[31m=====================================================\033[0m" 1>&2
-    exit 3
-fi
 
 if [ -r "$PROJECTROOT/script/${BACKEND}/validate.sh" ]; then
     save_attached_files

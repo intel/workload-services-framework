@@ -1,0 +1,20 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+*sysbench_cpu_pkm:
+  ALICLOUD_WORKER_INSTANCE_TYPE: ecs.g8a.2xlarge
+  THREADS: 8
+  TIME: 120
+  CPU_MAX_PRIME: 20000
+
+*sysbench_memory_pkm:
+  ALICLOUD_WORKER_INSTANCE_TYPE: ecs.g8a.2xlarge
+  THREADS: 8
+  TIME: 20
+  MEMORY_BLOCK_SIZE: 512M
+  MEMORY_TOTAL_SIZE: 2048G
+  MEMORY_SCOPE: global
+  MEMORY_OPER: read
+  MEMORY_ACCESS_MODE: seq

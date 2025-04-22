@@ -11,7 +11,7 @@ k8s_cgroup_driver: "systemd"
 k8s_kubeadm_options: {}
 k8s_data_root: "/var/lib/kubelet"
 k8s_containerd_socket: "unix:///var/run/containerd/containerd.sock"
-k8s_join_timeout: "600"
+k8s_join_timeout: "600s"
 k8s_logs_level: 2
 k8s_max_pods: "110"
 k8s_image_gc_low_threshold_percent: "80"
@@ -21,3 +21,4 @@ k8s_runtime_request_timeout: "2m"
 k8s_apiserver_ip: ""
 k8s_apiserver_port: ""
 k8s_node_ready_wait: "600s"
+k8s_reset_iptables: false

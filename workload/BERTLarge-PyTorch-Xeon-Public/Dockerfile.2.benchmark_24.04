@@ -9,7 +9,7 @@ ARG OS_VER="24.04"
 ARG OS_IMAGE="ubuntu"
 FROM ${OS_IMAGE}:${OS_VER} as build
 
-ARG IntelAI_MODELS_VER="v3.2"
+ARG IntelAI_MODELS_VER="v3.3"
 ARG IntelAI_MODELS_REPO="https://github.com/intel/ai-reference-models"
 
 

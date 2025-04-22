@@ -4,17 +4,17 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- include_role:
-    name: pkg-dataset
+- include_tasks:
+    file: download-atf.yaml
   vars:
     dataset_package: "http://images.cocodataset.org/zips/val2017.zip"
     dataset_size: 1
-    dataset_model_path_container: "/opt/dataset/stablediffusion-dev/coco"
+    dataset_model_path: "stablediffusion-dev/coco"
 
-- include_role:
-    name: pkg-dataset
+- include_tasks:
+    file: download-atf.yaml
   vars:
     dataset_package: "http://images.cocodataset.org/annotations/annotations_trainval2017.zip"
     dataset_size: 1
-    dataset_model_path_container: "/opt/dataset/stablediffusion-dev/coco"
+    dataset_model_path: "stablediffusion-dev/coco"
 

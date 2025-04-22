@@ -34,7 +34,6 @@ output "instances" {
     "kvmhost-${var.kvm_index}": {
       public_ip: var.kvm_host.host,
       private_ip: var.kvm_host.host,
-      ansible_ssh_private_key_file: var.ssh_pri_key_file,
       user_name: var.kvm_host.user,
       vm_group: "vmhost_hosts",
     }

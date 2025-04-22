@@ -1,0 +1,35 @@
+# fio
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+
+FROM ${OS_IMAGE}:${OS_VER} AS build
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y build-essential git-all libaio-dev bc \
+	zlib1g-dev && rm -rf /var/lib/apt/lists/*
+
+ARG FIO_VER="3.28"
+ARG FIO_REPO="https://github.com/axboe/fio.git"
+
+RUN git clone ${FIO_REPO} fio && \
+    cd fio && \
+    git checkout fio-${FIO_VER} && \
+    ./configure --disable-native --extra-cflags=-march=x86-64 && \
+    make
+
+FROM ${OS_IMAGE}:${OS_VER}
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y libaio1t64 bc zlib1g && rm -rf /var/lib/apt/lists/*
+RUN ln -s /usr/lib/x86_64-linux-gnu/libaio.so.1t64 /usr/lib/x86_64-linux-gnu/libaio.so.1
+COPY --from=build /fio/fio /home/
+COPY run_test.sh /home/
+RUN mkfifo /export-logs
+CMD (/home/run_test.sh; echo $? > status) 2>&1 | tee output.logs && \
+    tar cf /export-logs status output.logs && \
+    sleep infinity
+

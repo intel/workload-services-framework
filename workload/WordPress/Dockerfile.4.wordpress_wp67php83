@@ -1,0 +1,21 @@
+# wordpress-wordpress-wp6.7-php8.3
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG WORDPRESS_VER=6.7-php8.3-fpm-alpine
+ARG WORDPRESS_IMAGE=wordpress
+
+FROM ${WORDPRESS_IMAGE}:${WORDPRESS_VER}
+
+RUN apk update && apk add bash netcat-openbsd
+RUN apk update && apk add numactl-tools libxml2=2.13.4-r5
+
+# update the wp-config with docker setting
+COPY conf/base/www.conf /usr/local/etc/php-fpm.d/
+COPY conf/base/php-Base_8.ini /usr/local/etc/php/php.ini
+COPY scripts/prepare_php_config.sh /
+
+CMD (/prepare_php_config.sh 2>&1 | tee output.log | grep -v "GET" )

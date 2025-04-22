@@ -13,15 +13,22 @@
     - name: Invoke sutinfo (Linux)
       include_role:
         name: sutinfo
-        tasks_from: "{{ sutinfo_tool | default('perfspect') }}"
+        tasks_from: perfspect
       when:
       - (ansible_connection|default('ssh')) in ['ssh','local']
 
     - name: Invoke sutinfo (Windows)
       include_role:
         name: sutinfo
-        tasks_from: "{{ sutinfo_tool | default('perfspect') }}-win"
+        tasks_from: perfspect-win
       when:
       - ((ansible_connection|default('ssh')) == 'winrm')
-      - (playbook_dir+'/roles/sutinfo/tasks/'+(sutinfo_tool | default('perfspect'))+'-win.yaml') is exists
+      - (playbook_dir+'/roles/sutinfo/tasks/perfspect-win.yaml') is exists
 
+    - name: Invoke uncoreinfo
+      include_role:
+        name: sutinfo
+        tasks_from: uncoreinfo
+      when:
+      - (ansible_connection|default('ssh')) in ['ssh','local']
+      - sutinfo_uncore | default(false) | bool

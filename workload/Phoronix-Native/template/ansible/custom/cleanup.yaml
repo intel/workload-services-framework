@@ -1,0 +1,19 @@
+# - hosts: worker-0
+#   gather_facts: no
+#   tasks:
+#     - name: Remove workspace
+#       file:
+#         path: "/tmp/phoronix"
+#         state: absent
+#       ignore_errors: true
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+#     - name: Remove phoronix
+#       file:
+#         path: "~/.phoronix-test-suite"
+#         state: absent
+#       ignore_errors: true

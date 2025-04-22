@@ -7,16 +7,23 @@
 - block:
 
     - name: inspect local images
-      command: "docker image inspect {{ item.key }}"
+      shell:
+        cmd: |
+          {% if ('/' not in workload_config.registry) or ('/' not in item.key) %}
+            docker image inspect {{ item.key }}
+          {% else %}
+            false
+          {% endif %}
+        executable: /bin/bash
       register: inspect_l
       with_dict: "{{ wl_docker_images }}"
-      become: true
+      become: false
       no_log: true
 
     - name: inspect remote images
-      command: "skopeo inspect {{ skopeo_inspect_options }} --tls-verify={{ ((item.item.value|bool) and (item.item.key is not match('^'+(skopeo_insecure_registries|split(',')|reject('==','')|default(['NO-REGISTRY'],true)|join('|'))+'.*$'))) | ternary('true','false') }} docker://{{ item.item.key }}"
+      command: "skopeo inspect {{ skopeo_inspect_options }} --tls-verify=false docker://{{ item.item.key }}"
       register: inspect_r
-      become: true
+      become: false
       when: item.rc != 0
       loop: "{{ inspect_l.results }}"
       no_log: true

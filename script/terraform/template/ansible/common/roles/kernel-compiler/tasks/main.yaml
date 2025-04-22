@@ -1,0 +1,32 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Get OS
+  shell:
+    cmd: ". /etc/os-release; echo $ID"
+    executable: /bin/bash
+  delegate_to: "{{ kernel_driver_host }}"
+  register: os
+
+- name: Detect kernel version
+  command: uname -r
+  delegate_to: "{{ kernel_driver_host }}"
+  register: kernel_version
+  become: false
+
+- name: Detect proc version
+  command: cat /proc/version
+  delegate_to: "{{ kernel_driver_host }}"
+  register: proc_version
+  become: false
+
+- name: Install kernel gcc
+  include_tasks:
+    file: "install-{{ (os.stdout in ['debian','ubuntu']) | ternary('debian','centos') }}.yaml"
+
+- name: Reformat gcc bin
+  set_fact:
+    kernel_gcc_version: "{{ kernel_gcc_version | default('gcc',true) | regex_replace('[.].*','') }}"

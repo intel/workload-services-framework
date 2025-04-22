@@ -34,9 +34,9 @@
           run_once: true
           when:
           - (ansible_connection|default('ssh')) in ['ssh','local']
-          - (wl_docker_images | length) > 0
+          - (wl_docker_images | dict2items | rejectattr('key','==','') | length) > 0
           vars:
-            wl_docker_images: "{{ dict(docker_config.values() | flatten | map(attribute='image') | union(compose_config.services.values() | map(attribute='image')) | zip_longest([],fillvalue=true)) }}"
+            wl_docker_images: "{{ dict(docker_config.values() | flatten | map(attribute='image') | union(compose_config.services.values() | map(attribute='image')) | reject('==','') | zip_longest([],fillvalue=true)) }}"
 
         - name: Transfer images
           include_role:
@@ -45,14 +45,14 @@
           when:
           - (ansible_connection|default('ssh')) == 'ssh'
           - (native | default(false) | bool) == false
-          - (wl_docker_images | length) > 0
+          - (wl_docker_images | dict2items | rejectattr('key','==','') | length) > 0
           - ansible_host not in (my_ip_list | split(',')) or ((csp | default('static')) != 'static')
           vars:
-            wl_docker_images: "{{ dict(docker_config[inventory_hostname] | default([]) | map(attribute='image') | union(compose_config.services.values() | map(attribute='image')) | zip_longest([],fillvalue=true)) }}"
+            wl_docker_images: "{{ dict(docker_config[inventory_hostname] | default([]) | map(attribute='image') | union(compose_config.services.values() | map(attribute='image')) | reject('==','') | zip_longest([],fillvalue=true)) }}"
 
       vars:
         docker_config_str: "{% if (wl_logs_dir+'/docker-config.yaml') is exists %}{{ lookup('file',wl_logs_dir+'/docker-config.yaml') }}{% else %}{}{% endif %}"
         compose_config_str: "{% if (wl_logs_dir+'/compose-config.yaml') is exists %}{{ lookup('file',wl_logs_dir+'/compose-config.yaml') }}{% else %}{}{% endif %}"
-        docker_config: "{{ docker_config_str | from_yaml | default({},true) }}"
+        docker_config: "{{ docker_config_str | from_yaml | default({'worker-0':[{'image':workload_config.docker_image|default(''),'options':workload_config.docker_options|default(''),'export-logs':true}]},true) }}"
         compose_config: "{{ compose_config_str | from_yaml | default({'services':{}},true) }}"
 

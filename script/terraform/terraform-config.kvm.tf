@@ -144,21 +144,31 @@ terraform {
     libvirt = {
       source = "dmacvicar/libvirt"
     }
+    external = {
+      source = "hashicorp/external"
+    }
   }
 }
 
+data "external" "keyfile" {
+  count = length(var.kvm_hosts)
+  program = [ "bash", "-c",
+    "echo '{\"keyfile\":\"'$(ssh -S none -v -p ${var.kvm_hosts[count.index].port} ${var.kvm_hosts[count.index].user}@${var.kvm_hosts[count.index].host} echo 2>&1 | grep 'Server accepts key:' | cut -f5 -d' ')'\"}'"
+  ]
+}
+
 provider "libvirt" {
-  uri = "qemu+ssh://${var.kvm_hosts.0.user}@${var.kvm_hosts.0.host}:${var.kvm_hosts.0.port}/system"
+  uri = "qemu+ssh://${var.kvm_hosts.0.user}@${var.kvm_hosts.0.host}:${var.kvm_hosts.0.port}/system?keyfile=${data.external.keyfile.0.result.keyfile}"
   alias = "kvm0"
 }
 
 provider "libvirt" {
-  uri = "qemu+ssh://${element(var.kvm_hosts,1).user}@${element(var.kvm_hosts,1).host}:${element(var.kvm_hosts,1).port}/system"
+  uri = "qemu+ssh://${element(var.kvm_hosts,1).user}@${element(var.kvm_hosts,1).host}:${element(var.kvm_hosts,1).port}/system?keyfile=${element(data.external.keyfile,1).result.keyfile}"
   alias = "kvm1"
 }
 
 provider "libvirt" {
-  uri = "qemu+ssh://${element(var.kvm_hosts,2).user}@${element(var.kvm_hosts,2).host}:${element(var.kvm_hosts,2).port}/system"
+  uri = "qemu+ssh://${element(var.kvm_hosts,2).user}@${element(var.kvm_hosts,2).host}:${element(var.kvm_hosts,2).port}/system?keyfile=${element(data.external.keyfile,2).result.keyfile}"
   alias = "kvm2"
 }
 

@@ -38,17 +38,17 @@
   
   - block:
   
-    - name: Install prerequisites
-      yum:
-        name: 
-          - "@Development Tools"
-          - "kernel-devel-{{ kernel_version.stdout }}"
-        state: present
-      become: yes
-      register: yumrc
-      until: yumrc is success
-      retries: 10
-      delay: 10
+      - name: Install prerequisites
+        yum:
+          name:
+            - "@Development Tools"
+            - "kernel-devel-{{ kernel_version.stdout }}"
+          state: present
+        become: yes
+        register: yumrc
+        until: yumrc is success
+        retries: 10
+        delay: 10
   
     rescue:
   

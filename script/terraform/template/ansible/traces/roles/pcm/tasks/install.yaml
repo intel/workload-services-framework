@@ -26,7 +26,7 @@
       - name: Clone pcm locally
         shell: |
             mkdir -p /usr/local/src/pcm
-            curl --noproxy .intel.com -sL {{ pcm_repository }} -o /usr/local/src/pcm-{{ pcm_version }}.tar.gz
+            curl --netrc-optional --noproxy .intel.com -sL {{ pcm_repository }} -o /usr/local/src/pcm-{{ pcm_version }}.tar.gz
         delegate_to: localhost
         run_once: true
         
