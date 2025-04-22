@@ -87,13 +87,6 @@ _invoke_terraform () {
         cat "$PROJECTROOT/script/csp/ssh_config" > "$LOGSDIRH/ssh_config_csp"
         chmod 600 "$LOGSDIRH/ssh_config_csp"
     fi
-    if [ "static" = "${csp:-static}" ] && [ -d "$HOME/.kube" ]; then
-        kubeconfig_path="$(readlink -e "$HOME/.kube")"
-        dk_options+=(
-            "-v" "$kubeconfig_path:/home/.kube"
-            "-v" "$kubeconfig_path:/root/.kube"
-        )
-    fi
     if [ "static" = "${csp:-static}" ]; then
         worker_ip="$(sed -n '/^ *variable *"worker_profile" *{/,/}/{/"public_ip"/{p;q}}' "$TERRAFORM_CONFIG" | cut -f4 -d'"')"
         if [ "$worker_ip" = "127.0.0.1" ]; then
@@ -103,6 +96,10 @@ _invoke_terraform () {
                     "-v" "/opt/dataset:/opt/dataset"
                 )
             fi
+        fi
+        if [ -d "$HOME/.kube" ]; then
+            kubeconfig_path="$(readlink -e "$HOME/.kube")"
+            dk_options+=("-v" "$kubeconfig_path:/home/.kube" "-v" "$kubeconfig_path:/root/.kube")
         fi
     fi
     if [[ "$CTESTSH_OPTIONS " != *"--nodockerconf "* ]]; then
@@ -188,9 +185,9 @@ _checkdeprecatedoptions () {
   fi
 }
 
-print_workload_configurations 2>&1 | tee -a "$LOGSDIRH"/tfplan.logs
 _checkdeprecatedoptions
 _reconfigure_terraform
 "$PROJECTROOT/script/terraform/provision.sh" "$CLUSTER_CONFIG" "$TERRAFORM_CONFIG" $nctrs
 _reconfigure_reuse_sut
+print_workload_configurations 2>&1 | tee -a "$LOGSDIRH"/tfplan.logs
 _invoke_terraform

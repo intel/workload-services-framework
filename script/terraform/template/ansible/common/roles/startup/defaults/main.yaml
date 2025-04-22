@@ -4,8 +4,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-wl_sysctls: {}
-wl_sysfs: {}
 wl_kernel_args: {}
 wl_kernel_args_optional: {}
 wl_kernel_modules: []
@@ -36,6 +34,7 @@ sut_update_msr: false
 sut_update_bios: false
 sut_update_tpmi: false
 sut_update_datetime: true
+sut_reboot_timeout: 1800
 
 # for parameter validation
 dev_terraform_retries: ""

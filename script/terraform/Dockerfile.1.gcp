@@ -9,11 +9,12 @@ ARG RELEASE
 FROM terraform-csp-base${RELEASE}
 
 # Install GCP CLI
-ARG GCP_CLI_VER=476.0.0
+ARG GCP_CLI_VER=516.0.0
 ARG GCP_CLI_PKG=https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCP_CLI_VER}-linux-x86_64.tar.gz
 RUN curl --netrc-optional --retry 10 --retry-connrefused -fsSL ${GCP_CLI_PKG} -o - | tar xvfz - -C /usr/local && \
     /usr/local/google-cloud-sdk/install.sh --install-python false --usage-reporting false --no-compile-python --command-completion false --screen-reader false --quiet && \
-    ln -s /usr/local/google-cloud-sdk/bin/gcloud /usr/local/bin/gcloud
+    ln -s /usr/local/google-cloud-sdk/bin/gcloud /usr/local/bin/gcloud && \
+    rm -f /usr/local/google-cloud-sdk/platform/gsutil/third_party/urllib3/dummyserver/certs/*
 
 # Add cleanup script
 RUN ln -s /opt/project/script/csp/opt/script/cleanup-gcp.sh /usr/local/bin/cleanup && \

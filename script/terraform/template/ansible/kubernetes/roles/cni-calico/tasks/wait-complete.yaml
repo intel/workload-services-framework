@@ -4,9 +4,21 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: Wait for calico ready
-  shell: |
-    timeout {{ k8s_cni_ready_wait }} bash -c "while ! kubectl wait --namespace=kube-system pod --for=condition=Ready -l k8s-app=calico-node --timeout=30s; do sleep 1s; done"
-  delegate_to: "{{ ('controller' in groups) | ternary('controller-0','localhost') }}"
-  run_once: true
+- block:
+
+    - name: Wait for calico ready
+      shell: |
+        timeout {{ k8s_cni_ready_wait }} bash -c "while ! kubectl wait --namespace=kube-system pod --for=condition=Ready -l k8s-app=calico-node --timeout=30s; do sleep 1s; done"
+      delegate_to: "{{ ('controller' in groups) | ternary('controller-0','localhost') }}"
+      run_once: true
+
+  rescue:
+
+    - include_role:
+        name: debug
+      vars:
+        debug_options: "-A"
+
+    - fail:
+        msg: "Failed to setup CNI"
 

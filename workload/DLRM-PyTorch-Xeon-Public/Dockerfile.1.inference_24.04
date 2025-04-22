@@ -1,0 +1,45 @@
+# dlrm-pytorch-intel-public-inference-24.04
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+
+FROM ai-common-img${RELEASE} as ai_common
+FROM dlrm-pytorch-dataset-24.04${RELEASE} as dataset
+FROM dlrm-pytorch-benchmark-24.04${RELEASE} as benchmark
+
+FROM pytorch-intel-public-24.04${RELEASE}
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt -o Acquire::Check-Date=false update && \
+    apt install -y numactl
+
+ARG WORKSPACE_DIR=/home/workspace
+WORKDIR ${WORKSPACE_DIR}
+
+COPY --from=ai_common /home/ai_common/ ${WORKSPACE_DIR}/models/ai_common/
+COPY --from=dataset /dataset/terabyte_processed_test.bin /dataset/*.npz ${WORKSPACE_DIR}/dataset/
+COPY --from=benchmark /models/ ${WORKSPACE_DIR}/models/
+
+WORKDIR ${WORKSPACE_DIR}/models
+
+RUN mkdir -p output && \
+    mkdir -p ${WORKSPACE_DIR}/model && \
+    touch ${WORKSPACE_DIR}/dataset/terabyte_processed_train.bin
+
+ENV WEIGHT_PATH="${WORKSPACE_DIR}/model"
+ENV OUTPUT_DIR="${WORKSPACE_DIR}/models/output"
+ENV DATASET_DIR="${WORKSPACE_DIR}/dataset"
+ENV OMP_NUM_THREADS=1
+
+COPY --chmod=750 run_test.sh .
+
+RUN mkfifo /export-logs
+
+CMD ( ./run_test.sh; \
+    echo $? > status) 2>&1 | tee benchmark_${MODE}_${TOPOLOGY}_${PRECISION}_${FUNCTION}_${DATA_TYPE}_$(date +"%m-%d-%y-%H-%M-%S").log && \
+    tar cf /export-logs status $(find . -name "*.log") && \
+    sleep infinity

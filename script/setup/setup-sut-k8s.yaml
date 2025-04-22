@@ -16,6 +16,17 @@
         tasks_from: check-host
       when: inventory_hostname in dict(play_hosts | map('extract',hostvars,['private_ip']) | zip(play_hosts)).values()
 
+- hosts: cluster_hosts
+  any_errors_fatal: true
+  gather_facts: false
+  become: true
+  tasks:
+
+    - name: replace 127.0.[0-9].1 in /etc/hosts
+      include_role:
+        name: startup
+        tasks_from: hosts
+
 - hosts: controller
   gather_facts: false
   become: false

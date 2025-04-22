@@ -9,4 +9,6 @@ k8s_cni: flannel
 k8s_detect_pod_failure: true
 k8s_config_timezone: true
 k8s_schedule_wait_timeout: "15s"
+k8s_save_logs: false
+k8s_exec_options: "--username=root"
 

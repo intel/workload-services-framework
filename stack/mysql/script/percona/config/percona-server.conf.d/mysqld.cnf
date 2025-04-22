@@ -1,0 +1,4 @@
+[mysqld_safe]
+pid-file = /var/run/mysqld/mysqld.pid
+socket   = /var/lib/mysql/mysql.sock
+nice     = 0

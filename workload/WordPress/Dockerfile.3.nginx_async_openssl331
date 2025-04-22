@@ -1,0 +1,63 @@
+# wordpress-nginx-async-openssl3.3.1
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+ARG RELEASE
+# FROM ${OS_IMAGE}:${OS_VER} AS build
+
+FROM qatsw-crypto-base-ssl3-ubuntu2404${RELEASE} AS build
+RUN  apt-get update && apt-get install -y git make autoconf automake libtool gcc g++ libpcre3-dev zlib1g-dev libtcmalloc-minimal4 libunwind-dev libgoogle-perftools-dev
+RUN  cd /usr/lib/x86_64-linux-gnu && \
+     ln -f -s libtcmalloc_minimal.so.4 libtcmalloc_minimal.so
+
+
+RUN apt-get update && \
+    apt-get install -y \
+    git \
+    build-essential \
+    cmake \
+    make \
+    gcc \
+    g++ \
+    libarchive-tools \
+    nasm \
+    autoconf \
+    automake \
+    libtool \
+    curl
+
+ARG ASYNC_NGINX_VER="v0.5.1"
+ARG ASYNC_NGINX_REPO=https://github.com/intel/asynch_mode_nginx.git
+RUN git clone -b $ASYNC_NGINX_VER --depth 1 ${ASYNC_NGINX_REPO} && \
+    cd /asynch_mode_nginx && \
+    ./configure \
+      --prefix=/var/www \
+      --conf-path=/usr/local/share/nginx/conf/nginx.conf \
+      --sbin-path=/usr/local/bin/nginx \
+      --pid-path=/run/nginx.pid \
+      --lock-path=/run/lock/nginx.lock \
+      --modules-path=/var/www/modules/ \
+      --without-http_rewrite_module \
+      --with-http_ssl_module \
+      --with-pcre \
+      --add-dynamic-module=modules/nginx_qat_module/ \
+      --with-cc-opt="-DNGX_SECURE_MEM -O3 -I/usr/local/include/openssl -Wno-error=deprecated-declarations -Wimplicit-fallthrough=0" \
+      --with-ld-opt="-ltcmalloc_minimal -Wl,-rpath=/usr/local/lib64 -L/usr/local/lib64" && \
+    make -j && \
+    make install
+
+FROM qatsw-crypto-base-ssl3-ubuntu2404${RELEASE}
+RUN apt-get update && apt-get install -y numactl net-tools google-perftools libunwind8 libpcre3 libtcmalloc-minimal4 zlib1g systemd && apt-get clean
+RUN  cd /usr/lib/x86_64-linux-gnu && \
+     ln -f -s libtcmalloc_minimal.so.4 libtcmalloc_minimal.so
+COPY --from=build /usr/local/ /usr/local/
+COPY --from=build /var/www/ /var/www/
+COPY conf/opt/nginx-async-on.conf /usr/local/share/nginx/conf/nginx.conf
+COPY scripts/prepare_nginx_config.sh /
+
+CMD (/prepare_nginx_config.sh 2>&1 | tee output.log | grep -v "GET" )

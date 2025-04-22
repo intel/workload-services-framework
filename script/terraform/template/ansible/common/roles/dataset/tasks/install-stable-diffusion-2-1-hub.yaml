@@ -3,12 +3,12 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
-- include_role:
-    name: hf-dataset
+- include_tasks:
+    file: download-hf.yaml
   vars:
-    DEST_DIR: "/opt/dataset/stable-diffusion-2-1/hub"
-    MODEL_ID: "stabilityai/stable-diffusion-2-1"
-    DATASET_SIZE: 10
-    exclude: ['ckpt','bin']
-    revision: []
-    HF_LOGIN: false
+    dataset_model_path: "stable-diffusion-2-1/hub"
+    hfcli_model_id: "stabilityai/stable-diffusion-2-1"
+    dataset_size: 10
+    hfcli_exclude: ['ckpt','bin']
+    hfcli_revision: []
+    hfcli_login: false

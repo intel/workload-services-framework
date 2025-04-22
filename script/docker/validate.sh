@@ -10,7 +10,7 @@ docker_run () {
     [[ "$CTESTSH_OPTIONS" = *"--dry-run"* ]] && exit 0
 
     IFS=$'\n' images=($(sed -n "/^worker-0:/,/^worker-[0-9]*:/{/ image:/{s/.* image: *[\"']*\([^\"']*\)[\"']* *$/\1/;p}}" "$LOGSDIRH/docker-config.yaml"))
-    IFS=$'\n' docker_options=($(sed -n "/^worker-0:/,/^worker-/{/ options:/,/(^ *[^:]*:|^ *$)/{/^ * [-] /{s/^ *[-] *[\"']*\([^\"']*\)[\"']* *$/\1/;p};/ options: [^ ]/{s/^.*options: *[\"']*\([^\"']*\)[\"']* *$/~\1/;p};/ options: *$/{s/.*/~/;p}}}" "$LOGSDIRH/docker-config.yaml" | sed '1d' | tr '\n~' ' \n'))
+    IFS=$'\n' docker_options=($(sed -n "/^worker-0:/,/^worker-/{/ options:/,/(^ *[^:]*:|^ *$)/{/^ * [-] /{s/^ *[-] *[\"']*\([^\"']*\)[\"']* *$/\1/;p};/ options: [^ ]/{s/^.*options: *[\"']*\([^\"']*\)[\"']* *$/~\1/;p};/ options: *$/{s/.*/~/;p}}}" "$LOGSDIRH/docker-config.yaml" | tr '\n~' ' \n' | sed 1d))
     IFS=$'\n' export_logs=($(sed -n "/^worker-0:/,/^worker-/{/^ *[-] * [a-z-]*:/{s/.*/ export-logs: ~true/};/ export[-]logs:/{s/^.*export[-]logs: *//;p}}" "$LOGSDIRH/docker-config.yaml" | tr '\n~' ' \n'))
     IFS=$'\n' traceables=($(sed -n "/^worker-0:/,/^worker-/{/^ *[-] * [a-z-]*:/{s/.*/ traceable: ~true/};/ traceable:/{s/^.*traceable: *//;p}}" "$LOGSDIRH/docker-config.yaml" | tr '\n~' ' \n'))
     IFS=$'\n' commands=($(sed -n "/^worker-0:/,/^worker-/{/^ *[-] * [a-z-]*:/{s/.*/ command: ~/};/ command:/{s/^.*command: *[\"']*\([^\"']*\)[\"']* *$/\1/;p}}" "$LOGSDIRH/docker-config.yaml" | tr '\n~' ' \n'))

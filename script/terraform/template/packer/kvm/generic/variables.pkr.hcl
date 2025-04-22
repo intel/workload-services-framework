@@ -59,11 +59,6 @@ variable "kvm_host_port" {
   default = 22
 }
 
-variable "kvm_host_ssh_pri_key_file" {
-  type = string
-  default = "/home/.ssh/id_rsa"
-}
-
 variable "ssh_pri_key_file" {
   type = string
   default = "ssh_access.key"

@@ -18,6 +18,21 @@ resource "alicloud_vpc" "default" {
   tags = var.common_tags
 }
 
+resource "alicloud_vpc_prefix_list" "ssh" {
+  prefix_list_name = "wsf-${var.job_id}-pfx"
+  resource_group_id = var.resource_group_id
+  ip_version = "IPV4"
+
+  dynamic "entrys" {
+    for_each = toset(local.sg_whitelist_cidr_blocks)
+    content {
+      cidr = entrys.value
+    }
+  }
+
+  tags = var.common_tags
+}
+
 resource "alicloud_vswitch" "default" {
   vswitch_name = "wsf-${var.job_id}-vswitch"
   zone_id = var.zone
@@ -27,7 +42,7 @@ resource "alicloud_vswitch" "default" {
 }
 
 resource "alicloud_security_group" "default" {
-  name = "wsf-${var.job_id}-sg"
+  security_group_name = "wsf-${var.job_id}-sg"
   vpc_id = alicloud_vpc.default.id
   security_group_type = "normal"
   resource_group_id = var.resource_group_id
@@ -36,13 +51,11 @@ resource "alicloud_security_group" "default" {
 }
 
 resource "alicloud_security_group_rule" "ssh" {
-  for_each = toset(local.sg_whitelist_cidr_blocks)
-
   type = "ingress"
   ip_protocol = "tcp"
   port_range = "22/22"
   security_group_id = alicloud_security_group.default.id
-  cidr_ip = each.value
+  prefix_list_id = alicloud_vpc_prefix_list.ssh.id
 }
 
 resource "alicloud_security_group_rule" "outward_traffic" {

@@ -83,20 +83,20 @@
         environment:
           no_proxy: "{{ no_proxy }}"
         become: true
-  
-       - name: Install vtune
-         apt:
-           name: 
-             - "intel-oneapi-vtune={{ vtune_version }}"
-           state: present
-           update_cache: yes
-         environment:
-           no_proxy: "{{ no_proxy }}"
-         become: yes
-         register: aptrc
-         until: aptrc is success
-         retries: 10
-         delay: 10
+
+      - name: Install vtune
+        apt:
+          name:
+            - "intel-oneapi-vtune={{ vtune_version }}"
+          state: present
+          update_cache: yes
+        environment:
+          no_proxy: "{{ no_proxy }}"
+        become: yes
+        register: aptrc
+        until: aptrc is success
+        retries: 10
+        delay: 10
   
     always:
   

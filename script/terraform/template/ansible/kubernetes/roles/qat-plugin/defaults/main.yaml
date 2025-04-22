@@ -5,7 +5,8 @@
 #
 ---
 
-qatplugin_repository: https://github.com/intel/intel-device-plugins-for-kubernetes.git
-qatplugin_release: v0.28.0
-qatplugin_namespace: inteldeviceplugins-system
-qatplugin_max_qat_devices: 128
+k8s_qat_repository: https://github.com/intel/intel-device-plugins-for-kubernetes.git
+k8s_qat_version: "0.28.0"
+k8s_qat_namespace: inteldeviceplugins-system
+k8s_qat_max_qat_devices: 128
+k8s_qat_push_images: false

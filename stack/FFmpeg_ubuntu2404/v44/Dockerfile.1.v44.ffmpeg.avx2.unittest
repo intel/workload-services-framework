@@ -1,0 +1,21 @@
+# ffmpeg-base-v44-avx2-unittest-ubuntu2404
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE=latest
+FROM media-dataset-v44-ubuntu2404${RELEASE} as dataset
+FROM ffmpeg-base-v44-avx2-ubuntu2404${RELEASE}
+
+COPY --from=dataset /home/archive/Mixed_40sec_1920x1080_60fps_8bit_420_crf23_veryslow.mp4 /home/archive/
+COPY unittest.sh /home/
+
+WORKDIR /home
+RUN  mkfifo /export-logs
+CMD  (bash unittest.sh ; echo $? > status) 2>&1 | tee benchmark_unittest_$(date +"%m-%d-%y-%H-%M-%S").log && \
+     tar cf /export-logs status $(find . -name "*.log") && \
+     sleep infinity
+
+

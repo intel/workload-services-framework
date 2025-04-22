@@ -7,13 +7,13 @@
   - name: pull images locally
     command: "docker pull --platform {{ workload_config.image_arch }} {{ item }}"
     loop: "{{ k8s_preload_images }}"
-    become: true
+    become: false
     delegate_to: localhost
     run_once: true
 
   - name: extract image archives
     shell: "docker save {{ k8s_preload_images | join(' ') }} > /tmp/preload-images.tar"
-    become: true
+    become: false
     delegate_to: localhost
     run_once: true
   

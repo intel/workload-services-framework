@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<!--Phoronix Test Suite v10.8.4-->
+<PhoronixTestSuite>
+  <TestInformation>
+    <Title>nginx</Title>
+    <AppVersion>1.23.2</AppVersion>
+    <Description>This is a benchmark of the lightweight Nginx HTTP(S) web-server. This Nginx web server benchmark test profile makes use of the wrk program for facilitating the HTTP requests over a fixed period time with a configurable number of concurrent clients/connections. HTTPS with a self-signed OpenSSL certificate is used by this test for local benchmarking.</Description>
+    <ResultScale>Requests Per Second</ResultScale>
+    <Proportion>HIB</Proportion>
+    <TimesToRun>1</TimesToRun>
+  </TestInformation>
+  <TestProfile>
+    <Version>3.0.1</Version>
+    <SupportedPlatforms>Linux, BSD, Solaris, MacOSX</SupportedPlatforms>
+    <SoftwareType>Utility</SoftwareType>
+    <TestType>System</TestType>
+    <License>Free</License>
+    <Status>Verified</Status>
+    <ExternalDependencies>build-utilities, zlib-development, openssl-development</ExternalDependencies>
+    <EnvironmentSize>193</EnvironmentSize>
+    <ProjectURL>http://nginx.org/</ProjectURL>
+    <RepositoryURL>https://github.com/nginx/nginx</RepositoryURL>
+    <Maintainer>Michael Larabel</Maintainer>
+  </TestProfile>
+  <TestSettings>
+    <Default>
+      <Arguments>-d {{ PTS_NGINX301_DURATION }} -c {{ PTS_NGINX301_CONNECTIONS }} </Arguments>
+      <PostArguments> https://127.0.0.1:8089/test.html</PostArguments>
+    </Default>
+  </TestSettings>
+</PhoronixTestSuite>

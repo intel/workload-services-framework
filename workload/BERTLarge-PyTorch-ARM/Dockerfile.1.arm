@@ -1,0 +1,93 @@
+# bertlarge-pytorch-arm-public
+FROM python:3.11
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG WORK_DIR=/home/workspace
+ARG MODEL_REPO="https://github.com/intel/ai-reference-models.git"
+ARG MODEL_VER=pytorch_gnr_2024_ww42
+ARG TRANSFORMERS_VER="v4.38.1"
+ARG TRANSFORMES_REPO="https://github.com/huggingface/transformers.git"
+ARG TRANSFORMES_PATH=/home/workspace/pytorch_model/models_v2/pytorch/bert_large/inference/cpu/transformers
+ARG DATASET_VER="v1.1"
+ARG DATASET_PKG="https://rajpurkar.github.io/SQuAD-explorer/dataset/dev-${DATASET_VER}.json"
+ARG DATASET_PATH="/home/dataset/pytorch"
+ARG SQUAD_CONFIG_VER="b77a1101fca72fb51279d8aba154bddd61bff81c"
+ARG SQUAD_CONFIG_REPO="https://huggingface.co/google-bert/bert-large-uncased-whole-word-masking-finetuned-squad/resolve/${SQUAD_CONFIG_VER}/config.json"
+ARG PYTORCH_MODEL_VER="e0c83dfe42deb7fa17ed39b35aaf1948fb5417c8"
+ARG PYTORCH_MODEL_REPO="https://huggingface.co/google-bert/bert-large-uncased-whole-word-masking/resolve/${PYTORCH_MODEL_VER}/pytorch_model.bin"
+ARG VOCAB_VER="2f07d813ca87c8c709147704c87210359ccf2309"
+ARG VOCAB_REPO="https://huggingface.co/google-bert/bert-large-uncased/resolve/${VOCAB_VER}/vocab.txt"
+ARG MODEL_CONFIG_VER="e0c83dfe42deb7fa17ed39b35aaf1948fb5417c8"
+ARG MODEL_CONFIG_REPO="https://huggingface.co/google-bert/bert-large-uncased-whole-word-masking/resolve/${MODEL_CONFIG_VER}/config.json"
+ARG TORCH_PKG="https://download.pytorch.org/whl/cpu"
+ARG TORCH_VER="2.4.0"
+ARG PROTOBUF_PKG="pip"
+ARG PROTOBUF_VER="3.20.3"
+ARG NUMPY_PKG="pip"
+ARG NUMPY_VER="1.23.5"
+ARG PILLOW_PKG="pip"
+ARG PILLOW_VER="10.3.0"
+
+RUN apt-get update && apt-get install -y \
+    wget \
+    git \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/
+
+RUN apt-get update -y && apt-get install -y libjemalloc-dev libomp-dev numactl && apt-get clean -y && apt-get autoremove -y
+
+RUN pip3 install --no-cache-dir torch==${TORCH_VER} torchvision --index-url ${TORCH_PKG}
+
+# required to allow benchmark script locate jemalloc
+RUN mkdir -p /root/.local  \ 
+    && ln -s /usr/lib/aarch64-linux-gnu /root/.local/lib  \
+    && mkfifo /export-logs
+
+RUN --mount=type=secret,id=.netrc,dst=/root/.netrc \
+git clone ${MODEL_REPO} -b ${MODEL_VER} /home/workspace/pytorch_model/
+
+RUN git clone --progress --verbose --depth 1 -b ${TRANSFORMERS_VER} ${TRANSFORMES_REPO} ${TRANSFORMES_PATH} && \
+    cd ${TRANSFORMES_PATH} && \
+    pip3 install --no-cache-dir -e ./ && \
+    pip3 install --no-cache-dir -r ./examples/pytorch/text-classification/requirements.txt && \
+    pip3 install --no-cache-dir tensorboard protobuf==${PROTOBUF_VER} numpy==${NUMPY_VER} pillow==${PILLOW_VER}
+
+ENV DATASET_PATH=${DATASET_PATH}
+ENV BENCHMARK="BERTLarge"
+ENV DEFAULT_STEPS=200
+
+# https://github.com/aws/aws-graviton-getting-started/blob/main/machinelearning/pytorch.md#runtime-configurations-for-optimal-performance
+# OMP_NUM_THREADS is set by torch.backends.xeon.run_cpu --ncores_per_instance
+ENV OMP_PROC_BIND=false
+ENV OMP_PLACES=cores
+ENV LRU_CACHE_CAPACITY=1024
+ENV THP_MEM_ALLOC_ENABLE=1
+ENV TORCHINDUCTOR_FREEZING=1
+
+COPY jit.script.patch ${TRANSFORMES_PATH}
+RUN git -C ${TRANSFORMES_PATH} apply jit.script.patch
+
+RUN mkdir -p ${DATASET_PATH} && \
+    cd ${DATASET_PATH} && \
+    wget ${DATASET_PKG}  
+
+RUN mkdir -p /home/bert_squad_model	
+WORKDIR /home/bert_squad_model
+
+RUN wget ${SQUAD_CONFIG_REPO} -O config.json && \
+    wget --progress=bar:force:noscroll ${PYTORCH_MODEL_REPO} -O pytorch_model.bin && \
+    wget ${VOCAB_REPO} -O vocab.txt && \
+    wget ${MODEL_CONFIG_REPO} -O bert_config.json
+
+ENV MODEL_DIR="/home/bert_squad_model"
+    
+WORKDIR /home/workspace/benchmark
+
+COPY --chmod=750 main.sh /home/workspace/benchmark/
+CMD ( ./main.sh; \
+    echo $? > status) 2>&1 | tee benchmark.log  \
+    && tar cf /export-logs status $(find . -maxdepth 1 -name "*.log")  \
+    && sleep infinity

@@ -11,17 +11,17 @@
   
             . /opt/intel/oneapi/setvars.sh
             {% if vtune_target_process is not defined %}
-            nohup vtune -collect {{ vtune_collect_type }} {{ vtune_sampling_mode }} {{ vtune_options }} -data-limit={{ vtune_data_limit }} {{vtune_start_paused | default("")}} -r vtune-$1.record --duration {{ vtune_collect_time }} > vtune-$1.logs 2>&1 &
+            nohup vtune -collect {{ vtune_collect_type }} {{ vtune_sampling_mode }} {{ vtune_options }} -data-limit={{ vtune_data_limit }} {{vtune_start_paused | default("")}} -r vtune-$roi.record --duration {{ vtune_collect_time }} > vtune-$roi.logs 2>&1 &
             {% elif vtune_target_process == '' %}
-            nohup vtune -collect {{ vtune_collect_type }} {{ vtune_sampling_mode }} {{ vtune_options }} -data-limit={{ vtune_data_limit }} {{vtune_start_paused | default("")}} -r vtune-$1.record --duration {{ vtune_collect_time }} > vtune-$1.logs 2>&1 &
+            nohup vtune -collect {{ vtune_collect_type }} {{ vtune_sampling_mode }} {{ vtune_options }} -data-limit={{ vtune_data_limit }} {{vtune_start_paused | default("")}} -r vtune-$roi.record --duration {{ vtune_collect_time }} > vtune-$roi.logs 2>&1 &
             {% else %}
-            nohup vtune -collect {{ vtune_collect_type }} {{ vtune_sampling_mode }} {{ vtune_options }} -data-limit={{ vtune_data_limit }} {{vtune_start_paused | default("")}} -r vtune-$1.record --target-pid `ps -ef | grep "{{ vtune_target_process }}" | grep -v grep | awk '{print $2}'` > vtune-$1.logs 2>&1 &
+            nohup vtune -collect {{ vtune_collect_type }} {{ vtune_sampling_mode }} {{ vtune_options }} -data-limit={{ vtune_data_limit }} {{vtune_start_paused | default("")}} -r vtune-$roi.record --target-pid `ps -ef | grep "{{ vtune_target_process }}" | grep -v grep | awk '{print $2}'` > vtune-$roi.logs 2>&1 &
             {% endif %}
             echo $! > vtune.pid
             disown
     trace_module_stop_block: |
             . /opt/intel/oneapi/setvars.sh
-            vtune -r vtune-$1.record -command stop
+            vtune -r vtune-$roi.record -command stop
             kill $(cat vtune.pid)
   
             sysctl -w kernel.perf_event_paranoid={{ vtune_perf_event_paranoid.stdout | default(0) }}

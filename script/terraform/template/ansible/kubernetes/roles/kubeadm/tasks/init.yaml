@@ -103,6 +103,18 @@
     - kube-controller-manager
     - kube-scheduler
 
-- name: Wait for control-plane pods become ready
-  shell: "timeout {{ k8s_node_ready_wait }} kubectl wait --namespace=kube-system --for=condition=Ready pods --selector tier=control-plane"
+- block:
+
+    - name: Wait for control-plane pods become ready
+      shell: "timeout {{ k8s_node_ready_wait }} kubectl wait --namespace=kube-system --for=condition=Ready pods --selector tier=control-plane"
+
+  rescue:
+
+    - include_role:
+        name: debug
+      vars:
+        debug_options: "-A"
+
+    - fail:
+        msg: "Failed to setup control plane"
 

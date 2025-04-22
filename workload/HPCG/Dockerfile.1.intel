@@ -1,0 +1,51 @@
+# hpcg-generic
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=22.04
+ARG OS_IMAGE=ubuntu
+FROM ${OS_IMAGE}:${OS_VER}
+
+ARG MPICH_VER="4.1"
+ARG MPICH_REPO=http://www.mpich.org/static/downloads/${MPICH_VER}/mpich-${MPICH_VER}.tar.gz
+ARG HPCG_VER="3.1"
+ARG HPCG_REPO=http://www.hpcg-benchmark.org/downloads/hpcg-${HPCG_VER}.tar.gz
+
+# Prepare env
+ENV HOME_DIR="/"
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt -o Acquire::Check-Date=false update && \
+    apt-get install -y git make cmake gfortran wget build-essential python3
+
+# Download and build mpich
+WORKDIR ${HOME_DIR}
+RUN wget ${MPICH_REPO} && \
+    tar xzf mpich-${MPICH_VER}.tar.gz && \
+    cd mpich-${MPICH_VER} && \
+    ./configure --prefix=/usr/local && \
+    make && \
+    make install
+
+# Download and build HPCG
+WORKDIR ${HOME_DIR}
+RUN wget ${HPCG_REPO} && \
+    tar xzf hpcg-${HPCG_VER}.tar.gz && \
+    mv hpcg-${HPCG_VER} hpcg && \
+    cd hpcg && \
+    mkdir build && \
+    cd build && \
+    ../configure Linux_MPI && \
+    PATH=$PATH:/usr/local/bin && \
+    make && \
+    mv -f ${HOME_DIR}hpcg/build/bin/* ${HOME_DIR}hpcg/bin && \
+    PATH=$PATH:${HOME_DIR}hpcg/bin
+
+# Run testing for HPCG
+COPY run_test.sh /
+RUN mkfifo /export-logs
+CMD (/run_test.sh; echo $? > status) 2>&1 | tee output.logs && \ 
+    tar cf /export-logs status output.logs $(find . -name "HPCG-Benchmark_*.txt") && \
+    sleep infinity

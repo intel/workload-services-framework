@@ -4,8 +4,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-wl_bios: {}
-
 sut_update_bios: false
 sut_bios_tool: syscfg
 sut_bios_passwd: ''

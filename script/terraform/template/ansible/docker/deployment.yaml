@@ -18,6 +18,14 @@
       - sut_sudo | default(true) | bool
       - burn_cpu_seconds is defined
 
+    - name: create cgroup
+      include_role:
+        name: cgroup
+      when:
+      - (ansible_connection|default('ssh')) in ['ssh']
+      - sut_sudo | default(true) | bool
+      - sut_use_cgroup | default(false) | bool
+
     - name: run docker validation over iterations
       include_role:
         name: deployment

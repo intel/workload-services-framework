@@ -3,21 +3,10 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
-INTEL_MSR_ITEMS: [ {
-    "name": "LLC",
-    "value": "0x0c90"
-  },
-  {
-    "name": "L2C",
-    "value": "0x0d10"
-  },
-  {
-    "name": "UCORE",
-    "value": "0x620"
-  }]
 
 # format: <group>:key=value[,...]
 sut_msr_options: ''
 
-wl_msr: {}
 sut_update_msr: false
+
+msr_sysfs_uncore00_path: "/sys/devices/system/cpu/intel_uncore_frequency/uncore00"

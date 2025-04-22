@@ -86,7 +86,6 @@ for host in instances:
     "ansible_host": instances[host].get("ansible_host", instances[host].get("public_ip", instances[host].get("private_ip","127.0.0.1"))),
     "ansible_user": instances[host].get("ansible_user", instances[host].get("user_name",os.environ["TF_USER"])),
     "ansible_port": instances[host].get("ansible_port", instances[host].get("ssh_port", 22)),
-    "wl_kernel_args": options.get("wl_kernel_args", {}),
   })
   if vm_group == "controller":
     inventories["cluster_hosts"]["hosts"][host] = inventories[vm_group]["hosts"][host]
@@ -146,32 +145,6 @@ def _ScanK8sImages():
   return list(images.keys())
 
 
-def _DecodeKernelArgs(line):
-  llist = line.split(" ")
-  return { llist[k]:llist[k+1] for k in range(0,len(llist)-1,2) }
-
-
-def _EncodeKernelArgs(args):
-  return " ".join([f"{k} {args[k]}" for k in args])
-
-
-def _CreatePerHostCtls(name, ctls):
-  for group in ctls:
-    for igroup in inventories:
-      for host in inventories[igroup]["hosts"]:
-        vm_group = _GetVMGroup(host)
-        if vm_group == group:
-          inventories[igroup]["hosts"][host][name] = ctls[group]
-
-
-def _List2Dict(alist):
-  adict = {}
-  for e in alist.split(","):
-    k, _, v = e.partition("=")
-    adict[k] = v
-  return adict
-
-
 def _RegistryEnabled():
   my_ip_list = options["my_ip_list"].split(",")
   for h in inventories["cluster_hosts"]["hosts"]:
@@ -181,11 +154,6 @@ def _RegistryEnabled():
 
 
 nidx = {}
-sysctls = {}
-sysfs = {}
-bios = {}
-msr = {}
-tpmi = {}
 with open(CLUSTER_CONFIG) as fd:
   for doc in yaml.safe_load_all(fd):
     if doc and "cluster" in doc:
@@ -221,43 +189,10 @@ with open(CLUSTER_CONFIG) as fd:
             if label_str not in inventories[vm_group]["hosts"][host]["k8s_node_labels"]:
               inventories[vm_group]["hosts"][host]["k8s_node_labels"].append(label_str)
 
-        if "sysctls" in c:
-          if vm_group not in sysctls:
-            sysctls[vm_group] = {}
-          sysctls[vm_group].update(c["sysctls"])
-
-        if "sysfs" in c:
-          if vm_group not in sysfs:
-            sysfs[vm_group] = {}
-          sysfs[vm_group].update(c["sysfs"])
-
-        if "bios" in c:
-          if vm_group not in bios:
-            bios[vm_group] = {}
-          bios[vm_group].update(c["bios"])
-
-        if "msr" in c:
-          if vm_group not in msr:
-            msr[vm_group] = {}
-          msr[vm_group].update(c["msr"])
-          
-        if "tpmi" in c:
-          if vm_group not in tpmi:
-            tpmi[vm_group] = ""
-          tpmi[vm_group] += c["tpmi"]
-
-
-_CreatePerHostCtls("wl_sysctls", sysctls)
-_CreatePerHostCtls("wl_sysfs", sysfs)
-_CreatePerHostCtls("wl_bios", bios)
-_CreatePerHostCtls("wl_msr", msr)
-_CreatePerHostCtls("wl_tpmi", tpmi)
-
 playbooks = [{
   "name": "startup sequence",
   "import_playbook": "./template/ansible/common/startup.yaml",
   "vars": _ExtendOptions({
-    p: _List2Dict(options[p]) for p in ["wl_default_sysctls", "wl_default_sysfs"] if p in options
   })
 }]
 

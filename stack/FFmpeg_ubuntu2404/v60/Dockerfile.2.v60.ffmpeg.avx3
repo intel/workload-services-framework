@@ -1,0 +1,128 @@
+# ffmpeg-base-v60-avx3-ubuntu2404
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+FROM ${OS_IMAGE}:${OS_VER} AS build
+
+RUN apt update && \
+    apt install -y wget nasm \
+        autoconf automake libbz2-dev cmake libfreetype6-dev gcc g++ git libtool make pkg-config zlib1g-dev \
+        libass-dev libnuma-dev libarchive-dev meson tar findutils sed procps
+
+RUN mkdir -p /opt/build && mkdir -p /opt/dist
+ENV PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig
+
+ARG YASM_VER=1.3.0
+ARG YASM_REPO=https://github.com/OpenVisualCloud/Dockerfiles-Resources/raw/master/yasm-${YASM_VER}.tar.gz
+RUN cd /opt/build && \
+    wget --no-check-certificate -O - ${YASM_REPO} | tar xz
+RUN cd /opt/build/yasm-1.3.0 && \
+    ./configure --prefix=/usr/local --libdir=/usr/local/lib64 && \
+    make -j $(nproc) && \
+    make install
+
+ARG LIBX264_VER=baee400fa9ced6f5481a728138fed6e867b0ff7f
+ARG LIBX264_REPO=https://code.videolan.org/videolan/x264.git
+RUN cd /opt/build && \
+    git clone ${LIBX264_REPO} -b stable && \
+    cd x264 && \
+    git checkout ${LIBX264_VER} && \
+    ./configure --prefix=/usr/local --libdir=/usr/local/lib64 --bindir=/usr/local/bin --enable-shared --enable-pic && \
+    make -j$(nproc) && \
+    make install DESTDIR=/opt/dist && \
+    make install
+
+ARG LIBX265_VER=Release_3.5
+ARG LIBX265_REPO=https://github.com/videolan/x265.git
+RUN cd /opt/build && \
+    git clone ${LIBX265_REPO} && cd x265 && \
+    git checkout ${LIBX265_VER} && \
+    cd build/linux && \
+    #mkdir -p 8bit 10bit 12bit && \
+    #cd 12bit && cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DHIGH_BIT_DEPTH=ON -DEXPORT_C_API=OFF -DENABLE_SHARED=OFF -DENABLE_CLI=OFF -DMAIN12=ON ../../../source && \
+    #make -j$(nproc) && \
+    #cd ../10bit && cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DHIGH_BIT_DEPTH=ON -DEXPORT_C_API=OFF -DENABLE_SHARED=OFF -DENABLE_CLI=OFF ../../../source && \
+    #make -j$(nproc) && \
+    #cd ../8bit && ln -sf ../10bit/libx265.a libx265_main10.a && ln -sf ../12bit/libx265.a libx265_main12.a && \
+    #cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DLIB_INSTALL_DIR=/usr/local/lib64 -DEXTRA_LIB="x265_main10.a;x265_main12.a" -DEXTRA_LINK_FLAGS=-L. -DLINKED_10BIT=ON -DLINKED_12BIT=ON ../../source && \
+    cmake -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/usr/local -DLIB_INSTALL_DIR=/usr/local/lib64 ../../source && \
+    #cmake -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_INSTALL_LIBDIR=/usr/local/lib64 --bindir=/opt/build/bin ../../source && \
+    make -j$(nproc) && \
+    #mv libx265.a libx265_main.a && \
+    #echo -e "ar -M <<EOF\nCREATE libx265.a\nADDLIB libx265_main.a\nADDLIB libx265_main10.a\nADDLIB libx265_main12.a\nSAVE\nEND\nEOF" > script.sh && \
+    #chmod +x script.sh && \
+    #./script.sh && \
+    make install DESTDIR=/opt/dist && \
+    make install
+
+COPY patch/* /opt/build/
+
+ARG SVT_HEVC_VER=6cca5b932623d3a1953b165ae6b093ca1325ac44
+ARG SVT_HEVC_REPO=https://github.com/OpenVisualCloud/SVT-HEVC
+RUN cd /opt/build && \
+  git clone ${SVT_HEVC_REPO}  && cd SVT-HEVC && git checkout ${SVT_HEVC_VER} && git apply /opt/build/v1.5.1-avx512-svt-enabling.patch
+  
+RUN cd /opt/build/SVT-HEVC/Build/linux && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_INSTALL_LIBDIR=/usr/local/lib64 -DCMAKE_ASM_NASM_COMPILER=yasm ../.. && \
+    make -j $(nproc) && \
+    make install DESTDIR=/opt/dist && \
+    make install
+
+ARG DAV1D_VER=0.9.0
+ARG DAV1D_REPO=https://code.videolan.org/videolan/dav1d/-/archive/${DAV1D_VER}/dav1d-${DAV1D_VER}.tar.gz
+RUN cd /opt/build && \
+  wget -O - ${DAV1D_REPO} | tar xz
+RUN cd /opt/build/dav1d-${DAV1D_VER} && \
+  meson build --prefix=/usr/local --libdir /usr/local/lib64 --buildtype=plain && \
+  cd build && \
+  ninja install && \
+  DESTDIR=/opt/dist ninja install
+
+ARG SVT_AV1_VER=v1.5.0
+ARG SVT_AV1_REPO=https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/${SVT_AV1_VER}/SVT-AV1-${SVT_AV1_VER}.tar.gz
+RUN cd /opt/build && \
+    wget -O - ${SVT_AV1_REPO} | tar zx && cd SVT-AV1* && \
+    cd Build/linux && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_INSTALL_LIBDIR=/usr/local/lib64 -DCMAKE_ASM_NASM_COMPILER=yasm ../.. && \
+    make -j $(nproc) && \
+    sed -i "s/SvtAv1dec/SvtAv1Dec/" SvtAv1Dec.pc && \
+    make install DESTDIR=/opt/dist && \
+    make install
+
+
+ARG FFMPEG_VER=release/6.0 
+ARG FFMPEG_REPO=https://github.com/FFmpeg/FFmpeg
+RUN cd /opt/build && \
+    git clone ${FFMPEG_REPO} -b ${FFMPEG_VER} ffmpeg 
+
+RUN cd /opt/build/ffmpeg && \
+    git apply /opt/build/SVT-HEVC/ffmpeg_plugin/master-0001-lavc-svt_hevc-add-libsvt-hevc-encoder-wrapper.patch && \
+    ./configure --prefix=/usr/local --libdir=/usr/local/lib64 --bindir=/usr/local/bin --enable-shared --disable-doc --disable-htmlpages \
+    --disable-manpages --disable-podpages --disable-txtpages \
+    --extra-cflags=-w --enable-nonfree --enable-libass --enable-libfreetype --disable-xlib --disable-sdl2 --disable-hwaccels --disable-vaapi \
+    --enable-libx264 --enable-gpl --enable-libx265 --enable-libsvthevc --enable-libsvtav1 --enable-libdav1d --extra-libs="-lpthread -lm" && \
+    make -j$(nproc) && \
+    make install DESTDIR=/opt/dist && \
+    make install
+
+RUN rm -rf /opt/dist/usr/local/include && \
+    rm -rf /opt/dist/usr/local/lib64/pkgconfig && \
+    find /opt/dist -name "*.a" -exec rm -f {} \; || echo ""
+RUN rm -rf /opt/dist/usr/local/share/doc /opt/dist/usr/local/share/gtk-doc
+RUN rm -rf /opt/dist/usr/local/share/man
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+RUN apt update && apt install -y libnuma-dev libpciaccess0 libv4l-0 libass9
+RUN apt update && apt install -y dstat
+RUN apt update && apt install -y sysstat
+RUN apt update && apt install -y psmisc numactl findutils procps
+
+COPY --from=build /opt/dist /
+
+RUN echo "/usr/local/lib64" >> /etc/ld.so.conf.d/all-libs.conf && ldconfig

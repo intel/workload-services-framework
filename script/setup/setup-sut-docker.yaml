@@ -4,7 +4,16 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- import_playbook: ../terraform/template/ansible/docker/installation.yaml
+- hosts: all
+  become: true
+  any_errors_fatal: true
+  gather_facts: false
+  tasks:
+
+    - name: Install docker
+      include_role:
+        name: docker
+
   vars:
     wl_enable_reboot: true
     wl_trace_modules: ''

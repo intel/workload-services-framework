@@ -1,0 +1,134 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: delete folder {{ sut_dataset_path }}/{{ dataset_model_path }}.wip
+  file:
+    path: "{{ sut_dataset_path }}/{{ dataset_model_path }}.wip"
+    state: absent
+
+- name: get proxy values
+  shell:
+    cmd: |
+      echo "$http_proxy|$https_proxy|$no_proxy"
+    executable: /bin/bash
+  register: proxy_values
+  become: false
+
+- name: Test huggingface_cli
+  shell:
+    cmd: |
+      . {{ dataset_venv_path }}/bin/activate
+      huggingface-cli version
+    executable: /bin/bash
+  register: test_hfcli
+  ignore_errors: true
+
+- block:
+
+    - name: Get OS
+      shell:
+        cmd: ". /etc/os-release;echo $ID"
+        executable: /bin/bash
+      register: os
+
+    - name: Install venv
+      include_tasks:
+        file: "download-hf-{{ (os.stdout in ['ubuntu','debian']) | ternary('debian','centos') }}.yaml"
+
+    - name: "Create {{ dataset_venv_path }}"
+      shell:
+        cmd: |
+          python3 -m venv {{ dataset_venv_path }}
+          . {{ dataset_venv_path }}/bin/activate
+          pip3 install -U 'huggingface_hub[cli]'
+        executable: /bin/bash
+      environment:
+        http_proxy: "{{ 0 | extract(proxy_values.stdout | split('|')) }}"
+        https_proxy: "{{ 1 | extract(proxy_values.stdout | split('|')) }}"
+        no_proxy: "{{ 2 | extract(proxy_values.stdout | split('|')) }}"
+
+  when: test_hfcli is failed
+
+- name: delete dir "{{ sut_dataset_path }}/{{ dataset_model_path }}"
+  file:
+    path: "{{ sut_dataset_path }}/{{ dataset_model_path }}"
+    state: absent
+
+- name: Get the disk space of sut {{ sut_dataset_path }}
+  shell:
+    cmd: |
+      df -BG --output=avail {{ sut_dataset_path }} | sed '1{d};s/.$//'
+    executable: /bin/bash
+  register: free_space_sut
+
+- name: Check free space
+  fail:
+    msg: "Not enough disk space ({{ free_space_sut.stdout }}GB). Required {{ dataset_size }}GB."
+  when: free_space_sut.stdout | int < dataset_size
+
+- block:
+
+    - name: "Download dataset {{ hfcli_model_id }}"
+      shell:
+        cmd: |
+          nohup bash -l -c '. {{ dataset_venv_path }}/bin/activate;huggingface-cli download {{ hfcli_model_id }} {{ hfcli_exclude_option }} {{ hfcli_revision_option }} || echo Failed' > /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-hf-dataset.logs 2>&1 &
+          echo $!
+          disown
+        executable: /bin/bash
+      register: download_process
+      vars:
+        hfcli_exclude_option: "{{ '--exclude ' + (hfcli_exclude | map('regex_replace', '^(.*)$', '*.' ~ '\\1') | join(' ')) if hfcli_exclude | length > 0 else '' }}"
+        hfcli_revision_option: "{{ '--revision ' + hfcli_revision if hfcli_revision | length > 0 else '' }}"
+      environment:
+        HF_TOKEN: "{% if (hfcli_login|bool) and (dataset_ai_config_file is exists) %}{{ (lookup('file',dataset_ai_config_file)|from_json)['hf_token'] }}{% endif %}"
+        HF_HUB_CACHE: "{{ sut_dataset_path }}/{{ dataset_model_path }}.wip"
+        http_proxy: "{{ 0 | extract(proxy_values.stdout | split('|')) }}"
+        https_proxy: "{{ 1 | extract(proxy_values.stdout | split('|')) }}"
+        no_proxy: "{{ 2 | extract(proxy_values.stdout | split('|')) }}"
+
+    - name: Streaming download progress
+      shell:
+        cmd: |
+          {% for h in play_hosts %}
+            echo "nice -n 19 {% if (hostvars[h].ansible_connection|default('ssh'))!='local' %}ssh -p {{ hostvars[h].ansible_port | default(22) }} {{ hostvars[h].ansible_user }}@{{ hostvars[h].ansible_host }} {% if ansible_private_key_file is defined %}-i {{ ansible_private_key_file }}{% endif %}{% endif %} tail -f --pid={{ hostvars[h].download_process.stdout_lines | last }} /tmp/{{ wl_namespace }}-{{ h }}-hf-dataset.logs | stdbuf -oL sed 's|^|{{ h }}: |'" > /tmp/streaming-console
+          {% endfor %}
+        executable: /bin/bash
+      delegate_to: localhost
+      run_once: true
+      become: false
+      no_log: true
+
+    - name: Wait until download completes
+      shell:
+        cmd: |
+          tail -f --pid={{ download_process.stdout_lines | last }} /dev/null
+          if [ -e /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-hf-dataset.logs ]; then
+            if grep -q -E 'Error|Exception|Failed' /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-hf-dataset.logs; then
+              cat /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-hf-dataset.logs
+              exit 3
+            fi
+          else
+            exit 3
+          fi
+        executable: /bin/bash
+
+    - name: Move wip folder to {{ sut_dataset_path }}/{{ dataset_model_path }}
+      shell:
+        cmd: "mv -f {{ sut_dataset_path }}/{{ dataset_model_path }}.wip {{ sut_dataset_path }}/{{ dataset_model_path }}"
+        executable: /bin/bash
+      register: move_folder_sut
+
+  always:
+
+    - name: Delete folder {{ sut_dataset_path }}/{{ dataset_model_path }}.wip
+      file:
+        path: "{{ sut_dataset_path }}/{{ dataset_model_path }}.wip"
+        state: absent
+
+    - name: Delete logs
+      file:
+        path: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-hf-dataset.logs"
+        state: absent

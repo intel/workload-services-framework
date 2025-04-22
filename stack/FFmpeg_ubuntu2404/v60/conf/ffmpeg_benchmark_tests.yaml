@@ -1,0 +1,2721 @@
+##########################################################################################
+#
+# ffmpeg_benchmark_tests.yaml -- ffmpeg benchmark test configuration file mapped to Xeon Media 
+# workloads - last updated 07/21/2020
+# See the README file in this directory for details about the format of this file.
+#
+##########################################################################################
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+Automated:
+  description: 'This might be genius'
+  group: >-
+    x264-medium-1toNLive-avx2-1080p
+    x264-slow-1to4NLive_avx512-1080p
+    svt-hevc-1-1to1VOD-4k
+Primary:
+  description: 'Run all ffmpeg benchmark tests'
+  group: >-
+    OTTPremium
+    Broadcast
+    vod_mapped
+Primary-14:
+  description: 'Run all ffmpeg benchmark tests'
+  group: >-
+    OTTPremium-14
+    Broadcast-14
+    vod_mapped-14
+Version_Testing:
+  description: 'Not inteded to be run. Used to testing the prepare phase of version testing'
+  group: >-
+    svt-hevc-preset5-1toNLive-1080p-v1.5.0
+    svt-hevc-preset5-1toNLive-1080p-v1.4.3
+    svt-hevc-preset5-1toNLive-1080p-v1.3.0
+    x265-veryslow-1to1VOD_avx512-4k-Release_3.1
+    x265-veryslow-1to1VOD_avx512-4k-Release_3.2
+    x265-veryslow-1to1VOD_avx512-4k-Release_3.3
+fps_testing:
+  description: 'Testing weird use cases'
+  group: >-
+    svt-hevc-1-1to1VOD-4k-fps
+    svt-hevc-preset5-1to1Live-4k-fps
+    x264-medium-1toNLive-avx2-1080p-fps
+    x264-slow-1to4NLive_avx2-1080p-fps
+    x265-veryslow-1to1VOD_avx2-4k-fps
+    x265-veryslow-1to1VOD_avx512-4k-fps
+x265_ICX_testing:
+  description: 'Testing x265 versions on ICX'
+  group: >-
+    x265-veryslow-1to1VOD_avx2-4k-3.3
+    x265-veryslow-1to1VOD_avx2-4k-3.4
+    x265-veryslow-1to1VOD_avx2-4k-3.5
+  
+IPP:
+  description: 'Run all IPP ffmpeg benchmark tests'
+  group: >-
+    IPP_OTT
+    IPP_Broadcast
+    IPP_vod_mapped
+base_case:
+  descripion: "All IPP cases without ipp"
+  group: >-
+    base_OTT
+    base_Broadcast
+    base_vod_mapped
+base_OTT:
+  description: 'Run workloads under "OTT premium" category in Xeon Media Workloads shared Q2 2020 for IPP use-cases'
+  group: >-
+    x264-medium-1toNLive-avx2-1080p
+    x264-medium-1toNLive_avx512-1080p
+    svt-hevc-preset5-1toNLive-1080p
+    svt-hevc-preset5-1toNLive-4k
+base_Broadcast:
+  description: 'Run workloads under "Broadcast" category in Xeon Media Workload shared Q2 2020 for IPP use-cases'
+  group: >-
+    x264-slow-1to4NLive_avx512-1080p
+    x264-slow-1to4NLive_avx2-1080p
+    svt-hevc-preset4-1toNLive-1080p
+    svt-hevc-preset4-1toNLive-4k
+baseline_1:
+  description: 'SVT no IPP with and without abr, x264 without ipp, with abr and with cpuflags'
+  group: >-
+    x264-medium-1toNLive-avx2-1080p-abr-cpuflags
+    x264-medium-1toNLive_avx512-1080p-abr-cpuflags
+    svt-hevc-preset5-1toNLive-1080p-noabr-cpuflags
+    svt-hevc-preset5-1toNLive-4k-noabr-cluflags
+    svt-hevc-preset5-1toNLive-1080p-abr-cpuflags
+    svt-hevc-preset5-1toNLive-4k-abr-cpuflags
+
+baseline_2:
+  description: 'SVT with IPP, without abrpipeline. x264 with IPP and abrpipeline'
+  group: >-
+    x264-medium-1toNLive-avx2-1080p-abr-cpuflags-ipp
+    x264-medium-1toNLive_avx512-1080p-abr-cpuflags-ipp
+    svt-hevc-preset5-1toNLive-1080p-noabr-ipp
+    svt-hevc-preset5-1toNLive-4k-noabr-ipp
+baseline_3:
+  description: 'x264 with and without abrpipeline'
+  group: >-
+    x264-medium-1toNLive-avx2-1080p-noabr-cpuflags-ipp
+    x264-medium-1toNLive_avx512-1080p-noabr-cpuflags-ipp
+baseline_4:
+  description: 'x264 no abrpipeline and no IPP'
+  group: >-
+    x264-medium-1toNLive-avx2-1080p-noabr
+    x264-medium-1toNLive_avx512-1080p-noabr
+base_vod_mapped:
+  description: 'Run workloads under "VOD" category in Xeon Media Workload shared Q2 2020'
+  group: >-
+    x265-veryslow-1toNVOD_avx2-4k
+    x265-veryslow-1toNVOD_avx512-4k
+    svt-hevc-preset1-1toNVOD-4k
+    x264-veryslow-1toNVOD_avx512-1080p
+    x264-veryslow-1toNVOD_avx2-1080p
+    svt-hevc-preset1-1toNVOD-1080p
+IPP_OTT:
+  description: 'Run workloads under "OTT premium" category in Xeon Media Workloads shared Q2 2020 for IPP use-cases'
+  group: >-
+    x264-medium-1toNLive-avx2-1080p-ipp
+    x264-medium-1toNLive_avx512-1080p-ipp
+    svt-hevc-preset5-1toNLive-1080p-ipp
+    svt-hevc-preset5-1toNLive-4k-ipp
+IPP_Broadcast:
+  description: 'Run workloads under "Broadcast" category in Xeon Media Workload shared Q2 2020 for IPP use-cases'
+  group: >-
+    x264-slow-1to4NLive_avx512-1080p-ipp
+    x264-slow-1to4NLive_avx2-1080p-ipp
+    svt-hevc-preset4-1toNLive-1080p-ipp
+    svt-hevc-preset4-1toNLive-4k-ipp
+IPP_vod_mapped:
+  description: 'Run workloads under "VOD" category in Xeon Media Workload shared Q2 2020'
+  group: >-
+    x265-veryslow-1toNVOD_avx2-4k-ipp
+    x265-veryslow-1toNVOD_avx512-4k-ipp
+    svt-hevc-preset1-1toNVOD-4k-ipp
+    x264-veryslow-1toNVOD_avx512-1080p-ipp
+    x264-veryslow-1toNVOD_avx2-1080p-ipp
+    svt-hevc-preset1-1toNVOD-1080p-ipp	
+OTTPremium:
+  description: 'Run workloads under "OTT premium" category in Xeon Media Workloads shared Q2 2020'
+  group: >-
+    x264-medium-1toNLive-avx2-1080p
+    x264-medium-1toNLive_avx512-1080p
+    svt-hevc-preset5-1toNLive-1080p
+    svt-hevc-preset5-1toNLive-4k
+    svt-hevc-preset5-1to1Live-4k
+OTTPremium-14:
+  description: 'Run workloads under "OTT premium" category in Xeon Media Workloads shared Q2 2020'
+  group: >-
+    x264-medium-1toNLive-avx2-1080p-14
+    x264-medium-1toNLive_avx512-1080p-14
+    svt-hevc-preset5-1toNLive-1080p-14
+    svt-hevc-preset5-1toNLive-4k-14
+    svt-hevc-preset5-1to1Live-4k-14
+    
+Broadcast:
+  description: 'Run workloads under "Broadcast" category in Xeon Media Workload shared Q2 2020'
+  group: >-
+    x264-slow-1to4NLive_avx512-1080p
+    x264-slow-1to4NLive_avx2-1080p
+    svt-hevc-preset4-1toNLive-1080p
+    svt-hevc-preset4-1toNLive-4k
+    svt-hevc-preset4-1to1Live-4k
+Broadcast-14:
+  description: 'Run workloads under "Broadcast" category in Xeon Media Workload shared Q2 2020'
+  group: >-
+    x264-slow-1to4NLive_avx512-1080p-14
+    x264-slow-1to4NLive_avx2-1080p-14
+    svt-hevc-preset4-1toNLive-1080p-14
+    svt-hevc-preset4-1toNLive-4k-14
+    svt-hevc-preset4-1to1Live-4k-14
+
+vod_mapped:
+  description: 'Run workloads under "VOD" category in Xeon Media Workload shared Q2 2020'
+  group: >-
+    x265-veryslow-1to1VOD_avx512-4k
+    x265-veryslow-1to1VOD_avx2-4k
+    svt-hevc-1-1to1VOD-4k
+    x265-veryslow-1toNVOD_avx2-4k
+    x265-veryslow-1toNVOD_avx512-4k
+    svt-hevc-preset1-1toNVOD-4k
+    x264-veryslow-1toNVOD_avx512-1080p
+    x264-veryslow-1toNVOD_avx2-1080p
+    svt-hevc-preset1-1toNVOD-1080p
+vod_mapped-deepti:
+  description: 'Run workloads under "VOD" category in Xeon Media Workload shared Q2 2020'
+  group: >-
+    x265-medium-1to1VOD_avx512-1080p
+    x265-medium-1to1VOD_avx2-1080p
+    x265-veryslow-1to1VOD_avx512-4k
+    x265-veryslow-1to1VOD_avx2-4k
+    x264-veryslow-1toNVOD_avx512-1080p
+    x264-veryslow-1toNVOD_avx2-1080p
+vod_mapped-14:
+  description: 'Run workloads under "VOD" category in Xeon Media Workload shared Q2 2020'
+  group: >-
+    x265-veryslow-1to1VOD_avx512-4k-14
+    x265-veryslow-1to1VOD_avx2-4k-14
+    svt-hevc-1-1to1VOD-4k-14
+    x265-veryslow-1toNVOD_avx2-4k-14
+    x265-veryslow-1toNVOD_avx512-4k-14
+    svt-hevc-preset1-1toNVOD-4k-14
+    x264-veryslow-1toNVOD_avx512-1080p-14
+    x264-veryslow-1toNVOD_avx2-1080p-14
+    svt-hevc-preset1-1toNVOD-1080p-14
+Extras:
+  description: 'Run all ffmpeg benchmark tests'
+  group: >-
+    x264-avx512
+    x264-avx2
+    x265-avx512
+    x265-avx2
+    svt-hevc
+
+x264-avx512:
+  description: 'additional x264 avx512 codec tests'
+  group: >-
+    x264-medium-1to1Live_avx512-1080p
+    x264-veryfast-1to1Live_avx512-1080p
+    x264-veryfast-1toNLive_avx512-1080p
+
+x264-avx2:
+  description: 'additional x264 avx2 codec tests'
+  group: >-
+    x264-medium-1to1Live_avx2-1080p
+    x264-veryfast-1to1Live_avx2-1080p
+    x264-veryfast-1toNLive-avx2-1080p
+
+x265-avx512:
+  description: 'Additional x265 codec avx512 tests'
+  group: >-
+    x265-medium-1to1Live_avx512-1080p
+    x265-medium-1toNLive_avx512-1080p
+    x265-medium-1to1Live_avx512-4k
+    x265-medium-1toNLive_avx512-4k
+    x265-veryfast-1to1Live_avx512-1080p
+    x265-veryfast-1toNLive_avx512-1080p
+    x265-veryfast-1to1Live_avx512-4k
+    x265-veryfast-1toNLive_avx512-4k	
+x265-avx2:
+  description: 'Additional x265 codec avx2 tests'
+  group: >-
+    x265-medium-1to1Live_avx2-1080p
+    x265-medium-1toNLive_avx2-1080p
+    x265-medium-1to1Live_avx2-4k
+    x265-medium-1toNLive_avx2-4k
+    x265-veryfast-1to1Live_avx2-1080p
+    x265-veryfast-1toNLive_avx2-1080p
+    x265-veryfast-1to1Live_avx2-4k
+    x265-veryfast-1toNLive_avx2-4k   
+
+svt-hevc:
+  description: 'additional svt-hevc codec tests'
+  group: >-
+    svt-hevc-preset9-1to1Live-1080p
+    svt-hevc-preset6-1to1Live-1080p
+    svt-hevc-preset5-1to1Live-1080p
+    svt-hevc-preset4-1to1Live-1080p
+    svt-hevc-preset6-1to1Live-4k
+    svt-hevc-preset10-1to1Live-4k
+
+x264_interlaced:
+  description: 'Run ffmpeg benchmark use the x264 interlaced codec'
+  group: >-
+    x264-slow-1to8NLive_avx512-1080p
+    x264-slow-1to8NLive_avx2-1080p    
+
+x264-medium-1to1Live_avx512-1080p:
+  description: '1080p input to 1080P output using x264/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -frames 3000 -y 1080p.mp4
+x264-veryfast-1to1Live_avx512-1080p:
+  description: '1080p input to 1080P output using x264/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: veryfast
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -frames 3000  -y 1080p.mp4
+
+x264-medium-1toNLive_avx512-1080p:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+
+x264-veryfast-1toNLive_avx512-1080p:
+  description: '1080p input to multiple outputs using x264/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: veryfast
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset veryfast -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset veryfast -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset veryfast -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset veryfast -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+
+x264-slow-1to4NLive_avx512-1080p:
+  description: '1080p input to multiple outputs using x264/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: slow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset slow -x264-params asm=avx512 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p60.mp4      
+      -c:v libx264 -preset slow -x264-params asm=avx512 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4     
+      -c:v libx264 -preset slow -x264-params asm=avx512 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4     
+      -c:v libx264 -preset slow -x264-params asm=avx512 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+ 
+x264-slow-1to8NLive_avx512-1080p:
+  description: '1080p input to multiple outputs using x264/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: slow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset slow -x264-params asm=avx512 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 4.1M -maxrate 4.1M -bufsize 8.2M -sc_threshold 0 -r 60 -y 1080i60.mp4
+      -c:v libx264 -preset slow -x264-params asm=avx512 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 30 -y 1080p_30.mp4      
+      -c:v libx264 -preset slow -x264-params asm=avx512 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset slow -x264-params asm=avx512 -vf scale=1280:720 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 2.1M -maxrate 2.1M -bufsize 4.2M -sc_threshold 0 -r 30 -y 720p30.mp4
+      -c:v libx264 -preset slow -x264-params asm=avx512 -vf scale=960:540  -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 1.8M -maxrate 1.8M -bufsize 3.6M -r 60  -sc_threshold 0 -y 540pSVT_M5.mp4     
+      -c:v libx264 -preset slow -x264-params asm=avx512 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset slow -x264-params asm=avx512 -vf scale=512:288 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.8M -maxrate 0.8M -bufsize 1.6M -sc_threshold 0 -r 30 -y 288p.mp4      
+      -c:v libx264 -preset slow -x264-params asm=avx512 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+                 
+x265-medium-1to1Live_avx512-1080p:
+  description: '1080p input to 1080p output using x265/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 30
+  video_codec:
+    codec: x265
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=30 -y 1080p.mp4
+
+x265-veryfast-1to1Live_avx512-1080p:
+  description: '1080p input to 1080p output using x265/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 30
+  video_codec:
+    codec: x265
+    preset: veryfast
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=30 -y 1080p.mp4
+
+x265-medium-1toNLive_avx512-1080p:
+  description: '1080p input to multiple outputs using x265/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 30
+  video_codec:
+    codec: x265
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx265 -preset medium -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=30 -y 1080p.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=2480:vbv-maxrate=2480:vbv-bufsize=4960:ref=3:fps=30 -y -vf scale=1280:720 720p.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=440:vbv-maxrate=440:vbv-bufsize=880:ref=3:fps=30 -y -vf scale=640:360 360p.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=144:vbv-maxrate=144:vbv-bufsize=288:ref=3:fps=30 -y -vf scale=288:160 160p.mp4
+      -abr_pipeline
+
+x265-veryfast-1toNLive_avx512-1080p:
+  description: '1080p input to multiple outputs using x265/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 30
+  video_codec:
+    codec: x265
+    preset: veryfast
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx265 -preset veryfast -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=30 -y 1080p.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=2480:vbv-maxrate=2480:vbv-bufsize=4960:ref=3:fps=60 -y -vf scale=1280:720 720p.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=440:vbv-maxrate=440:vbv-bufsize=880:ref=3:fps=30 -y -vf scale=640:360 360p.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=144:vbv-maxrate=144:vbv-bufsize=288:ref=3:fps=30 -y -vf scale=288:160 160p.mp4
+      -abr_pipeline
+
+x265-medium-1to1Live_avx512-4k:
+  description: '4k input to 4k output using x265/medium'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx512
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x265
+    preset: medium
+    #tune:
+    args: -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60 -y 4k.mp4
+
+x265-veryfast-1to1Live_avx512-4k:
+  description: '4k input to 4k output using x265/veryfast'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx512
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x265
+    preset: veryfast
+    #tune:
+    args: -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60 -y 4k.mp4
+
+x265-medium-1toNLive_avx512-4k:
+  description: '4k input to multiple outputs using x265/medium'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx512
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x265
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx265 -preset medium -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60 -y 4k.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=60 -vf scale=1920:1080 -y 1080p.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=2480:vbv-maxrate=2480:vbv-bufsize=4960:ref=3:fps=60 -y -vf scale=1280:720 720p.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=960:vbv-maxrate=960:vbv-bufsize=1920:ref=3:fps=60 -y -vf scale=640:480 480p.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=960:vbv-maxrate=960:vbv-bufsize=1920:ref=3:fps=60 -y -vf scale=640:360 360p.mp4
+      -abr_pipeline
+
+x265-veryfast-1toNLive_avx512-4k:
+  description: '4k input to multiple outputs using x265/veryfast'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx512
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x265
+    preset: veryfast
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx265 -preset veryfast -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60 -y 4k.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=60 -vf scale=1920:1080 -y 1080p.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=2480:vbv-maxrate=2480:vbv-bufsize=4960:ref=3:fps=60 -y -vf scale=1280:720 720p.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=960:vbv-maxrate=960:vbv-bufsize=1920:ref=3:fps=60 -y -vf scale=640:480 480p.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=960:vbv-maxrate=960:vbv-bufsize=1920:ref=3:fps=60 -y -vf scale=640:360 360p.mp4
+      -abr_pipeline
+
+svt-hevc-preset9-1to1Live-1080p:
+  description: '1080p input to 1080P output using hevc/6'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 9
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0 -y 1080P.mp4	  
+svt-hevc-preset6-1to1Live-1080p:
+  description: '1080p input to 1080P output using hevc/6'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 6
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0 -y 1080P.mp4
+svt-hevc-preset5-1to1Live-1080p:
+  description: '1080p input to 1080P output using hevc/6'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0 -y 1080P.mp4
+svt-hevc-preset4-1to1Live-1080p:
+  description: '1080p input to 1080P output using hevc/9'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 4
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0  -y 1080P.mp4
+svt-hevc-preset5-1toNLive-1080p:
+  description: '1080p input to multiple outputs using hevc/6'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60 -sc_detection 0 -y  720P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.44M -maxrate 0.44M -bufsize 0.88M -vf scale=640:360 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30 -sc_detection 0  -y 160p.mp4
+      -abr_pipeline
+svt-hevc-preset4-1toNLive-1080p:
+  description: '1080p input to multiple outputs using hevc/9'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 4
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60 -sc_detection 0  -y 720P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 0.44M -maxrate 0.44M -bufsize 0.88M -vf scale=640:360 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30 -sc_detection 0  -y 160p.mp4
+      -abr_pipeline
+svt-hevc-preset5-1to1Live-4k:
+  description: '4k input to 4k output using hevc/6'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: -c:v libsvt_hevc -preset 5 -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0 -y  4k.mp4
+
+svt-hevc-preset4-1to1Live-4k:
+  description: '4k input to 4k output using hevc/10'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 4
+    #tune:
+    args: -c:v libsvt_hevc -preset 4 -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0  -y 4k.mp4
+
+svt-hevc-preset6-1to1Live-4k:
+  description: '4k input to 4k output using hevc/10'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 6
+    #tune:
+    args: -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0  -y 4k.mp4
+
+svt-hevc-preset10-1to1Live-4k:
+  description: '4k input to 4k output using hevc/10'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 10
+    #tune:
+    args: -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0  -y 4k.mp4
+
+
+svt-hevc-preset5-1toNLive-4k:
+  description: '4k input to multiple outputs using hevc/6'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0  -y 4k.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -vf scale=1920:1080 -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60 -sc_detection 0  -y  -y 720P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 1.8M -maxrate 1.8M -bufsize 3.6M -vf scale=960:540 -r 60 -sc_detection 0  -y 540pSVT_M5.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.96M -maxrate 0.96M -bufsize 1.92M -vf scale=640:360 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30 -sc_detection 0  -y  160P.mp4
+      -abr_pipeline
+      
+svt-hevc-preset4-1toNLive-4k:
+  description: '4k input to multiple outputs using hevc/9'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 4
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0 4k.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -vf scale=1920:1080 -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60 -sc_detection 0   -y 720P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 1.8M -maxrate 1.8M -bufsize 3.6M -vf scale=960:540 -r 60 -sc_detection 0  -y  540pSVT_M5.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 0.96M -maxrate 0.96M -bufsize 1.92M -vf scale=640:360 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30 -sc_detection 0  -y  160P.mp4
+      -abr_pipeline
+
+x264-medium-1to1Live_avx2-1080p:
+  description: '1080p input to 1080P output using x264/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+
+x264-veryfast-1to1Live_avx2-1080p:
+  description: '1080p input to 1080P output using x264/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: veryfast
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+
+x264-medium-1toNLive-avx2-1080p:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60 
+  video_codec:
+    codec: x264
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+
+x264-veryfast-1toNLive-avx2-1080p:
+  description: '1080p input to multiple outputs using x264/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: veryfast
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset veryfast -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset veryfast -x264-params asm=avx2 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset veryfast -x264-params asm=avx2 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset veryfast -x264-params asm=avx2 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline 
+
+x264-slow-1to4NLive_avx2-1080p:
+  description: '1080p input to multiple outputs using x264/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: slow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset slow -x264-params asm=avx2 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p60.mp4      
+      -c:v libx264 -preset slow -x264-params asm=avx2 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4     
+      -c:v libx264 -preset slow -x264-params asm=avx2 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4     
+      -c:v libx264 -preset slow -x264-params asm=avx2 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+ 
+x264-slow-1to8NLive_avx2-1080p:
+  description: '1080p input to multiple outputs using x264/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: slow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset slow -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 4.1M -maxrate 4.1M -bufsize 8.2M -sc_threshold 0 -r 60 -y 1080i60.mp4
+      -c:v libx264 -preset slow -x264-params asm=avx2 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 30 -y 1080p_30.mp4      
+      -c:v libx264 -preset slow -x264-params asm=avx2 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset slow -x264-params asm=avx2 -vf scale=1280:720 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 2.1M -maxrate 2.1M -bufsize 4.2M -sc_threshold 0 -r 30 -y 720p30.mp4
+      -c:v libx264 -preset slow -x264-params asm=avx2 -vf scale=960:540  -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 1.8M -maxrate 1.8M -bufsize 3.6M -r 60  -sc_threshold 0 -y 540pSVT_M5.mp4     
+      -c:v libx264 -preset slow -x264-params asm=avx2 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset slow -x264-params asm=avx2 -vf scale=512:288 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.8M -maxrate 0.8M -bufsize 1.6M -sc_threshold 0 -r 30 -y 288p.mp4      
+      -c:v libx264 -preset slow -x264-params asm=avx2 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+   
+x265-medium-1to1Live_avx2-1080p:
+  description: '1080p input to 1080p output using x265/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 30
+  video_codec:
+    codec: x265
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=30 -y 1080p.mp4
+
+x265-veryfast-1to1Live_avx2-1080p:
+  description: '1080p input to 1080p output using x265/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 30
+  video_codec:
+    codec: x265
+    preset: veryfast
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=30 -y 1080p.mp4
+
+x265-medium-1toNLive_avx2-1080p:
+  description: '1080p input to multiple outputs using x265/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 30
+  video_codec:
+    codec: x265
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx265 -preset medium -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=30 -y 1080p.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=2480:vbv-maxrate=2480:vbv-bufsize=4960:ref=3:fps=60 -y -vf scale=1280:720 720p.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=440:vbv-maxrate=440:vbv-bufsize=880:ref=3:fps=30 -y -vf scale=640:360 360p.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=144:vbv-maxrate=144:vbv-bufsize=288:ref=3:fps=30 -y -vf scale=288:160 160p.mp4
+      -abr_pipeline
+
+x265-veryfast-1toNLive_avx2-1080p:
+  description: '1080p input to multiple outputs using x265/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 30
+  video_codec:
+    codec: x265
+    preset: veryfast
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx265 -preset veryfast -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=30 -y 1080p.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=2480:vbv-maxrate=2480:vbv-bufsize=4960:ref=3:fps=60 -y -vf scale=1280:720 720p.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=440:vbv-maxrate=440:vbv-bufsize=880:ref=3:fps=30 -y -vf scale=640:360 360p.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=144:vbv-maxrate=144:vbv-bufsize=288:ref=3:fps=30 -y -vf scale=288:160 160p.mp4
+      -abr_pipeline
+
+x265-medium-1to1Live_avx2-4k:
+  description: '4k input to 4k output using x265/medium'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx2
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x265
+    preset: medium
+    #tune:
+    args: -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60 -y 4k.mp4
+
+x265-veryfast-1to1Live_avx2-4k:
+  description: '4k input to 4k output using x265/veryfast'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx2
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x265
+    preset: veryfast
+    #tune:
+    args: -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60 -y 4k.mp4
+
+x265-medium-1toNLive_avx2-4k:
+  description: '4k input to multiple outputs using x265/medium'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x265
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx265 -preset medium -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60 -y 4k.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=60 -vf scale=1920:1080 -y 1080p.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=2480:vbv-maxrate=2480:vbv-bufsize=4960:ref=3:fps=60 -y -vf scale=1280:720 720p.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=960:vbv-maxrate=960:vbv-bufsize=1920:ref=3:fps=60 -y -vf scale=640:480 480p.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=960:vbv-maxrate=960:vbv-bufsize=1920:ref=3:fps=60 -y -vf scale=640:360 360p.mp4
+      -abr_pipeline
+
+x265-veryfast-1toNLive_avx2-4k:
+  description: '4k input to multiple outputs using x265/veryfast'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x265
+    preset: veryfast
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx265 -preset veryfast -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60 -y 4k.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=60 -vf scale=1920:1080 -y 1080p.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=2480:vbv-maxrate=2480:vbv-bufsize=4960:ref=3:fps=60 -y -vf scale=1280:720 720p.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=960:vbv-maxrate=960:vbv-bufsize=1920:ref=3:fps=60 -y -vf scale=640:480 480p.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=960:vbv-maxrate=960:vbv-bufsize=1920:ref=3:fps=60 -y -vf scale=640:360 360p.mp4
+      -abr_pipeline
+
+x264-slow-1to1_Live_avx2-1080p:
+  description: '1080P input to 1080P output using x264/veryslow'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: slow
+    #tune:
+    args: -x264-params asm=62463 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 5.5M -maxrate 5.5M -frames 100 -bufsize 11M -sc_threshold 0 -r 60 -y 1080p.mp4      
+
+x265-veryslow-1to1VOD_avx2-1080p:
+  description: '1080P input to 1080P output using x265/veryslow'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=30  -frames 100 -y 1080p.mp4
+
+x265-veryslow-1to1VOD_avx512-1080p:
+  description: '1080P input to 1080P output using x265/veryslow'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=30  -frames 100 -y 1080p.mp4    
+
+x265-veryslow-1to1VOD_avx2-4k:
+  description: '4K input to 4K output using x265/veryslow'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx2
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60   -frames 100 -y 4k.mp4
+
+x265-veryslow-1to1VOD_avx512-4k:
+  description: '4K input to 4K output using x265/veryslow'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx512
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60  -frames 100 -y 4k.mp4
+
+svt-hevc-1-1to1VOD-1080p:
+  description: '1080P input to 1080P output using SVT-HEVC/0/2'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: SVT-HEVC
+    preset: 1
+    tune: 1
+    args: -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60  -frames 100 -g 120  -y 1080P.mp4
+
+svt-hevc-1-1to1VOD-4k:
+  description: '4k input to 4k output using SVT-HEVC/0/2'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: SVT-HEVC
+    preset: 1
+    tune: 1
+    args: -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60  -frames 100 -y  4k.mp4
+
+svt-hevc-preset1-1toNVOD-4k:
+  description: '4k input to multiple outputs using hevc/6'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  video_codec:
+    codec: SVT-HEVC
+    preset: 1
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0 -frames 100 4k.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -vf scale=1920:1080 -r 60  -frames 100 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60  -frames 100 -sc_detection 0  -y 720P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 1.8M -maxrate 1.8M -bufsize 3.6M  -vf scale=960:540 -r 60  -frames 100 -sc_detection 0  -y 540pSVT_M5.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 0.96M -maxrate 0.96M -bufsize 1.92M  -vf scale=640:360 -r 30  -frames 100 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30  -frames 100 -sc_detection 0  -y 160P.mp4
+      -abr_pipeline
+      
+svt-hevc-preset4-1toNLive-4k:
+  description: '4k input to multiple outputs using hevc/9'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 4
+    #tune:
+    args: >-
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0 4k.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -vf scale=1920:1080 -r 60 -sc_detection 0 -y  1080P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60  -sc_detection 0  -y 720P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 1.8M -maxrate 1.8M -bufsize 3.6M -vf scale=960:540 -r 60  -sc_detection 0  -y 540p.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 0.96M -maxrate 0.96M -bufsize 1.92M  -vf scale=640:360 -r 30 -sc_detection 0 -y  360P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30 -sc_detection 0  -y 160P.mp4
+      -abr_pipeline      
+   
+x265-veryslow-1toNVOD_avx2-4k:
+  description: '4k input to multiple  outputs using x265/veryslow VOD'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx2
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60  -frames 100 -y 4k.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=60 -vf scale=1920:1080  -frames 100 -y 1080p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=2480:vbv-maxrate=2480:vbv-bufsize=4960:ref=3:fps=60 -y -vf scale=1280:720  -frames 100  -y 720p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=1800:vbv-maxrate=1800:vbv-bufsize=3600:ref=3:fps=60 -y -vf scale=960:540  -frames 100 -y 540p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=960:vbv-maxrate=960:vbv-bufsize=1920:ref=3:fps=30 -y -vf scale=640:360   -frames 100 -y 360p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=144:vbv-maxrate=144:vbv-bufsize=288:ref=3:fps=30 -y -vf scale=288:160   -frames 100 -y 160p.mp4      
+      -abr_pipeline
+
+x265-veryslow-1toNVOD_avx512-4k:
+  description: '4k input to multiple  outputs using x265/veryslow VOD'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx512
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60 -frames 100 -y 4k.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=60 -vf scale=1920:1080 -frames 100 -y 1080p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=2480:vbv-maxrate=2480:vbv-bufsize=4960:ref=3:fps=60 -y -vf scale=1280:720  -frames 100 -y 720p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=1800:vbv-maxrate=1800:vbv-bufsize=3600:ref=3:fps=60 -y -vf scale=960:540  -frames 100 -y 540p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=960:vbv-maxrate=960:vbv-bufsize=1920:ref=3:fps=30 -y -vf scale=640:360  -frames 100  -y 360p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=144:vbv-maxrate=144:vbv-bufsize=288:ref=3:fps=30 -y -vf scale=288:160  -frames 100 -y 160p.mp4      
+      -abr_pipeline
+
+x265-veryslow-1toNVOD_avx2-1080p:
+  description: '1080p input to multiple outputs using x265/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=30 -frames 100 -y 1080p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=2480:vbv-maxrate=2480:vbv-bufsize=4960:ref=3:fps=30 -frames 100 -y -vf scale=1280:720  -frames 100 -y 720p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=440:vbv-maxrate=440:vbv-bufsize=880:ref=3:fps=30 -frames 100 -y -vf scale=640:360  -frames 100 -y 360p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=144:vbv-maxrate=144:vbv-bufsize=288:ref=3:fps=30 -frames 100 -y -vf scale=288:160  -frames 100  -y 160p.mp4
+      -abr_pipeline      
+
+x265-veryslow-1toNVOD_avx512-1080p:
+  description: '1080p input to multiple outputs using x265/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=30 -frames 100 -y 1080p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=2480:vbv-maxrate=2480:vbv-bufsize=4960:ref=3:fps=30 -y -vf scale=1280:720  -frames 100 -y 720p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=440:vbv-maxrate=440:vbv-bufsize=880:ref=3:fps=30 -y -vf scale=640:360 -frames 100 -y 360p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=144:vbv-maxrate=144:vbv-bufsize=288:ref=3:fps=30 -y -vf scale=288:160 -frames 100 -y 160p.mp4
+      -abr_pipeline      
+
+x264-veryslow-1toNVOD_avx2-1080p:
+  description: '1080p input to multiple outputs using x264/veryfast VOD'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  video_codec:
+    codec: x264
+    preset: veryslow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset veryslow -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -frames 1000 -y -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y  1080p.mp4
+      -c:v libx264 -frames 1000 -y -preset veryslow -x264-params asm=avx2 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -frames 1000 -y -preset veryslow -x264-params asm=avx2 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -frames 1000 -y -preset veryslow -x264-params asm=avx2 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline 
+
+x264-veryslow-1toNVOD_avx512-1080p:
+  description: '1080p input to multiple outputs using x264/veryfast VOD'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  video_codec:
+    codec: x264
+    preset: veryslow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset veryslow -x264-params asm=avx512 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -frames 1000 -y  1080p.mp4
+      -c:v libx264 -preset veryslow -x264-params asm=avx512 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -frames 1000 -y  720p.mp4
+      -c:v libx264 -preset veryslow -x264-params asm=avx512 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -frames 1000 -y  360p.mp4
+      -c:v libx264 -preset veryslow -x264-params asm=avx512 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -frames 1000 -y  160p.mp4
+      -abr_pipeline
+
+svt-hevc-preset1-1toNVOD-1080p:
+  description: '1080p input to multiple outputs using hevc/9'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  video_codec:
+    codec: SVT-HEVC
+    preset: 1
+    tune: 1
+    args: >-
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0 -frames 100 -y 1080P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60 -sc_detection 0 -frames 100 -y 720P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 0.44M -maxrate 0.44M -bufsize 0.88M -vf scale=640:360 -r 30 -sc_detection 0 -frames 100 -y 360P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30 -sc_detection 0 -frames 100 -y 160p.mp4
+      -abr_pipeline
+
+x264-veryslow-1to1VOD_avx2-1080p:
+  description: '1080p input to 1080P output using x264/veryslow'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:1/VOD
+    fps_threshold: 0
+  video_codec:
+    codec: x264
+    preset: veryslow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -frames 100 -y  1080p.mp4
+
+x264-veryslow-1to1VOD_avx512-1080p:
+  description: '1080p input to 1080P output using x264/veryslow'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:1/VOD
+    fps_threshold: 0
+  video_codec:
+    codec: x264
+    preset: veryslow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -x264-params asm=avx512 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -frames 100 -y  1080p.mp4
+#------------------------------------IPP use cases-------------------------#
+x264-medium-1toNLive-avx2-1080p-ipp:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60 
+  video_codec:
+    codec: x264
+    preset: medium
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale_ipp=1280:720:ipp_threading=1 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale_ipp=640:360:ipp_threading=1 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale_ipp=288:160:ipp_threading=1 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+x264-medium-1toNLive_avx512-1080p-ipp:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: medium
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -vf scale_ipp=1280:720:ipp_threading=1 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -vf scale_ipp=640:360:ipp_threading=1 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -vf scale_ipp=288:160:ipp_threading=1 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+svt-hevc-preset5-1toNLive-1080p-ipp:
+  description: '1080p input to multiple outputs using hevc/6'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale_ipp=1280:720:ipp_threading=1 -r 60 -sc_detection 0 -y  720P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.44M -maxrate 0.44M -bufsize 0.88M -vf scale_ipp=640:360:ipp_threading=1 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale_ipp=288:160:ipp_threading=1 -r 30 -sc_detection 0  -y 160p.mp4
+svt-hevc-preset5-1toNLive-4k-ipp:
+  description: '4k input to multiple outputs using hevc/6'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0  -y 4k.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -vf scale_ipp=1920:1080:ipp_threading=1 -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale_ipp=1280:720:ipp_threading=1 -r 60 -sc_detection 0  -y  -y 720P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 1.8M -maxrate 1.8M -bufsize 3.6M -vf scale_ipp=960:540:ipp_threading=1 -r 60 -sc_detection 0  -y 540pSVT_M5.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.96M -maxrate 0.96M -bufsize 1.92M -vf scale_ipp=640:360:ipp_threading=1 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale_ipp=288:160:ipp_threading=1 -r 30 -sc_detection 0  -y  160P.mp4
+x264-slow-1to4NLive_avx512-1080p-ipp:
+  description: '1080p input to multiple outputs using x264/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: slow
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libx264 -preset slow -x264-params asm=avx512 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p60.mp4      
+      -c:v libx264 -preset slow -x264-params asm=avx512 -vf scale_ipp=1280:720:ipp_threading=1  -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4     
+      -c:v libx264 -preset slow -x264-params asm=avx512 -vf scale_ipp=640:360:ipp_threading=1 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4     
+      -c:v libx264 -preset slow -x264-params asm=avx512 -vf scale_ipp=288:160:ipp_threading=1 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+x264-slow-1to4NLive_avx2-1080p-ipp:
+  description: '1080p input to multiple outputs using x264/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: slow
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libx264 -preset slow -x264-params asm=avx2 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p60.mp4      
+      -c:v libx264 -preset slow -x264-params asm=avx2 -vf scale_ipp=1280:720:ipp_threading=1 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4     
+      -c:v libx264 -preset slow -x264-params asm=avx2 -vf scale_ipp=640:360:ipp_threading=1 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4     
+      -c:v libx264 -preset slow -x264-params asm=avx2 -vf scale_ipp=288:160:ipp_threading=1 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+svt-hevc-preset4-1toNLive-1080p-ipp:
+  description: '1080p input to multiple outputs using hevc/9'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 4
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale_ipp=1280:720:ipp_threading=1 -r 60 -sc_detection 0  -y 720P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 0.44M -maxrate 0.44M -bufsize 0.88M -vf scale_ipp=640:360:ipp_threading=1 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale_ipp=288:160:ipp_threading=1 -r 30 -sc_detection 0  -y 160p.mp4
+svt-hevc-preset4-1toNLive-4k-ipp:
+  description: '4k input to multiple outputs using hevc/9'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 4
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0 4k.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -vf scale_ipp=1920:1080:ipp_threading=1 -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale_ipp=1280:720:ipp_threading=1 -r 60 -sc_detection 0   -y 720P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 1.8M -maxrate 1.8M -bufsize 3.6M -vf scale_ipp=960:540:ipp_threading=1 -r 60 -sc_detection 0  -y  540pSVT_M5.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 0.96M -maxrate 0.96M -bufsize 1.92M -vf scale_ipp=640:360:ipp_threading=1 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale_ipp=288:160:ipp_threading=1 -r 30 -sc_detection 0  -y  160P.mp4
+x265-veryslow-1toNVOD_avx2-4k-ipp:
+  description: '4k input to multiple  outputs using x265/veryslow VOD'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx2
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60  -frames 100 -y 4k.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=60 -vf scale_ipp=1920:1080  -frames 100 -y 1080p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=2480:vbv-maxrate=2480:vbv-bufsize=4960:ref=3:fps=60 -y -vf scale_ipp=1280:720  -frames 100  -y 720p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=1800:vbv-maxrate=1800:vbv-bufsize=3600:ref=3:fps=60 -y -vf scale_ipp=960:540  -frames 100 -y 540p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=960:vbv-maxrate=960:vbv-bufsize=1920:ref=3:fps=30 -y -vf scale_ipp=640:360   -frames 100 -y 360p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=144:vbv-maxrate=144:vbv-bufsize=288:ref=3:fps=30 -y -vf scale_ipp=288:160   -frames 100 -y 160p.mp4      
+      -abr_pipeline
+x265-veryslow-1toNVOD_avx512-4k-ipp:
+  description: '4k input to multiple  outputs using x265/veryslow VOD'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx512
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60 -frames 100 -y 4k.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=60 -vf scale_ipp=1920:1080 -frames 100 -y 1080p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=2480:vbv-maxrate=2480:vbv-bufsize=4960:ref=3:fps=60 -y -vf scale_ipp=1280:720  -frames 100 -y 720p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=1800:vbv-maxrate=1800:vbv-bufsize=3600:ref=3:fps=60 -y -vf scale_ipp=960:540  -frames 100 -y 540p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=960:vbv-maxrate=960:vbv-bufsize=1920:ref=3:fps=30 -y -vf scale_ipp=640:360  -frames 100  -y 360p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=144:vbv-maxrate=144:vbv-bufsize=288:ref=3:fps=30 -y -vf scale_ipp=288:160  -frames 100 -y 160p.mp4      
+      -abr_pipeline
+svt-hevc-preset1-1toNVOD-4k-ipp:
+  description: '4k input to multiple outputs using hevc/6'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  video_codec:
+    codec: SVT-HEVC
+    preset: 1
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0 -frames 100 4k.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -vf scale_ipp=1920:1080:ipp_threading=1 -r 60  -frames 100 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale_ipp=1280:720:ipp_threading=1 -r 60  -frames 100 -sc_detection 0  -y 720P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 1.8M -maxrate 1.8M -bufsize 3.6M  -vf scale_ipp=960:540:ipp_threading=1 -r 60  -frames 100 -sc_detection 0  -y 540pSVT_M5.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 0.96M -maxrate 0.96M -bufsize 1.92M  -vf scale_ipp=640:360:ipp_threading=1 -r 30  -frames 100 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale_ipp=288:160:ipp_threading=1 -r 30  -frames 100 -sc_detection 0  -y 160P.mp4
+x264-veryslow-1toNVOD_avx512-1080p-ipp:
+  description: '1080p input to multiple outputs using x264/veryfast VOD'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  video_codec:
+    codec: x264
+    preset: veryslow
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libx264 -preset veryslow -x264-params asm=avx512 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -frames 1000 -y  1080p.mp4
+      -c:v libx264 -preset veryslow -x264-params asm=avx512 -vf scale_ipp=1280:720:ipp_threading=1 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -frames 1000 -y  720p.mp4
+      -c:v libx264 -preset veryslow -x264-params asm=avx512 -vf scale_ipp=640:360:ipp_threading=1 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -frames 1000 -y  360p.mp4
+      -c:v libx264 -preset veryslow -x264-params asm=avx512 -vf scale_ipp=288:160:ipp_threading=1 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -frames 1000 -y  160p.mp4
+      -abr_pipeline
+x264-veryslow-1toNVOD_avx2-1080p-ipp:
+  description: '1080p input to multiple outputs using x264/veryfast VOD'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  video_codec:
+    codec: x264
+    preset: veryslow
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libx264 -preset veryslow -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -frames 1000 -y -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y  1080p.mp4
+      -c:v libx264 -frames 1000 -y -preset veryslow -x264-params asm=avx2 -vf scale_ipp=1280:720:ipp_threading=1 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -frames 1000 -y -preset veryslow -x264-params asm=avx2 -vf scale_ipp=640:360:ipp_threading=1 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -frames 1000 -y -preset veryslow -x264-params asm=avx2 -vf scale_ipp=288:160:ipp_threading=1 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+svt-hevc-preset1-1toNVOD-1080p-ipp:
+  description: '1080p input to multiple outputs using hevc/9'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  video_codec:
+    codec: SVT-HEVC
+    preset: 1
+    tune: 1
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0 -frames 100 -y 1080P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale_ipp=1280:720 -r 60 -sc_detection 0 -frames 100 -y 720P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 0.44M -maxrate 0.44M -bufsize 0.88M -vf scale_ipp=640:360 -r 30 -sc_detection 0 -frames 100 -y 360P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale_ipp=288:160 -r 30 -sc_detection 0 -frames 100 -y 160p.mp4
+#-------------------------baseline 1-----------------------------------------------#
+x264-medium-1toNLive-avx2-1080p-abr-cpuflags:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60 
+  video_codec:
+    codec: x264
+    preset: medium
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+x264-medium-1toNLive_avx512-1080p-abr-cpuflags:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: medium
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+svt-hevc-preset5-1toNLive-1080p-noabr-cpuflags:
+  description: '1080p input to multiple outputs using hevc/6'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60 -sc_detection 0 -y  720P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.44M -maxrate 0.44M -bufsize 0.88M -vf scale=640:360 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30 -sc_detection 0  -y 160p.mp4
+svt-hevc-preset5-1toNLive-4k-noabr-cluflags:
+  description: '4k input to multiple outputs using hevc/6'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0  -y 4k.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -vf scale=1920:1080 -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60 -sc_detection 0  -y  -y 720P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 1.8M -maxrate 1.8M -bufsize 3.6M -vf scale=960:540 -r 60 -sc_detection 0  -y 540pSVT_M5.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.96M -maxrate 0.96M -bufsize 1.92M -vf scale=640:360 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30 -sc_detection 0  -y  160P.mp4
+svt-hevc-preset5-1toNLive-1080p-abr-cpuflags:
+  description: '1080p input to multiple outputs using hevc/6'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60 -sc_detection 0 -y  720P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.44M -maxrate 0.44M -bufsize 0.88M -vf scale=640:360 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30 -sc_detection 0  -y 160p.mp4
+      -abr_pipeline
+svt-hevc-preset5-1toNLive-4k-abr-cpuflags:
+  description: '4k input to multiple outputs using hevc/6'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: >-
+      -abr-cluflags
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0  -y 4k.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -vf scale=1920:1080 -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60 -sc_detection 0  -y  -y 720P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 1.8M -maxrate 1.8M -bufsize 3.6M -vf scale=960:540 -r 60 -sc_detection 0  -y 540pSVT_M5.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.96M -maxrate 0.96M -bufsize 1.92M -vf scale=640:360 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30 -sc_detection 0  -y  160P.mp4
+      -abr_pipeline
+#-------------------------------------Baseline 2 --------------------------------#
+#-----------SVT with IPP, without abrpipeline. x264 with IPP and abrpipeline-----#
+x264-medium-1toNLive-avx2-1080p-abr-cpuflags-ipp:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60 
+  video_codec:
+    codec: x264
+    preset: medium
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale_ipp=1280:720:ipp_threading=1 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale_ipp=640:360:ipp_threading=1 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale_ipp=288:160:ipp_threading=1 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+x264-medium-1toNLive_avx512-1080p-abr-cpuflags-ipp:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: medium
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -vf scale_ipp=1280:720:ipp_threading=1 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -vf scale_ipp=640:360:ipp_threading=1 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -vf scale_ipp=288:160:ipp_threading=1 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+svt-hevc-preset5-1toNLive-1080p-noabr-ipp:
+  description: '1080p input to multiple outputs using hevc/6'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale_ipp=1280:720:ipp_threading=1 -r 60 -sc_detection 0 -y  720P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.44M -maxrate 0.44M -bufsize 0.88M -vf scale_ipp=640:360:ipp_threading=1 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160:ipp_threading=1 -r 30 -sc_detection 0  -y 160p.mp4
+svt-hevc-preset5-1toNLive-4k-noabr-cluflags:
+  description: '4k input to multiple outputs using hevc/6'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0  -y 4k.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -vf scale_ipp=1920:1080:ipp_threading=1 -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale_ipp=1280:720:ipp_threading=1 -r 60 -sc_detection 0  -y  -y 720P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 1.8M -maxrate 1.8M -bufsize 3.6M -vf scale_ipp=960:540:ipp_threading=1 -r 60 -sc_detection 0  -y 540pSVT_M5.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.96M -maxrate 0.96M -bufsize 1.92M -vf scale_ipp=640:360:ipp_threading=1 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale_ipp=288:160:ipp_threading=1 -r 30 -sc_detection 0  -y  160P.mp4
+svt-hevc-preset5-1toNLive-1080p-abr-cpuflags:
+  description: '1080p input to multiple outputs using hevc/6'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale_ipp=1280:720:ipp_threading=1 -r 60 -sc_detection 0 -y  720P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.44M -maxrate 0.44M -bufsize 0.88M -vf scale_ipp=640:360:ipp_threading=1 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale_ipp=288:160:ipp_threading=1 -r 30 -sc_detection 0  -y 160p.mp4
+
+svt-hevc-preset5-1toNLive-4k-noabr-ipp:
+  description: '4k input to multiple outputs using hevc/6'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: >-
+      -abr-cluflags
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0  -y 4k.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -vf scale_ipp=1920:1080:ipp_threading=1 -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale_ipp=1280:720:ipp_threading=1 -r 60 -sc_detection 0  -y  -y 720P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 1.8M -maxrate 1.8M -bufsize 3.6M -vf scale_ipp=960:540:ipp_threading=1 -r 60 -sc_detection 0  -y 540pSVT_M5.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.96M -maxrate 0.96M -bufsize 1.92M -vf scale_ipp=640:360:ipp_threading=1 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale_ipp=288:160:ipp_threading=1 -r 30 -sc_detection 0  -y  160P.mp4
+#-----------------------baseline 3-----------------------------------#
+x264-medium-1toNLive_avx512-1080p-noabr-cpuflags-ipp:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: medium
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -vf scale_ipp=1280:720:ipp_threading=1 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -vf scale_ipp=640:360:ipp_threading=1 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -vf scale_ipp=288:160:ipp_threading=1 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+x264-medium-1toNLive-avx2-1080p-noabr-cpuflags-ipp:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60 
+  video_codec:
+    codec: x264
+    preset: medium
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale_ipp=1280:720:ipp_threading=1 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale_ipp=640:360:ipp_threading=1 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale_ipp=288:160:ipp_threading=1 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+#------------------baseline 4--------------------------#
+x264-medium-1toNLive-avx2-1080p-noabr:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60 
+  video_codec:
+    codec: x264
+    preset: medium
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+x264-medium-1toNLive_avx512-1080p-noabr:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: medium
+    #tune:
+    args: >-
+      -cpuflags avx2
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+#----------------------------version testing-----------------------------------#
+svt-hevc-preset5-1toNLive-1080p-v1.5.0:
+  description: '1080p input to multiple outputs using hevc/6'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    version: v1.5.0
+    preset: 5
+    #tune:
+    args: >-
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60 -sc_detection 0 -y  720P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.44M -maxrate 0.44M -bufsize 0.88M -vf scale=640:360 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30 -sc_detection 0  -y 160p.mp4
+      
+svt-hevc-preset5-1toNLive-1080p-v1.4.3:
+  description: '1080p input to multiple outputs using hevc/6'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    version: v1.4.3
+    preset: 5
+    #tune:
+    args: >-
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60 -sc_detection 0 -y  720P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.44M -maxrate 0.44M -bufsize 0.88M -vf scale=640:360 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30 -sc_detection 0  -y 160p.mp4
+svt-hevc-preset5-1toNLive-1080p-v1.3.0:
+  description: '1080p input to multiple outputs using hevc/6'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    version: v1.3.0
+    preset: 5
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60 -sc_detection 0 -y  720P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.44M -maxrate 0.44M -bufsize 0.88M -vf scale=640:360 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30 -sc_detection 0  -y 160p.mp4
+      -abr_pipeline
+x265-veryslow-1to1VOD_avx512-4k-Release_3.1:
+  description: '4K input to 4K output using x265/veryslow'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx512
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: x265
+    version: Release_3.1
+    preset: veryslow
+    #tune:
+    args: -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60  -frames 100 -y 4k.mp4
+x265-veryslow-1to1VOD_avx512-4k-No-Tango-Release_3.1:
+  description: '4K input to 4K output using x265/veryslow'
+  input_files: crowd_run_2160p50.mp4
+  input_format: 4k-avx512
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: x265
+    version: Release_3.1
+    preset: veryslow
+    #tune:
+    args: -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60  -frames 100 -y 4k.mp4
+x265-veryslow-1to1VOD_avx512-4k-Release_3.2:
+  description: '4K input to 4K output using x265/veryslow'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx512
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: x265
+    version: Release_3.2
+    preset: veryslow
+    #tune:
+    args: -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60  -frames 100 -y 4k.mp4
+x265-veryslow-1to1VOD_avx512-4k-Release_3.3:
+  description: '4K input to 4K output using x265/veryslow'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx512
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: x265
+    version: Release_3.3
+    preset: veryslow
+    #tune:
+    args: -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60  -frames 100 -y 4k.mp4
+
+#-----------------FPS Testing-----------------------------#
+svt-hevc-1-1to1VOD-4k-fps:
+  description: '4k input to 4k output using SVT-HEVC/0/2'
+  input_files: Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: SVT-HEVC
+    preset: 1
+    tune: 1
+    args: -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60  -frames 100 -y  4k.mp4
+svt-hevc-preset5-1to1Live-4k-fps:
+  description: '4k input to 4k output using hevc/6'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: -c:v libsvt_hevc -preset 5 -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0 -y  4k.mp4
+x264-medium-1toNLive-avx2-1080p-fps:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60 
+  video_codec:
+    codec: x264
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+x264-slow-1to4NLive_avx2-1080p-fps:
+  description: '1080p input to multiple outputs using x264/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x264
+    preset: slow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset slow -x264-params asm=avx2 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p60.mp4      
+      -c:v libx264 -preset slow -x264-params asm=avx2 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4     
+      -c:v libx264 -preset slow -x264-params asm=avx2 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4     
+      -c:v libx264 -preset slow -x264-params asm=avx2 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+x265-veryslow-1to1VOD_avx2-4k-fps:
+  description: '4K input to 4K output using x265/veryslow'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx2
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60   -frames 1000 -y 4k.mp4
+x265-veryslow-1to1VOD_avx512-4k-fps:
+  description: '4K input to 4K output using x265/veryslow'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx512
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60  -frames 1000 -y 4k.mp4
+
+
+#----------------------x265 version testing ARM-------------------------#
+x265-version-3.4:
+  description:   
+    x265-medium-1to1Live_avx2-1080p-3.4
+    x265-medium-1toNLive_avx2-1080p-3.4
+    x265-medium-1to1Live_avx2-4k-3.4
+    x265-medium-1toNLive_avx2-4k-3.4
+    x265-veryfast-1to1Live_avx2-1080p-3.4
+    x265-veryfast-1toNLive_avx2-1080p-3.4
+    x265-veryfast-1to1Live_avx2-4k-3.4
+    x265-veryfast-1toNLive_avx2-4k-3.4   
+
+x265-medium-1to1Live_avx2-1080p-3.4:
+  description: '1080p input to 1080p output using x265/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 30
+  video_codec:
+    codec: x265
+    preset: medium
+    version: Release_3.4
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=30 -y 1080p.mp4
+x265-medium-1toNLive_avx2-1080p-3.4:
+  description: '1080p input to multiple outputs using x265/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 30
+  video_codec:
+    codec: x265
+    preset: medium
+    version: Release_3.4
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx265 -preset medium -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=30 -y 1080p.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=2480:vbv-maxrate=2480:vbv-bufsize=4960:ref=3:fps=60 -y -vf scale=1280:720 720p.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=440:vbv-maxrate=440:vbv-bufsize=880:ref=3:fps=30 -y -vf scale=640:360 360p.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=144:vbv-maxrate=144:vbv-bufsize=288:ref=3:fps=30 -y -vf scale=288:160 160p.mp4
+      -abr_pipeline
+x265-medium-1to1Live_avx2-4k-3.4:
+  description: '4k input to 4k output using x265/medium'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx2
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x265
+    preset: medium
+    version: Release_3.4
+    #tune:
+    args: -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60 -y 4k.mp4
+x265-medium-1toNLive_avx2-4k-3.4:
+  description: '4k input to multiple outputs using x265/medium'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x265
+    preset: medium
+    version: Release_3.4
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx265 -preset medium -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60 -y 4k.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=60 -vf scale=1920:1080 -y 1080p.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=2480:vbv-maxrate=2480:vbv-bufsize=4960:ref=3:fps=60 -y -vf scale=1280:720 720p.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=960:vbv-maxrate=960:vbv-bufsize=1920:ref=3:fps=60 -y -vf scale=640:480 480p.mp4
+      -c:v libx265 -preset medium -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=960:vbv-maxrate=960:vbv-bufsize=1920:ref=3:fps=60 -y -vf scale=640:360 360p.mp4
+      -abr_pipeline
+x265-veryfast-1to1Live_avx2-1080p-3.4:
+  description: '1080p input to 1080p output using x265/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 30
+  video_codec:
+    codec: x265
+    preset: veryfast
+    version: Release_3.4
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=30 -y 1080p.mp4
+x265-veryfast-1toNLive_avx2-1080p-3.4:
+  description: '1080p input to multiple outputs using x265/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 30
+  video_codec:
+    codec: x265
+    preset: veryfast
+    version: Release_3.4
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx265 -preset veryfast -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=30 -y 1080p.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=2480:vbv-maxrate=2480:vbv-bufsize=4960:ref=3:fps=60 -y -vf scale=1280:720 720p.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=440:vbv-maxrate=440:vbv-bufsize=880:ref=3:fps=30 -y -vf scale=640:360 360p.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=144:vbv-maxrate=144:vbv-bufsize=288:ref=3:fps=30 -y -vf scale=288:160 160p.mp4
+      -abr_pipeline
+x265-veryfast-1to1Live_avx2-4k:
+  description: '4k input to 4k output using x265/veryfast'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx2
+  output_mode:
+    type: 1:1/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x265
+    preset: veryfast
+    version: Release_3.4
+    #tune:
+    args: -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60 -y 4k.mp4
+x265-veryfast-1toNLive_avx2-4k:
+  description: '4k input to multiple outputs using x265/veryfast'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  video_codec:
+    codec: x265
+    preset: veryfast
+    version: Release_3.4
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx265 -preset veryfast -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60 -y 4k.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=60 -vf scale=1920:1080 -y 1080p.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=2480:vbv-maxrate=2480:vbv-bufsize=4960:ref=3:fps=60 -y -vf scale=1280:720 720p.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=960:vbv-maxrate=960:vbv-bufsize=1920:ref=3:fps=60 -y -vf scale=640:480 480p.mp4
+      -c:v libx265 -preset veryfast -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=960:vbv-maxrate=960:vbv-bufsize=1920:ref=3:fps=60 -y -vf scale=640:360 360p.mp4
+      -abr_pipeline
+#--------------x265 Version Testing ICX------------------#
+x265-veryslow-1to1VOD_avx2-4k-3.3:
+  description: '4K input to 4K output using x265/veryslow'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx2
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: x265
+    num_inst: 9
+    version: Release_3.3
+    preset: veryslow
+    #tune:
+    args: -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60   -frames 100 -y 4k.mp4
+x265-veryslow-1to1VOD_avx2-4k-354:
+  description: '4K input to 4K output using x265/veryslow'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx2
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: x265
+    num_inst: 9
+    version: Release_3.4
+    preset: veryslow
+    #tune:
+    args: -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60   -frames 100 -y 4k.mp4
+x265-veryslow-1to1VOD_avx2-4k-3.5:
+  description: '4K input to 4K output using x265/veryslow'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx2
+  output_mode:
+    type: 1:1/VOD
+  video_codec:
+    codec: x265
+    num_inst: 9
+    version: Release_3.5
+    preset: veryslow
+    #tune:
+    args: -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60   -frames 100 -y 4k.mp4
+#Grouped specific instance count
+x264-medium-1toNVOD-avx2-1080-all:  
+  description: 'All specific num-instances'
+  group: >-
+    x264-medium-1toNVOD-avx2-1080p-15
+    x264-medium-1toNVOD-avx2-1080p-14
+    x264-medium-1toNVOD-avx2-1080p-13
+    x264-medium-1toNVOD-avx2-1080p-12
+    x264-medium-1toNVOD-avx2-1080p-11
+    x264-medium-1toNVOD-avx2-1080p-10
+    x264-medium-1toNVOD-avx2-1080p-9
+#Gordon CPU x264 use case
+x264-medium-1toNVOD-avx2-1080p-15:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/VOD
+    #fps_threshold: 60 
+  num_instances: 15
+  video_codec:
+    codec: x264
+    
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+x264-medium-1toNVOD-avx2-1080p-14:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/VOD
+    #fps_threshold: 60 
+  num_instances: 14
+  video_codec:
+    codec: x264
+    
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+x264-medium-1toNVOD-avx2-1080p-13:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/VOD
+    #fps_threshold: 60 
+  num_instances: 13
+  video_codec:
+    codec: x264
+    
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+x264-medium-1toNVOD-avx2-1080p-12:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/VOD
+    #fps_threshold: 60 
+  num_instances: 12
+  video_codec:
+    codec: x264
+    
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+x264-medium-1toNVOD-avx2-1080p-11:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/VOD
+    #fps_threshold: 60 
+  num_instances: 11
+  video_codec:
+    codec: x264
+    
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+x264-medium-1toNVOD-avx2-1080p-10:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/VOD
+    #fps_threshold: 60 
+  num_instances: 10
+  video_codec:
+    codec: x264
+    
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+x264-medium-1toNVOD-avx2-1080p-9:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/VOD
+    #fps_threshold: 60 
+  num_instances: 9
+  video_codec:
+    codec: x264
+    
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+#--------------VOD 14------------------#
+x265-veryslow-1to1VOD_avx512-4k-14:
+  description: '4K input to 4K output using x265/veryslow'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx512
+  output_mode:
+    type: 1:1/VOD
+  num_instances: 14
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60  -frames 100 -y 4k.mp4
+x265-veryslow-1to1VOD_avx2-4k-14:
+  description: '4K input to 4K output using x265/veryslow'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx2
+  output_mode:
+    type: 1:1/VOD
+  num_instances: 14
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60   -frames 100 -y 4k.mp4
+svt-hevc-1-1to1VOD-4k-14:
+  description: '4k input to 4k output using SVT-HEVC/0/2'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:1/VOD
+  num_instances: 14
+  video_codec:
+    codec: SVT-HEVC
+    preset: 1
+    tune: 1
+    args: -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60  -frames 100 -y  4k.mp4
+x265-veryslow-1toNVOD_avx2-4k-14:
+  description: '4k input to multiple  outputs using x265/veryslow VOD'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx2
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  num_instances: 14
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60  -frames 100 -y 4k.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=60 -vf scale=1920:1080  -frames 100 -y 1080p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=2480:vbv-maxrate=2480:vbv-bufsize=4960:ref=3:fps=60 -y -vf scale=1280:720  -frames 100  -y 720p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=1800:vbv-maxrate=1800:vbv-bufsize=3600:ref=3:fps=60 -y -vf scale=960:540  -frames 100 -y 540p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=960:vbv-maxrate=960:vbv-bufsize=1920:ref=3:fps=30 -y -vf scale=640:360   -frames 100 -y 360p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=144:vbv-maxrate=144:vbv-bufsize=288:ref=3:fps=30 -y -vf scale=288:160   -frames 100 -y 160p.mp4      
+      -abr_pipeline
+x265-veryslow-1toNVOD_avx512-4k-14:
+  description: '4k input to multiple  outputs using x265/veryslow VOD'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k-avx512
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  num_instances: 14
+  video_codec:
+    codec: x265
+    preset: veryslow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=9600:vbv-maxrate=9600:vbv-bufsize=19200:ref=3:fps=60 -frames 100 -y 4k.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=60 -vf scale=1920:1080 -frames 100 -y 1080p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=2480:vbv-maxrate=2480:vbv-bufsize=4960:ref=3:fps=60 -y -vf scale=1280:720  -frames 100 -y 720p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=60:keyint=60:bitrate=1800:vbv-maxrate=1800:vbv-bufsize=3600:ref=3:fps=60 -y -vf scale=960:540  -frames 100 -y 540p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=960:vbv-maxrate=960:vbv-bufsize=1920:ref=3:fps=30 -y -vf scale=640:360  -frames 100  -y 360p.mp4
+      -c:v libx265 -preset veryslow -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=144:vbv-maxrate=144:vbv-bufsize=288:ref=3:fps=30 -y -vf scale=288:160  -frames 100 -y 160p.mp4      
+      -abr_pipeline
+svt-hevc-preset1-1toNVOD-4k-14:
+  description: '4k input to multiple outputs using hevc/6'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  num_instances: 14
+  video_codec:
+    codec: SVT-HEVC
+    preset: 1
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0 -frames 100 4k.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -vf scale=1920:1080 -r 60  -frames 100 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60  -frames 100 -sc_detection 0  -y 720P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 1.8M -maxrate 1.8M -bufsize 3.6M  -vf scale=960:540 -r 60  -frames 100 -sc_detection 0  -y 540pSVT_M5.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 0.96M -maxrate 0.96M -bufsize 1.92M  -vf scale=640:360 -r 30  -frames 100 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30  -frames 100 -sc_detection 0  -y 160P.mp4
+      -abr_pipeline
+x264-veryslow-1toNVOD_avx512-1080p-14:
+  description: '1080p input to multiple outputs using x264/veryfast VOD'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  num_instances: 14
+  video_codec:
+    codec: x264
+    preset: veryslow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset veryslow -x264-params asm=avx512 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -frames 1000 -y  1080p.mp4
+      -c:v libx264 -preset veryslow -x264-params asm=avx512 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -frames 1000 -y  720p.mp4
+      -c:v libx264 -preset veryslow -x264-params asm=avx512 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -frames 1000 -y  360p.mp4
+      -c:v libx264 -preset veryslow -x264-params asm=avx512 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -frames 1000 -y  160p.mp4
+      -abr_pipeline
+x264-veryslow-1toNVOD_avx2-1080p-14:
+  description: '1080p input to multiple outputs using x264/veryfast VOD'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  num_instances: 14
+  video_codec:
+    codec: x264
+    preset: veryslow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset veryslow -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -frames 1000 -y -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y  1080p.mp4
+      -c:v libx264 -frames 1000 -y -preset veryslow -x264-params asm=avx2 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -frames 1000 -y -preset veryslow -x264-params asm=avx2 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -frames 1000 -y -preset veryslow -x264-params asm=avx2 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+svt-hevc-preset1-1toNVOD-1080p-14:
+  description: '1080p input to multiple outputs using hevc/9'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  num_instances: 14
+  video_codec:
+    codec: SVT-HEVC
+    preset: 1
+    tune: 1
+    args: >-
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0 -frames 100 -y 1080P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60 -sc_detection 0 -frames 100 -y 720P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 0.44M -maxrate 0.44M -bufsize 0.88M -vf scale=640:360 -r 30 -sc_detection 0 -frames 100 -y 360P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30 -sc_detection 0 -frames 100 -y 160p.mp4
+      -abr_pipeline
+test-ladder:
+  description: '1080p input to multiple outputs using hevc/9'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/VOD
+    fps_threshold: 0
+  video_codec:
+    codec: SVT-HEVC
+    preset: 1
+    tune: 1
+    args: >-
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0 -y 1080P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60 -sc_detection 0  -y 720P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 0.44M -maxrate 0.44M -bufsize 0.88M -vf scale=640:360 -r 30 -sc_detection 0 -y 360P.mp4
+      -c:v libsvt_hevc -preset 1 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30 -sc_detection 0  -y 160p.mp4
+      -abr_pipeline
+x264-slow-1to4NLive_avx512-1080p-14:
+  description: '1080p input to multiple outputs using x264/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  num_instances: 14
+  video_codec:
+    codec: x264
+    preset: slow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset slow -x264-params asm=avx512 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p60.mp4      
+      -c:v libx264 -preset slow -x264-params asm=avx512 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4     
+      -c:v libx264 -preset slow -x264-params asm=avx512 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4     
+      -c:v libx264 -preset slow -x264-params asm=avx512 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+x264-slow-1to4NLive_avx2-1080p-14:
+  description: '1080p input to multiple outputs using x264/veryfast'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  num_instances: 14
+  video_codec:
+    codec: x264
+    preset: slow
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset slow -x264-params asm=avx2 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p60.mp4      
+      -c:v libx264 -preset slow -x264-params asm=avx2 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4     
+      -c:v libx264 -preset slow -x264-params asm=avx2 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4     
+      -c:v libx264 -preset slow -x264-params asm=avx2 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+svt-hevc-preset4-1toNLive-1080p-14:
+  description: '1080p input to multiple outputs using hevc/9'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  num_instances: 14
+  video_codec:
+    codec: SVT-HEVC
+    preset: 4
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60 -sc_detection 0  -y 720P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 0.44M -maxrate 0.44M -bufsize 0.88M -vf scale=640:360 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30 -sc_detection 0  -y 160p.mp4
+      -abr_pipeline
+svt-hevc-preset4-1toNLive-4k-14:
+  description: '4k input to multiple outputs using hevc/9'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  num_instances: 14
+  video_codec:
+    codec: SVT-HEVC
+    preset: 4
+    #tune:
+    args: >-
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0 4k.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -vf scale=1920:1080 -r 60 -sc_detection 0 -y  1080P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60  -sc_detection 0  -y 720P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 1.8M -maxrate 1.8M -bufsize 3.6M -vf scale=960:540 -r 60  -sc_detection 0  -y 540p.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 0.96M -maxrate 0.96M -bufsize 1.92M  -vf scale=640:360 -r 30 -sc_detection 0 -y  360P.mp4
+      -c:v libsvt_hevc -preset 4 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30 -sc_detection 0  -y 160P.mp4
+      -abr_pipeline
+svt-hevc-preset4-1to1Live-4k-14:
+  description: '4k input to 4k output using hevc/10'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  num_instances: 14
+  video_codec:
+    codec: SVT-HEVC
+    preset: 4
+    #tune:
+    args: -c:v libsvt_hevc -preset 4 -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0  -y 4k.mp4
+x264-medium-1toNLive-avx2-1080p-14:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  num_instances: 14 
+  video_codec:
+    codec: x264
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -x264-params asm=avx2 -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+x264-medium-1toNLive_avx512-1080p-14:
+  description: '1080p input to multiple outputs using x264/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  num_instances: 14
+  video_codec:
+    codec: x264
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libx264 -preset medium -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 6M -maxrate 6M -bufsize 12M -sc_threshold 0 -r 60 -y 1080p.mp4
+      -c:v libx264 -preset medium -vf scale=1280:720 -profile:v main -refs 3 -g 60 -keyint_min 60 -b:v 3.1M -maxrate 3.1M -bufsize 6.2M -sc_threshold 0 -r 60 -y 720p.mp4
+      -c:v libx264 -preset medium -vf scale=640:360 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.55M -maxrate 0.55M -bufsize 1.1M -sc_threshold 0 -r 30 -y 360p.mp4
+      -c:v libx264 -preset medium -vf scale=288:160 -profile:v main -refs 3 -g 30 -keyint_min 30 -b:v 0.18M -maxrate 0.18M -bufsize 0.36M -sc_threshold 0 -r 30 -y 160p.mp4
+      -abr_pipeline
+svt-hevc-preset5-1toNLive-1080p-14:
+  description: '1080p input to multiple outputs using hevc/6'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  num_instances: 14
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60 -sc_detection 0 -y  720P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.44M -maxrate 0.44M -bufsize 0.88M -vf scale=640:360 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30 -sc_detection 0  -y 160p.mp4
+      -abr_pipeline
+svt-hevc-preset5-1toNLive-4k-14:
+  description: '4k input to multiple outputs using hevc/6'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  num_instances: 14
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0  -y 4k.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 4.4M -maxrate 4.4M -bufsize 8.8M -vf scale=1920:1080 -r 60 -sc_detection 0  -y 1080P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 2.48M -maxrate 2.48M -bufsize 4.96M -vf scale=1280:720 -r 60 -sc_detection 0  -y  -y 720P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 1.8M -maxrate 1.8M -bufsize 3.6M -vf scale=960:540 -r 60 -sc_detection 0  -y 540pSVT_M5.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.96M -maxrate 0.96M -bufsize 1.92M -vf scale=640:360 -r 30 -sc_detection 0  -y 360P.mp4
+      -c:v libsvt_hevc -preset 5 -rc 1 -b:v 0.144M -maxrate 0.144M -bufsize 0.288M -vf scale=288:160 -r 30 -sc_detection 0  -y  160P.mp4
+      -abr_pipeline
+svt-hevc-preset5-1to1Live-4k-14:
+  description: '4k input to 4k output using hevc/6'
+  input_files: crowd_run_2160p50.mp4 Netflix_Tango_4096x2160_60fps_10bit_420.mp4
+  input_format: 4k
+  output_mode:
+    type: 1:n/LIVE
+    fps_threshold: 60
+  num_instances: 14
+  video_codec:
+    codec: SVT-HEVC
+    preset: 5
+    #tune:
+    args: -c:v libsvt_hevc -preset 5 -rc 1 -b:v 9.6M -maxrate 9.6M -bufsize 19.2M -r 60 -sc_detection 0 -y  4k.mp4
+x265-medium-1to1VOD_avx2-1080p:
+  description: '1080p input to 1080p output using x265/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx2
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: x265
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -x265-params asm=avx2:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=30 -frames 100 -y 1080p.mp4
+x265-medium-1to1VOD_avx512-1080p:
+  description: '1080p input to 1080p output using x265/medium'
+  input_files: crowd_run_1080p50.mp4 CSGO.mp4
+  input_format: 1080P-avx512
+  output_mode:
+    type: 1:1/LIVE
+  video_codec:
+    codec: x265
+    preset: medium
+    #tune:
+    args: >-
+      -filter_scale_threads 4
+      -x265-params asm=avx512:bframes=4:scenecut=0:min-keyint=30:keyint=30:bitrate=4400:vbv-maxrate=4400:vbv-bufsize=8800:ref=3:fps=30 -frames 100 -y 1080p.mp4

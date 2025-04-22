@@ -3,12 +3,12 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
-- include_role:
-    name: hf-dataset
+- include_tasks:
+    file: download-hf.yaml
   vars:
-    DEST_DIR: "/opt/dataset/falcon/40b"
-    MODEL_ID: "tiiuae/falcon-40b"
-    DATASET_SIZE: 88
-    exclude: []
-    revision: []
-    HF_LOGIN: false
+    dataset_model_path: "falcon/40b"
+    hfcli_model_id: "tiiuae/falcon-40b"
+    dataset_size: 88
+    hfcli_exclude: []
+    hfcli_revision: []
+    hfcli_login: false

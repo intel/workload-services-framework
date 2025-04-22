@@ -10,6 +10,7 @@ function(add_image name)
     add_component_build(image ${name} ${ARGN})
     set(image ${component} PARENT_SCOPE)
     set(sut_reqs "${sut_reqs}" PARENT_SCOPE)
+    set(build_args "${build_args}" PARENT_SCOPE)
 endfunction()
 
 function(add_testcase name)

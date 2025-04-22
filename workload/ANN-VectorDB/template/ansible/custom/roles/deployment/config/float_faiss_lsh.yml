@@ -1,0 +1,11 @@
+float:
+  any:
+  - base_args: ['@metric']
+    constructor: FaissLSH
+    disabled: true
+    docker_tag: ann-benchmarks-faiss
+    module: ann_benchmarks.algorithms.faiss
+    name: faiss-lsh
+    run_groups:
+      base:
+        args: [[32, 64, 128, 256, 512, 1024, 2048, 4096]]

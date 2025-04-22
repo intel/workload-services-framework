@@ -7,7 +7,7 @@ terraform {
   required_providers {
     alicloud = {
       source = "aliyun/alicloud"
-      version = "= 1.228.0"
+      version = "= 1.244.0"
     }
     template = {
       source = "hashicorp/template"

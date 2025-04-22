@@ -3,15 +3,15 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
-- include_role:
-    name: hf-dataset
+- include_tasks:
+    file: download-hf.yaml
   vars:
-    DEST_DIR: "/opt/dataset/codegen25/7b"
-    MODEL_ID: "Salesforce/codegen25-7b-multi_P"
-    DATASET_SIZE: 36
-    exclude: []
-    revision: 0bdf3f45a09e4f53b333393205db1388634a0e2e
-    HF_LOGIN: false
+    dataset_model_path: "codegen25/7b"
+    hfcli_model_id: "Salesforce/codegen25-7b-multi_P"
+    dataset_size: 36
+    hfcli_exclude: []
+    hfcli_revision: 0bdf3f45a09e4f53b333393205db1388634a0e2e
+    hfcli_login: false
 
 - name: install patch
   block:
@@ -30,6 +30,6 @@
         content: "{{ revision }}"
         dest: "{{DEST_DIR}}/models--Salesforce--codegen25-7b-multi_P/refs/main"
   vars: 
-    DEST_DIR: "/opt/dataset/codegen25/7b"
-    revision: 0bdf3f45a09e4f53b333393205db1388634a0e2e
+    dataset_model_path: "codegen25/7b"
+    hfcli_revision: 0bdf3f45a09e4f53b333393205db1388634a0e2e
 

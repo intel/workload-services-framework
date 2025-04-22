@@ -6,7 +6,7 @@
 
 - name: persist hugepage allocation
   set_fact:
-    wl_sysfs: "{{ wl_sysfs | combine({ '/sys/kernel/mm/hugepages/hugepages-' + (label_name.split('-')[3]) + '/nr_hugepages': (label_name.split('=')[0].split('-')[4] | int) }) }}"
+    wl_sysfs_options_dict: "{{ wl_sysfs_options_dict | default({}) | combine({ '/sys/kernel/mm/hugepages/hugepages-' + (label_name.split('-')[3]) + '/nr_hugepages': (label_name.split('=')[0].split('-')[4] | int) }) }}"
 
 - name: force hugepage allocation
   shell:

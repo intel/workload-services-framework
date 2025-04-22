@@ -7,3 +7,7 @@ docker: false
 native: false
 compose: false
 docker_streaming_logs: true
+docker_save_logs: false
+compose_save_logs: false
+docker_exec_options: "--user=root"
+compose_exec_options: "--user=root"

@@ -92,11 +92,11 @@
     }
   </style>
 
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/apexcharts/3.42.0/apexcharts.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/apexcharts/3.54.1/apexcharts.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-HwwvtgBNo3bZJJLYd8oVXjrBZt8cqVSpeBNS5n7C8IVInixGAoxmnlMuBnhbgrkm"
     crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/apexcharts/3.42.0/apexcharts.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/apexcharts/3.54.1/apexcharts.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
 </head>
@@ -487,6 +487,7 @@
             series.push({
               name: "cpu-" + k,
               data: data_mhz[k].map((x) => [x[0], x[1] / 1000]),
+              hidden: (k != 'all'),
             });
           }
           create_line_chart(id, {
@@ -919,13 +920,26 @@
         }
 
       }
-      function create_per_cpu_chart(id, title, data) {
+      function create_per_cpu_chart(id, title, data, sk) {
         try {
           var series = [];
+          if (sk < 0) {
+            var v1 = 0;
+            for (let k in data) {
+              if (k == 'all') continue;
+              for (let v in data[k]) {
+                if (data[k][v][1] > v1) {
+                  v1 = data[k][v][1];
+                  sk = k;
+                }
+              }
+            }
+          }
           for (let k in data) {
-            if (k != 'all') series.push({
+            if (k!='all') series.push({
               name: "cpu-" + k,
               data: data[k],
+              hidden: (k != sk),
             });
           }
           create_line_chart(id, {
@@ -948,6 +962,7 @@
           hide_chart(id);
           console.log(e);
         }
+        return sk;
       }
 
       create_memory_percent_chart('memory-percent-id', 'Memory (%)');
@@ -968,16 +983,16 @@
       create_interfaces_chart('network-id', 'Network (Mbps)');
       create_sockets_chart('sockets-id', 'Sockets');
 
-      create_per_cpu_chart("cpu-user-id", "CPU-user (%)", data_usr);
-      create_per_cpu_chart("cpu-nice-id", "CPU-nice (%)", data_nice);
-      create_per_cpu_chart("cpu-system-id", "CPU-system (%)", data_sys);
-      create_per_cpu_chart("cpu-iowait-id", "CPU-iowait (%)", data_iowait);
-      create_per_cpu_chart("cpu-steal-id", "CPU-steal (%)", data_steal);
-      create_per_cpu_chart("cpu-irq-id", "CPU-irq (%)", data_irq);
-      create_per_cpu_chart("cpu-soft-id", "CPU-soft (%)", data_soft);
-      create_per_cpu_chart("cpu-guest-id", "CPU-guest (%)", data_guest);
-      create_per_cpu_chart("cpu-gnice-id", "CPU-gnice (%)", data_gnice);
-      create_per_cpu_chart("cpu-idle-id", "CPU-idle (%)", data_idle);
+      var sk = create_per_cpu_chart("cpu-user-id", "CPU-user (%)", data_usr, -1);
+      create_per_cpu_chart("cpu-nice-id", "CPU-nice (%)", data_nice, sk);
+      create_per_cpu_chart("cpu-system-id", "CPU-system (%)", data_sys, sk);
+      create_per_cpu_chart("cpu-iowait-id", "CPU-iowait (%)", data_iowait, sk);
+      create_per_cpu_chart("cpu-steal-id", "CPU-steal (%)", data_steal, sk);
+      create_per_cpu_chart("cpu-irq-id", "CPU-irq (%)", data_irq, sk);
+      create_per_cpu_chart("cpu-soft-id", "CPU-soft (%)", data_soft, sk);
+      create_per_cpu_chart("cpu-guest-id", "CPU-guest (%)", data_guest, sk);
+      create_per_cpu_chart("cpu-gnice-id", "CPU-gnice (%)", data_gnice, sk);
+      create_per_cpu_chart("cpu-idle-id", "CPU-idle (%)", data_idle, sk);
 
       function createSortable(div_id) {
         Sortable.create(document.getElementById(div_id), {

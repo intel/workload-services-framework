@@ -1,0 +1,38 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: configure docker cgroup vars
+    set_fact:
+      docker_cgroup_options: "--cgroup-parent {{ sut_cgroup_prefix }}{{ vm_groups|first }}.slice"
+      docker_cgroup_metadata: "{{ ['cgroup:'+sut_cgroup_prefix+(vm_groups|first)+'.slice'] }}"
+    when: vm_groups | length > 0
+
+  - name: set global cgroup options from workload
+    set_fact:
+      cgroup_options_dict: "{{ cluster_config.cluster | zip_longest([],fillvalue={'vm_group':'worker','cgroup':{}}) | map('last') | map('dict2items') | zip(cluster_config.cluster | map('dict2items')) | map('flatten') | map('items2dict') | selectattr('vm_group','in',vm_groups) | map(attribute='cgroup') | map('dict2items') | flatten | items2dict }}"
+    vars:
+      cluster_config: "{{ lookup('file',wl_logs_dir+'/cluster-config.yaml') | from_yaml }}"
+
+  - name: set global cgroup options from user
+    set_fact:
+      cgroup_options_dict: "{{ cgroup_options_dict | combine(dict(sut_cgroup_options | split(',') | map('trim') | select('match',item+':.*') | map('regex_replace','^[^:]*:','') | map('trim') | reject('==','') | map('split','=') | map('map','trim'))) }}"
+    loop: "{{ vm_groups }}"
+
+  - name: "Set cgroup {{ sut_cgroup_prefix }}.slice transient parameters"
+    shell:
+      cmd: |
+        mkdir -p /sys/fs/cgroup/{{ sut_cgroup_prefix }}{{ item }}.slice
+        {% for option in cgroup_options_dict|dict2items %}
+          echo "{{ option.value }}" > "/sys/fs/cgroup/{{ sut_cgroup_prefix }}{{ item }}.slice/{{ option.key }}"
+        {% endfor %}
+      executable: /bin/bash
+    loop: "{{ vm_groups }}"
+    become: true
+
+  vars:
+    vm_groups: "{{ group_names | intersect(sut_cgroup_vmgroups|split(',')) | map('regex_replace','[_-]','') }}"

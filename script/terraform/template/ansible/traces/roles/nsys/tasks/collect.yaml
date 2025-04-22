@@ -32,13 +32,10 @@
         ' | tar xf - --strip-components=1 >> nsys-collect.logs 2>&1
       executable: /bin/bash
       chdir: "{{ trace_data_path }}"
-    loop: "{{ workload_progresses.startswith('docker:') | ternary(workload_progresses.replace('docker:','').split(' '),[]) | reject('==','') }}"
+    loop: "{{ hostvars[trace_node.1].WORKLOAD_METADATA | default([]) | select('match','^docker:.*') | map('regex_replace','docker:','') }}"
     loop_control:
       loop_var: container
       index_var: i
-    become: true
-    vars:
-      workload_progresses: "{{ hostvars[trace_node.1].WORKLOAD_PROCESSES | default('') }}"
 
   - name: Get nsys files 
     shell:

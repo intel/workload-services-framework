@@ -1,0 +1,48 @@
+diff --git a/alicloud/resource_alicloud_instance.go b/alicloud/resource_alicloud_instance.go
+index 2dfa5886f..b2dd3dfd0 100644
+--- a/alicloud/resource_alicloud_instance.go
++++ b/alicloud/resource_alicloud_instance.go
+@@ -696,6 +696,23 @@ func resourceAliCloudInstance() *schema.Resource {
+ 					},
+ 				},
+ 			},
++			"cpu_options": {
++				Type:     schema.TypeSet,
++				Optional: true,
++				Computed: true,
++				MaxItems: 1,
++				Elem: &schema.Resource{
++					Schema: map[string]*schema.Schema{
++						"accelerators": {
++							Type:     schema.TypeSet,
++							Optional: true,
++							Computed: true,
++							MaxItems: 10,
++							Elem:     &schema.Schema{Type: schema.TypeString},
++						},
++					},
++				},
++			},
+ 		},
+ 	}
+ }
+@@ -1120,6 +1137,19 @@ func resourceAliCloudInstanceCreate(d *schema.ResourceData, meta interface{}) er
+ 		}
+ 	}
+ 
++	if v, ok := d.GetOk("cpu_options"); ok {
++		for _, raw := range v.(*schema.Set).List() {
++			cpuOptionsArg := raw.(map[string]interface{})
++			if v, ok := cpuOptionsArg["accelerators"]; ok {
++				count := 1
++				for _, accelerator := range v.(*schema.Set).List() {
++					request[fmt.Sprintf("CpuOptions.Accelerators.%d", count)] = accelerator
++					count++
++				}
++			}
++		}
++	}
++
+ 	wait := incrementalWait(1*time.Second, 1*time.Second)
+ 	err = resource.Retry(d.Timeout(schema.TimeoutCreate), func() *resource.RetryError {
+ 		response, err = client.RpcPost("Ecs", "2014-05-26", action, nil, request, false)

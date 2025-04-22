@@ -1,0 +1,77 @@
+diff --git a/models/image_recognition/pytorch/common/main.py b/models/image_recognition/pytorch/common/main.py
+index 82f7f89d7..dd9dff05d 100644
+--- a/models/image_recognition/pytorch/common/main.py
++++ b/models/image_recognition/pytorch/common/main.py
+@@ -285,8 +285,7 @@ def main_worker(gpu, ngpus_per_node, args):
+     num_classes = model.fc.out_features
+     if args.ipex:
+         import intel_extension_for_pytorch as ipex
+-    elif args.inductor:
+-        args.jit = False
++
+     # for ipex path, always convert model to channels_last for bf16, fp32, int8.
+     if args.ipex:
+         model = model.to(memory_format=torch.channels_last)
+@@ -395,7 +394,6 @@ def main_worker(gpu, ngpus_per_node, args):
+         # for offical pytorch, int8 and jit path is not enabled.
+         # for torch.compile(backend=inductor) INT8 quantization is been supported.
+         assert not args.int8, "int8 path is not enabled for offical pytorch"
+-        assert not args.jit, "jit path is not enabled for offical pytorch"
+
+     if not args.dummy:
+         # Data loading code
+@@ -488,6 +486,9 @@ def main_worker(gpu, ngpus_per_node, args):
+         # torch.compile() inductor path
+         elif args.inductor:
+             model.eval()
++            if args.jit:
++                model = torch.jit.script(model)
++                model = torch.jit.optimize_for_inference(model)
+             from torch._inductor import config as inductor_config
+             inductor_config.cpp_wrapper = True
+             x = torch.randn(args.batch_size, 3, 224, 224).contiguous(memory_format=torch.channels_last)
+@@ -585,7 +586,7 @@ def main_worker(gpu, ngpus_per_node, args):
+         print("create DistributedDataParallel in CPU")
+         device_ids = None
+         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=device_ids)
+-
++
+     num_steps_per_epoch = len(train_loader)
+     if args.base_op.lower() == "lars":
+         print("Creating LR scheduler ")
+@@ -607,7 +608,7 @@ def train(train_loader, val_loader, model, criterion, optimizer, lr_scheduler, a
+             len(train_loader) * (args.epochs - args.start_epoch),
+             [batch_time, data_time, losses, top1, top5],
+             prefix="Training: ")
+-
++
+     # switch to train mode
+     model.train()
+
+@@ -617,14 +618,14 @@ def train(train_loader, val_loader, model, criterion, optimizer, lr_scheduler, a
+         print("running float16 training step\n")
+     else:
+         print("running fp32 training step\n")
+-
++
+     for epoch in range(args.start_epoch, args.epochs):
+-
++
+         if args.distributed:
+             train_sampler.set_epoch(epoch)
+         if args.base_op.lower() == "sgd":
+             adjust_learning_rate(optimizer, epoch, args)
+-
++
+         for i, (images, target) in enumerate(train_loader):
+             if args.training_steps > 0 and (epoch - args.start_epoch) * len(train_loader) + i >= args.training_steps:
+                 break
+@@ -705,7 +706,7 @@ def train(train_loader, val_loader, model, criterion, optimizer, lr_scheduler, a
+                         'best_acc1': best_acc1,
+                         'optimizer' : optimizer.state_dict(),
+                     }, is_best)
+-
++
+     batch_size = args.batch_size
+     perf = batch_size / (batch_time.avg - data_time.avg)
+     print("Training throughput: {:.3f} fps".format(perf))

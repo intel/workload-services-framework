@@ -1,0 +1,13 @@
+diff --git a/Source/Lib/Codec/EbDefinitions.h b/Source/Lib/Codec/EbDefinitions.h
+index d85bd4c..c268185 100644
+--- a/Source/Lib/Codec/EbDefinitions.h
++++ b/Source/Lib/Codec/EbDefinitions.h
+@@ -15,7 +15,7 @@ extern "C" {
+ #define LATENCY_PROFILE 0
+ //#define DEBUG_LIFE_CYCLE 0
+ // Internal Marcos
+-#define NON_AVX512_SUPPORT
++//#define NON_AVX512_SUPPORT
+ 
+ #ifdef __cplusplus
+ #define EB_EXTERN extern "C"

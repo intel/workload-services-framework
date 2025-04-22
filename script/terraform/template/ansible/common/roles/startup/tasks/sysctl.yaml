@@ -6,14 +6,18 @@
 
 - name: Set sysctl default settings
   set_fact:
-    sysctl_options_dict: "{{ sysctl_options_dict | default({}) | combine(dict((sut_sysctl_options=='default') | ternary(sut_sysctl_default_options,'') | split(',') | map('trim') | select('match',item+':.*') | map('regex_replace','^[^:]*:','') | reject('==','') | map('split','=') | map('map','trim'))) }}"
+    sysctl_options_dict: "{{ sysctl_options_dict | combine(dict((sut_sysctl_options=='default') | ternary(sut_sysctl_default_options,'') | split(',') | map('trim') | select('match',item+':.*') | map('regex_replace','^[^:]*:','') | reject('==','') | map('split','=') | map('map','trim'))) }}"
   loop: "{{ group_names }}"
+  vars:
+    sysctl_options_dict: {}
 
 - name: overwrite by workload settings
   set_fact:
-    sysctl_options_dict: "{{ sysctl_options_dict | combine(wl_sysctls) }}"
+    sysctl_options_dict: "{{ sysctl_options_dict | combine(wl_sysctl_options_dict | default({})) | combine(cluster_config.cluster | zip_longest([],fillvalue={'vm_group':'worker','sysctls':{}}) | map('last') | map('dict2items') | zip(cluster_config.cluster | map('dict2items')) | map('flatten') | map('items2dict') | selectattr('vm_group','in',group_names) | map(attribute='sysctls') | map('dict2items') | flatten | items2dict) }}"
+  vars:
+    cluster_config: "{{ lookup('file',wl_logs_dir+'/cluster-config.yaml') | from_yaml }}"
 
-- name: Set sysctl settings
+- name: overwrite by user settings
   set_fact:
     sysctl_options_dict: "{{ sysctl_options_dict | combine(dict((sut_sysctl_options=='default') | ternary('',sut_sysctl_options) | split(',') | map('trim') | select('match',item+':.*') | map('regex_replace','^[^:]*:','') | reject('==','') | map('split','=') | map('map','trim'))) }}"
   loop: "{{ group_names }}"

@@ -1,0 +1,17 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- hosts: worker-0
+  gather_facts: no
+  tasks:
+    - name: Running ANN benchmark
+      include_role:
+        name: deployment
+        tasks_from: deploy_container.yaml
+      when: (ansible_connection|default('ssh')) in ['ssh','local']
+      loop: "{{ range(1, run_stage_iterations | default(1) |int+1, 1) | list }}"
+      loop_control:
+        loop_var: itr
+  become: yes

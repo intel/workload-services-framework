@@ -11,24 +11,10 @@
     executable: /bin/bash
   register: pods
 
-- name: get trace pods
-  shell:
-    cmd: |
-      kubectl get --namespace={{ wl_namespace }} pod "-o=jsonpath={.items[?(@.spec.nodeName in ['{{ groups.trace_hosts | join(sep) }}'])].metadata.name}"
-    executable: /bin/bash
-  register: trace_pods
-  when: wl_trace_modules | default('') | split(',') | reject('==','') | reject('match','.*:host.*') | length > 0
-  vars:
-    sep: "','"
-
-- set_fact:
-    WORKLOAD_PROCESSES: "kubernetes:{{ trace_pods.stdout }}"
-  when: wl_trace_modules | default('') | split(',') | reject('==','') | reject('match','.*:host.*') | length > 0
-
 - name: waitproc to wait for logs complete
   shell:
     cmd: |
-      nohup bash -c "timeout {{ timeout }}s bash -c \"{% if (k8s_detect_pod_failure|bool) %}kubectl --namespace={{ wl_namespace }} wait pod --all --for=condition=Failed --timeout={{ timeout | int+300 }}s & kubectl --namespace={{ wl_namespace }} wait pod --all --for=condition=Error --timeout={{ timeout | int+300 }}s & {% endif %}({% for pod in pods.stdout_lines %}kubectl exec --namespace={{ wl_namespace }} {{ pod }} -c {{ pod_container }} -- sh -c 'cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-{{ pod }}-{{ itr }}-logs.tar; tar tf /tmp/{{ wl_namespace }}-{{ pod }}-{{ itr }}-logs.tar || tar cf /tmp/{{ wl_namespace }}-{{ pod }}-{{ itr }}-logs.tar \\\$(cat /tmp/{{ wl_namespace }}-{{ pod }}-{{ itr }}-logs.tar)'; {% endfor %})& wait -n\"; echo \$? > /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-waitproc.status" > /dev/null 2>&1 &
+      nohup bash -c "timeout {{ timeout }}s bash -c \"{% if (k8s_detect_pod_failure|bool) %}kubectl --namespace={{ wl_namespace }} wait pod --all --for=condition=Failed --timeout={{ timeout | int+300 }}s & kubectl --namespace={{ wl_namespace }} wait pod --all --for=condition=Error --timeout={{ timeout | int+300 }}s & {% endif %}({% for pod in pods.stdout_lines %}kubectl exec {{ k8s_exec_options }} --namespace={{ wl_namespace }} {{ pod }} -c {{ pod_container }} -- sh -c 'cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-{{ pod }}-{{ itr }}-logs.tar; tar tf /tmp/{{ wl_namespace }}-{{ pod }}-{{ itr }}-logs.tar || tar cf /tmp/{{ wl_namespace }}-{{ pod }}-{{ itr }}-logs.tar \\\$(cat /tmp/{{ wl_namespace }}-{{ pod }}-{{ itr }}-logs.tar)'; {% endfor %})& wait -n\"; echo \$? > /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-waitproc.status" > /dev/null 2>&1 &
       echo $!
       disown
     executable: /bin/bash
@@ -38,6 +24,26 @@
     pod_container_tmp: "{{ workload_config.job_filter.split(',')[0].split('=')[1] | default(workload_config.job_filter.split(',')[0].split('=')[0]) }}"
     pod_container: "{{ pod_container_tmp.split(':')[1] | default(pod_container_tmp.split(':')[0]) }}"
     timeout: "{{ workload_config.timeout.split(',') | first }}"
+
+- name: get trace pods
+  shell:
+    cmd: |
+      kubectl get --namespace={{ wl_namespace }} pod "-o=jsonpath={.items[?(@.spec.nodeName in ['{{ item }}'])].metadata.uid}"
+    executable: /bin/bash
+  loop: "{{ groups.trace_hosts | intersect(groups.cluster_hosts) }}"
+  when: wl_trace_modules | default('') | split(',') | reject('==','') | reject('match','.*:host.*') | length > 0
+  register: trace_pods
+  ignore_errors: true
+
+- set_fact:
+    WORKLOAD_METADATA: "{{ item.stdout | split(' ') | map('regex_replace','^','pod:') }}"
+  when:
+  - wl_trace_modules | default('') | split(',') | reject('==','') | reject('match','.*:host.*') | length > 0
+  - item.rc == 0
+  - item.stdout | split(' ') | length > 0
+  delegate_to: "{{ item.item }}"
+  delegate_facts: true
+  loop: "{{ trace_pods.results }}"
 
 - name: invoke the trace procedure
   include_role:
@@ -53,7 +59,7 @@
 - name: retrieve execution logs
   shell: 
     cmd: |
-      kubectl exec --namespace={{ wl_namespace }} {{ item }} -c {{ pod_container }} -- sh -c 'cat /tmp/{{ wl_namespace }}-{{ item }}-{{ itr }}-logs.tar' > /tmp/{{ wl_namespace }}-{{ item }}-{{ itr }}-logs.tar && tar tf /tmp/{{ wl_namespace }}-{{ item }}-{{ itr }}-logs.tar > /dev/null
+      kubectl exec {{ k8s_exec_options }} --namespace={{ wl_namespace }} {{ item }} -c {{ pod_container }} -- sh -c 'cat /tmp/{{ wl_namespace }}-{{ item }}-{{ itr }}-logs.tar' > /tmp/{{ wl_namespace }}-{{ item }}-{{ itr }}-logs.tar && tar tf /tmp/{{ wl_namespace }}-{{ item }}-{{ itr }}-logs.tar > /dev/null
     executable: /bin/bash
   register: status
   until: status.rc == 0
@@ -75,12 +81,12 @@
     cmd: |
       for pod in {{ item.stdout_lines | difference(pods.stdout_lines) | join(' ') }}; do
         ( 
-          kubectl exec --namespace={{ wl_namespace }} $pod -c {{ (item.item.split('=')[1] | default(item.item.split('=')[0])).split(':')[1] | default((item.item.split('=')[1] | default(item.item.split('=')[0])).split(':')[0]) }} -- sh -c "cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar; tar tf /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar || tar cf /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar \$(cat /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar)"
+          kubectl exec {{ k8s_exec_options }} --namespace={{ wl_namespace }} $pod -c {{ (item.item.split('=')[1] | default(item.item.split('=')[0])).split(':')[1] | default((item.item.split('=')[1] | default(item.item.split('=')[0])).split(':')[0]) }} -- sh -c "cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar; tar tf /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar || tar cf /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar \$(cat /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar)"
           for retries in 1 2 3 4 5; do
-            kubectl exec --namespace={{ wl_namespace }} $pod -c {{ (item.item.split('=')[1] | default(item.item.split('=')[0])).split(':')[1] | default((item.item.split('=')[1] | default(item.item.split('=')[0])).split(':')[0]) }} -- sh -c "cat /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar" > /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar && tar tf /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar && break
+            kubectl exec {{ k8s_exec_options }} --namespace={{ wl_namespace }} $pod -c {{ (item.item.split('=')[1] | default(item.item.split('=')[0])).split(':')[1] | default((item.item.split('=')[1] | default(item.item.split('=')[0])).split(':')[0]) }} -- sh -c "cat /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar" > /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar && tar tf /tmp/{{ wl_namespace }}-$pod-{{ itr }}-logs.tar && break
             sleep 5s
           done
-        )&
+        ) > /dev/null 2>&1 &
       done
       wait
     executable: /bin/bash
@@ -126,3 +132,26 @@
   with_items: "{{ pods.stdout_lines | union(services | json_query('results[*].stdout_lines') | flatten) | unique }}"
   ignore_errors: yes
 
+- block:
+
+  - name: get all pods
+    command: "kubectl get pod --namespace {{ wl_namespace }} --ignore-not-found -o name"
+    register: all_pods
+
+  - name: get all pod logs
+    command: kubectl logs --namespace {{ wl_namespace }} --all-containers=true --prefix=true {{ item }}
+    when: k8s_save_logs | bool
+    loop: "{{ all_pods.stdout_lines }}"
+    register: all_pod_logs
+    no_log: true
+
+  - name: save pod logs
+    copy:
+      dest: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ item.item | replace('pod/','') }}.logs"
+      content: "{{ item.stdout }}"
+    loop: "{{ all_pod_logs.results }}"
+    delegate_to: localhost
+    no_log: true
+
+  when: k8s_save_logs | bool
+  ignore_errors: true

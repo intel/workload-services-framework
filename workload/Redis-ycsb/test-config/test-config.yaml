@@ -1,0 +1,17 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+*_default:
+  ALICLOUD_SPOT_INSTANCE: false
+  ALICLOUD_ZONE: cn-beijing-l
+  ALICLOUD_WORKER_INSTANCE_TYPE: ecs.r8i.xlarge
+  ALICLOUD_CLIENT_INSTANCE_TYPE: ecs.g7.xlarge
+  CLIENT_COUNT: 1
+  INSTANCE_NUM: 4
+  REDIS_NUMACTL_STRATEGY: 1
+  WORKLOAD_FILE: workloadd
+  THREADS: 16
+  READ_PROPORTION: 0.9
+  INSERT_PROPORTION: 0.1

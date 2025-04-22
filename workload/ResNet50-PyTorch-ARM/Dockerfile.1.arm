@@ -1,0 +1,49 @@
+# resnet-pytorch-inference
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG PYTHON_VER=3.11
+FROM python:${PYTHON_VER}
+
+ARG MODEL_VER=pytorch_gnr_2024_ww01
+ARG MODEL_REPO="https://github.com/intel/ai-reference-models"
+ARG MODEL_ROOT=/home/workspace/pytorch_model/
+ARG TORCHVISION_VER="0.19.0"
+ARG TORCHVISION_REPO="https://download.pytorch.org/whl/cpu"
+ARG TORCH_VER="2.4.0"
+ARG TORCH_REPO="https://download.pytorch.org/whl/cpu"
+ARG WSL_VER="c4dac640995f66db893410d6d4356d49a9d3dcc0"
+ARG WSL_PKG=https://github.com/facebookresearch/WSL-Images/archive/${WSL_VER}.zip
+
+
+RUN --mount=type=secret,id=.netrc,dst=/root/.netrc \
+    git clone ${MODEL_REPO} -b ${MODEL_VER} ${MODEL_ROOT}
+COPY *.patch ${MODEL_ROOT}
+
+# jemalloc -- required to have closer comparison to PAIV images
+# omp (OpenMP) -- alternative for MKL
+RUN apt-get update -y && apt-get install -y libjemalloc-dev libomp-dev numactl && apt-get clean -y && apt-get autoremove -y
+
+RUN pip3 install --no-cache-dir torch==${TORCH_VER} torchvision==${TORCHVISION_VER} --index-url ${TORCH_REPO}
+
+# mimic dlboost PAIV images -- ensures we are using the same model
+RUN mkdir -p /root/.cache/torch/hub/  && \
+    cd /root/.cache/torch/hub/  && \
+    wget ${WSL_PKG} && \
+    unzip ${WSL_VER}.zip && \
+    mv WSL-Images-${WSL_VER} facebookresearch_WSL-Images_main;
+
+# required to allow benchmark script locate jemalloc
+RUN mkdir -p /root/.local  \
+    && ln -s /usr/lib/aarch64-linux-gnu /root/.local/lib  \
+    && mkfifo /export-logs
+
+WORKDIR /home/workspace/benchmark
+COPY main.sh .
+CMD ( ./main.sh; \
+    echo $? > status) 2>&1 | tee benchmark.log  \
+    && tar cf /export-logs status $(find . -maxdepth 1 -name "*.log")  \
+    && sleep infinity

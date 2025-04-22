@@ -1,4 +1,4 @@
 
 Host {{ ansible_host }}
-  ProxyCommand ssh -p {{ kvm_host_port }} -i {{ kvm_host_ident }} {{ kvm_host_user}}@{{ kvm_host }} -W %h:%p
+  ProxyCommand ssh -p {{ kvm_host_port }} {{ kvm_host_user}}@{{ kvm_host }} -W %h:%p
 

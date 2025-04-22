@@ -33,7 +33,7 @@
   - not (sut_bios_probe | bool)
   - ('\n' + request.key + '=') in bios_settings
   - ('\n' + request.key + '=' + request.value) not in bios_settings
-  loop: "{{ wl_bios.keys() | select('in',bios_settings.replace('\n','~') | regex_replace('.*~BIOSVersion=([^; ]*).*','\\1')) | sort(true) | first | default([]) | extract(wl_bios) | default({}) | combine(bios_options_dict) | dict2items }}"
+  loop: "{{ bios_options_wl_dict.keys() | select('in',bios_settings.replace('\n','~') | regex_replace('.*~BIOSVersion=([^; ]*).*','\\1')) | sort(true) | first | default([]) | extract(bios_options_wl_dict) | default({}) | combine(bios_options_dict) | dict2items }}"
   loop_control:
     loop_var: request
   vars:

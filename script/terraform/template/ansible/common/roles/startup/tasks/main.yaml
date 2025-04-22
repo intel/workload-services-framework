@@ -128,7 +128,6 @@
     name: msr
   when:
   - sut_update_msr | bool
-  - (playbook_dir + '/roles/msr/tasks/main.yaml') is exists
 
 - name: apply tpmi settings
   include_role:

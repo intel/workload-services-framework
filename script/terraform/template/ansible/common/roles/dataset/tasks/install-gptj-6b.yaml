@@ -3,12 +3,12 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
-- include_role:
-    name: hf-dataset
+- include_tasks:
+    file: download-hf.yaml
   vars:
-    DEST_DIR: "/opt/dataset/gptj/6b"
-    MODEL_ID: "EleutherAI/gpt-j-6b"
-    DATASET_SIZE: 38
-    exclude: ['msgpack','h5']
-    revision: []
-    HF_LOGIN: false
+    dataset_model_path: "gptj/6b"
+    hfcli_model_id: "EleutherAI/gpt-j-6b"
+    dataset_size: 38
+    hfcli_exclude: ['msgpack','h5']
+    hfcli_revision: []
+    hfcli_login: false

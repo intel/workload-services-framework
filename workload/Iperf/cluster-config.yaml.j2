@@ -1,0 +1,15 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+cluster:
+- labels: {}
+- labels: {}
+{% if 'ingress' in MODE %}
+  off_cluster: true
+terraform:
+  iperf_client_image: {{ REGISTRY }}{{ WORKLOAD }}{{ IMAGESUFFIX }}{{ RELEASE }}
+{% endif %}
+

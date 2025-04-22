@@ -1,0 +1,68 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+{{- $httpmode := .Values.HTTPMODE -}}
+{{- $openssl_version := .Values.OPENSSL_VERSION -}}
+{{- $syncmode := .Values.SYNCMODE -}}
+{{- $registry := .Values.REGISTRY -}}
+{{- $opt_degree := .Values.OPT_DEGREE -}}
+{{- $release := .Values.RELEASE -}}
+{{- $nusers := .Values.NUSERS -}}
+{{- $duration := .Values.DURATION -}}
+{{- $siege_numa_options := .Values.SIEGE_NUMA_OPTIONS -}}
+{{- $node := .Values.NODE -}}
+{{- $nginx_base_port := int .Values.NGINX_BASE_PORT }}
+{{- $wp_os_suffix := .Values.WP_OS_SUFFIX -}}
+
+{{- $instance_count := int .Values.INSTANCE_COUNT -}}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: benchmark
+spec:
+  template:
+    metadata:
+      labels:
+        role: client
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: VM-GROUP
+                operator: In
+                values:
+{{- if eq $node "1n" }}
+                - "worker"
+{{- end }}
+{{- if eq $node "2n" }}
+                - "client"
+{{- end }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: benchmark
+        image: {{ $registry }}wordpress-siege{{ $wp_os_suffix }}{{ $release }}
+        imagePullPolicy: Always
+        env:
+        - name: INSTANCE_COUNT
+          value: "{{ $instance_count }}"
+        - name: NUSERS
+          value: "{{ $nusers }}"
+        - name: DURATION
+          value: "{{ $duration }}"
+        - name: HTTPMODE
+          value: "{{ $httpmode }}"
+        - name: SIEGE_NUMA_OPTIONS
+          value: "{{ $siege_numa_options }}"
+        - name: NGINX_BASE_PORT
+          value: "{{ $nginx_base_port }}"
+        securityContext:
+          privileged: true
+      restartPolicy: Never

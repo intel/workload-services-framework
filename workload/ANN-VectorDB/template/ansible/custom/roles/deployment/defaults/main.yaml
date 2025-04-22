@@ -1,0 +1,29 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+WORKSPACE: "/tmp/ann"
+ANN_HOME: "/tmp/ann/benchmark"
+
+algorithm: "faiss"
+dataset: "glove-100-angular"
+batch: "False"
+cpu_limit: 8
+mem_limit: 16
+
+milvus_m: 96
+milvus_query_args: 800
+
+faiss_name: float_faiss_ivfpqfs
+faiss_args: 4096
+faiss_query_args: 200
+faiss_query_args2: 1000
+
+redisearch_arg_group: 96
+redisearch_query_args: 800
+
+hnswlib_arg_group: 96
+hnswlib_query_args: 800
+
+itr: 1

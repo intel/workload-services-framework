@@ -1,0 +1,12 @@
+# redis-ycsb-config-center-ubuntu2404
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+FROM ${OS_IMAGE}:${OS_VER}
+RUN apt update && apt install -y redis
+CMD (redis-server --protected-mode no & ) && sleep infinity

@@ -1,0 +1,130 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+{{- $startPort := .Values.REDIS_NATIVE_TRANSPORT_PORT -}}
+{{- $nInstance := .Values.INSTANCE_NUM -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-ycsb-server
+  labels:
+    app: redis-ycsb-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-ycsb-server
+  template:
+    metadata:
+      labels:
+        app: redis-ycsb-server
+        name: REDIS-YCSB-SERVER
+    spec:
+{{- if $.Values.HOST_NETWORK_ENABLE }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+{{- end }}
+      containers:
+      - name: redis-ycsb-server
+        image: {{ $.Values.REGISTRY }}redis-ycsb-server{{ $.Values.IMAGE_ARCH }}{{ $.Values.RELEASE }}
+        imagePullPolicy: {{ include "imagepolicy" $.Values }}
+        resources:
+          requests:
+            cpu: "0.5"
+        securityContext:
+          privileged: true
+        env:
+        - name: INSTANCE_NUM
+          value: "{{ $nInstance }}"
+        - name: REDIS_NATIVE_TRANSPORT_PORT
+          value: "{{ $.Values.REDIS_NATIVE_TRANSPORT_PORT }}"
+        - name: REDIS_NUMACTL_STRATEGY
+          value: "{{ $.Values.REDIS_NUMACTL_STRATEGY }}"
+        - name: REDIS_VERSION
+          value: "{{ $.Values.REDIS_VERSION }}"
+        - name: NUMA_NODE_FOR_REDIS_SERVER
+          value: "{{ $.Values.NUMA_NODE_FOR_REDIS_SERVER }}"
+        - name: REDIS_SERVER_IO_THREADS
+          value: "{{ $.Values.REDIS_SERVER_IO_THREADS }}"
+        - name: REDIS_SERVER_IO_THREADS_DO_READS
+          value: "{{ $.Values.REDIS_SERVER_IO_THREADS_DO_READS }}"
+        - name: REDIS_PERSISTENCE_POLICY
+          value: "{{ $.Values.REDIS_PERSISTENCE_POLICY }}"
+        - name: REDIS_SERVER_IO_THREADS_CPU_AFFINITY
+          value: "{{ $.Values.REDIS_SERVER_IO_THREADS_CPU_AFFINITY }}"
+        - name: REDIS_EVICTION_POLICY
+          value: "{{ $.Values.REDIS_EVICTION_POLICY }}"
+{{- if ne .Values.CLIENT_COUNT 0 }}
+      {{- $args := dict "anti" "REDIS-YCSB-CLIENT" "affi" "REDIS-YCSB-SERVER" }}
+      {{- include "podAffinity" $args }}
+      {{- $args2 := dict "nkey" "VM-GROUP" "nvalue" "worker" }}
+      {{- include "nodeAffinity" $args2 }}
+{{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Values.REDIS_SERVICE }}
+  labels:
+    app: {{ $.Values.REDIS_SERVICE }}
+spec:
+  ports: 
+  {{- range $i, $e := until (int $nInstance) }}
+  - port: {{ add $startPort $i }}
+    name: redis-server-port-{{ add $startPort $i }}
+    protocol: TCP
+  {{- end }}
+  selector:
+    app: redis-ycsb-server
+  type: ClusterIP
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: redis-ycsb-config-center
+  name: redis-ycsb-config-center
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-ycsb-config-center
+  template:
+    metadata:
+      labels:
+        app: redis-ycsb-config-center
+    spec:
+      containers:
+      - image: {{ $.Values.REGISTRY }}redis-ycsb-config-center-ubuntu{{ $.Values.UBUNTU_OS }}{{ $.Values.IMAGE_ARCH }}{{ $.Values.RELEASE }}
+        imagePullPolicy: {{ include "imagepolicy" $.Values }}
+        name: redis-ycsb-config-center-ubuntu{{ $.Values.UBUNTU_OS }}
+        resources: {}
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+{{- if ne .Values.CLIENT_COUNT 0 }}
+    {{- $args := dict "anti" "REDIS-YCSB-SERVER" "affi" "REDIS-YCSB-CLIENT" }}
+    {{- include "podAffinity" $args }}
+    {{- $args2 := dict "nkey" "VM-GROUP" "nvalue" "client" }}
+    {{- include "nodeAffinity" $args2 }}
+{{- end }}
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: {{ $.Values.CONFIG_CENTER_SERVICE }}
+  name: {{ $.Values.CONFIG_CENTER_SERVICE }}
+spec:
+  ports:
+  - port: {{ .Values.CONFIG_CENTER_PORT }}
+    protocol: TCP
+    targetPort: 6379
+  selector:
+    app: redis-ycsb-config-center
+  type: ClusterIP

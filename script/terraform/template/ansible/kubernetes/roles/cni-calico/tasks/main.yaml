@@ -78,8 +78,6 @@
     path: "/tmp/{{ wl_namespace }}-calico.yaml"
     state: absent
   ignore_errors: true
-  async: 30
-  poll: 0
 
 - name: Wait for the controller calico ready
   include_tasks:

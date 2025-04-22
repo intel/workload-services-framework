@@ -9,11 +9,6 @@ variable "ssh_pub_key" {
   nullable = false
 }
 
-variable "ssh_pri_key_file" {
-  type = string
-  default = "/home/.ssh/id_rsa"
-}
-
 variable "job_id" {
   type = string
   nullable = false

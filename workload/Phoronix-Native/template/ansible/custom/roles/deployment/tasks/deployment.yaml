@@ -1,0 +1,124 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: Remove phoronix test-result directory
+  file:
+    path: "{{ PHORONIX_INSTALL_DIR }}/test-results/{{ BENCHMARK_WL }}"
+    state: absent
+  ignore_errors: true
+
+- name: Create the Logs Directory
+  file:
+    path: "{{ WORKSPACE }}/itr-{{ itr }}/benchmark"
+    state: directory
+    recurse: yes
+
+- name: Ensure the phoronix result directory exists
+  file:
+    path: "{{ PHORONIX_INSTALL_DIR }}/test-results/{{ BENCHMARK_WL }}"
+    state: directory
+    mode: '0755'
+
+- name: Create run log file for benchmark
+  file:
+    path: "{{ WORKSPACE }}/itr-{{ itr }}/benchmark/output.log"
+    state: touch
+    mode: "0666"
+
+- name: install benchmark
+  shell: |
+    {{ PHORONIX_INSTALL_DIR }}/phoronix-test-suite/phoronix-test-suite force-install {{ BENCHMARK_WL }}
+
+
+- name: Install Template of wl settings from the role
+  template:
+    src: "{{ lookup('first_found', params, errors='ignore') }}"
+    dest: "~/.phoronix-test-suite/test-profiles/{{ BENCHMARK_WL }}/test-definition.xml"
+    mode: "0755"
+  vars:
+    params:
+      - "roles/{{ workload_config.name }}/templates/wl_settings.xml"
+
+# - name: Install Template of wl settings
+#   template:
+#     src: "wl_settings.xml"
+#     dest: "~/.phoronix-test-suite/test-profiles/{{ BENCHMARK_WL }}/test-definition.xml"
+#     mode: "0755"
+
+- name: Install Template of result settings from the role
+  template:
+    src: "{{ lookup('first_found', params, errors='ignore') }}"
+    dest: "~/.phoronix-test-suite/test-profiles/{{ BENCHMARK_WL }}/results-definition.xml"
+    mode: "0755"
+  vars:
+    params:
+      - "roles/{{ workload_config.name }}/templates/result_settings.xml"
+
+
+# - name: Install Template of result settings
+#   template:
+#     src: "result_settings.xml"
+#     dest: "~/.phoronix-test-suite/test-profiles/{{ BENCHMARK_WL }}/results-definition.xml"
+#     mode: "0755"
+
+- name: "Running benchmark {{ BENCHMARK_WL }}"
+  shell: |
+    {{ PHORONIX_INSTALL_DIR }}/phoronix-test-suite/phoronix-test-suite batch-benchmark {{ BENCHMARK_WL }} > {{ WORKSPACE }}/itr-{{ itr }}/benchmark/output.log 2>&1 &
+    echo $? > {{ WORKSPACE }}/itr-{{ itr }}/benchmark/status
+    echo $!
+    disown
+  args:
+    executable: /bin/bash
+  register: waitproc
+
+- name: invoke the trace procedure
+  include_role:
+    name: trace
+  vars:
+    trace_waitproc_pid: "{{ waitproc.stdout }}"
+    trace_logs_scripts: ["cat {{ WORKSPACE }}/itr-{{ itr }}/benchmark/output.log"]
+    trace_logs_host: "worker-0"
+
+- name: collect trace data
+  include_role:
+    name: trace
+    tasks_from: collect
+  when: wl_trace_modules | default('') | split(',') | reject('==','') | length > 0
+
+- name: Copy results
+  synchronize:
+    src: "{{ PHORONIX_INSTALL_DIR }}/test-results/"  # Source folder on remote_dest
+    dest: "{{ WORKSPACE }}/itr-{{ itr }}/test-results/"  # Destination folder on remote_src
+    recursive: yes
+  delegate_to: worker-0
+
+- name: Archive Logs
+  archive:
+    path: "{{ WORKSPACE }}/itr-{{ itr }}"
+    dest: "{{ WORKSPACE }}/itr-{{ itr }}.tar.gz"
+
+- name: Fetch Logs to Localhost
+  become: false
+  fetch:
+    src: "{{ WORKSPACE }}/itr-{{ itr }}.tar.gz"
+    dest: "{{ wl_logs_dir }}/"
+    flat: yes
+    validate_checksum: yes
+
+- name: UnArchive Logs on Localhost
+  become: false
+  unarchive:
+    src: "{{ wl_logs_dir }}/itr-{{ itr }}.tar.gz"
+    dest: "{{ wl_logs_dir }}"
+    mode: "0777"
+  delegate_to: localhost
+
+- name: delete Logs tar file
+  become: false
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}.tar.gz"
+    state: absent
+  delegate_to: localhost
+  ignore_errors: true

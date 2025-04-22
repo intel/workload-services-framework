@@ -23,5 +23,8 @@
       $dcs = New-Object -ComObject Pla.DataCollectorSet
       $dcs.Query("wsf-{{ wl_namespace }}-{{ trace_node.1 }}-dcs",$null)
       $dcs.stop($true)
+      while ($dcs.Status -ne 0) {
+        Start-Sleep -Seconds 1
+      }
       $dcs.Delete()
   

@@ -1,0 +1,14 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: "Delete cgroup {{ sut_cgroup_prefix }}"
+  shell:
+    cmd: |
+      find /sys/fs/cgroup/{{ sut_cgroup_prefix }}{{ item }}.slice -type d -depth -exec rmdir {} \; -print
+    executable: /bin/bash
+  loop: "{{ group_names | intersect(sut_cgroup_vmgroups|split(',')) | map('regex_replace','[_-]','') }}"
+  ignore_errors: true
+  become: true

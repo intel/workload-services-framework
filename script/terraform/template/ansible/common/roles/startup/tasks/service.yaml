@@ -12,8 +12,6 @@
   loop: "{{ sut_incompatible_services | split(',') | reject('==', '') }}"
   failed_when: false
   no_log: true
-  async: 100
-  poll: 1
 
 - name: Print out removed services
   debug:

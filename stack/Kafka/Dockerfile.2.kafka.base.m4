@@ -10,14 +10,16 @@ changecom(`#')
 
 ARG `RELEASE'
 ARG `IMAGESUFFIX'
+ARG `OS_SUFFIX'
 ARG JDKVER=17
 ARG JDKVENDOR=openjdk
 
-FROM jdk-${JDKVENDOR}-`${JDKVER}${IMAGESUFFIX}${RELEASE}'
+
+FROM jdk-${JDKVENDOR}-`${JDKVER}${OS_SUFFIX}${IMAGESUFFIX}${RELEASE}'
 
 
 RUN apt-get update && apt-get install -y wget procps python3 numactl nmap libssl-dev findutils ethtool \
-    dnsutils netcat net-tools && apt-get clean
+    dnsutils netcat-openbsd net-tools && apt-get clean
 
 ARG BASE_DIR=/opt
 WORKDIR ${BASE_DIR}
@@ -29,7 +31,7 @@ ENV JAVA_HOME=${JDK_INSTALL_DIR}/"${JDKVER}"/ \
   PATH=${JDK_INSTALL_DIR}/"${JDKVER}"/bin:$PATH:${JDK_INSTALL_DIR}/"${JDKVER}"/jre/bin
 
 # Prepare Kafka
-ARG KAFKA_VER=3.2.0
+ARG KAFKA_VER=3.8.0
 ARG SCALA_VER=2.12
 ARG KAFKA_FILE_NAME=kafka_${SCALA_VER}-${KAFKA_VER}.tgz
 ARG KAFKA_PKG=https://archive.apache.org/dist/kafka/${KAFKA_VER}/${KAFKA_FILE_NAME}

@@ -1,0 +1,150 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+---
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: iperf-server
+spec:
+  template:
+    metadata:
+      labels:
+        app: iperf-server
+    spec:
+      restartPolicy: Never
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - iperf-client
+            topologyKey: "kubernetes.io/hostname"
+      containers:
+      - name: iperf-server
+        image: "{{ REGISTRY }}{{ WORKLOAD }}{{ IMAGESUFFIX }}{{ RELEASE }}"
+        imagePullPolicy: Always
+        ports:
+        - containerPort: {{ SERVER_POD_PORT | int }}
+          protocol: "{{ PROTOCOL }}"
+        - containerPort: {{ SERVER_PING_PORT | int }}
+        env:
+        - name: IPERF_VER
+          value: "{{ IPERF_VER }}"
+        - name: PROTOCOL
+          value: "{{ PROTOCOL }}"
+        - name: SERVER_POD_PORT
+          value: "{{ SERVER_POD_PORT }}"
+        - name: SERVER_CORE_COUNT
+          value: "{{ SERVER_CORE_COUNT }}"
+        - name: SERVER_CORE_LIST
+          value: "{{ SERVER_CORE_LIST }}"
+        - name: SERVER_OPTIONS
+          value: "{{ SERVER_OPTIONS }}"
+        - name: ONLY_USE_PHY_CORE
+          value: "{{ ONLY_USE_PHY_CORE }}"
+        - name: CLIENT_OR_SERVER
+          value: "server"
+        - name: PARALLEL_NUM
+          value: "{{ PARALLEL_NUM }}"
+        - name: SERVER_PING_PORT
+          value: "{{ SERVER_PING_PORT }}"
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: "{{ IPERF_SERVICE_NAME }}"
+  name: "{{ IPERF_SERVICE_NAME }}"
+spec:
+{% if MODE == 'pod2pod' %}
+  clusterIP: None
+{% endif %}
+  selector:
+    app: iperf-server
+  ports:
+  - protocol: "{{ PROTOCOL }}"
+    port: {{ SERVER_POD_PORT | int }}
+    targetPort: {{ SERVER_POD_PORT | int }}
+    name: iperf-server-pod-port
+  - protocol: TCP
+    port: {{ SERVER_PING_PORT | int }}
+    targetPort: {{ SERVER_PING_PORT | int }}
+    name: iperf-server-ping-port
+{% if MODE == 'ingress' %}
+  externalIPs:
+  - 127.0.0.1
+{% endif %}
+
+{% if MODE != 'ingress' %}
+---
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: iperf-client
+  labels:
+    application: "iperf-client"
+spec:
+  template:
+    metadata:
+      labels:
+        app: iperf-client
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - iperf-server
+            topologyKey: "kubernetes.io/hostname"
+      containers:
+      - name: iperf-client
+        image: "{{ REGISTRY }}{{ WORKLOAD }}{{ IMAGESUFFIX }}{{ RELEASE }}"
+        imagePullPolicy: Always
+        env:
+        - name: IPERF_VER
+          value: "{{ IPERF_VER }}"
+        - name: MODE
+          value: "{{ MODE }}"
+        - name: PROTOCOL
+          value: "{{ PROTOCOL }}"
+        - name: IPERF_SERVICE_NAME
+          value: "{{ IPERF_SERVICE_NAME }}"
+        - name: SERVER_POD_PORT
+          value: "{{ SERVER_POD_PORT }}"
+        - name: CLIENT_CORE_COUNT
+          value: "{{ CLIENT_CORE_COUNT }}"
+        - name: CLIENT_CORE_LIST
+          value: "{{ CLIENT_CORE_LIST }}"
+        - name: CLIENT_OPTIONS
+          value: "{{ CLIENT_OPTIONS }}"
+        - name: ONLY_USE_PHY_CORE
+          value: "{{ ONLY_USE_PHY_CORE }}"
+        - name: PARALLEL_NUM
+          value: "{{ PARALLEL_NUM }}"
+        - name: CLIENT_TRANSMIT_TIME
+          value: "{{ CLIENT_TRANSMIT_TIME }}"
+        - name: BUFFER_SIZE
+          value: "{{ BUFFER_SIZE }}"
+        - name: UDP_BANDWIDTH
+          value: "{{ UDP_BANDWIDTH }}"
+        - name: CLIENT_OR_SERVER
+          value: "client"
+        - name: SERVER_PING_PORT
+          value: "{{ SERVER_PING_PORT }}"
+      restartPolicy: Never
+  backoffLimit: 5
+{% endif %}

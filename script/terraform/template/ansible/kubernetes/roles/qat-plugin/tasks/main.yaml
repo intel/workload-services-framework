@@ -3,10 +3,10 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
----
+
 - block:
   - name: check QAT Device Plugin status before installation
-    command: "kubectl wait --for=condition=Ready pod --all -n {{ qatplugin_namespace }} --timeout 1s"
+    command: "kubectl wait --for=condition=Ready pod --all -n {{ k8s_qat_namespace }} --timeout 1s"
 
   rescue:
   - name: install git
@@ -17,32 +17,55 @@
   - name: delete qat-plugin namespace
     ignore_errors: true
     shell: |
-      kubectl delete namespace {{ qatplugin_namespace }}
+      kubectl delete namespace {{ k8s_qat_namespace }}
     args:  
       executable: /bin/bash
 
   - name: create qat-plugin namespace
     shell: |
-      kubectl create namespace {{ qatplugin_namespace }}
+      kubectl create namespace {{ k8s_qat_namespace }}
     args:  
       executable: /bin/bash
 
   - name: Install qat-plugin
-    shell: |
-      git clone --depth 1 {{ qatplugin_repository }} -b {{ qatplugin_release }} /tmp/{{ wl_namespace }}-qatplugin
-      cd /tmp/{{ wl_namespace }}-qatplugin
-      sed -i '/imagePullPolicy: IfNotPresent/a \\        args: ["-allocation-policy", "balanced", "-max-num-devices", "{{ qatplugin_max_qat_devices }}"]' ./deployments/qat_plugin/base/intel-qat-plugin.yaml
-      kubectl create -k deployments/qat_plugin/overlays/apparmor_unconfined -n {{ qatplugin_namespace }}
-    args:  
+    shell:
+      cmd: |
+        git clone --depth 1 {{ k8s_qat_repository }} -b v{{ k8s_qat_version }} /tmp/{{ wl_namespace }}-qatplugin
+        cd /tmp/{{ wl_namespace }}-qatplugin
+        sed -i '/imagePullPolicy: IfNotPresent/a \\        args: ["-allocation-policy", "balanced", "-max-num-devices", "{{ k8s_qat_max_qat_devices }}"]' ./deployments/qat_plugin/base/intel-qat-plugin.yaml
       executable: /bin/bash
+    register: pluginrc
+    until: pluginrc is success
+    retries: 10
+    delay: 10
     run_once: true
 
+  - block:
+
+      - name: download intel-qat-device-plugin
+        command: "docker pull intel/intel-qat-plugin:{{ k8s_qat_version }}"
+        delegate_to: localhost
+
+      - name: push images to remote containerd
+        shell:
+          cmd: |
+            docker save intel/intel-qat-plugin:{{ k8s_qat_version }} | tee {% for h in groups['workload_hosts'] %}>(ssh -p {{ hostvars[h]['ansible_port'] | default(22) }} {{ hostvars[h]['ansible_user'] }}@{{ hostvars[h]['ansible_host'] }} {% if hostvars[h].ansible_private_key_file is defined %}-i {{ hostvars[h].ansible_private_key_file }}{% endif %} sudo -E ctr i import - > /dev/null) {% endfor %} > /dev/null
+          executable: /bin/bash
+
+    when: k8s_qat_push_images | bool
+    delegate_to: localhost
+    run_once: true
+
+  - name: Deploy qat-plugin
+    command: "kubectl create -k /tmp/{{ wl_namespace }}-qatplugin/deployments/qat_plugin/overlays/apparmor_unconfined -n {{ k8s_qat_namespace }}"
+
   - name: remove qat-plugin installation files
-    become: true
     file:
       path: '/tmp/{{ wl_namespace }}-qatplugin'
       state: absent
+    ignore_errors: true
+    become: true
 
   - name: check qat-plugin status on worker
-    command: "kubectl wait --for=condition=Ready pod --all -n {{ qatplugin_namespace }} --timeout 30s"
+    command: "kubectl wait --for=condition=Ready pod --all -n {{ k8s_qat_namespace }} --timeout 30s"
     ignore_errors: true

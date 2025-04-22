@@ -1,0 +1,256 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+{{- $registry := .Values.REGISTRY -}}
+{{- $wp_version := .Values.WP_VERSION -}}
+{{- $php_version := .Values.PHP_VERSION -}}
+{{- $phpmode := .Values.PHPMODE -}}
+{{- $httpmode := .Values.HTTPMODE -}}
+{{- $openssl_version := .Values.OPENSSL_VERSION -}}
+{{- $syncmode := .Values.SYNCMODE -}}
+{{- $release := .Values.RELEASE -}}
+{{- $nservers := .Values.NSERVERS -}}
+{{- $php_numa_options := .Values.PHP_NUMA_OPTIONS -}}
+{{- $wordpress_db_name := .Values.WORDPRESS_DB_NAME -}}
+{{- $wordpress_db_user := .Values.WORDPRESS_DB_USER -}}
+{{- $wordpress_db_password := .Values.WORDPRESS_DB_PASSWORD -}}
+{{- $wordpress_host := .Values.WORDPRESS_HOST -}}
+{{- $hugepage_num := .Values.HUGEPAGE_NUM -}}
+{{- $async := .Values.ASYNC -}}
+{{- $nginx_worker_processes := .Values.NGINX_WORKER_PROCESSES -}}
+{{- $protocol := .Values.PROTOCOL -}}
+{{- $cipher := .Values.CIPHER -}}
+{{- $curve := .Values.CURVE -}}
+{{- $cert := .Values.CERT -}}
+{{- $nginx_numa_options := .Values.NGINX_NUMA_OPTIONS -}}
+{{- $node := .Values.NODE -}}
+{{- $wp_version := .Values.WP_VERSION -}}
+{{- $php_version := .Values.PHP_VERSION -}}
+{{- $phpmode := .Values.PHPMODE -}}
+{{- $httpmode := .Values.HTTPMODE -}}
+{{- $registry := .Values.REGISTRY -}}
+{{- $release := .Values.RELEASE -}}
+{{- $mysql_database := .Values.MYSQL_DATABASE -}}
+{{- $mysql_user := .Values.MYSQL_USER -}}
+{{- $mysql_password := .Values.MYSQL_PASSWORD}}
+{{- $mariadb_numa_options := .Values.MARIADB_NUMA_OPTIONS -}}
+{{- $node := .Values.NODE -}}
+{{- $sutinfo_csp := .Values.SUTINFO_CSP -}}
+{{- $vcpus_per_instance := .Values.VCPUS_PER_INSTANCE -}}
+{{- $all_instance_cpu_str := .Values.ALL_INSTANCE_CPU_STR -}}
+{{- $wp_os_suffix := .Values.WP_OS_SUFFIX -}}
+
+
+{{- $instance_count := int .Values.INSTANCE_COUNT -}}
+{{- $nginx_base_port := int .Values.NGINX_BASE_PORT }}
+{{- $wp_base_port := int .Values.WP_BASE_PORT }}
+{{- $db_base_port := int .Values.DB_BASE_PORT }}
+{{- range $i, $e := until $instance_count }}
+{{- $nginx_port := add $i $nginx_base_port }}
+{{- $wp_port := add $i $wp_base_port }}
+{{- $db_port := add $i $db_base_port }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: siteurl-{{ $i }}
+  labels:
+    app: siteurl-{{ $i }}
+spec:
+  ports:
+  - port: {{ $nginx_port }}
+    protocol: TCP
+  selector:
+    app: wordpress-{{ $i }}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wordpress-{{ $i }}
+  labels:
+    app: wordpress-{{ $i }}
+spec:
+  selector:
+    matchLabels:
+      app: wordpress-{{ $i }}
+  template:
+    metadata:
+      labels:
+        app: wordpress-{{ $i }}
+        role: server
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: VM-GROUP
+                operator: In
+                values:
+                - "worker"
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: database-{{ $i }}
+{{- if eq $phpmode "nojit" }}
+        image: {{ $registry }}wordpress-mariadb-wp{{ $wp_version }}-php{{ $php_version }}{{ $release }}
+{{- end }}
+{{- if eq $phpmode "jit" }}
+        image: {{ $registry }}wordpress-mariadb-opt-wp{{ $wp_version }}-php{{ $php_version }}{{ $release }}
+{{- end }}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: {{ $db_port }}
+        command: [ "sh", "-c", "/prepare_mariadb_config.sh;" ]
+        env:
+        - name: INSTANCE_COUNT
+          value: "{{ $instance_count }}"
+        - name: BENCHMARK_ID
+          value: "{{ $i }}"
+        - name: NGINX_HOST
+          value: "siteurl-{{ $i }}"
+        - name: NGINX_PORT
+          value: "{{ $nginx_port }}"
+        - name: MYSQL_DATABASE
+          value: "{{ $mysql_database }}"
+        - name: MYSQL_USER
+          value: "{{ $mysql_user }}"
+        - name: MYSQL_PASSWORD
+          value: "{{ $mysql_password }}"
+        - name: MYSQL_PORT
+          value: "{{ $db_port }}"
+        - name: MYSQL_ALLOW_EMPTY_PASSWORD
+          value: "yes"
+        - name: MARIADB_NUMA_OPTIONS
+          value: "{{ $mariadb_numa_options }}"
+        - name: HTTPMODE
+          value: "{{ $httpmode }}"
+        - name: SUTINFO_CSP
+          value: "{{ $sutinfo_csp }}"
+        - name: VCPUS_PER_INSTANCE
+          value: "{{ $vcpus_per_instance }}"
+        - name: ALL_INSTANCE_CPU_STR
+          value: "{{ $all_instance_cpu_str }}"
+        volumeMounts:
+        - mountPath: /var/lib/mysql
+          name: mysql-data-{{ $i }}
+        securityContext:
+          privileged: true
+      - name: wordpress-{{ $i }}
+{{- if eq $phpmode "nojit" }}
+        image: {{ $registry }}wordpress-wordpress-wp{{ $wp_version }}-php{{ $php_version }}{{ $release }}
+{{- end }}
+{{- if eq $phpmode "jit" }}
+        image: {{ $registry }}wordpress-wordpress-final-opt-wp{{ $wp_version }}-php{{ $php_version }}{{ $release }}
+{{- end }}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: {{ $wp_port }}
+        #command: [ "/bin/bash", "-c", "/prepare_php_config.sh | tee output.log | grep -v "GET";" ]
+        #command: [ "/bin/bash", "-c", "/prepare_php_config.sh;" ]
+        # command: [ "/bin/bash", "-c", "sleep infinity;" ]
+        env:
+        - name: INSTANCE_COUNT
+          value: "{{ $instance_count }}"
+        - name: BENCHMARK_ID
+          value: "{{ $i }}"
+        - name: NSERVERS
+          value: "{{ $nservers }}"
+        - name: PHP_NUMA_OPTIONS
+          value: "{{ $php_numa_options }}"
+        - name: WORDPRESS_DB_HOST
+          value: "127.0.0.1:{{ $db_port }}"
+        - name: WORDPRESS_DB_NAME
+          value: "{{ $wordpress_db_name }}"
+        - name: WORDPRESS_DB_USER
+          value: "{{ $wordpress_db_user }}"
+        - name: WORDPRESS_DB_PASSWORD
+          value: "{{ $wordpress_db_password }}"
+        - name: WORDPRESS_PORT
+          value: "{{ $wp_port }}"
+        - name: WORDPRESS_DEBUG
+          value: "false"
+        - name: SUTINFO_CSP
+          value: "{{ $sutinfo_csp }}"
+        - name: VCPUS_PER_INSTANCE
+          value: "{{ $vcpus_per_instance }}"
+        - name: ALL_INSTANCE_CPU_STR
+          value: "{{ $all_instance_cpu_str }}"
+        volumeMounts:
+        - mountPath: /var/www/html
+          name: homepage-{{ $i }}
+        securityContext:
+          privileged: true
+        resources:
+          limits:
+            hugepages-2Mi: {{ $hugepage_num }}Mi
+          requests:
+            cpu: 0.3
+            hugepages-2Mi: {{ $hugepage_num }}Mi
+      - name: nginxd-{{ $i }}
+{{- if eq $syncmode "sync" }}
+        image: {{ $registry }}wordpress-nginx-async-{{ $openssl_version }}{{ $release }}
+{{- else if eq $syncmode "async" }}
+        image: {{ $registry }}wordpress-nginx-async-{{ $openssl_version }}{{ $release }}
+{{- else}}
+        image: {{ $registry }}wordpress-nginx{{ $wp_os_suffix }}{{ $release }}
+{{- end }}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: {{ $nginx_port }}
+        #command: [ "/bin/bash", "-c", "/prepare_nginx_config.sh;" ]
+        env:
+        - name: INSTANCE_COUNT
+          value: "{{ $instance_count }}"
+        - name: BENCHMARK_ID
+          value: "{{ $i }}"
+        - name: WORDPRESS_HOST
+          value: "{{ $wordpress_host }}"
+        - name: WORDPRESS_PORT
+          value: "{{ $wp_port }}"
+        - name: ASYNC
+{{- if eq $syncmode "async" }}
+          value: "on"
+{{- end }}
+{{- if eq $syncmode "sync" }}
+          value: "off"
+{{- end }}
+        - name: NGINX_WORKER_PROCESSES
+          value: "{{ $nginx_worker_processes }}"
+        - name: PROTOCOL
+          value: "{{ $protocol }}"
+        - name: CIPHER
+          value: "{{ $cipher }}"
+        - name: CURVE
+          value: "{{ $curve }}"
+        - name: CERT
+          value: "{{ $cert }}"
+        - name: NGINX_NUMA_OPTIONS
+          value: "{{ $nginx_numa_options }}"
+        - name: NGINX_PORT
+          value: "{{ $nginx_port }}"
+        - name: HTTPMODE
+          value: "{{ $httpmode }}"
+        - name: SUTINFO_CSP
+          value: "{{ $sutinfo_csp }}"
+        - name: VCPUS_PER_INSTANCE
+          value: "{{ $vcpus_per_instance }}"
+        - name: ALL_INSTANCE_CPU_STR
+          value: "{{ $all_instance_cpu_str }}"
+        volumeMounts:
+        - mountPath: /var/www/html
+          name: homepage-{{ $i }}
+        securityContext:
+          privileged: true
+      volumes:
+      - name: homepage-{{ $i }}
+        emptyDir: {}
+      - name: mysql-data-{{ $i }}
+        emptyDir: {}
+
+{{- end }}

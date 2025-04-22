@@ -147,6 +147,7 @@ output "options" {
     #docker_registry_mirrors: "https://mirror.ccs.tencentyun.com",
     #containerd_registry_mirrors: "https://mirror.ccs.tencentyun.com",
 
+    k8s_version: "1.28.2",
     k8s_repo_key_url: {
       "debian": "http://mirrors.aliyun.com/kubernetes/apt/doc/apt-key.gpg",
       "centos": ["http://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg","https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg"],
@@ -165,6 +166,7 @@ output "options" {
     k8s_calico_cni_repo: "public.ecr.aws/metakube/calico",
     k8s_cni: "calico",
     k8s_enable_nfd: false,
+    k8s_qat_push_images: true,
   }
 }
 

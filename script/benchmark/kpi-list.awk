@@ -9,47 +9,22 @@ BEGIN {
     status="failed"
 }
 
-function calc_median(values) {
-    m=0
-    if (length(values)>0) { 
-      i=(asort(values,sorted_values,"@val_num_asc")+1)/2
-      m=sorted_values[int(i)-1]
-      if (int(i)<i) m=(m+sorted_values[int(i)])/2
-    }
-    return int(m*100)/100
-}
-
-function calc_avg(values) {
-    s=0
-    if (length(values)>0) { 
-        for (v in values)
-            s=s+values[v]
-        s=s/length(values)
-    }
-    return int(s*100)/100
-}
-
-function calc_max(values) {
-    m=0
-    for (v in values)
-      if (values[v]>m || m==0) m=values[v]
-    return int(m*100)/100
-}
-
-/^#sutinfo[:-] / {
-    if (!sutinfo) next
-}
-
-/^#inventory- / || /^#config- / {
-    next
-}
-
 /^#(pcm|pdu|uprof|emon|perfspect): / {
-    pwr_host=gensub(/^(.*)-[0-9]*$/,"\\1",1,$2)
-    pwr_itr=gensub(/^.*-([0-9]*)$/,"\\1",1,$2)
-    pwr_roi=$3
+    nc=split($2,columns,"/")
+    for(i=3;i<=nc-1;i++)
+      if(columns[i]~/logs-/)break
+    split(columns[i+1],fields,"-")
+    pwr_host=fields[1]"-"fields[2]
+    pwr_itr=fields[3]
     detected_profile_records=0
     detected_record_id=0
+}
+/^#(pcm|uprof|perfspect): / {
+    pwr_roi=columns[i+2]
+}
+/^#(pdu|emon): / {
+    patsplit(columns[i+2],fields,/[0-9][0-9]*/)
+    pwr_roi="roi-"fields[1]
 }
 /^#pcm- S[0-9]*; Consumed energy units:/ {
     socket=gensub(/S([0-9]*);/,"\\1",1,$2)
@@ -105,8 +80,8 @@ function calc_max(values) {
     split($0,fields,",")
     perfspect_data[pwr_host][pwr_roi][++perfspect_count[pwr_host][pwr_roi]]+=fields[perfspect_package_power_column]
 }
-/^#(bom|timestamp|pdu|pcm|uprof|emon|perfspect)[:-] / {
-    next
+/^#(bom|timestamp|pdu|pcm|uprof|emon|perfspect|sar|collectd|igt|sutinfo|logsdir|terraform-config|.*[.]csv)[:-] / {
+    if (!sutinfo) next
 }
 { 
     print $0
@@ -162,51 +137,6 @@ END {
         }
         geo_avg = exp(geo_sum / nv[x])
         print "geo "kpis_k[x]": " geo_avg
-
-        r=0
-        if (outlier>0) {
-            for (y in kpis_v[x]) {
-                if ((kpis_v[x][y]>average+outlier*stdev)||(kpis_v[x][y]<average-outlier*stdev)) {
-                    delete kpis_v[x][y];
-                    r=r+1
-                }
-            }
-        }
-
-        if (r>0) {
-            print "removed "r" outlier(s)"
-
-            sum[x]=0
-            sumsq[x]=0
-            n[x]=0
-            for (y in kpis_v[x]) {
-                sum[x]+=kpis_v[x][y]
-                sumsq[x]+=kpis_v[x][y]^2
-                n[x]=n[x]+1
-            }
-
-            asort(kpis_v[x], kpis1, "@val_num_asc")
-            if(n[x]%2) {
-                k=(n[x]+1)/2
-                print "med "kpis_k[x]": "kpis1[k]
-            } else {
-                k=n[x]/2+1
-                print "med "kpis_k[x]": "kpis1[k]
-            }
-
-            average=sum[x]/n[x]
-            stdev=sqrt((sumsq[x]-sum[x]^2/n[x])/n[x])
-            print "avg "kpis_k[x]": "average
-            print "std "kpis_k[x]": "stdev
-
-            geo_sum = 0
-            for (y in kpis_v[x]) {
-                log_value = log(kpis_v[x][y])
-                geo_sum += log_value
-            }
-            geo_avg = exp(geo_sum / n[x])
-            print "geo "kpis_k[x]": " geo_avg
-        }
     }
     if (length(pcm_data)>0) {
         print "pcm socket power (w): "

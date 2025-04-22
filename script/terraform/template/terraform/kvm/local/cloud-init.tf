@@ -24,7 +24,7 @@ resource "random_password" "default" {
 
 data "external" "env" {
   count = length(local.instances)>0?1:0
-  program = [ "${path.module}/scripts/env.sh", "-p", var.kvm_host.port, "-i", var.ssh_pri_key_file, "${var.kvm_host.user}@${var.kvm_host.host}" ]
+  program = [ "${path.module}/scripts/env.sh", "-p", var.kvm_host.port, "${var.kvm_host.user}@${var.kvm_host.host}"]
 }
 
 resource "macaddress" "network" {

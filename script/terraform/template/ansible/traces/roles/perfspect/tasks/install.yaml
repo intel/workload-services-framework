@@ -6,27 +6,41 @@
 
 - name: check if perfspect already exists
   stat:
-    path: /usr/local/perfspect/perfspect
+    path: "{{ perfspect_bin_path }}/perfspect"
   register: perfspect_st
   delegate_to: "{{ trace_node.1 }}"
   become: true
   
 - block:
 
-    - name: Download and Extract 
-      unarchive:
-        src: "{{ perfspect_private_repository | default(perfspect_public_repository) }}"
-        dest: /usr/local
-        remote_src: true
+    - name: Download perfspect
+      get_url:
+        url: "{{ perfspect_private_repository | default(perfspect_public_repository) }}"
+        dest: "/tmp/perfspect-{{ perfspect_version }}.tgz"
   
   rescue:
 
-    - name: Download and Extract 
-      unarchive:
-        src: "{{ perfspect_repository }}"
-        dest: /usr/local
-        remote_src: true
+    - name: Download public perfspect
+      get_url:
+        url: "{{ perfspect_public_repository }}"
+        dest: "/tmp/perfspect-{{ perfspect_version }}.tgz"
+      register: getrc
+      until: getrc is success
+      retries: 2
+      delay: 10
 
+  when:
+  - (not perfspect_st.stat.exists) or (perfspect_reset | bool)
+  - (('/tmp/perfspect-'+perfspect_version+'.tgz') is not exists)
+  delegate_to: localhost
+  run_once: true
+  become: false
+
+- name: Uncompress the perfspect archive
+  unarchive:
+    src: "/tmp/perfspect-{{ perfspect_version }}.tgz"
+    dest: "{{ perfspect_bin_path | dirname }}"
+    remote_src: "{{ (ansible_connection|default('ssh')) == 'local' }}"
   when: (not perfspect_st.stat.exists) or (perfspect_reset | bool)
   delegate_to: "{{ trace_node.1 }}"
   become: true

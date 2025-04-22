@@ -4,11 +4,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-variable ssh_pri_keyfile {
-  type = string
-  default = "/home/.ssh/id_rsa"
-}
-
 variable kvm_host {
   type = string
   nullable = false

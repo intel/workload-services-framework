@@ -20,14 +20,14 @@
   become: true
   ignore_errors: true
   vars:
-    tpmi_setting: "{{ tpmi_option | default(wl_tpmi, true) }}"
+    tpmi_setting: "{{ tpmi_options | default('',true) }}"
 
 - name: Print out TMPI changes
   debug:
     msg: "[{{ inventory_hostname }}]: Host TPMI+ {{ tpmi_setting }}"
   when: tpmi_setting in ['default','latency-optimized-mode']
   vars:
-    tpmi_setting: "{{ tpmi_option | default(wl_tpmi, true) }}"
+    tpmi_setting: "{{ tpmi_options | default('',true) }}"
 
 # If tpmi_rc.rc == 0, This means that the tpmi setup was successful, so you need to keep the restore file in order to prepare for cleanup operations.
 - name: Save default tpmi value to restore file

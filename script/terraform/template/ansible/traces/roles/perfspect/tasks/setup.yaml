@@ -4,15 +4,32 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+- name: get perfspect version
+  command: "{{ perfspect_bin_path }}/perfspect --version"
+  register: versionrc
+  ignore_errors: true
+  
 - set_fact:
     trace_module_start_block: |
             mkdir -p roi-$roi
             cd roi-$roi
-            nohup /usr/local/perfspect/perfspect metrics --format csv {{ perfspect_metrics_options }} --interval {{ perfspect_metrics_interval }} --noupdate --output . > perfspect.logs 2>&1 &
+            {% if perfspect_metrics_cids|bool %}
+              cids_options=""
+              for v in $@; do
+                [[ "$v" != docker:* ]] || cids_options="$cids_options,${v#docker:}"
+                [[ "$v" != pod:* ]] || cids_options="$cids_options,${v#pod:}"
+              done
+              [ -z "$cids_options" ] || cids_options="--cids ${cids_options#,}"
+            {% endif %}
+            nohup {{ perfspect_bin_path }}/perfspect metrics --format csv {{ perfspect_metrics_options }} $cids_options --noupdate --output . > perfspect.logs 2>&1 &
             echo $! > perfspect.pid
             disown
     trace_module_stop_block: |
             cd roi-$roi
-            killall -s SIGINT perf
+            {% if (versionrc.stdout|default('0.0')|regex_replace('^perfspect *version *([0-9.]*).*$','\\1')) is version('3.3.1','>=') %}
+              kill -s SIGINT $(cat perfspect.pid)
+            {% else %}
+              killall -s SIGINT perf
+            {% endif %}
             tail -f --pid=$(cat perfspect.pid) /dev/null
 

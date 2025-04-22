@@ -1,0 +1,33 @@
+# dlrm-pytorch-benchmark-24.04
+ 
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER="24.04"
+ARG OS_IMAGE="ubuntu"
+ 
+FROM ${OS_IMAGE}:${OS_VER} as build
+ 
+ENV DEBIAN_FRONTEND=noninteractive
+ 
+RUN apt -o Acquire::Check-Date=false update && \
+    apt install -y wget git
+ 
+ARG IntelAI_BENCHMARK_REPO="https://github.com/intel/ai-reference-models.git"
+ARG IntelAI_BENCHMARK_VER="d8ca4c89de6f5b4c171f02075acc682db1dae0f8"
+ 
+# Install model zoo benchmark scripts
+COPY ./patches/dlrm_s_pytorch.patch /tmp/
+ 
+RUN cd / && \
+    git clone ${IntelAI_BENCHMARK_REPO} && \
+    cd ai-reference-models/ && \
+    git checkout ${IntelAI_BENCHMARK_VER} && \
+    cd models_v2/pytorch/dlrm/common && \
+    patch dlrm_s_pytorch.py /tmp/dlrm_s_pytorch.patch
+ 
+FROM scratch
+ 
+COPY --from=build /ai-reference-models/ /models/

@@ -10,23 +10,23 @@
     shell:
       cmd: |
         . /opt/intel/oneapi/setvars.sh
-  
-        for vtuneout in vtune-*.record; do
-          if [ -e "$vtuneout" ]; then
-            {% if vtune_report != '' %}
-                report_prefix="${vtuneout/.record/.}"
-                {% if vtune_report != 'summary' %}
-                  vtune -report summary -r $vtuneout -search-dir={{ vtune_bin_search_dir or "/" }} -source-search-dir={{ vtune_src_search_dir or "/" }} -format html -report-output "./${report_prefix}summary.html"
-                {% endif %}
-                vtune -report {{ vtune_report }} -r $vtuneout -search-dir={{ vtune_bin_search_dir or "/" }} -source-search-dir={{ vtune_src_search_dir or "/" }} -format {{ vtune_report_format }} -report-output "./${report_prefix}{{ vtune_report }}.{{ vtune_report_format }}"
-            {% endif %}
-            
-            {% if not vtune_fetch_data %}
-              rm -fr $vtuneout
-            {% endif %}
-          fi
-        done
-  
+
+        {% if vtune_report != '' %}
+          for vtuneout in vtune-*.record; do
+            if [ -e "$vtuneout" ]; then
+              report_prefix="${vtuneout/.record/.}"
+              {% if vtune_report != 'summary' %}
+                vtune -report summary -r $vtuneout -search-dir={{ vtune_bin_search_dir or "/" }} -source-search-dir={{ vtune_src_search_dir or "/" }} -format html -report-output "./${report_prefix}summary.html"
+              {% endif %}
+              vtune -report {{ vtune_report }} -r $vtuneout -search-dir={{ vtune_bin_search_dir or "/" }} -source-search-dir={{ vtune_src_search_dir or "/" }} -format {{ vtune_report_format }} -report-output "./${report_prefix}{{ vtune_report }}.{{ vtune_report_format }}"
+            fi
+          done
+        {% endif %}
+
+        {% if not vtune_fetch_data %}
+          rm -fr vtune-*.record
+        {% endif %}
+
       chdir: "{{ trace_data_path }}"
       executable: /bin/bash
     become: true

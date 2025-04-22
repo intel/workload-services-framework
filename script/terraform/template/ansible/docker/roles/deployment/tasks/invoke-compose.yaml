@@ -26,22 +26,22 @@
   shell: 
     cmd: |
       echo "TZ=$(timedatectl show --va -p Timezone 2> /dev/null || echo $TZ)" > .env
-      chown 600 .env
+      chmod 600 .env
       {% for k in workload_secrets.keys() %}
         echo "{{ k }}=${{ k }}" >> .env
       {% endfor %}
-      docker compose up {% for s in compose_config.services %}{% for r in skopeo_sut_accessible_registries | default('') | split(',') | reject('==','') %}{% if compose_config.services[s]['image'].startswith(r) %}--pull always {% endif %}{% endfor %}{% endfor %} --detach --force-recreate
+      docker compose up {% for s in compose_config.services %}{% for r in sut_accessible_registries | default(skopeo_sut_accessible_registries|default(''),true) | split(',') | reject('==','') %}{% if compose_config.services[s]['image'].startswith(r) %}--pull always {% endif %}{% endfor %}{% endfor %} {% if (((ansible_connection|default('ssh')) in ['local']) or (ansible_host in (my_ip_list|split(',')))) and ('/' in workload_config.registry) %}--pull always{% endif %} --detach --force-recreate
     chdir: "/tmp/{{ wl_namespace }}-compose"
     executable: /bin/bash
   environment: "{{ workload_secrets }}"
   vars:
     compose_config: "{{ lookup('file', wl_logs_dir+'/compose-config.yaml') | from_yaml }}"
-    workload_secrets: "{{ lookup('file', wl_logs_dir+'/.workload-secret.yaml') | from_yaml | default({},true) }}"
+    workload_secrets: "{% if (wl_logs_dir+'/.workload-secret.yaml') is exists %}{{ lookup('file', wl_logs_dir+'/.workload-secret.yaml') | from_yaml | default({},true) }}{% else %}{{ {} }}{% endif %}"
 
 - name: waitproc to wait for logs complete
   shell:
     cmd: |
-      nohup bash -c 'timeout {{ workload_config.timeout | split(',') | first }}s docker compose exec {{ workload_config.job_filter.split(',')[0].split('=')[-1] }} sh -c "cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-compose-logs.tar; tar tf /tmp/{{ wl_namespace }}-compose-logs.tar > /dev/null && cat /tmp/{{ wl_namespace }}-compose-logs.tar || tar cf - \$(cat /tmp/{{ wl_namespace }}-compose-logs.tar)" > /tmp/{{ wl_namespace }}-compose/{{ workload_config.job_filter.split(',')[0].split('=')[-1] }}-logs.tar; echo $? > /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-waitproc.status' > /dev/null 2>&1 &
+      nohup bash -c 'timeout {{ workload_config.timeout | split(',') | first }}s docker compose exec {{ compose_exec_options }} {{ workload_config.job_filter.split(',')[0].split('=')[-1] }} sh -c "cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-compose-logs.tar; tar tf /tmp/{{ wl_namespace }}-compose-logs.tar > /dev/null && cat /tmp/{{ wl_namespace }}-compose-logs.tar || tar cf - \$(cat /tmp/{{ wl_namespace }}-compose-logs.tar)" > /tmp/{{ wl_namespace }}-compose/{{ workload_config.job_filter.split(',')[0].split('=')[-1] }}-logs.tar; echo $? > /tmp/{{ wl_namespace }}-{{ inventory_hostname }}-waitproc.status' > /dev/null 2>&1 &
       echo $!
       disown
     executable: /bin/bash
@@ -63,7 +63,7 @@
 - name: retrieve additional service logs
   shell:
     cmd: |
-      docker compose exec {{ item.split('=')[-1] }} sh -c 'cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-compose-logs.tar; tar tf /tmp/{{ wl_namespace }}-compose-logs.tar > /dev/null && cat /tmp/{{ wl_namespace }}-compose-logs.tar || tar cf - $(cat /tmp/{{ wl_namespace }}-compose-logs.tar)' > /tmp/{{ wl_namespace }}-compose/{{ item.split('=')[-1] }}-logs.tar
+      docker compose exec {{ compose_exec_options }} {{ item.split('=')[-1] }} sh -c 'cat {{ workload_config.export_logs }} > /tmp/{{ wl_namespace }}-compose-logs.tar; tar tf /tmp/{{ wl_namespace }}-compose-logs.tar > /dev/null && cat /tmp/{{ wl_namespace }}-compose-logs.tar || tar cf - $(cat /tmp/{{ wl_namespace }}-compose-logs.tar)' > /tmp/{{ wl_namespace }}-compose/{{ item.split('=')[-1] }}-logs.tar
     executable: /bin/bash
     chdir: "/tmp/{{ wl_namespace }}-compose"
   loop: "{{ workload_config.job_filter.split(',')[1:] }}"
@@ -81,44 +81,51 @@
   when: wl_trace_modules | default('') | split(',') | reject('==','') | length > 0
   ignore_errors: true
 
-- block:
+- name: print docker logs
+  command:
+    cmd: "docker compose logs"
+    chdir: "/tmp/{{ wl_namespace }}-compose"
+  register: compose_logs
+  ignore_errors: true
 
-  - name: print docker logs
-    command:
-      cmd: "docker compose logs"
-      chdir: "/tmp/{{ wl_namespace }}-compose"
-    ignore_errors: true
+- name: create the iteration direcctory
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ item.split('=')[-1] }}"
+    state: directory
+    recurse: true
+  delegate_to: localhost
+  loop: "{{ workload_config.job_filter.split(',') }}"
 
-  - name: create the iteration direcctory
-    file:
-      path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ item.split('=')[-1] }}"
-      state: directory
-    delegate_to: localhost
-    loop: "{{ workload_config.job_filter.split(',') }}"
+- name: save docker logs
+  copy:
+    dest: "{{ wl_logs_dir }}/itr-{{ itr }}/compose.logs"
+    content: "{{ compose_logs.stdout }}"
+  when: compose_save_logs | bool
+  delegate_to: localhost
+  ignore_errors: true
 
-  - name: copy logs back to the itr directory
-    fetch:
-      src: "/tmp/{{ wl_namespace }}-compose/{{ item.split('=')[-1] }}-logs.tar"
-      dest: "{{ wl_logs_dir }}/itr-{{ itr }}/"
-      flat: true
-    loop: "{{ workload_config.job_filter.split(',') }}"
+- name: copy logs back to the itr directory
+  fetch:
+    src: "/tmp/{{ wl_namespace }}-compose/{{ item.split('=')[-1] }}-logs.tar"
+    dest: "{{ wl_logs_dir }}/itr-{{ itr }}/"
+    flat: true
+  loop: "{{ workload_config.job_filter.split(',') }}"
 
-  - name: untar the logs
-    unarchive:
-      src: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ item.split('=')[-1] }}-logs.tar"
-      dest: "{{ wl_logs_dir}}/itr-{{ itr }}/{{ item.split('=')[-1] }}"
-    delegate_to: localhost
-    loop: "{{ workload_config.job_filter.split(',') }}"
+- name: untar the logs
+  unarchive:
+    src: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ item.split('=')[-1] }}-logs.tar"
+    dest: "{{ wl_logs_dir}}/itr-{{ itr }}/{{ item.split('=')[-1] }}"
+  delegate_to: localhost
+  loop: "{{ workload_config.job_filter.split(',') }}"
+  ignore_errors: true
 
-  always:
-  
-  - name: remove local logs tarfile
-    file:
-      path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ item.split('=')[-1] }}-logs.tar"
-      state: absent
-    delegate_to: localhost
-    ignore_errors: true
-    loop: "{{ workload_config.job_filter.split(',') }}"
+- name: remove local logs tarfile
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ item.split('=')[-1] }}-logs.tar"
+    state: absent
+  delegate_to: localhost
+  ignore_errors: true
+  loop: "{{ workload_config.job_filter.split(',') }}"
 
 - name: remove workspace
   include_role:

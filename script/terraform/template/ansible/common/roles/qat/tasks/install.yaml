@@ -3,8 +3,10 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
----
-# tasks file for qat
+
+- name: check qat device
+  shell: |
+    lspci | grep -q "{{ qat_pci_ids | split(',') | join('\|') }}"
 
 - name: Detect OS
   shell: 
@@ -12,35 +14,20 @@
     executable: /bin/bash
   register: os
 
+- fail:
+    msg: "OS not supported"
+  when: not os.stdout in ['centos', 'fedora', 'ubuntu', 'debian']
+
 - name: Detect OS VERSION
   shell: 
     cmd: ". /etc/os-release; echo $VERSION_ID"
     executable: /bin/bash
   register: os_ver
 
-- name: check qat 4xx device
-  shell: lspci | grep '4940\|4xxx'
-  ignore_errors: true
-  register: qat4xx_supported
-
-- name: check qat 401xx device
-  shell: lspci | grep 4942
-  ignore_errors: true
-  register: qat401xx_supported
-
-- fail:
-    msg: "This machine does not support qat"
-  when: (qat4xx_supported is failed and qat401xx_supported is failed)
-
-- fail:
-    msg: "OS not supported"
-  when: not os.stdout in ['centos', 'fedora', 'ubuntu', 'debian']
-
 - name: check qat.service file
   stat:
     path: "{{qat_service}}"
   register: p
-
 
 - name:  check qat runing status
   shell: |
@@ -48,11 +35,8 @@
   register: qat_status
   ignore_errors: true
 
-- block:
-  - name: confiure qat service
-    include_tasks: tasks/configure_qat.yaml
-  - debug:
-      msg: "qat is loaded on this machine"
+- name: confiure qat service
+  include_tasks: tasks/configure_qat.yaml
   when: p.stat.exists and ('running' in qat_status.stdout)
 
 - name: Install dependencies on RedHat.
@@ -70,6 +54,7 @@
       - wget
       - tar
       - dracut
+      - m4
     state: present
   register: dnfrc
   until: dnfrc is success
@@ -114,23 +99,22 @@
   become: true
   when: os.stdout in ['ubuntu', 'debian'] and ('running' not in qat_status.stdout)
 
-- block:
-  - name: confiure memory on ubuntu
-    include_tasks: tasks/configure_mem.yaml
-  become: true
+- name: confiure memory on ubuntu
+  include_tasks: tasks/configure_mem.yaml
   when: os.stdout in ['ubuntu', 'debian'] and ('running' not in qat_status.stdout)
 
-- name: Detect kernel
+- name: Check linux-modules
   shell:
-    cmd: "echo linux-modules-extra-$(uname -r)"
+    cmd: |
+      apt-cache madison linux-modules-extra-$(uname -r)
     executable: /bin/bash
-  register: aws_ubuntu_kernel
+  register: linux_modules_rc
+  when: os.stdout in ['ubuntu', 'debian'] and ('running' not in qat_status.stdout)
+  become: true
 
-- name: install dependencies for AWS.
+- name: install linux-modules
   apt:
-    name:
-      - "{{ aws_ubuntu_kernel.stdout }}"
-    update_cache: true
+    name: "{{ linux_modules_rc.stdout_lines | first | split('|') | first | trim }}"
     state: present
   register: aptrc
   until: aptrc is success
@@ -139,8 +123,8 @@
   ignore_errors: true
   become: true
   when: 
-    - os.stdout in ['ubuntu', 'debian'] and ('running' not in qat_status.stdout)
-    - aws_ubuntu_kernel is search("aws")
+  - os.stdout in ['ubuntu', 'debian'] and ('running' not in qat_status.stdout)
+  - linux_modules_rc is success
 
 - name: check firmware1
   stat:
@@ -153,6 +137,7 @@
   register: firm2
 
 - block:
+
   - name: Download qat_firmware1 
     get_url:
       url: "{{ qat_firmware1_repo }}"
@@ -168,7 +153,7 @@
   - name: reinstall kernel mod
     shell:
       cmd: |
-        rmmod qat_4xxx
+        rmmod qat_4xxx 2> /dev/null
         modprobe qat_4xxx
       executable: /bin/bash
 
@@ -183,6 +168,7 @@
     - ('running' not in qat_status.stdout)
 
 - block:
+
   - name: insatll qatlib on fedora 34+
     dnf:
       name: qatlib-devel
@@ -191,16 +177,19 @@
     until: dnfrc is success
     retries: 10
     delay: 10
+
   - name: confiure qat
     include_tasks: tasks/configure_qat.yaml
+
   become: true
   when: (os.stdout=="fedora") and (os_ver.stdout | int >= 34)
 
 - name: build & install qatlib
   shell:
     cmd: |
-      git clone https://github.com/intel/qatlib
+      git clone {{ qat_qatlib_repository }}
       cd qatlib
+      git checkout tags/{{ qat_qatlib_version }}
       ./autogen.sh
       ./configure --prefix=/usr --enable-service
       make -j
@@ -242,13 +231,14 @@
     - name: make install QAT drivers
       shell:
         cmd: |
-          cd "{{ qat_driver_dir }}"
           ./configure
           make -j
           make install
         executable: /bin/bash
+        chdir: "{{ qat_driver_dir }}"
       ignore_errors: true
       become: true
+
   when: os.stdout in ['centos', 'rhel']
 
 - name: configure qat

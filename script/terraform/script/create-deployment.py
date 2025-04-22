@@ -108,7 +108,7 @@ def _AddNodeAffinity(spec, nodes):
 
 
 def _IsSUTAccessible(image):
-  for reg1 in options.get("skopeo_sut_accessible_registries", "").split(","):
+  for reg1 in options.get("sut_accessible_registries",options.get("skopeo_sut_accessible_registries", "")).split(","):
     if reg1 and image.startswith(reg1):
       return True
   return False
@@ -210,7 +210,7 @@ if os.path.exists("/opt/workload/template/ansible/custom/deployment.yaml"):
     }),
   })
 
-if (((str(options.get("docker", False)).lower()=='true' or str(options.get("native", False)).lower()=='true') and os.path.exists(DOCKER_CONFIG)) or (str(options.get("compose", False)).lower()=='true' and os.path.exists(COMPOSE_CONFIG))) and str(options.get("kubernetes", False)).lower()=='false':
+if (((str(options.get("docker", False)).lower()=='true' or str(options.get("native", False)).lower()=='true') and (os.path.exists(DOCKER_CONFIG) or workload_config.get('docker_image','')!='')) or (str(options.get("compose", False)).lower()=='true' and os.path.exists(COMPOSE_CONFIG))) and str(options.get("kubernetes", False)).lower()=='false':
   playbooks.append({
     "name": "deployment",
     "import_playbook": "./template/ansible/docker/deployment.yaml",

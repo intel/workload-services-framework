@@ -1,0 +1,32 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- import_playbook: installation.yaml.origin
+
+- hosts: off_cluster_hosts
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Install docker
+    include_role:
+      name: docker
+    when: wl_tunables.MODE == 'ingress'
+
+- hosts: off_cluster_hosts
+  gather_facts: no
+  tasks:
+
+  - name: Transfer client image
+    include_role:
+      name: docker-image
+      tasks_from: to-daemon
+    vars:
+      images:
+      - key: "{{ iperf_client_image }}"
+        value: false
+      wl_docker_images: "{{ images | items2dict }}"
+    when: wl_tunables.MODE == 'ingress'
+

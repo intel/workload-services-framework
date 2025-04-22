@@ -9,7 +9,7 @@ ARG RELEASE
 ARG OS_VER=24.04
 ARG OS_IMAGE=ubuntu
 
-ARG DOCKER_CLI_VER=26.1.4
+ARG DOCKER_CLI_VER=27.5.1
 ARG DOCKER_CLI_IMG=docker:${DOCKER_CLI_VER}-dind
 FROM ${DOCKER_CLI_IMG} as dockercli
 
@@ -22,18 +22,47 @@ RUN git clone ${FLAMEGRAPH_REPO} flamegraph && \
     cd flamegraph && \
     git checkout tags/${FLAMEGRAPH_VER}
 
-FROM ${OS_IMAGE}:${OS_VER} as skopeo
+FROM ${OS_IMAGE}:${OS_VER} as go-dev
 RUN apt-get update && apt-get install -y git curl make gcc pkg-config libdevmapper-dev libgpgme-dev
 
-ARG GO_VER=1.23.3
+ARG GO_VER=1.24.1
 ARG GO_PKG=https://go.dev/dl/go${GO_VER}.linux-amd64.tar.gz
-RUN curl --netrc-optional --retry 10 --retry-connrefused -fsSL ${GO_PKG} | tar xfz - -C /usr/local
+ENV GOPATH=/home/go
+RUN curl --netrc-optional --retry 10 --retry-connrefused -fsSL ${GO_PKG} | tar xfz - -C /usr/local && \
+    mkdir -p ${GOPATH}
+ENV PATH=/usr/local/go/bin:$PATH
 
-ARG SKOPEO_VER=1.17.0
+FROM go-dev as goshu
+
+ARG GOSU_VER=1.17
+ARG GOSU_REPO=https://github.com/tianon/gosu
+RUN git clone ${GOSU_REPO} && \
+    cd gosu && \
+    git checkout tags/${GOSU_VER} && \
+    go build -o gosu main.go setup-user.go version.go
+
+FROM go-dev as terraform
+ARG TERRAFORM_VER=v1.11.3
+ARG TERRAFORM_REPO=https://github.com/hashicorp/terraform.git
+RUN git clone ${TERRAFORM_REPO} && \
+    cd terraform && \
+    git checkout tags/${TERRAFORM_VER} && \
+    /usr/local/go/bin/go install .
+
+FROM go-dev as packer
+ARG PACKER_VER=v1.12.0
+ARG PACKER_REPO=https://github.com/hashicorp/packer.git
+RUN mkdir -p $GOPATH/src/github.com/hashicorp && \
+    cd $GOPATH/src/github.com/hashicorp && \
+    git clone ${PACKER_REPO} && \
+    cd packer && \
+    git checkout tags/${PACKER_VER} && \
+    make dev
+
+FROM go-dev as skopeo
+ARG SKOPEO_VER=1.18.0
 ARG SKOPEO_REPO=https://github.com/containers/skopeo.git
-RUN export GOPATH=/home/go && \
-    export PATH=/usr/local/go/bin:$PATH && \
-    mkdir -p $GOPATH/src/github.com/containers && \
+RUN mkdir -p $GOPATH/src/github.com/containers && \
     git clone -b v${SKOPEO_VER} ${SKOPEO_REPO} $GOPATH/src/github.com/containers/skopeo && \
     cd $GOPATH/src/github.com/containers/skopeo && \
     DISABLE_DOCS=1 make bin/skopeo && \
@@ -52,7 +81,7 @@ RUN mkdir -p /etc/apt/keyrings && \
 
 FROM ${OS_IMAGE}:${OS_VER}
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends libdevmapper1.02.1 libgpgme11t64 sshpass zip unzip less gnupg ca-certificates curl gawk netcat-openbsd connect-proxy sudo openssh-client bzip2 jq git && \
+RUN apt-get update && apt-get install -y --no-install-recommends libdevmapper1.02.1 libgpgme11t64 sshpass zip unzip less gnupg ca-certificates curl gawk netcat-openbsd netcat-traditional ncat connect-proxy sudo openssh-client bzip2 jq git && \
     apt-get clean -y && \
     rm -rf /var/lib/apt/lists/*
 
@@ -71,20 +100,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends ansible=${ANSIB
     rm -rf /var/lib/apt/lists/* 
 
 # Install terraform and packer
-ARG TERRAFORM_VER=1.9.8
-ARG TERRAFORM_PKG=https://releases.hashicorp.com/terraform/${TERRAFORM_VER}/terraform_${TERRAFORM_VER}_linux_amd64.zip
-RUN curl --netrc-optional --retry 10 --retry-connrefused -L ${TERRAFORM_PKG} -o /tmp/terraform.zip && \
-    unzip /tmp/terraform.zip -d /usr/local/bin && \
-    mv /usr/local/bin/LICENSE.txt /usr/local/bin/LICENSE.terraform.txt && \
-    rm -f /tmp/terraform.zip
+COPY --from=terraform /home/go/bin/terraform /usr/local/bin/
 
 # Install packer
-ARG PACKER_VER=1.11.2
-ARG PACKER_PKG=https://releases.hashicorp.com/packer/${PACKER_VER}/packer_${PACKER_VER}_linux_amd64.zip
-RUN curl --netrc-optional --retry 10 --retry-connrefused -L ${PACKER_PKG} -o /tmp/packer.zip && \
-    unzip /tmp/packer.zip -d /usr/local/bin && \
-    mv /usr/local/bin/LICENSE.txt /usr/local/bin/LICENSE.packer.txt && \
-    rm -f /tmp/packer.zip
+COPY --from=packer /home/go/bin/packer /usr/local/bin/
 
 # Install docker CLI
 COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/
@@ -107,11 +126,7 @@ RUN groupadd -f docker && usermod -aG docker tfu
 ####
 
 # Install gosu
-ARG GOSU_VER=1.17
-ARG GOSU_REPO=https://github.com/tianon/gosu/releases/download/${GOSU_VER}/gosu-amd64
-RUN curl --netrc-optional --retry 10 --retry-connrefused -o /usr/local/bin/gosu -fsSL ${GOSU_REPO} && \
-    curl --netrc-optional --retry 10 --retry-connrefused -o /usr/local/bin/gosu.asc -fsSL ${GOSU_REPO}.asc && \
-    chmod +x /usr/local/bin/gosu
+COPY --from=goshu /gosu/gosu /usr/local/bin/
 
 # Install skopeo
 COPY --from=skopeo /usr/local/bin/skopeo /usr/local/bin/
@@ -128,7 +143,6 @@ WORKDIR /opt/workspace
 
 # Setup ssh proxy
 RUN echo "Include /opt/workspace/ssh_config*" >> /etc/ssh/ssh_config
-
 
 # Copy script/template
 COPY script/ /opt/terraform/script/

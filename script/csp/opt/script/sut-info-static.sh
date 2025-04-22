@@ -18,8 +18,10 @@ for instance in $@; do
   sut_host="${instance//*:/}"
   sut_port="$(echo "$instance" | cut -f2 -d:)"
   sut_info="$(remote_access cat /proc/cpuinfo /proc/meminfo)"
+  numa_info="$(remote_access lscpu -e=NODE | grep -v NODE | tr -d ' ' | paste -sd, -)"
   vcpus="$(echo "$sut_info" | grep -E '^processor\s*:' | wc -l)"
   memory="$(echo "$sut_info" | awk '/^MemTotal:/{print int($2/1024)}')"
+  echo "${vm_group^^}_NUMAINFO=$numa_info"
   echo "${vm_group^^}_VCPUS=$vcpus"
   echo "${vm_group^^}_MEMORY=$memory"
   gpus=()

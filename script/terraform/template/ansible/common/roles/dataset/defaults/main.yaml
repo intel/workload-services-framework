@@ -1,0 +1,10 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+sut_dataset_path: /opt/dataset
+dataset_venv_path: "{{ sut_dataset_path }}/.venv"
+dataset_logs_interval: "5"
+dataset_ai_config_file: /home/.ai/config.json

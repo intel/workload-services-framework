@@ -3,24 +3,36 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
----
+
+- name: Add group
+  group:
+    name: qat
+    state: present
+  become: true
+  ignore_errors: true
+
+- name: Add user to the qat group
+  user:
+    name: "{{ ansible_user | default('tfu') }}"
+    groups: qat
+    append: true
+  become: true
+  ignore_errors: true
 
 - name: confiure qat
   shell:
     cmd: |
-        groupadd qat
-        usermod -a -G qat `whoami`
         mkdir -p /etc/sysconfig/
-        echo "ServicesEnabled=sym;asym" > /etc/sysconfig/qat
+        echo "ServicesEnabled={{qat_service_enabled}}" > /etc/sysconfig/qat
         echo "POLICY={{qat_policy}}" >> /etc/sysconfig/qat
     executable: /bin/bash
   become: true
   ignore_errors: true
 
 - name: restart qat service
-  shell:
-    cmd: |
-        systemctl restart qat.service
-        systemctl enable qat.service
-    executable: /bin/bash
+  systemd:
+    name: qat.service
+    state: restarted
+    enabled: true
   become: true
+  ignore_errors: true

@@ -1,0 +1,21 @@
+# wordpress-mariadb-wp6.7-php8.3
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG MARIADB_VER=11.5.2-noble
+ARG MARIADB_IMAGE=mariadb
+FROM ${MARIADB_IMAGE}:${MARIADB_VER}
+
+COPY conf/base/my.cnf /etc/mysql
+RUN  chown mysql:mysql /etc/mysql/*.cnf
+RUN rm -rf /usr/local/bin/gosu
+RUN apt update && apt install -y numactl dnsutils gosu=1.17-1ubuntu0.24.04.2 rsync=3.2.7-1ubuntu1.2
+
+#update the config
+COPY conf/base/my.cnf /etc/mysql/my.cnf
+
+COPY files/dbdump_wp6.4.sql.gz /dbdump.sql.gz
+COPY scripts/prepare_mariadb_config.sh /

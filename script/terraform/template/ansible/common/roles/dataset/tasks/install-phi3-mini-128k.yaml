@@ -3,12 +3,12 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
-- include_role:
-    name: hf-dataset
+- include_tasks:
+    file: download-hf.yaml
   vars:
-    DEST_DIR: "/opt/dataset/phi3/mini-128k"
-    MODEL_ID: "microsoft/Phi-3-mini-128k-instruct"
-    DATASET_SIZE: 8
-    exclude: []
-    revision: []
-    HF_LOGIN: false
+    dataset_model_path: "phi3/mini-128k"
+    hfcli_model_id: "microsoft/Phi-3-mini-128k-instruct"
+    dataset_size: 8
+    hfcli_exclude: []
+    hfcli_revision: []
+    hfcli_login: false

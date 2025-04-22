@@ -38,12 +38,16 @@
       - name: Join workers
         shell:
           cmd: |
-            kubeadm join --v={{ k8s_logs_level }} --config=/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-kubeadm-config.yaml
+            timeout {{ k8s_join_timeout }} kubeadm join --v={{ k8s_logs_level }} --config=/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-kubeadm-config.yaml
           executable: /bin/bash
-        timeout: "{{ k8s_join_timeout }}"
   
       rescue:
   
+      - include_role:
+          name: debug
+        vars:
+          debug_options: "-A"
+
       - name: kubeadm reset
         include_tasks:
           file: reset.yaml
@@ -51,9 +55,8 @@
       - name: Rejoin workers
         shell:
           cmd: |
-            kubeadm join --v={{ k8s_logs_level }} --config=/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-kubeadm-config.yaml
+            timeout {{ k8s_join_timeout }} kubeadm join --v={{ k8s_logs_level }} --config=/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-kubeadm-config.yaml
           executable: /bin/bash
-        timeout: "{{ k8s_join_timeout }}"
 
   always:
 

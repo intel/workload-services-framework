@@ -12,10 +12,10 @@
 
 - name: Set global tpmi options
   set_fact:
-     tpmi_option: "{{ tpmi_option + sut_tpmi_options | split(',') | map('trim') | select('match', item + ':.*') | map('regex_replace', '^[^:]*:', '') | map('trim') | reject('==', '') | join('')  }}"
+     tpmi_options: "{{ tpmi_options + sut_tpmi_options | split(',') | map('trim') | select('match', item + ':.*') | map('regex_replace', '^[^:]*:', '') | map('trim') | reject('==', '') | join('')  }}"
   loop: "{{ group_names }}"
   vars:
-    tpmi_option: ""
+    tpmi_options: ""
 
 - block:
   - name: create tpmi workspace
@@ -35,11 +35,11 @@
     include_tasks:
       file: update-tpmi.yaml
     when:
-    - tpmi_settings != (tpmi_option | default(wl_tpmi, true))
+    - tpmi_settings != (tpmi_options | default('',true))
     vars:
       tpmi_settings: "{{ lookup('file', wl_logs_dir + '/' + inventory_hostname + '-tpmi/tpmi') }}"
 
-  when: (wl_tpmi | length > 0) or (tpmi_option | length > 0)
+  when: (tpmi_options | length > 0)
 
 
 

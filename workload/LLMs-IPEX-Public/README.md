@@ -1,81 +1,104 @@
 >
 > **Note: The Workload Services Framework is a benchmarking framework and is not intended to be used for the deployment of workloads in production environments. It is recommended that users consider any adjustments which may be necessary for the deployment of these workloads in a production environment including those necessary for implementing software best practices for workload scalability and security.**
 >
-Getting started with AI workloads in WSF
-This document is a guide for using AI workloads in WSF. It includes following contents:
+Introduction
+This workload is targeting for Large Language Models (LLMs) benchmarking using Intel® Extension for PyTorch (IPEX) solution on Intel® Xeon® processors.
 
-AI Decoupling solution for the big image issue
-Reason of introducing Decoupling solution into AI workloads
-There are several reasons that AI workloads need more storge now:
+In the very beginning, please follow the terraform setup guide to setup terraform environment first.
 
-The size of AI models is increasing: AI models are becoming increasingly complex, and this is increasing the amount of data that is required to train them. For example, the GPT-3 language model has 175 billion parameters, which requires a significant amount of storage space.
-The amount of data that is being used for AI is increasing: AI models are being used to process more and more data, such as images, videos, and text. This is increasing the demand for storage space to store the data that is being used to train and deploy AI models.
-It may spend much time to pull an AI WL image from docker registry if we put model file and dataset in one docker image. In some situation, e.g. slow network connection, it makes run AI workload using WSF impossible (always timeout when pulling AI workload docker image from docker registry) .
+Below is an execution example terraform static test:
 
-Decoupling solution for AI big images
-Based on the issue of big images of AI workload, we introduce a Decoupling solution for that. Main idea is to decouple dataset (include both model file and dataset) contents and benchmark contents into different docker image and dataset image should be prepared before case execution. When dataset image preparing on SUT for one time, no need to pull the same model file and dataset again and again when execution the test case. currently, for the workload which image size is higher than 50G, we will use Decoupling solution for this AI workload. You can check which AI workload is using Decoupling solution from this table
+Create a build dir
+cd <WSF REPO>
+mkdir -p build
+CMAKE
+cd build
+cmake -DBACKEND=terraform -DTERRAFORM_OPTIONS="--docker --svrinfo --owner=<your id> --intel_publish" -DTERRAFORM_SUT=static -DBENCHMARK= ..
+Note: Input your huggingface token at ../../script/csp/.ai when you try to execute Llama2, gptj. 
+Example:
 
-The image preparation should be done on the dev machine, with terraform-config.static.tf points to the SUT (worker-0). According to the SUT type, if you use bare metal machine, please refer BM preparation for large dataset and models, and if you use public cloud VM machine, please refer CSP VM image preparation for large dataset and model
-
-BM preparation for large dataset and model
-Run cmake cmdline
-cmake -DREGISTRY=xx.xx.xx.xx:20666 -DBACKEND=terraform -DTERRAFORM_OPTIONS="--owner=xxx" -DTERRAFORM_SUT=static -DBENCHMARK=image/dataset-ai ..
-Note: -DBACKEND option MUST be terraform because there are part of auto-provisioning to check dataset readiness and add Label in terraform.
-
-Build Dataset images Build image to prepare your dataset/model to BM. Please get dataset name for each workload from workload Readme and replace below XXX.
-make build_dataset_ai_XXX
-Note: You can check the progress of downloading dataset as shown below: image
-
-Then build AI workload which used dataset/model above
-cmake -DBENCHMARK=workload/<workload name> ..
-cd workload/<workload name>
+mkdir -p <WSF REPO>/script/csp/.ai/
+cd <WSF REPO>/script/csp/.ai
+echo "{ \"hf_token\": \"$(read -p token: token;echo $token)\" }" > config.json
+Build the workload
+cd <WSF REPO>/build/workload/LLMs-IPEX-Public
 make
-CSP VM image preparation for large dataset and model
-Run cmake
-cmake -DREGISTRY=xx.xx.xx.xx:20666 -DBACKEND=terraform -DTERRAFORM_OPTIONS="--owner=xxx" -DTERRAFORM_SUT=aws/gcp/alicloud/azure -DBENCHMARK=image/dataset-ai ..
-Note: -DBACKEND option MUST be terraform because there are part of auto-provisioning to check dataset readiness and add Label in terraform.
+CTEST
+Show all the test cases. There are 3 diffent modes can be choosen, including latency, throughput, accuracy, and 2 case types, including gated and pkm.
+./ctest.sh -N
+Run specific test case(s) which shows in ./ctest.sh -N. For example, ./ctest.sh -R pkm -V is to run PKM test cases. This will use default parameters.
+./ctest.sh -R <test case key word> -V
+Run specific test case(s) with specified parameters which mentioned in section Parameters. For example, ./ctest.sh -R pkm --set "PRECISION=woq_int8/USE_DEEPSPEED=True" -V is to run PKM test case with PRECISION=woq_int8 and USE_DEEPSPEED=True.
+./ctest.sh -R <test case key word> --set <specified parameters> -V
+Parameters
+PRECISION: Specify the model precision, the supported precisions are bfloat16 (default) or woq_int8 (Weight only quantzation INT8) or woq_int4 (Weight only quantzation INT4) or static_int8 (Static quantzation INT8).
+BATCH_SIZE: Specify the size of batch, the default value is 1.
+STEPS: Specify the step value, the default value is 20.
+INPUT_TOKENS: Specify the number of input_tokens, the default value is 1024.
+OUTPUT_TOKENS: Specify the number of output_tokens, the default value is 128.
+MODEL_NAME: Specify the model name, the default model is meta-llama/Llama-2-7b-chat-hf or you can choose the models as following:
+meta-llama/Llama-2-7b-chat-hf
+meta-llama/Llama-2-13b-chat-hf
+EleutherAI/gpt-j-6b
 
-Build Dataset images if there are no dataset in the CSP region Build image to prepare your dataset/model on csp. Please get dataset name for each workload from workload Readme and replace below XXX.
-make build_dataset_ai_XXX
-Note: You can check the progress of downloading dataset as shown below: image Please skip Step 2 if you want to run AI on below CSP zones. AI big imagess dataset are ready on them:
+Note:
 
-aws: us-west-2a
-gcp: us-west1-a
-alicloud: cn-beijing-a/cn-shanghai-m
-azure: eastus-1
-NOTE: The dataset images are CSP region specific. Users must prepare the dataset image for each new CSP region.
+Precision woq_int4 does not support for chatglm2, chatglm3, flan-t5, baichuan-13b, baichuan2-7b, baichuan2-13b, mpt-30b.
+Precision woq_int8 does not support for mpt-30b.
+Precision static_int8 does not support for mistral-7b, mpt-30b, Qwen-7B, Qwen-14B.
+MODEL_PATH: Specify the root path which stores the pre-downloaded model files. Please use the huggingface model cache as the value of this parameter, e.g. /root/.cache/huggingface/hub. We highly recommand to use WSF's big image solution (pls refer to the steps in section Workload Execution). The default path is: /opt/dataset/chatglm2/6b.
+USE_DEEPSPEED: Specify whether using deepspeed. You can choose True or False. The default value is False.
+Note:
 
-Clean up the dataset image when you don't use that anymore
-make aws/gcp/alicloud/azure
-cleanup --images
-ERROR if dataset image is not ready
-If you dataset image is not ready in your environment and you directly run the test case, you will get the error information in the log:
+Only precisions bfloat16 and woq_int8 support DeepSpeed.
+THUDM/chatglm2-6b and THUDM/chatglm3-6b do not support DeepSpeed.
+meta-llama/Llama-2-7b-chat-hf and meta-llama/Llama-2-13b-chat-hf do not support accuracy+DeepSpeed.
+CORES_PER_INSTANCE: Specify how many cores will be used for single instance. The default value is number of cores per numa node. (This parameter only works when USE_DEEPSPEED=False)
+GREEDY: Specify whether to use greedy search.
+False: beam number is 4.
+True: beam number is 1.
+ONEDNN_VERBOSE: Specify if print the oneDNN information. 1 means on, 0 means off. The default value is 0.
+RANK_USE: Specify the socket you want to use for DeepSpeed:
+0: Use numa nodes on 1st socket
+1: Use numa nodes on 2nd socket
+all: Use all numa nodes in system.
+BENCHMARKING_TRACE: Specify when to stat/stop traces (emon, sar, vtune, ...). Default is True:
+True: Collect traces during benchmarking time.
+False: Collect traces during whole workload process, including preconditonal check, model loading, warmup and benchmarking.
+CSP VM image preparasion for large dataset and model
+See AI Setup for coresponding part
 
-Dataset not available at /opt/dataset/**. This workload is enabling big image solution. Please prepare dataset first according to README.
-Then you should follow BM preparation for large dataset and models or CSP VM image preparation for large dataset and model to prepare dataset image firstly.
+BM preparasion for large dataset and model
+See AI Setup for coresponding part
 
-AI Workload on Gaudi2
-There are several OOB workloads are supported on Gaudi2 (on develop branch) which can be referred to README.md for detail information.
+Docker Image
+The LLMs-IPEX-Public workload provides 2 docker images: llms-ipex-public-base and llms-ipex-public-inference-lite
 
-Steps below shows how to run workload on Gaudi2 IDC:
+build docker image from scrach
+do cmake and make to build a specific workload Please refer to cmake doc You can also run the workload using docker run directly, providing the set of environment variables described in the Parameters section as follows:
 
-Once you got a Gaudi2 IDC, please follow the instruction SUT Connection via Jumpbox and Socks5 Proxy to setup a port mapping relationship between your dev system and Gaudi2 IDC.
-The mapping relationship should be like:
+mkdir -p logs-llms-ipex-public_inference_latency
+id=$(docker run --network host --privileged -e MODE=latency -e WORKLOAD=llms_ipex_public -e PRECISION=bfloat16 -e NUMA_NODES_USE=0 -e FUNCTION=inference -e DATA_TYPE=real -e BATCH_SIZE=1 -e INPUT_TOKENS=32 -e OUTPUT_TOKENS=32 -e STEPS=20 -e GREEDY=False -e WARMUP_STEPS=2 -e MODEL_NAME=THUDM/chatglm2-6b -e MODEL_PATH=/opt/dataset/chatglm2/6b -e USE_DEEPSPEED=False -e ONEDNN_VERBOSE=0 -e TARGET_PLATFORM=SPR -e RANK_USE=all -e CORES_PER_INSTANCE= -v /opt/dataset/chatglm2/6b:/root/.cache/huggingface/hub --rm --detach llms-ipex-public-inference-lite:latest)
+docker exec $id cat /export-logs | tar xf - -C logs-llms-ipex-public_inference_latency
+docker rm -f $id
+KPI
+Run the list-kpi.sh script to parse the KPIs from the validation logs.
 
-<your dev ip>:12100 -> <guadi2 user>:<gaudi2 ip>:22
-Modify the terraform config:
-...
-        "user_name": "<gaudi2 user>",
-        "public_ip": "<your dev ip>",
-        "private_ip": "<your dev ip>",
-        "ssh_port": 12100,
-...
-Prepare environment:
-./script/setup/setup-dev.sh
-./script/setup/setup-sut-k8s.sh <gaudi2 user>@<your dev ip>:12100 <gaudi2 user>@<your dev ip>:12100
-Use ./ctest.sh to run workload:
-./ctest.sh -V -R _gaudi--prepare-sut
-./ctest.sh -R _gaudi -V --reuse-sut
-AI Workload Summary
-The AISEF(Artificial Intelligence Strategic Execution Forum) has defined a set of top 25 artificial intelligence (AI) workloads that are considered to be the most important recently and related workloads are well-maintained in WSF repo. We suggest you use these workloads (with AISEF priority) for benchmarking.
+For example:
 
+./list-kpi.sh --all logs-llms-ipex-public_inference_latency
+Please refer to AI for more KPI details.
+
+
+Furthermore, in order to reduce the workload docker image size and save cloud execution time, Big image solution is implemented on this Workload.
+
+This dataset name is build_dataset_ai_llama2-7b. The dataset will be located at /opt/dataset/llama2/7b, it will occupy 28G disk space.
+This dataset name is build_dataset_ai_llama2-13b. The dataset will be located at /opt/dataset/llama2/13b, it will occupy 50G disk space.
+This dataset name is build_dataset_ai_gptj-6b. The dataset will be located at /opt/dataset/gptj/6b, it will occupy 38G disk space.
+
+
+Index Info
+Name: LLMs, IPEX, Pytorch
+Category: ML/DL/AI
+Platform: SPR, EMR, GNR
+Keywords: LLMs, BIGIMAGE, CPU

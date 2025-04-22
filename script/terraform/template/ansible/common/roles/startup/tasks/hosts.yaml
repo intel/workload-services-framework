@@ -7,10 +7,15 @@
 # conflicts with sudo escalation
 # https://superuser.com/questions/429790/sudo-command-trying-to-search-for-hostname#429890
 
+- name: Get hostname
+  shell: hostname;hostname -f
+  register: hostnames
+  become: false
+
 - name: Comment out 127.0.[0-9].1 in /etc/hosts
   lineinfile:
     path: /etc/hosts
-    regexp: '^(127.0.[0-9].1 .*{{ inventory_hostname }}.*)$'
+    regexp: "^({{ ([inventory_hostname]+hostnames.stdout_lines) | map('regex_replace','^(.*)$','127.0.[0-9].1 .*\\1.*') | join('|') }})$"
     line: '#\1'
     backrefs: true
 

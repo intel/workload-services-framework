@@ -8,4 +8,5 @@ nsys_options: ""
 nsys_session: ""
 nsys_analyze_options: ""
 nsys_stats_options: ""
+docker_exec_options: "--user=root"
 

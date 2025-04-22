@@ -25,6 +25,14 @@ resource "alicloud_instance" "default" {
   host_name = each.key
   image_id = local.images[each.value.profile]
   instance_type = each.value.instance_type
+
+  dynamic "cpu_options" {
+    for_each = each.value.accelerators != null?[1]:[]
+    content {
+      accelerators = split(",", each.value.accelerators)
+    }
+  }
+
   security_groups = [ alicloud_security_group.default.id ]
   system_disk_category = each.value.os_disk_type
   system_disk_size = each.value.os_disk_size

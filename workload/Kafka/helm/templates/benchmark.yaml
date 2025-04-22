@@ -1,0 +1,145 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+{{- $producer_node_num := (int .Values.PRODUCER_NODE_NUM) -}}
+{{- $brokerServerList := include "brokerServerList" .Values -}}
+{{- $zkServerList := include "zkServerList" .Values -}}
+{{- $IMAGESUFFIX := include "IMAGESUFFIX" .Values -}}
+{{- $jdkVER := trimPrefix "kafka_" .Values.WORKLOAD }}
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: benchmark
+spec:
+  parallelism: {{ $producer_node_num }}
+  completions: {{ $producer_node_num }}
+  completionMode: Indexed
+  template:
+    metadata:
+      labels:
+        zoo-producer-consumer: anti
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: benchmark
+        image: {{ .Values.REGISTRY }}kafka-client-{{  $jdkVER }}{{ $IMAGESUFFIX }}{{ .Values.RELEASE }}
+        imagePullPolicy:  {{ include "imagepolicy" .Values }}
+        securityContext:
+          privileged: true
+        env:
+          - name: K_IDENTIFIER
+            value: "producer"
+          - name: K_SERVER_CORE_NEEDED_FACTOR
+            value: "{{ .Values.SERVER_CORE_NEEDED_FACTOR }}"
+          - name: K_KAFKA_SERVER
+            value: "{{ $brokerServerList }}"
+          - name: K_ZK_SERVER
+            value: "zookeeper-kafka-server-0.zookeeper-kafka-server-service:2181"
+          - name: K_KAFKA_BENCHMARK_TOPIC
+            value: "{{ .Values.KAFKA_BENCHMARK_TOPIC }}"
+          - name: K_NUM_RECORDS
+            value: "{{ .Values.NUM_RECORDS }}"
+          - name: K_THROUGHPUT
+            value: "{{ .Values.THROUGHPUT }}"
+          - name: K_RECORD_SIZE
+            value: "{{ .Values.RECORD_SIZE }}"
+          - name: K_COMPRESSION_TYPE
+            value: "{{ .Values.COMPRESSION_TYPE }}"
+          - name: K_PRODUCERS
+            value: "{{ .Values.PRODUCERS }}"
+          - name: K_BUFFER_MEM
+            value: "{{ .Values.BUFFER_MEM }}"
+          - name: K_BATCH_SIZE
+            value: "{{ .Values.BATCH_SIZE }}"
+          - name: K_LINGER_MS
+            value: "{{ .Values.LINGER_MS }}"
+          - name: K_ACKS
+            value: "{{ .Values.ACKS }}"
+          - name: K_ENCRYPTION
+            value: "{{ .Values.ENCRYPTION }}"
+          - name: K_PAYLOAD_NUM
+            value: "{{ .Values.PAYLOAD_NUM }}"
+          - name: K_SERVER_PROTECTION
+            value: "{{ .Values.SERVER_PROTECTION }}"
+          - name: K_PRODUCER_NUMACTL_OPTIONS
+            value: "{{ .Values.PRODUCER_NUMACTL_OPTIONS }}"
+          - name: K_KAFKA_HEAP_OPTS
+            value: "{{ .Values.KAFKA_HEAP_OPTS }}"
+          - name: K_TOPIC_NUM
+            value: "{{ .Values.TOPIC_NUM }}"
+          - name: K_PRODUCER_NODE_NUM
+            value: "{{ .Values.PRODUCER_NODE_NUM }}"
+      restartPolicy: Never
+{{- if contains "_multinode" .Values.TESTCASE }}
+        {{- $args := dict "key" "zoo-producer-consumer" "value" "anti" }}
+        {{- include "podAntiAffinity" $args }}
+        {{- $args2 := dict "nkey" "VM-GROUP" "nvalue" "client" }}
+        {{- include "nodeAffinity" $args2 }}
+{{- else }}
+        {{- $args := dict "key" "app" "value" "zookeeper-kafka-server" }}
+        {{- include "podAffinity" $args }}
+{{- end }}
+
+{{- $consumer_node_num := (int .Values.CONSUMER_NODE_NUM) -}}
+{{- if ne $consumer_node_num 0 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: benchmarkconsumer
+spec:
+  parallelism: {{ $consumer_node_num }}
+  completions: {{ $consumer_node_num }}
+  completionMode: Indexed
+  template:
+    metadata:
+      labels:
+        zoo-producer-consumer: anti
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: kafka-consumer-container 
+        image: {{ .Values.REGISTRY }}kafka-client-{{  $jdkVER }}{{ $IMAGESUFFIX }}{{ .Values.RELEASE }}
+        imagePullPolicy:  {{ include "imagepolicy" .Values }}
+        securityContext:
+          privileged: true
+        env:
+          - name: K_IDENTIFIER
+            value: "consumer"
+          - name: K_SERVER_CORE_NEEDED_FACTOR
+            value: "{{ .Values.SERVER_CORE_NEEDED_FACTOR }}"
+          - name: K_KAFKA_SERVER
+            value: "{{ $brokerServerList }}"
+          - name: K_KAFKA_BENCHMARK_TOPIC
+            value: "{{ .Values.KAFKA_BENCHMARK_TOPIC }}"
+          - name: K_MESSAGES
+            value: "{{ .Values.MESSAGES }}"
+          - name: K_CONSUMERS
+            value: "{{ .Values.CONSUMERS }}"
+          - name: K_CONSUMER_TIMEOUT
+            value: "{{ .Values.CONSUMER_TIMEOUT }}"
+          - name: K_FETCH_SIZE
+            value: "{{ .Values.FETCH_SIZE }}"
+          - name: K_ENCRYPTION
+            value: "{{ .Values.ENCRYPTION }}"
+          - name: K_CONSUMER_NUMACTL_OPTIONS
+            value: "{{ .Values.CONSUMER_NUMACTL_OPTIONS }}"
+          - name: K_TOPIC_NUM
+            value: "{{ .Values.TOPIC_NUM }}"
+      restartPolicy: Never
+{{- if contains "_multinode" .Values.TESTCASE }}
+        {{- $args := dict "key" "zoo-producer-consumer" "value" "anti" }}
+        {{- include "podAntiAffinity" $args }}
+        {{- $args2 := dict "nkey" "VM-GROUP" "nvalue" "client" }}
+        {{- include "nodeAffinity" $args2 }}
+{{- else }}
+        {{- $args := dict "key" "app" "value" "zookeeper-kafka-server" }}
+        {{- include "podAffinity" $args }}
+{{- end }}
+{{- end }}

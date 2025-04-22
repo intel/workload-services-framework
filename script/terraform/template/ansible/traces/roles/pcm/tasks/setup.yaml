@@ -23,7 +23,7 @@
         mkdir -p roi-$roi
         cd roi-$roi
         {% if pcm_action == 'pcm-sensor-server' %}
-        nohup bash -c '{{ pcm_sensor_server_envs }} /usr/local/sbin/pcm-sensor-server {{ pcm_sensor_server_options }} -p {{ pcm_sensor_server_port }} -d >> pcm.logs 2>&1; while true; do sleep 1s; curl -H "Accept: application/json" http://localhost:{{ pcm_sensor_server_port }}{{ pcm_sensor_server_path }} >> records.mjson; done' > /dev/null 2>&1 &
+        nohup bash -c '{{ pcm_sensor_server_envs }} /usr/local/sbin/pcm-sensor-server {{ pcm_sensor_server_options }} -p {{ pcm_sensor_server_port }} -d >> pcm.logs 2>&1; while true; do sleep 1s; curl --netrc-optional -H "Accept: application/json" http://localhost:{{ pcm_sensor_server_port }}{{ pcm_sensor_server_path }} >> records.mjson; done' > /dev/null 2>&1 &
         {% elif pcm_action == 'pcm-power' %}
         nohup bash -c 'PCM_IGNORE_ARCH_PERFMON=1 /usr/local/sbin/pcm-power {{ pcm_power_options }} > power.records' > power.logs 2>&1 &
         {% endif %}

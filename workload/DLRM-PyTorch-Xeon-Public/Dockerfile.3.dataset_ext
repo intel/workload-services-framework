@@ -1,0 +1,79 @@
+# dlrm-pytorch-dataset-24.04
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+
+FROM pytorch-intel-public-24.04${RELEASE} as build
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt -o Acquire::Check-Date=false update && \
+    apt install -y wget tar gzip
+
+ARG INFERENCE_DATASET="day_{$(seq -s , 0 23)}.gz"
+ARG INFERENCE_DATASET_VER="2013"
+# It is not necessary to download all 24 days of data here
+# You can only download day_0.gz(15.2 GB) via the below link and place it under ./dataset/
+ARG INFERENCE_DATASET_REPO="https://criteo.wetransfer.com/downloads/4bbea9b4a54baddea549d71271a38e2c20230428071257/d4f0d2/grid"
+ARG DAY_0_MD5="6cef23542552c3195e9e6e2bdbc4c235"
+
+SHELL ["/bin/bash", "-c"]
+
+WORKDIR /dataset
+
+# To access the required dataset, kindly download it using the link provided above.
+# Downloading the dataset will provide you with access to the Criteo 1TB Click Logs dataset,
+# which is a widely used dataset for machine learning performance benchmarks.
+# The dataset contains click logs from various display advertisements, and it is used extensively in machine learning research,
+# particularly in the areas of click-through rate prediction and recommender systems.
+
+# By downloading the dataset, you will be able to explore and analyze the data and use it for your own research and development purposes.
+# However, it is crucial to adhere to the usage terms and conditions to ensure that the dataset is used appropriately and ethically.
+
+# Therefore, we kindly request that you carefully read and accept the usage terms and conditions via the following link before proceeding with the download.
+# You can read and accept the use terms and conditions via the following link:
+# https://ailab.criteo.com/criteo-1tb-click-logs-dataset-for-mlperf/
+# Thank you for your cooperation and understanding.
+
+# By exercising the Licensed Rights (defined on https://ailab.criteo.com/criteo-1tb-click-logs-dataset-for-mlperf/),
+# You accept and agree to be bound by the terms and conditions of this Creative Commons
+# Attribution-NonCommercial-ShareAlike 4.0 International Public License (“Public License”).
+# To the extent this Public License may be interpreted as a contract, You are granted the Licensed Rights in consideration
+# of Your acceptance of these terms and conditions, and the Licensor grants You such rights in consideration of benefits
+# the Licensor receives from making the Licensed Material available under these terms and conditions.
+
+COPY ./dataset/day_0.gz .
+
+# RUN CHECK_HASH=$(echo "${DAY_0_MD5} day_0.gz" | md5sum -c | awk -F ' ' '{print $2}') && \
+#     if [ "$CHECK_HASH" != "OK" ]; \
+#     then echo -e "\e[1;33m \
+#                     dataset(day_0.gz) has not been prepared properly,\n \
+#                     please download the dataset from the source\n \
+#                     https://ailab.criteo.com/criteo-1tb-click-logs-dataset-for-mlperf/\n \
+#                     following the instruction provided \
+#                   \e[0m"; exit 1; \
+#     fi
+
+RUN gzip -d day*.gz && \
+    split -l $(($(cat day_0 | wc -l)/24+1)) day_0 day0_ -a 2 -d && \
+    for f in ./day0_0*; do mv "$f" "${f//_0/_}"; done
+
+COPY ./scripts/data-preprocessing/dlrm_data_pytorch.py /tmp/
+
+RUN num_cores=$(grep -c processor /proc/cpuinfo) && \
+    if [ "$num_cores" -gt 24 ]; then multiprocessing="--dataset-multiprocessing"; else multiprocessing=""; fi && \
+    python /tmp/dlrm_data_pytorch.py --data-set=terabyte \
+                                     --max-ind-range=40000000 \
+                                     --raw-data-file=/dataset/day0 \
+                                     --processed-data-file=/dataset/terabyte_processed.npz \
+                                     --memory-map \
+                                     --eval-days=1 \
+                                     ${multiprocessing}
+
+FROM scratch
+
+COPY --from=build /dataset/*.bin /dataset/
+COPY --from=build /dataset/*count.npz /dataset/

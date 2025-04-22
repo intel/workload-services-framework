@@ -1,0 +1,17 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+script_args: ""
+tunables: "usecase:AVC-1080p-fast-avx2;tool:ffmpeg;arch:arm64;compiler:gcc;scaling:;image_type:amd64gcc;testcase:"
+script_args: ""
+tunables: "usecase:AVC-1080p-fast-avx2;tool:ffmpeg;arch:arm64;compiler:gcc;scaling:;image_type:amd64gcc;testcase:"
+script_args: ""
+tunables: "usecase:AVC-1080p-fast-avx2;tool:ffmpeg;arch:arm64;compiler:gcc;scaling:;image_type:amd64gcc;testcase:"
+script_args: ""
+tunables: "usecase:AVC-1080p-fast-avx2;tool:ffmpeg;arch:arm64;compiler:gcc;scaling:;image_type:amd64gcc;testcase:"
+script_args: ""
+tunables: "usecase:AVC-1080p-fast-avx2;tool:ffmpeg;arch:arm64;compiler:gcc;scaling:;image_type:amd64gcc;testcase:"
+script_args: ""
+tunables: "usecase:AVC-1080p-fast-avx2;tool:ffmpeg;arch:amd64;compiler:gcc;scaling:;image_type:amd64gcc;testcase:"

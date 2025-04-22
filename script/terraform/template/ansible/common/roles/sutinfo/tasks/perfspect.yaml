@@ -6,28 +6,36 @@
 
 - block:
 
-    - name: Uncompress the perfspect package
-      unarchive:
-        src: "{{ perfspect_private_package | default(perfspect_public_package) }}"
-        dest: /tmp/
-        remote_src: true
+    - name: Get the perfspect package
+      get_url:
+        url: "{{ perfspect_private_package | default(perfspect_public_package) }}"
+        dest: "/tmp/perfspect-{{ perfspect_version }}.tgz"
 
   rescue:
 
-    - name: Uncompress the perfspect package
-      unarchive:
-        src: "{{ perfspect_public_package }}"
-        dest: /tmp/
-        remote_src: true
+    - name: Get the public perfspect package
+      get_url:
+        url: "{{ perfspect_public_package }}"
+        dest: "/tmp/perfspect-{{ perfspect_version }}.tgz"
       register: perfspect_get_rc
       until: perfspect_get_rc is success
       retries: 2
       delay: 10
       ignore_errors: true
 
-  become: false
+  when: (('/tmp/perfspect-'+perfspect_version+'.tgz') is not exists)
   delegate_to: localhost
   run_once: true
+  become: false
+
+- name: Uncompress the perfspect package
+  unarchive:
+    src: "/tmp/perfspect-{{ perfspect_version }}.tgz"
+    dest: /tmp/
+    remote_src: true
+  delegate_to: localhost
+  run_once: true
+  become: false
 
 - name: Create the perfspect directory
   file:
@@ -37,7 +45,7 @@
   ignore_errors: yes
 
 - name: Run perfspect report
-  command: "/tmp/perfspect/perfspect report {{ perfspect_report_options }} {% if ansible_host!='127.0.0.1' %} --target {{ ansible_host }} --port {{ ansible_port | default(22) }} --user {{ ansible_user }} --key {{ ansible_ssh_private_key_file }} {% endif %} --output {{ wl_logs_dir }}/{{ inventory_hostname }}-sutinfo"
+  command: "/tmp/perfspect/perfspect report {{ perfspect_report_options }} {% if ansible_host!='127.0.0.1' %} --target {{ ansible_host }} --port {{ ansible_port | default(22) }} --user {{ ansible_user }} {% if ansible_private_key_file is defined %}--key {{ ansible_private_key_file }} {% endif %}{% endif %} --output {{ wl_logs_dir }}/{{ inventory_hostname }}-sutinfo"
   register: perfspect_rc
   until: perfspect_rc is success
   retries: 2

@@ -7,7 +7,7 @@ locals {
 }
 
 source "libvirt" "default" {
-  libvirt_uri = "qemu+ssh://${var.kvm_host_user}@${var.kvm_host}:${var.kvm_host_port}/system?keyfile=${var.kvm_host_ssh_pri_key_file}&no_verify=1"
+  libvirt_uri = "qemu+ssh://${var.kvm_host_user}@${var.kvm_host}:${var.kvm_host_port}/system?keyfile=${data.external.ssh_keyfile.result.keyfile}&no_verify=1"
 
   domain_name = "wsf-${var.job_id}-builder"
   vcpu = var.cpu_core_count
@@ -30,7 +30,7 @@ source "libvirt" "default" {
     ssh_bastion_host = var.kvm_host
     ssh_bastion_username = var.kvm_host_user
     ssh_bastion_port = var.kvm_host_port
-    ssh_bastion_private_key_file = var.kvm_host_ssh_pri_key_file
+    ssh_bastion_private_key_file = data.external.ssh_keyfile.result.keyfile
   }
   
   volume {
@@ -87,7 +87,6 @@ build {
       "-e", "kvm_host=${var.kvm_host}", 
       "-e", "kvm_host_port=${var.kvm_host_port}", 
       "-e", "kvm_host_user=${var.kvm_host_user}", 
-      "-e", "kvm_host_ident=${var.kvm_host_ssh_pri_key_file}", 
     ]
     use_proxy = false
   }

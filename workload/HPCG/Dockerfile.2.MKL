@@ -1,0 +1,67 @@
+# hpcg-mkl
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=22.04
+ARG OS_IMAGE=ubuntu
+
+ARG ONEAPI_IMAGE=intel/oneapi-hpckit
+ARG ONEAPI_VER=2023.1.0-devel-ubuntu22.04
+
+FROM ${ONEAPI_IMAGE}:${ONEAPI_VER} AS build
+
+# Keep the folder path structure and delete unused files
+ARG ONEAPI_PATH="/opt/intel/oneapi"
+
+RUN mkdir /pkg_tmp 
+RUN cd ${ONEAPI_PATH}/mkl/latest/benchmarks && \
+    mv hpcg /pkg_tmp && \
+    cd ${ONEAPI_PATH}/mkl/latest/lib && \
+    rm -f intel64/*.a && \
+    mv intel64 /pkg_tmp && \
+    cd ${ONEAPI_PATH}/compiler/latest/linux/compiler/lib/intel64_lin && \
+    mv libiomp5.so /pkg_tmp
+
+RUN rm -rf ${ONEAPI_PATH}/advisor && \
+    rm -rf ${ONEAPI_PATH}/ccl && \
+    rm -rf ${ONEAPI_PATH}/clck && \
+    rm -rf ${ONEAPI_PATH}/diagnostics && \
+    rm -rf ${ONEAPI_PATH}/tbb && \
+    rm -rf ${ONEAPI_PATH}/dal && \
+    rm -rf ${ONEAPI_PATH}/conda_channel && \
+    rm -rf ${ONEAPI_PATH}/dev-utilities && \
+    rm -rf ${ONEAPI_PATH}/dpcpp-ct && \
+    rm -rf ${ONEAPI_PATH}/debugger && \
+    rm -rf ${ONEAPI_PATH}/inspector && \
+    rm -rf ${ONEAPI_PATH}/ipp && \
+    rm -rf ${ONEAPI_PATH}/ippcp && \
+    rm -rf ${ONEAPI_PATH}/itac && \
+    rm -rf ${ONEAPI_PATH}/vpl && \
+    rm -rf ${ONEAPI_PATH}/dpl && \
+    rm -rf ${ONEAPI_PATH}/intelpython && \
+    rm -rf ${ONEAPI_PATH}/dnnl && \
+    rm -rf ${ONEAPI_PATH}/vtune && \
+    rm -fr ${ONEAPI_PATH}/compiler && \
+    rm -fr ${ONEAPI_PATH}/mkl
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+COPY --from=build /opt /opt
+
+WORKDIR /hpcg
+
+COPY --from=build /pkg_tmp/hpcg /hpcg
+COPY --from=build /pkg_tmp/intel64 bin/lib
+COPY --from=build /pkg_tmp/libiomp5.so bin/lib
+
+ENV LD_LIBRARY_PATH=/hpcg/bin/lib:$LD_LIBRARY_PATH
+
+# Run testing for HPCG
+COPY run_test.sh /
+RUN mkfifo /export-logs
+CMD (/run_test.sh; echo $? > status) 2>&1 | tee output.logs && \ 
+    tar cf /export-logs status output.logs $(find . -name "n*.txt") && \
+    sleep infinity

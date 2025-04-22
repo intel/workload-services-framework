@@ -47,5 +47,5 @@ module "optimized-postgresql-server" {
   db_name                = "postdb"
   security_group_ids     = [aws_security_group.rds.id]
   depends_on             = [aws_vpc.main, aws_subnet.private1, aws_subnet.private2]
-  db_engine_version      = 14.9
+  db_engine_version      = 14.12
 }

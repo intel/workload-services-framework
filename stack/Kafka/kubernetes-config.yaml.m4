@@ -15,5 +15,6 @@ spec:
     spec:
       containers:
       - name: kafka-version-check
-        image: IMAGENAME(Dockerfile.1.kafka.unittest)
+        image: IMAGENAME(DOCKER_IMAGE)
+        imagePullPolicy: IMAGEPOLICY(Always)
       restartPolicy: Never

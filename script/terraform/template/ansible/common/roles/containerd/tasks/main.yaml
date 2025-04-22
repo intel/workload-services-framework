@@ -56,7 +56,7 @@
     - name: re-create containerd configuration
       shell: |
         containerd config default > {{ containerd_config_toml }}
-        grep 'SystemdCgroup = true\|{{ containerd_pause_registry }}\|{{ containerd_certsd_path }}\|{{ containerd_data_root }}' {{ containerd_config_toml }}
+        grep 'SystemdCgroup = true\|{{ containerd_pause_registry | regex_replace(':.*','') }}\|{{ containerd_certsd_path }}\|{{ containerd_data_root }}' {{ containerd_config_toml }}
       register: containerd_config2
       no_log: true
 
@@ -76,7 +76,7 @@
     lineinfile:
       path: "{{ containerd_config_toml }}"
       regexp: '^(\s*)sandbox_image\s*=\s*".*(/.*)"'
-      line: '\1sandbox_image = "{{ containerd_pause_registry }}\2"'
+      line: '\1sandbox_image = "{{ containerd_pause_registry }}{% if ":" not in containerd_pause_registry %}\2{% endif %}"'
       backrefs: true
     when: containerd_pause_registry not in (containerd_config2.stdout | default(containerd_config1.stdout | default('')))
     become: true

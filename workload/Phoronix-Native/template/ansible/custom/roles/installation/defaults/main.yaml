@@ -1,0 +1,12 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+WORKSPACE: "/tmp/phoronix"
+
+PHORONIX_VER: "f665ba8ee724331f5bc375715089ad6393bcf10e"  # Specify Phoronix Test Suite version
+PHORONIX_REPO: "https://github.com/phoronix-test-suite/phoronix-test-suite.git"  # Phoronix GitHub repo URL
+PHORONIX_INSTALL_DIR: "{{ WORKSPACE }}/phoronix"
+
+BENCHMARK_WL: "pts/nginx-3.0.1"

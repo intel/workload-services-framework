@@ -27,7 +27,7 @@ resource "alicloud_vswitch" "default" {
 }
 
 resource "alicloud_security_group" "default" {
-  name = "wsf-${var.job_id}-sg"
+  security_group_name = "wsf-${var.job_id}-sg"
   vpc_id = alicloud_vpc.default.id
   security_group_type = "normal"
   resource_group_id = var.resource_group_id

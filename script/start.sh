@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-LOGSDIRH="$(pwd)/${CTESTSH_PREFIX}logs-${TESTCASE#test_}"
+LOGSDIRH="${LOGSDIRH:-"$(pwd)/${CTESTSH_PREFIX}logs-${TESTCASE#test_}"}"
 rm -rf "$LOGSDIRH"
 mkdir -p "$LOGSDIRH"
 cd "$LOGSDIRH"

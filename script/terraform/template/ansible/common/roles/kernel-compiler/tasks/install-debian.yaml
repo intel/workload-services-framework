@@ -1,0 +1,84 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Install prerequisites
+    apt:
+      name: "{{ ['build-essential'] | union(kernel_driver_build_pkgs.debian) }}"
+      update_cache: true
+    register: aptrc
+    until: aptrc is success
+    retries: 10
+    delay: 10
+
+  - name: Check if kernel header is already installed
+    stat:
+      path: "/usr/src/kernels/{{ kernel_version.stdout }}"
+    register: kernel_header
+    no_log: true
+
+  - name: Install kernel header
+    apt:
+      name: "linux-headers-{{ kernel_version.stdout }}"
+      state: present
+    when: not kernel_header.stat.exists
+    register: aptrc
+    until: aptrc is success
+    retries: 10
+    delay: 10
+    ignore_errors: true
+
+  - name: kernel gcc version
+    set_fact:
+      kernel_gcc_version: "{{ proc_version.stdout | regex_replace('^.*x86_64-linux-gnu-gcc-(\\d+).*$', 'gcc-\\1') }}"
+    when: (proc_version.stdout is match('.*x86_64-linux-gnu-gcc-\\d+'))
+
+  - name: kernel gcc version
+    set_fact:
+      kernel_gcc_version: "{{ proc_version.stdout | regex_replace('^.*gcc version (\\d+)(\\.\\d+\\.\\d+).*$', 'gcc-\\1') }}"
+    when: (proc_version.stdout is match('.*gcc version \\d+\\.\\d+\\.\\d+'))
+
+  - name: kernel gcc version
+    set_fact:
+      kernel_gcc_version: "{{ proc_version.stdout | regex_replace('^.*gcc \\(Ubuntu .*?\\) (\\d+)(\\.\\d+\\.\\d+).*$', 'gcc-\\1') }}"
+    when: (proc_version.stdout is match('.*gcc \\(Ubuntu .*?\\) \\d+\\.\\d+\\.\\d+'))
+
+  - block:
+
+    - name: "check if {{ kernel_gcc_version }} is installed"
+      shell: "{{ kernel_gcc_version }} --version"
+#
+# cat /proc/version
+# Linux version 5.15.0-113-generic (buildd@lcy02-amd64-072) (gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0, GNU ld (GNU Binutils for Ubuntu) 2.38) #123-Ubuntu SMP Mon Jun 10 08:16:17 UTC 2024
+# apt-cache madison gcc-11
+# gcc-11 | 11.4.0-1ubuntu1~22.04 | http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 Packages
+# gcc-11 | 11.4.0-1ubuntu1~22.04 | http://security.ubuntu.com/ubuntu jammy-security/main amd64 Packages
+# gcc-11 | 11.2.0-19ubuntu1 | http://archive.ubuntu.com/ubuntu jammy/main amd64 Packages
+# The gcc-11=11.4.0-1ubuntu1~22.04 version should be installed as it is matching "gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"  is included in the /proc/version field.
+#
+    rescue:
+
+    - name: "find {{ kernel_gcc_version }} in the apt repo list"
+      shell:
+        cmd: "apt-cache madison {{ kernel_gcc_version }}"
+        executable: /bin/bash
+      register: all_gcc_pkgs
+
+    - name: Install kernel gcc version
+      apt:
+        name: "{{ kernel_gcc_version }}={{ all_gcc_pkgs.stdout_lines | map('regex_replace','^[^|][^|]*[|]([^|]*)[|].*$','\\1') | map('trim') | select('in',proc_version.stdout) | last }}"
+        state: present
+      register: aptrc
+      until: aptrc is success
+      retries: 10
+      delay: 10
+      ignore_errors: true
+
+    when: kernel_gcc_version | length > 0 # Did not succeed in getting the gcc version of the compiled kernel
+
+  delegate_to: "{{ kernel_driver_host }}"
+  become: true

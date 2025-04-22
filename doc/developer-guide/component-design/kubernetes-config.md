@@ -43,49 +43,9 @@ spec:
 
 ### About `imagePullPolicy`
 
-To ensure that the validation runs always on the latest code, it is recommended to use `imagePullPolicy: Always`. However, this requires to use a private docker registry. In a local development, `imagePullPolicy: IfNotPresent` is desired. 
+To ensure that the validation runs always on the latest code, it is recommended to use `imagePullPolicy: Always`.
 
-If you use the `.m4`, `.j2`, or helm template, the variable `IMAGEPULLPOLICY` is defined to be either `IfNotPresent` or `Always`.  
-
-```m4
-...
-    spec:
-      containers:
-      - name: database
-        image: IMAGENAME(wordpress5mt-defn(`DATABASE'))
-        imagePullPolicy: IMAGEPULLPOLICY
-...
-```
-
-If you use the `.j2` template, use the following conditions:
-
-```jinja
-...
-spec:
-...
-    spec:
-      containers:
-      - name: database
-        image: "{{ REGISTRY }}wordpress5mt-{{ DATABASE }}{{ IMAGESUFFIX }}{{ RELEASE }}"
-        imagePullPolicy: "{{ IMAGEPULLPOLICY }}"
-...
-```
-
-If you use helm charts, use the following conditions:
-
-```jinja
-...
-spec:
-...
-    spec:
-      containers:
-      - name: database
-        image: "{{ REGISTRY }}wordpress5mt-{{ DATABASE }}{{ IMAGESUFFIX }}{{ RELEASE }}"
-        imagePullPolicy: "{{ IMAGEPULLPOLICY }}"
-...
-```
-
-Not all docker images are built equally. Some are less frequently updated and less sensitive to performance. Thus it is preferrable to use `imagePullPolicy: IfNotPresent` in all cases.   
+Not all docker images are built equally. Some are less frequently updated and less sensitive to performance. Thus it is preferrable to use `imagePullPolicy: IfNotPresent`.
 
 ### About `podAntiAffinity`
 

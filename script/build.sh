@@ -21,14 +21,14 @@ parse_dockerfile_ingredients () {
         "ARG "*_VER=*|"ARG "*_VERSION=*|"ARG "*_REPO=*|"ARG "*_REPOSITORY=*|"ARG "*_IMAGE=*|"ARG "*_PACKAGE=*|"ARG "*_IMG=*|"ARG "*_PKG=*)
             local var="$(echo "${line/ARG /}" | tr -d "'"'" ' | cut -f1 -d=)"
             local value="$(echo "${line/ARG /}" | tr -d "'"'" ' | cut -f2- -d= | cut -f1 -d'#')"
-            eval "local $var=\"$value\""
+            eval "local $var=\"$value\"" || true
             eval "local value=\"$value\""
             echo "$1${var^^}=$value"
             ;;
         "ARG "*=*)
             local var="$(echo "${line/ARG /}" | tr -d "'"'" ' | cut -f1 -d=)"
             local value="$(echo "${line/ARG /}" | tr -d "'"'" ' | cut -f2- -d= | cut -f1 -d'#')"
-            eval "local $var=\"$value\""
+            eval "local $var=\"$value\"" || true
             ;;
         esac
     done
@@ -53,9 +53,9 @@ parse_ansible_ingredients () {
 build_commits () {
     local commit_id="$(flock /dev/urandom cat /dev/urandom | tr -dc '0-9a-f' | head -c 40)"
     if git --version > /dev/null 2>&1; then
-        commit_id="$(cd "$PROJECTROOT"; GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo flock .git git rev-parse HEAD 2> /dev/null || true)"
+        commit_id="$(cd "$PROJECTROOT"; GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo flock "$PROJECTROOT" git rev-parse HEAD 2> /dev/null || true)"
         local branch_id=""
-        local show_ref="$(cd "$PROJECTROOT";GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo flock .git git show-ref 2> /dev/null | grep -F "$commit_id" || true)"
+        local show_ref="$(cd "$PROJECTROOT";GIT_SSH_COMMAND='ssh -o BatchMode=yes' GIT_ASKPASS=echo flock "$PROJECTROOT" git show-ref 2> /dev/null | grep -F "$commit_id" || true)"
         if [[ "$RELEASE" = :v* ]]; then
             branch_id="$(echo "$show_ref" | grep -m1 -E "refs/tags/${RELEASE#:}\$" | cut -f2- -d/)"
             [ -n "$branch_id" ] || branch_id="$(echo "$show_ref" | grep -m1 -E "refs/remotes/.*/${RELEASE#:v}\$" | cut -f3- -d/)"
@@ -199,7 +199,8 @@ FIND_OPTIONS="$(echo "x$FIND_OPTIONS" | sed -e 's/^x//' -e 's/\([(*?)]\)/\\\1/g'
 
     # template substitution
     tmp_files=()
-    trap 'rm -f "${tmp_files[@]}";exit 0' SIGTERM SIGINT SIGKILL ERR EXIT
+    exit_code=3
+    trap 'rm -f "${tmp_files[@]}";exit $exit_code' SIGTERM SIGINT SIGKILL ERR EXIT
 
     if [[ "$SOURCEROOT" = "$PROJECTROOT"/workload/* ]]; then
         for bc in "${BUILD_CONTEXT[@]}"; do
@@ -244,6 +245,12 @@ FIND_OPTIONS="$(echo "x$FIND_OPTIONS" | sed -e 's/^x//' -e 's/\([(*?)]\)/\\\1/g'
         fi
     fi
     
+    if [[ "$@" = *"--exit-on-error"* ]]; then
+        exit_on_error="-n"
+    else
+        exit_on_error=""
+    fi
+
     for dc in "${BUILD_CONTEXT[@]}"; do
         pushd "$SOURCEROOT/$dc" > /dev/null
         for pat in '.9.*' '.8.*' '.7.*' '.6.*' '.5.*' '.4.*' '.3.*' '.2.*' '.1.*' '.tmpj2.*' '.tmpm4.*' ''; do
@@ -289,19 +296,26 @@ FIND_OPTIONS="$(echo "x$FIND_OPTIONS" | sed -e 's/^x//' -e 's/\([(*?)]\)/\\\1/g'
                             )
                         fi
                         DOCKER_BUILDKIT=1 docker build $BUILD_OPTIONS "${build_options[@]}" "${this_build_options[@]}" -f "$dockerfile" . & 
-                        wait
+                        wait $exit_on_error
                     fi
 
                     # if REGISTRY is specified, push image to the private registry
                     if [ -n "$REGISTRY" ] && [ "$header" = "#" ]; then
                         [ "$BACKEND" = "atscale" ] && . "$PROJECTROOT/script/atscale/build.sh"
                         docker_push $IMAGE &
-                        wait
+                        wait $exit_on_error
                     fi
                 fi
             done
         done
         popd > /dev/null
     done
+    exit_code=0
 ) 9< "$SOURCEROOT/build.sh"
 
+# prep for multiple build.sh calls
+FIND_OPTIONS=""
+BUILD_OPTIONS=""
+BUILD_FILES=()
+DOCKER_CONTEXT=()
+BUILD_CONTEXT=()

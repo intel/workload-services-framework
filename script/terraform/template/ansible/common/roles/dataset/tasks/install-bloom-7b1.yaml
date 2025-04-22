@@ -3,12 +3,12 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
-- include_role:
-    name: hf-dataset
+- include_tasks:
+    file: download-hf.yaml
   vars:
-    DEST_DIR: "/opt/dataset/bloom/7b1"
-    MODEL_ID: "bigscience/bloom-7b1"
-    DATASET_SIZE: 25
-    exclude: ['safetensors', 'msgpack']
-    revision: []
-    HF_LOGIN: false
+    dataset_model_path: "bloom/7b1"
+    hfcli_model_id: "bigscience/bloom-7b1"
+    dataset_size: 25
+    hfcli_exclude: ['safetensors', 'msgpack']
+    hfcli_revision: []
+    hfcli_login: false

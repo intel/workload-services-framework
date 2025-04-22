@@ -4,8 +4,20 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-- name: wait for cilium ready
-  command: "cilium status --wait"
-  delegate_to: "{{ ('controller' in groups) | ternary('controller-0','localhost') }}"
-  run_once: true
+- block:
+
+    - name: wait for cilium ready
+      command: "cilium status --wait"
+      delegate_to: "{{ ('controller' in groups) | ternary('controller-0','localhost') }}"
+      run_once: true
+
+  rescue:
+
+    - include_role:
+        name: debug
+      vars:
+        debug_options: "-A"
+
+    - fail:
+        msg: "Failed to setup CNI"
 

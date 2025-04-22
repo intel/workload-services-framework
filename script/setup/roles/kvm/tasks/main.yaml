@@ -137,8 +137,6 @@
 
 - name: reboot
   command: "reboot"
-  async: 1
-  poll: 0
   ignore_errors: yes
   when:
   - kvm_reboot | bool
