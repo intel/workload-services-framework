@@ -1,0 +1,11 @@
+--- ../HiBench/bin/functions/test_load_config.py	2022-04-07 15:36:12.916432322 -0400
++++ test_load_config.py	2022-04-06 18:42:28.020098541 -0400
+@@ -8,7 +8,7 @@
+ 
+ 
+ def print_hint_seperator(hint):
+-    print("\n" + hint)
++    print(("\n" + hint))
+     print("--------------------------------")
+ 
+ 

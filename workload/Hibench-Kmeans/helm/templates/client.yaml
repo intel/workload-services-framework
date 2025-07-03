@@ -1,0 +1,142 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: general-config
+data:
+  TESTCASE: {{ .Values.TESTCASE }}
+  DISK_COUNT: "{{ .Values.DISK_COUNT }}"
+  WORKERNODE_NUM: "{{ .Values.WORKERNODE_NUM }}"
+  WORKER_MEMORY: "{{ .Values.WORKER_MEMORY }}"
+  WORKER_CPU_CORES: "{{ .Values.WORKER_CPU_CORES }}"
+  
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hibench-config
+data:
+  HIBENCH_SCALE_PROFILE: "{{ .Values.HIBENCH_SCALE_PROFILE }}"
+  HIBENCH_YARN_EXECUTOR_NUM: "{{ .Values.HIBENCH_YARN_EXECUTOR_NUM }}"
+  HIBENCH_YARN_EXECUTOR_CORES: "{{ .Values.HIBENCH_YARN_EXECUTOR_CORES }}"
+  HIBENCH_DEFAULT_MAP_PARALLELISM: "{{ .Values.HIBENCH_DEFAULT_MAP_PARALLELISM }}"
+  HIBENCH_DEFAULT_SHUFFLE_PARALLELISM: "{{ .Values.HIBENCH_DEFAULT_SHUFFLE_PARALLELISM }}"
+  HIBENCH_KMEANS_NUM_OF_SAMPLES: "{{ .Values.HIBENCH_KMEANS_NUM_OF_SAMPLES }}"
+  HIBENCH_KMEANS_SAMPLES_PER_INPUTFILE: "{{ .Values.HIBENCH_KMEANS_SAMPLES_PER_INPUTFILE }}"
+  HIBENCH_KMEANS_NUM_OF_CLUSTERS: "{{ .Values.HIBENCH_KMEANS_NUM_OF_CLUSTERS }}"
+  HIBENCH_KMEANS_DIMENSIONS: "{{ .Values.HIBENCH_KMEANS_DIMENSIONS }}"
+  HIBENCH_KMEANS_MAX_ITERATION: "{{ .Values.HIBENCH_KMEANS_MAX_ITERATION }}"
+  HIBENCH_KMEANS_K: "{{ .Values.HIBENCH_KMEANS_K }}"
+  HIBENCH_KMEANS_CONVERGEDIST: "{{ .Values.HIBENCH_KMEANS_CONVERGEDIST }}"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hibench-spark-conf
+data:
+  SPARK_EXECUTOR_MEMORY: "{{ .Values.SPARK_EXECUTOR_MEMORY }}"
+  SPARK_EXECUTOR_MEMORYOVERHEAD: "{{ .Values.SPARK_EXECUTOR_MEMORYOVERHEAD }}"
+  SPARK_DRIVER_MEMORY: "{{ .Values.SPARK_DRIVER_MEMORY }}"
+  SPARK_DEFAULT_PARALLELISM: "{{ .Values.SPARK_DEFAULT_PARALLELISM }}"
+  SPARK_SQL_SHUFFLE_PARTITIONS: "{{ .Values.SPARK_SQL_SHUFFLE_PARTITIONS }}"
+
+  spark.conf: |-
+    hibench.spark.home      /usr/local/spark
+    hibench.spark.master {{ .Values.HIBENCH_SPARK_MASTER }}
+    spark.driver.port 12345
+    spark.blockManager.port 12346
+    spark.port.maxRetries	65535
+    spark.serializer org.apache.spark.serializer.KryoSerializer 
+    hibench.yarn.executor.num     {{ .Values.HIBENCH_YARN_EXECUTOR_NUM }}
+    hibench.yarn.executor.cores   {{ .Values.HIBENCH_YARN_EXECUTOR_CORES }}
+    spark.executor.cores   {{ .Values.HIBENCH_YARN_EXECUTOR_CORES }}
+    spark.executor.memory  {{ .Values.SPARK_EXECUTOR_MEMORY }}
+    spark.executor.memoryOverhead	{{ .Values.SPARK_EXECUTOR_MEMORYOVERHEAD }}
+    spark.driver.memory    {{ .Values.SPARK_DRIVER_MEMORY }}
+    spark.default.parallelism     {{ .Values.SPARK_DEFAULT_PARALLELISM }}
+    spark.sql.shuffle.partitions  {{ .Values.SPARK_SQL_SHUFFLE_PARTITIONS }}
+    
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: hibench-benchmark
+  namespace: {{ .Values.NAMESPACE }}
+spec:
+  template:
+    metadata:
+      labels:
+        name: hibench-cluster
+    spec:
+      hostname: node-master
+      subdomain: hibench-svc
+      containers:
+      - name:  hibench-benchmark
+        image: {{ .Values.REGISTRY }}hibench-kmeans-client{{ .Values.IMAGESUFFIX }}{{ .Values.RELEASE }}
+        imagePullPolicy: {{ include "imagepolicy" .Values }}
+        envFrom:
+          - configMapRef: 
+              name: general-config
+          - configMapRef: 
+              name: hibench-config
+          - configMapRef: 
+              name: hdfs-config
+          - configMapRef: 
+              name: yarn-config
+          - configMapRef: 
+              name: hibench-spark-conf
+        {{- $args := dict "value" "master" }}
+        {{- include "hadoopENV" $args | nindent 8 }} 
+        - name: HADOOP_USER_NAME
+          value: root
+        - name: WORKLOAD
+          value: "{{ .Values.WORKLOAD }}"
+        volumeMounts:
+        - name: data-hdfs
+          mountPath: /root/hdfs
+        - name: hibench-configmap-vol1
+          mountPath: /HiBench/conf/spark.conf_template
+          subPath: spark.conf
+        {{ include "hadoop-config-volumeMounts" . | nindent 8 }}
+        - name: kmeans-config-vol
+          mountPath: /HiBench/conf/workloads/ml/kmeans.conf_template
+          subPath: kmeans.conf
+      volumes:
+      - name: data-hdfs
+  {{- if $.Values.ENABLE_MOUNT_DIR }}
+        hostPath:
+          path: {{ .Values.MOUNT_DIR }}/node-master
+          type: DirectoryOrCreate
+  {{- else }}
+        emptyDir: {}
+  {{- end }}
+      - name: hibench-configmap-vol1
+        configMap:
+          name: hibench-spark-conf
+          items:
+            - key: spark.conf
+              path: spark.conf
+      {{ include "hadoop-config-volumes" . | nindent 6 }}
+      - name: kmeans-config-vol
+        configMap:
+          name: kmeans-conf
+          items:
+            - key: kmeans.conf
+              path: kmeans.conf
+      dnsConfig:
+        searches:
+        - hibench-svc.{{ .Values.NAMESPACE }}.svc.cluster.local
+      restartPolicy: Never
+    {{- if not (contains "gated" $.Values.TESTCASE) }}
+      affinity:
+      {{- include "podAntiAffinity" . }}
+      {{- $args2 := dict "nkey" "VM-GROUP" "nvalue" "client" }}
+      {{- include "nodeAffinity" $args2 }}
+    {{- end }}
+

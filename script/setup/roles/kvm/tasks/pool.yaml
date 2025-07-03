@@ -1,0 +1,63 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- block:
+
+  - name: Create storage directory
+    file:
+      path: "{{ pool_path }}"
+      state: directory
+
+  - block:
+
+    - name: Cache common OS images
+      get_url:
+        url: "{{ item }}"
+        dest: "{{ pool_path }}/{{ item | basename }}"
+      loop: "{{ kvm_pool_os_list }}"
+
+    rescue:
+
+    - name: Cache common OS images
+      get_url:
+        url: "{{ item }}"
+        dest: "/tmp/{{ item | basename }}"
+      loop: "{{ kvm_pool_os_list }}"
+      delegate_to: localhost
+      become: false
+
+    - name: Copy OS images
+      copy:
+        src: "/tmp/{{ item | basename }}"
+        dest: "{{ pool_path }}/{{ item | basename }}"
+      loop: "{{ kvm_pool_os_list }}"
+
+    - name: Remove local copies
+      file:
+        path: "/tmp/{{ item | basename }}"
+        state: absent
+      loop: "{{ kvm_pool_os_list }}"
+      delegate_to: localhost
+      become: false
+
+    when: pool_name in (kvm_image_pool_spec|split(',')|map('split',':')|map('first'))
+
+  - name: Create storage pool
+    shell:
+      cmd: |
+        virsh pool-destroy   {{ pool_name }}
+        virsh pool-undefine  {{ pool_name }}
+        virsh pool-define-as {{ pool_name }} dir --target "{{ pool_path }}"
+        virsh pool-build     {{ pool_name }}
+        virsh pool-start     {{ pool_name }}
+        virsh pool-autostart {{ pool_name }}
+        virsh pool-refresh   {{ pool_name }}
+      executable: /bin/bash
+    ignore_errors: true
+
+  vars:
+    pool_name: "{{ pool_spec.split(':')[0] }}"
+    pool_path: "{{ 1 | extract((pool_spec+':/usr/local/'+pool_name) | split(':')) }}"

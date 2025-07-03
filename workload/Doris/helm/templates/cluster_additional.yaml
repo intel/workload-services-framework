@@ -1,0 +1,36 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+apiVersion: v1
+kind: Service
+metadata:
+  name: doris-be-service
+  labels:
+    name: doris-be-service
+spec:
+  ports:
+    - port: 8040
+      protocol: TCP
+      name: webserver-port
+  selector:
+    app: doris-be
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: doris-fe-service
+  labels:
+    name: doris-fe-service
+spec:
+  ports:
+    - port: 8030
+      protocol: TCP
+      name: http-port
+  selector:
+    app: doris-fe
+  type: ClusterIP
+

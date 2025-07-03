@@ -76,10 +76,10 @@ done
 . <(sed '/^# BEGIN WSF Setup/,/^# END WSF Setup/{d}' /etc/environment)
 export http_proxy https_proxy no_proxy
 rm -f /tmp/wsf-setup-ssh-* 2> /dev/null || true
-ANSIBLE_ROLES_PATH=../terraform/template/ansible/kubernetes/roles:../terraform/template/ansible/common/roles:../terraform/template/ansible/traces/roles ANSIBLE_INVENTORY_ENABLED=yaml ansible-playbook --flush-cache -vv -e wl_logs_dir="$DIR" -e my_ip_list=1.1.1.1 "${ansible_options[@]}" --inventory <(create_inventory) ./setup-sut-k8s.yaml 2>&1 | tee -a setup-sut-k8s.logs
+ANSIBLE_ROLES_PATH=../terraform/template/ansible/kubernetes/roles:../terraform/template/ansible/common/roles:../terraform/template/ansible/traces/roles ANSIBLE_INVENTORY_ENABLED=yaml ansible-playbook --flush-cache -vv -e mysut_config_name="$sutname" -e wl_logs_dir="$DIR" -e my_ip_list=1.1.1.1 "${ansible_options[@]}" --inventory <(create_inventory) ./setup-sut-k8s.yaml 2>&1 | tee -a setup-sut-k8s.logs
 rm -f cluster-info.json timing.yaml
 
-create_tf_file 2>&1 | tee -a setup-sut-k8s.logs
+show_tf_file 2>&1 | tee -a setup-sut-k8s.logs
 
 is_controller_on_dev_host () {
   for h in ${controller_hosts[@]/:*/}; do
@@ -94,7 +94,7 @@ if [[ "$(is_controller_on_dev_host $(hostname) $(hostname -f) $(hostname -i))" =
     echo "then no more setup is required. Otherwise you must create a private registry (setup-reg.sh) and set it"
     echo "as follows:"
     echo "  cd build"
-    echo "  cmake -DREGISTRY=<value> .."
+    echo "  wsf-config -DREGISTRY=<value>"
   ) 2>&1 | tee -a setup-sut-k8s.logs
 else
   (
@@ -103,8 +103,8 @@ else
     echo "then no more setup is required. Otherwise do one of the following setup steps:"
     echo "(1) Setup a private registry (setup-reg.sh) and activate it as follows:"
     echo "  cd build"
-    echo "  cmake -DREGISTRY=<value> .."
-    echo "(2) Set 'k8s_enable_registry: true' in script/terraform/$(basename "$sutfile"). An in-cluster registry"
+    echo "  wsf-config -DREGISTRY=<value>"
+    echo "(2) Set 'k8s_enable_registry: true' in script/terraform/terraform-config.$sutname.tf. An in-cluster registry"
     echo "will be created to serve images."
   ) 2>&1 | tee -a setup-sut-k8s.logs
 fi

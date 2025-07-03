@@ -1,0 +1,100 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app-name: frontend
+    deployPolicy: frontend
+  name: frontend
+spec:
+  replicas: {{ .Values.REPLICAS }}
+  selector:
+    matchLabels:
+      app-name: frontend
+      deployPolicy: frontend
+  strategy: {}
+  template:
+    metadata:
+      name: frontend
+      labels:
+        app-name: frontend
+        deployPolicy: frontend
+      annotations:
+        sidecar.istio.io/inject: "true"
+    spec:
+      containers:
+      - image: {{ .Values.REGISTRY }}django_frontend{{ .Values.IMARCH }}{{ .Values.OS_SUFFIX }}{{ .Values.RELEASE }}
+        name: django-frontend
+        env:
+        - name: CASSANDRA_ENDPOINT
+          value: cassandra
+        - name: MEMCACHED_ENDPOINT
+          value: "memcached:{{ .Values.MEMCACHED_PORT }}"
+        - name: SIEGE_ENDPOINT
+          value: siege
+        - name: TLS
+          value: {{ .Values.TLS | quote }}
+        - name: PROC_NO
+          value: {{ .Values.UWSGI_WORKER | quote }}
+        ports:
+        - containerPort: 8000
+        resources: {}
+        imagePullPolicy: {{ include "imagepolicy" .Values }}
+      initContainers:
+      - name: wait-for-services-ready
+        image: curlimages/curl:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh","-c"] 
+        args:
+        - |  
+          until 
+            nc -z -w5 memcached {{ .Values.MEMCACHED_PORT }} &&
+            nc -z -w5 cassandra {{ .Values.CASSANDRA_PORT }}
+          do 
+            echo Waiting for services ready...;
+            sleep 1s;
+          done
+      - name: sysctl
+        image: busybox
+        imagePullPolicy: Always
+        command:
+        - sysctl
+        - -w
+        - net.ipv4.tcp_tw_reuse=1
+        - net.ipv4.ip_local_port_range=1024 65535
+        - net.core.somaxconn=16384
+        securityContext:
+          privileged: true
+      restartPolicy: Always
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: deployPolicy
+                operator: In
+                values:
+                - benchmark
+            topologyKey: "kubernetes.io/hostname"
+          - labelSelector:
+              matchExpressions:
+              - key: deployPolicy
+                operator: In
+                values:
+                - cassandra
+            topologyKey: "kubernetes.io/hostname"
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: deployPolicy
+                operator: In
+                values:
+                - frontend
+            topologyKey: "kubernetes.io/hostname"
+status: {}

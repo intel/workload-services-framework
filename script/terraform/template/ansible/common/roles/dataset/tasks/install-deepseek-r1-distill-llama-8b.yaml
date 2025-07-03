@@ -1,0 +1,14 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- include_tasks:
+    file: download-hf.yaml
+  vars:
+    dataset_model_path: "deepseek-r1-distill/llama/8b"
+    hfcli_model_id: "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
+    dataset_size: 30
+    hfcli_exclude: []
+    hfcli_revision: []
+    hfcli_login: true

@@ -19,6 +19,9 @@
     testcase=columns[i]
     iteration=gensub(/itr-([0-9]*):/,"\\1",1,columns[i+1])*1
     print testcase > "/dev/stderr"
+
+    portal_null[testcase]=""
+    logs[workload][testcase]["location"][1]=testcase
 }
 
 /^# status: (passed|failed)/ {
@@ -49,10 +52,10 @@
     bom[workload][testcase][kk][1]=v
 }
 
-/^# [a-zA-Z0-9_]*:/ && status=="passed" {
-    k=gensub(/^# ([a-zA-Z0-9_]*):.*/,"\\1",1)
+/^# [a-zA-Z0-9_ \(\)]*:/ && status=="passed" {
+    k=gensub(/^# ([a-zA-Z0-9_ \(\)]*):.*/,"\\1",1)
     v=gensub(/["]/,"","g",gensub(/^# [a-zA-Z0-9_]*: /,"",1))
-    if (k!="status" && k!="testcase") {
+    if (k!="status" && k!="portal" && k!="testcase") {
         kk=add_prefix(k,tunables_uniq,workload)
         tunables[workload][testcase][kk][1]=v
     }
@@ -95,7 +98,7 @@
         instance_type[tc_workload][tc_testcase]="c"cpu_core_count[tc_workload][tc_testcase]"m"memory_size[tc_workload][tc_testcase]
 }
 
-/^#(pcm|pdu|uprof|emon|perfspect|sar|collectd|igt): / {
+/^#(pcm|pdu|uprof|emon|perfspect|sar|collectd|igt|turbostat): / {
     trace_file=$2
     nc=split($2,columns,"/")
     for(i=3;i<=nc-1;i++)
@@ -111,7 +114,7 @@
 /^#(pcm|uprof|perfspect): / {
     trace_roi=columns[i+2]
 }
-/^#(pdu|emon): / {
+/^#(pdu|emon|turbostat): / {
     patsplit(columns[i+2],fields,/[0-9][0-9]*/)
     trace_roi="roi-"fields[1]
 }
@@ -240,7 +243,17 @@
 /^#igt- / && igt_section[2]=="engines" && igt_section[3]=="[unknown]" && $2=="\"busy\":" {
     igt_unknown_busy[trace_tc][trace_host"/"igt_card"/"trace_roi][trace_itr][igt_section_count[igt_section[3]][trace_tc][trace_host"/"igt_card"/"trace_roi][trace_itr]]+=gensub(/,/,"",1,$3)*1
 }
-
+/^#turbostat- / && /Time_Of_Day_Seconds/ {
+    for (i=2;i<=NF;i++)
+      turbostat_columns[$i]=i
+}
+/^#turbostat- / && $(turbostat_columns["Core"])=="-" && $(turbostat_columns["CPU"])=="-" {
+    turbostat_pkgwatt[trace_tc][trace_host"/"trace_roi][trace_itr][++turbostat_count[trace_tc][trace_host"/"trace_roi][trace_itr]]=$(turbostat_columns["PkgWatt"])*1
+    turbostat_gfxwatt[trace_tc][trace_host"/"trace_roi][trace_itr][turbostat_count[trace_tc][trace_host"/"trace_roi][trace_itr]]=$(turbostat_columns["GFXWatt"])*1
+    turbostat_corwatt[trace_tc][trace_host"/"trace_roi][trace_itr][turbostat_count[trace_tc][trace_host"/"trace_roi][trace_itr]]=$(turbostat_columns["CorWatt"])*1
+    turbostat_ramwatt[trace_tc][trace_host"/"trace_roi][trace_itr][turbostat_count[trace_tc][trace_host"/"trace_roi][trace_itr]]=$(turbostat_columns["RAMWatt"])*1
+    turbostat_busy[trace_tc][trace_host"/"trace_roi][trace_itr][turbostat_count[trace_tc][trace_host"/"trace_roi][trace_itr]]=$(turbostat_columns["Busy%"])*1
+}
 
 function empty_lines (lines) {
     for(k=1;k<=lines;k++) {
@@ -356,15 +369,15 @@ function write_2d_data(title, tcsp, data, data_type, portal, ith, sortfunc, hidd
             for (itc=1;itc<=ntc;itc++) {
                 if (data_type=="String") {
                     if (length(data[tcsp[itc]][ksp[k]])>0) {
-                        print "<Cell ss:Index=\"" ith[itc] "\" ss:StyleID=\"border\"><Data ss:Type=\"String\">" escape(data[tcsp[itc]][ksp[k]][1]) "</Data></Cell>"
+                        href=length(portal)>0 && length(portal[tcsp[itc]])>0?" ss:HRef=\""portal[tcsp[itc]]"\"":""
+                        print "<Cell ss:Index=\"" ith[itc] "\" ss:StyleID=\"border\""href"><Data ss:Type=\"String\">" escape(data[tcsp[itc]][ksp[k]][1]) "</Data></Cell>"
                     } else {
                         print "<Cell ss:Index=\"" ith[itc] "\" ss:StyleID=\"border\"><Data ss:Type=\"String\"></Data></Cell>"
                     }
                 }
                 if (data_type=="Number") {
                     if (length(data[tcsp[itc]])>0 && length(data[tcsp[itc]][ksp[k]])>0 && length(data[tcsp[itc]][ksp[k]][dii[itc][ksp[k]]])>0) {
-                        href=((remove_prefix(ksp[k]) ~ /^[*]/) && length(portal)>0 && length(portal[tcsp[itc]])>0)?" ss:HRef=\""portal[tcsp[itc]]"\"":""
-                        print "<Cell ss:Index=\"" ith[itc] "\" ss:StyleID=\"border\""href"><Data ss:Type=\"Number\">" data[tcsp[itc]][ksp[k]][dii[itc][ksp[k]]]*1 "</Data></Cell>"
+                        print "<Cell ss:Index=\"" ith[itc] "\" ss:StyleID=\"border\"><Data ss:Type=\"Number\">" data[tcsp[itc]][ksp[k]][dii[itc][ksp[k]]]*1 "</Data></Cell>"
                     } else {
                         print "<Cell ss:Index=\"" ith[itc] "\" ss:StyleID=\"border\"><Data ss:Type=\"Number\"></Data></Cell>"
                     }
@@ -402,6 +415,11 @@ END {
     summarize_data(igt_video_enhance_busy, igt_video_enhance_busy_summary)
     summarize_data(igt_compute_busy, igt_compute_busy_summary)
     summarize_data(igt_unknown_busy, igt_unknown_busy_summary)
+    summarize_data(turbostat_pkgwatt, turbostat_pkgwatt_summary)
+    summarize_data(turbostat_gfxwatt, turbostat_gfxwatt_summary)
+    summarize_data(turbostat_corwatt, turbostat_corwatt_summary)
+    summarize_data(turbostat_ramwatt, turbostat_ramwatt_summary)
+    summarize_data(turbostat_busy, turbostat_busy_summary)
 
     add_xls_header(1)
 
@@ -458,25 +476,31 @@ END {
 
         add_sutinfo_brief(tcsp, ith, hssp)
 
-        write_2d_data("Workload Ingredients:", tcsp, bom[wlsp[iwl]], "String", portal[wlsp[iwl]], ith, "@ind_str_asc", "")
-        write_2d_data("Workload Parameters:", tcsp, tunables[wlsp[iwl]], "String", portal[wlsp[iwl]], ith, "@ind_str_asc", "")
-        write_2d_data("Workload KPI:", tcsp, kpis_v[wlsp[iwl]], "Number", portal[wlsp[iwl]], ith, "@ind_str_asc", "")
-        write_2d_data("pcm socket power (W):", tcsp, pcm_power_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
-        write_2d_data("uprof socket power (W):", tcsp, uprof_power_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
-        write_2d_data("pdu power (W):", tcsp, pdu_power_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
-        write_2d_data("emon packet power (W):", tcsp, emon_power_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
-        write_2d_data("perfspect packet power (W):", tcsp, perfspect_power_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
-        write_2d_data("emon cpu util (%):", tcsp, emon_cpu_util_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
-        write_2d_data("perfspect cpu util (%):", tcsp, perfspect_cpu_util_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
-        write_2d_data("sar cpu util (%):", tcsp, sar_cpu_util_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
-        write_2d_data("collectd cpu util (%):", tcsp, collectd_cpu_util_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
-        write_2d_data("igt package power (W):", tcsp, igt_package_power_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
-        write_2d_data("igt render3d busy (%):", tcsp, igt_render3d_busy_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
-        write_2d_data("igt blitter busy (%):", tcsp, igt_blitter_busy_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
-        write_2d_data("igt video busy (%):", tcsp, igt_video_busy_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
-        write_2d_data("igt video enhance busy (%):", tcsp, igt_video_enhance_busy_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
-        write_2d_data("igt compute busy (%):", tcsp, igt_compute_busy_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
-        write_2d_data("igt unknown busy (%):", tcsp, igt_unknown_busy_summary, "Number", portal[wlsp[iwl]], ith, "host_compare", "worker-0/")
+        write_2d_data("Workload Ingredients:", tcsp, bom[wlsp[iwl]], "String", portal_null, ith, "@ind_str_asc", "")
+        write_2d_data("Workload Parameters:", tcsp, tunables[wlsp[iwl]], "String", portal_null, ith, "@ind_str_asc", "")
+        write_2d_data("Workload Logs:", tcsp, logs[wlsp[iwl]], "String", portal[wlsp[iwl]], ith, "@ind_str_asc", "")
+        write_2d_data("Workload KPI:", tcsp, kpis_v[wlsp[iwl]], "Number", portal_null, ith, "@ind_str_asc", "")
+        write_2d_data("pcm socket power (W):", tcsp, pcm_power_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
+        write_2d_data("uprof socket power (W):", tcsp, uprof_power_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
+        write_2d_data("pdu power (W):", tcsp, pdu_power_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
+        write_2d_data("emon packet power (W):", tcsp, emon_power_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
+        write_2d_data("perfspect packet power (W):", tcsp, perfspect_power_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
+        write_2d_data("emon cpu util (%):", tcsp, emon_cpu_util_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
+        write_2d_data("perfspect cpu util (%):", tcsp, perfspect_cpu_util_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
+        write_2d_data("sar cpu util (%):", tcsp, sar_cpu_util_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
+        write_2d_data("collectd cpu util (%):", tcsp, collectd_cpu_util_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
+        write_2d_data("igt package power (W):", tcsp, igt_package_power_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
+        write_2d_data("igt render3d busy (%):", tcsp, igt_render3d_busy_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
+        write_2d_data("igt blitter busy (%):", tcsp, igt_blitter_busy_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
+        write_2d_data("igt video busy (%):", tcsp, igt_video_busy_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
+        write_2d_data("igt video enhance busy (%):", tcsp, igt_video_enhance_busy_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
+        write_2d_data("igt compute busy (%):", tcsp, igt_compute_busy_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
+        write_2d_data("igt unknown busy (%):", tcsp, igt_unknown_busy_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
+        write_2d_data("turbostat pkg power (W):", tcsp, turbostat_pkgwatt_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
+        write_2d_data("turbostat gfx power (W):", tcsp, turbostat_gfxwatt_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
+        write_2d_data("turbostat core power (W):", tcsp, turbostat_corwatt_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
+        write_2d_data("turbostat ram power (W):", tcsp, turbostat_ramwatt_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
+        write_2d_data("turbostat busy (%):", tcsp, turbostat_busy_summary, "Number", portal_null, ith, "host_compare", "worker-0/")
 
         print "</Table>"
         print "</Worksheet>"

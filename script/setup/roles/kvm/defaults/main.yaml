@@ -13,6 +13,8 @@ kvm_packages:
     - virt-manager
     - arp-scan
     - bridge-utils
+    - numad
+    - nvme-cli
   centos:
     - libvirt-client
     - qemu-kvm
@@ -22,9 +24,11 @@ kvm_packages:
     - virt-install
     - arp-scan
     - bridge-utils
+    - numad
+    - nvme-cli
 kvm_grub_actions:
   debian:
-    grub_path: /etc/default/grub.d/99-kvm-settings.cfg
+    grub_path: /etc/default/grub.d/98-kvm-settings.cfg
     update_grub_cmd: |
         update-grub
   centos:
@@ -32,6 +36,7 @@ kvm_grub_actions:
     update_grub_cmd: |
         grub2-mkconfig -o /boot/grub2/grub.cfg
         grub2-mkconfig -o /etc/grub2.cfg
+kvm_reboot_timeout: 1800
 kvm_hugepage_paths:
   "2m":
     mount_path: /dev/hugepages-2M
@@ -62,3 +67,22 @@ kvm_default_name: default
 kvm_default_bridge: virbr0
 kvm_default_subnet: "192.168.122.0/24"
 
+kvm_image_pool_spec: ""
+kvm_disk_pool_spec: ""
+kvm_pool_os_list:
+- https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
+- https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+
+kvm_sriov_devs: ""
+kvm_dhcpd_devs: ""
+kvm_dhcpd_dhcp_start: "100"
+kvm_dhcpd_dhcp_end: "200"
+kvm_default_network: "default"
+kvm_config_name: "mykvm"
+kvm_vfnet_prefix: "wsfvf"
+
+kvm_nvme_provision: false
+kvm_nvme_block_size: "512"
+kvm_nvme_driver: nvme
+kvm_nvme_vq: 2
+kvm_nvme_vi: 2

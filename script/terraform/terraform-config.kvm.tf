@@ -8,6 +8,7 @@ variable "disk_spec_1" {
     disk_count = 1
     disk_size = 100
     disk_format = "ext4"
+    disk_pool = null
   }
 }
 
@@ -16,6 +17,7 @@ variable "disk_spec_2" {
     disk_count = 1
     disk_size = 200
     disk_format = "ext4"
+    disk_pool = null
   }
 }
 
@@ -47,6 +49,8 @@ variable "worker_profile" {
     name = "worker"
     cpu_core_count = 2
     memory_size = 2
+    cpu_set = null
+    node_set = null
     vm_count = 1
 
     os_image = null
@@ -58,7 +62,7 @@ variable "worker_profile" {
 
     # Specifies which KVM host must be used to host
     # different workers.
-    kvm_hosts = [ 0, 1, 2, 0, 1, 2 ]
+    kvm_hosts = [ 0 ]
   }
 }
 
@@ -67,6 +71,8 @@ variable "client_profile" {
     name = "client"
     cpu_core_count = 2
     memory_size = 2
+    cpu_set = null
+    node_set = null
     vm_count = 1
 
     os_image = null
@@ -78,7 +84,7 @@ variable "client_profile" {
 
     # Specifies which KVM host must be used to host
     # different clients.
-    kvm_hosts = [ 1, 0, 1, 2, 0, 1 ]
+    kvm_hosts = [ 0 ]
   }
 }
 
@@ -87,6 +93,8 @@ variable "controller_profile" {
     name = "controller"
     cpu_core_count = 2
     memory_size = 2
+    cpu_set = null
+    node_set = null
     vm_count = 1
 
     os_image = null
@@ -98,7 +106,7 @@ variable "controller_profile" {
 
     # Specifies which KVM host must be used to host
     # different controllers.
-    kvm_hosts = [ 1, 2, 0, 1, 2, 0 ]
+    kvm_hosts = [ 0 ]
   }
 }
 
@@ -115,29 +123,6 @@ variable "kvm_hosts" {
     pool   = null
   }]
 }
-
-# multiple KVM hosts
-#variable "kvm_hosts" {
-#  default = [{
-#    user = "user"
-#    host = "127.0.1.1"
-#    port = 22
-#    # DHCP must be enabled on the network interface
-#    networks = [ "wsfbr0", "default" ]
-#    # if specified, os image will reuse the storage pool
-#    # images (with same image names.)
-#    pool = "osimages"
-#  }, {
-#    user = "user"
-#    host = "127.0.1.2"
-#    port = 22
-#    # DHCP must be enabled on the network interface
-#    networks = [ "wsfbr0", "default" ]
-#    # if specified, os image will reuse the storage pool
-#    # images (with same image names.)
-#    pool = "osimages"
-#  }]
-#}
 
 terraform {
   required_providers {
@@ -160,16 +145,6 @@ data "external" "keyfile" {
 provider "libvirt" {
   uri = "qemu+ssh://${var.kvm_hosts.0.user}@${var.kvm_hosts.0.host}:${var.kvm_hosts.0.port}/system?keyfile=${data.external.keyfile.0.result.keyfile}"
   alias = "kvm0"
-}
-
-provider "libvirt" {
-  uri = "qemu+ssh://${element(var.kvm_hosts,1).user}@${element(var.kvm_hosts,1).host}:${element(var.kvm_hosts,1).port}/system?keyfile=${element(data.external.keyfile,1).result.keyfile}"
-  alias = "kvm1"
-}
-
-provider "libvirt" {
-  uri = "qemu+ssh://${element(var.kvm_hosts,2).user}@${element(var.kvm_hosts,2).host}:${element(var.kvm_hosts,2).port}/system?keyfile=${element(data.external.keyfile,2).result.keyfile}"
-  alias = "kvm2"
 }
 
 locals {
@@ -203,34 +178,6 @@ module "wsf_kvm0" {
   }
 }
 
-module "wsf_kvm1" {
-  source = "./template/terraform/kvm/local"
-
-  job_id = var.wl_namespace
-  ssh_pub_key = file("${path.root}/ssh_access.key.pub")
-  instance_profiles = local.instance_profiles
-
-  kvm_index = 1
-  kvm_host  = element(var.kvm_hosts,1)
-  providers = {
-    libvirt = libvirt.kvm1
-  }
-}
-
-module "wsf_kvm2" {
-  source = "./template/terraform/kvm/local"
-
-  job_id = var.wl_namespace
-  ssh_pub_key = file("${path.root}/ssh_access.key.pub")
-  instance_profiles = local.instance_profiles
-
-  kvm_index = 2
-  kvm_host  = element(var.kvm_hosts,2)
-  providers = {
-    libvirt = libvirt.kvm2
-  }
-}
-
 output "options" {
   value = merge({
     wl_name : var.wl_name,
@@ -239,25 +186,14 @@ output "options" {
     k8s_enable_registry: true,
   }, {
     for k,v in try(module.wsf_kvm0.options,{}): k => v
-  }, {
-    for k,v in try(module.wsf_kvm1.options,{}): k => v
-  }, {
-    for k,v in try(module.wsf_kvm2.options,{}): k => v
   })
 }
 
 output "instances" {
   sensitive = true
   value = merge({
+  }, {
     for k,v in module.wsf_kvm0.instances : k => merge(v, {
-      csp = "kvm",
-    })
-  }, {
-    for k,v in module.wsf_kvm1.instances : k => merge(v, {
-      csp = "kvm",
-    })
-  }, {
-    for k,v in module.wsf_kvm2.instances : k => merge(v, {
       csp = "kvm",
     })
   })

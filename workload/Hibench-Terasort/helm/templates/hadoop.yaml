@@ -1,0 +1,244 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hadoop-file-conf
+data:
+  HDFS_MASTER_SERVICE: node-master
+  HDOOP_YARN_MASTER: node-master
+  workers: |-
+    node1.hibench-svc.{{ .Values.NAMESPACE }}
+    node2.hibench-svc.{{ .Values.NAMESPACE }}
+    node3.hibench-svc.{{ .Values.NAMESPACE }}
+    node4.hibench-svc.{{ .Values.NAMESPACE }}
+
+  mapred-site.xml: |-
+    <?xml version="1.0"?>
+    <configuration>
+        <property>
+            <name>mapreduce.framework.name</name>
+            <value>yarn</value>
+        </property>
+        <property>
+            <name>mapreduce.output.fileoutputformat.compress</name>
+            <value>true</value>
+        </property>
+        <property>
+            <name>mapreduce.map.output.compress</name>
+            <value>true</value>
+        </property>
+        <property>
+            <name>yarn.app.mapreduce.am.env</name>
+            <value>HADOOP_MAPRED_HOME=${HADOOP_HOME}</value>
+        </property>
+        <property>
+            <name>mapreduce.map.env</name>
+            <value>HADOOP_MAPRED_HOME=${HADOOP_HOME}</value>
+        </property>
+        <property>
+            <name>mapreduce.reduce.env</name>
+            <value>HADOOP_MAPRED_HOME=${HADOOP_HOME}</value>
+        </property>
+        <property>
+            <name>mapreduce.map.cpu.vcores</name>
+            <value>{{ .Values.MAPREDUCE_MAP_CPU_VCORES }}</value>
+        </property>
+        <property>
+            <name>mapreduce.reduce.cpu.vcores</name>
+            <value>{{ .Values.MAPREDUCE_REDUCE_CPU_VCORES }}</value>
+        </property>
+        <property>
+            <name>mapreduce.task.io.sort.factor</name>
+            <value>{{ .Values.MAPREDUCE_TASK_IO_SORT_FACTOR }}</value>
+        </property>
+        <property>
+            <name>mapreduce.task.io.sort.mb</name>
+            <value>{{ .Values.MAPREDUCE_TASK_IO_SORT_MB }}</value>
+        </property>
+        <property>
+            <name>mapreduce.map.sort.spill.percent</name>
+            <value>{{ .Values.MAPREDUCE_MAP_SORT_SPILL_PERCENT }}</value>
+        </property>
+        <property>
+            <name>mapreduce.job.reduce.slowstart.completedmaps</name>
+            <value>{{ .Values.MAPREDUCE_JOB_REDUCE_SLOWSTART_COMPLETEDMAPS }}</value>
+        </property>
+        <property>
+            <name>mapreduce.output.fileoutputformat.compress.codec</name>
+            <value>{{ .Values.MAPREDUCE_OUTPUT_FILEOUTPUTFORMAT_COMPRESS_CODEC }}</value>
+        </property>
+        <property>
+          <name>mapreduce.map.java.opts</name>
+          <value>-Djava.net.preferIPv4Stack=true -XmxMAPREDUCE_MAP_JAVA_OPTS_XMX_REPLACE </value>
+        </property>
+        <property>
+          <name>mapreduce.reduce.java.opts</name>
+          <value>-Djava.net.preferIPv4Stack=true -XmxMAPREDUCE_REDUCE_JAVA_OPTS_XMX_REPLACE </value>
+        </property>
+        <property>
+          <name>mapreduce.job.maps</name>
+          <value>MAPREDUCE_JOB_MAPS_REPLACE</value>
+        </property>
+        <property>
+          <name>mapreduce.job.reduces</name>
+          <value>MAPREDUCE_JOB_REDUCES_REPLACE</value>
+        </property>
+        <property>
+          <name>mapreduce.map.memory.mb</name>
+          <value>MAPREDUCE_MAP_MEMORY_MB_REPLACE</value>
+        </property>
+        <property>
+          <name>mapreduce.reduce.memory.mb</name>
+          <value>MAPREDUCE_REDUCE_MEMORY_MB_REPLACE</value>
+        </property>
+        <property>
+          <name>mapreduce.reduce.shuffle.parallelcopies</name>
+          <value>MAPREDUCE_REDUCE_SHUFFLE_PARALLELCOPIES_REPLACE</value>
+        </property>
+    </configuration>
+
+  yarn-site.xml: |-
+    <?xml version="1.0"?>
+    <configuration>
+        <property>
+            <name>yarn.nodemanager.aux-services</name>
+            <value>mapreduce_shuffle</value>
+        </property>
+        <property>
+            <name>yarn.nodemanager.aux-services.mapreduce_shuffle.class</name>
+            <value>org.apache.hadoop.mapred.ShuffleHandler</value>
+        </property>
+        <property>
+            <name>yarn.resourcemanager.hostname</name>
+            <value>node-master</value>
+        </property>
+        <property>
+            <name>yarn.resourcemanager.bind-host</name>
+            <value>0.0.0.0</value>
+        </property>
+        <property>
+            <name>yarn.nodemanager.resource.detect-hardware-capabilities</name>
+            <value>true</value>
+        </property>
+        <property>
+            <name>yarn.nodemanager.resource.count-logical-processors-as-cores</name>
+            <value>true</value>
+        </property>
+        <property>
+            <name>yarn.scheduler.minimum-allocation-mb</name>
+            <value>{{ .Values.YARN_SCHEDULER_MINIMUM_ALLOCATION_MB }}</value>
+        </property>
+        <property>
+            <name>yarn.scheduler.maximum-allocation-mb</name>
+            <value>{{ .Values.YARN_SCHEDULER_MAXIMUM_ALLOCATION_MB }}</value>
+        </property>
+        <property>
+            <name>yarn.nodemanager.resource.memory-mb</name>
+            <value>{{ .Values.YARN_NODEMANAGER_RESOURCE_MEMORY_MB }}</value>
+        </property>
+        <property>
+            <name>yarn.nodemanager.resource.cpu-vcores</name>
+            <value>{{ .Values.YARN_NODEMANAGER_RESOURCE_CPU_VCORES }}</value>
+        </property>
+        <property>
+            <name>yarn.scheduler.maximum-allocation-vcores</name>
+            <value>{{ .Values.YARN_SCHEDULER_MAXIMUM_ALLOCATION_VCORES }}</value>
+        </property>
+        <property>
+            <name>yarn.nodemanager.vmem-pmem-ratio</name>
+            <value>{{ .Values.YARN_NODEMANAGER_VMEM_PMEM_RATIO }}</value>
+        </property>
+        <property>
+            <name>yarn.scheduler.minimum-allocation-vcores</name>
+            <value>{{ .Values.YARN_SCHEDULER_MINIMUM_ALLOCATION_VCORES }}</value>
+        </property>
+        <property>
+            <name>yarn.nodemanager.resource.percentage-physical-cpu-limit</name>
+            <value>{{ .Values.YARN_NODEMANAGER_RESOURCE_PERCENTAGE_PHYSICAL_CPU_LIMIT }}</value>
+        </property>
+        <property>
+            <name>yarn.resourcemanager.scheduler.client.thread-count</name>
+            <value>{{ .Values.YARN_RESOURCEMANAGER_SCHEDULER_CLIENT_THREAD_COUNT }}</value>
+        </property>
+        <property>
+           <name>yarn.scheduler.increment-allocation-mb</name>
+            <value>512</value>
+        </property>
+        <property>
+            <name>yarn.scheduler.increment-allocation-vcores</name>
+            <value>1</value>
+        </property>
+
+    </configuration>
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hibench-svc
+  namespace: {{ .Values.NAMESPACE }}
+spec:
+  selector:
+    name: hibench-cluster
+  clusterIP: None
+
+{{- $worker_num := (int .Values.WORKERNODE_NUM) -}}
+{{- range $i, $e := until $worker_num }} 
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: hibench-benchmark-{{ add $i 1 }}
+  namespace: {{  $.Values.NAMESPACE }}
+spec:
+  template:
+    metadata:
+      labels:
+        name: hibench-cluster
+    spec:
+      hostname: node{{ add $i 1 }}
+      subdomain: hibench-svc
+      containers:
+      - name: hibench-benchmark-{{ add $i 1 }}
+        image: {{ $.Values.REGISTRY }}hibench{{ $.Values.RELEASE }}
+        imagePullPolicy: {{ include "imagepolicy" $.Values }} 
+        envFrom:
+          - configMapRef: 
+              name: general-config
+          - configMapRef: 
+              name: hdfs-config
+          - configMapRef: 
+              name: yarn-config
+        {{- $args := dict "value" "worker" }}
+        {{- include "hadoopENV" $args | nindent 8 }}
+        volumeMounts:
+{{- $disk_num := (int $.Values.DISK_COUNT) -}}
+{{- range $j, $f := until $disk_num }} 
+        - name: data-hdfs-{{ add $j 1 }}
+          mountPath: /data/0{{ add $j 1 }}/dfs/dn
+{{- end }}
+        {{ include "hadoop-config-volumeMounts" . | nindent 8 }}
+      volumes:
+{{- $disk_num := (int $.Values.DISK_COUNT) -}}
+{{- range $j, $f := until $disk_num }} 
+      - name: data-hdfs-{{ add $j 1 }}
+  {{- if $.Values.ENABLE_MOUNT_DIR }}
+        hostPath:
+          path: {{ $.Values.MOUNT_DIR }}{{ add $j 1 }}/node{{ add $i 1 }}
+          type: DirectoryOrCreate
+  {{- else }}
+        emptyDir: {}
+  {{- end }}
+{{- end }}
+      {{ include "hadoop-config-volumes" . | nindent 6 }}
+      dnsConfig:
+        searches:
+        - hibench-svc.{{ $.Values.NAMESPACE }}.svc.cluster.local
+      restartPolicy: Never
+      affinity:
+      {{- include "podAntiAffinity" . }}
+      {{- include "nodeAffinity" . }}
+{{- end }}

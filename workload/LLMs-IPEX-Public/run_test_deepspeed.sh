@@ -14,7 +14,7 @@ NUMA_NODES=`lscpu | grep  "NUMA node.*CPU(s).*[0-9]$" | wc -l`
 CORES_PER_NUMA=$(( $SOCKETS * $CORES_PER_SOCKET / $NUMA_NODES ))
 echo "CORES_PER_INSTANCE: ${CORES_PER_NUMA}"
 
-# not support 
+# not support
 if [[ "${PRECISION}" != "woq_int8" ]] && [[ "${PRECISION}" != "bfloat16" ]]; then
     echo "Run error, This precision is ${PRECISION} not supported for DeepSpeed, please choose bfloat16 or woq_int8"
     exit 1
@@ -28,6 +28,14 @@ elif [[ "${MODEL_NAME}" == *"Llama"* ]] && [[ "${MODE}" == "accuracy" ]]; then
     exit 1
 fi
 
+# Following MODEL_ABS_PATH is true for all huggingface based llm models
+DEVICE_SHM_PATH="/dev/shm"
+MODEL_FOLDER=$( ls ${DEVICE_SHM_PATH} | grep models )
+SNAPSHOTS=$( ls ${DEVICE_SHM_PATH}/${MODEL_FOLDER} | grep snapshots )
+HASH_ID=$( ls -p ${DEVICE_SHM_PATH}/${MODEL_FOLDER}/${SNAPSHOTS})
+MODEL_ABS_PATH="${DEVICE_SHM_PATH}/${MODEL_FOLDER}/${SNAPSHOTS}/${HASH_ID}"
+echo "MODEL_ABS_PATH: ${MODEL_ABS_PATH}"
+
 # base args
 if [ "${MODE}" == "accuracy" ]; then
     EXEC_ARGS=" --model ${MODEL_NAME} --tasks 'lambada_openai' --batch-size ${BATCH_SIZE}"
@@ -38,7 +46,7 @@ else
                 --num-iter=${STEPS} \
                 --num-warmup=${WARMUP_STEPS} \
                 --batch-size=${BATCH_SIZE} \
-                -m ${MODEL_NAME}"
+                -m ${MODEL_ABS_PATH}"
     if [ "$OUTPUT_TOKENS" != "1" ]; then
         EXEC_ARGS+=" --token-latency"
     fi
@@ -62,7 +70,6 @@ if [ "${MODE}" == "accuracy" ]; then
     echo "DS_TP: ${NUMA_NODES}"
     EVAL_ARGS="deepspeed  --num_gpus 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank"
     EVAL_SCRIPT="distributed/run_accuracy_with_deepspeed.py"
-      
 else
     TOTAL_CORES=$((SOCKETS*CORES_PER_SOCKET))
     CORES_PER_NUMA=$((TOTAL_CORES/NUMA_NODES))

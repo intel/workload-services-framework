@@ -46,7 +46,7 @@ create_view () {
     for license in "$1"/license/*; do
       name="${license/*\//}"
       if [ -r "$license" ] && ([[ "$license" = *"*" ]] && [[ "${3/*\//}" = "${name%'*'}"* ]] || [[ "${3/*\//}" = *".$name" ]]); then
-        i=$(( $(sed -n '{/^\s*$/{q};/^changecom(.*)\s*$/{p;d};/^[^#]/{q};p}' "$3" | wc -l) + 1 ))
+        i=$(( $(sed -n '{/^\s*$/{q};/^changecom(.*)/{p;d};/^[^#]/{q};p}' "$3" | wc -l) + 1 ))
         while IFS= read line; do
           [ "$(sed -n "$i{p}" "$3")" = "$line" ] || sed -i "${i}i${line:-\\}" "$3"
           i=$(( i + 1 ))

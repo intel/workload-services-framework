@@ -86,33 +86,33 @@ BEGIN {
 /^MODEL_SIZE:/{ model_size=$2 }
 /Inference latency:/{ 
     split($2, tmp_str, " ")
-    mean_latency=tmp_str[1]
+    mean_latency=tmp_str[1]/1000
 }
 /\|acc/{
     accuracy=$5
 }
 /First token average latency:/{
     split($2, tmp_str, " ")
-    first_token_average_latency=tmp_str[1]
+    first_token_average_latency=tmp_str[1]/1000
 }
 /Average 2... latency:/{
     split($2, tmp_str, " ")
-    second_token_average_latency=tmp_str[1]
+    second_token_average_latency=tmp_str[1]/1000
     total_throughput=batch_size/second_token_average_latency
 }
-/^P50/{ p50_latency+=$2 }
+/^P50/{ p50_latency+= ($2/1000) }
 /^P90/{ 
     p90_latency="0"
-    p90_latency+=$2
+    p90_latency+= ($2/1000)
     p90+=1
 }
-/^P95/{ p95_latency+=$2 }
+/^P95/{ p95_latency+=($2/1000) }
 /^P99/{
     p99_latency="0"
-    p99_latency+=$2
+    p99_latency+=($2/1000)
     p99+=1
     }
-/^P99.9/{ p999_latency=$2 }
+/^P99.9/{ p999_latency=($2/1000) }
 /torch.version:/{
     framework_version=$2
 }

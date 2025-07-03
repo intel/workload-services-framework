@@ -1,0 +1,72 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kmeans-conf
+data:
+
+  kmeans.conf: |-
+    hibench.kmeans.tiny.num_of_clusters             5
+    hibench.kmeans.tiny.dimensions                  100
+    hibench.kmeans.tiny.num_of_samples              31000000
+    hibench.kmeans.tiny.samples_per_inputfile       10000
+    hibench.kmeans.tiny.max_iteration               40
+    hibench.kmeans.tiny.k                           300
+    hibench.kmeans.tiny.convergedist                0.5
+    hibench.kmeans.small.num_of_clusters            5
+    hibench.kmeans.small.dimensions                 300
+    hibench.kmeans.small.num_of_samples             31000000
+    hibench.kmeans.small.samples_per_inputfile      10000
+    hibench.kmeans.small.max_iteration              40
+    hibench.kmeans.small.k                          300
+    hibench.kmeans.small.convergedist               0.5
+    hibench.kmeans.large.num_of_clusters            5
+    hibench.kmeans.large.dimensions                 400
+    hibench.kmeans.large.num_of_samples             31000000
+    hibench.kmeans.large.samples_per_inputfile      10000
+    hibench.kmeans.large.max_iteration              40
+    hibench.kmeans.large.k                          300
+    hibench.kmeans.large.convergedist               0.5
+    hibench.kmeans.huge.num_of_clusters             5
+    hibench.kmeans.huge.dimensions                  600
+    hibench.kmeans.huge.num_of_samples              31000000
+    hibench.kmeans.huge.samples_per_inputfile       10000
+    hibench.kmeans.huge.max_iteration               40
+    hibench.kmeans.huge.k                           300
+    hibench.kmeans.huge.convergedist                0.5
+    hibench.kmeans.gigantic.num_of_clusters         5
+    hibench.kmeans.gigantic.dimensions              800
+    hibench.kmeans.gigantic.num_of_samples          31000000
+    hibench.kmeans.gigantic.samples_per_inputfile   10000
+    hibench.kmeans.gigantic.max_iteration           40
+    hibench.kmeans.gigantic.k                       300
+    hibench.kmeans.gigantic.convergedist            0.5
+    hibench.kmeans.bigdata.num_of_clusters          5
+    hibench.kmeans.bigdata.dimensions               1000
+    hibench.kmeans.bigdata.num_of_samples           31000000
+    hibench.kmeans.bigdata.samples_per_inputfile    20000
+    hibench.kmeans.bigdata.max_iteration            40
+    hibench.kmeans.bigdata.k                        300
+    hibench.kmeans.bigdata.convergedist             0.5
+    
+
+    hibench.kmeans.num_of_clusters          ${hibench.kmeans.${hibench.scale.profile}.num_of_clusters}
+    hibench.kmeans.dimensions               ${hibench.kmeans.${hibench.scale.profile}.dimensions}
+    hibench.kmeans.num_of_samples           ${hibench.kmeans.${hibench.scale.profile}.num_of_samples}
+    hibench.kmeans.samples_per_inputfile    ${hibench.kmeans.${hibench.scale.profile}.samples_per_inputfile}
+    hibench.kmeans.max_iteration            ${hibench.kmeans.${hibench.scale.profile}.max_iteration}
+    hibench.kmeans.k                        ${hibench.kmeans.${hibench.scale.profile}.k}
+    hibench.kmeans.base.hdfs                ${hibench.hdfs.data.dir}/Kmeans
+    hibench.kmeans.input.sample             ${hibench.workload.input}/samples
+    hibench.kmeans.input.cluster            ${hibench.workload.input}/cluster
+
+    hibench.workload.input                  ${hibench.hdfs.data.dir}/Kmeans/Input
+    hibench.workload.output                 ${hibench.hdfs.data.dir}/Kmeans/Output
+
+    hibench.kmeans.storage.level                    MEMORY_ONLY
+    hibench.kmeans.initializationmode Random

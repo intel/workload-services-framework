@@ -1,0 +1,23 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+  - name: reboot
+    command: reboot
+    ignore_errors: true
+    register: reboot_rc
+    async: 1000
+    poll: 0
+
+  - name: wait for the machine to come back
+    wait_for_connection:
+      connect_timeout: 20
+      sleep: 1
+      delay: 15
+      timeout: "{{ kvm_reboot_timeout }}"
+
+  - async_status:
+      jid: "{{ reboot_rc.ansible_job_id }}"
+      mode: cleanup

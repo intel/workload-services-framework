@@ -1,0 +1,32 @@
+# django_siege_ubuntu2404
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+ARG SIEGE_VER=4.0.7-1build5
+RUN chmod 1777 /tmp
+
+RUN apt-get update && \
+    apt-get install -y openssl libssl-dev siege=${SIEGE_VER}
+
+RUN mkdir -p ~/.siege/ && cp -r /etc/siege/siegerc ~/.siege/siege.conf
+
+COPY ./siege/siege_init_ubuntu2404.sh ./siege/urls.txt ./siege/urls_https.txt ./siege/seen.json /home/scripts/
+RUN chmod +x /home/scripts/siege_init_ubuntu2404.sh
+
+ENV DEBIAN_FRONTEND=teletype
+
+RUN mkfifo /export-logs
+CMD (/home/scripts/siege_init_ubuntu2404.sh; echo $? > status) 2>&1 | tee output.log && \
+    tar cf /export-logs status output.log && \
+    sleep infinity
+

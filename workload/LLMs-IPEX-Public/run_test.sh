@@ -8,9 +8,11 @@
 DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
 source "$DIR"/ai_common/libs/precondition_check.sh
 
+export MODE_WSF=${MODE}
 # activate llm environment
 source activate llm
-source ./tools/env_activate.sh
+source ./tools/env_activate.sh inference
+export MODE=${MODE_WSF}
 unset KMP_SETTINGS
 
 MODEL_ID=$(echo ${MODEL_NAME}|cut -d "/" -f2)
@@ -37,9 +39,16 @@ elif [[ "${MODEL_ID}" == *"gpt-neox"* ]]; then
 elif [[ "${MODEL_ID}" == *"flan-t5"* ]]; then
     echo "BASE_MODEL_NAME: t5"
     echo "MODEL_SIZE: $(echo ${MODEL_ID}|cut -d "-" -f3)"
+elif [[ "${MODEL_ID}" == *"DeepSeek-R1-Distill-Llama-8B"* ]]; then
+    echo "BASE_MODEL_NAME: Llama-8B"
+    echo "MODEL_SIZE: $(echo ${MODEL_ID}|cut -d "-" -f5)"
 elif [[ "${MODEL_ID}" == *"Llama-3"* ]]; then
     echo "BASE_MODEL_NAME: llama3"
-    echo "MODEL_SIZE: $(echo ${MODEL_ID}|cut -d "-" -f4)"
+    if  [[ "${MODEL_ID}" == *"Llama-3.2"* ]]; then
+        echo "MODEL_SIZE: $(echo ${MODEL_ID}|cut -d "-" -f3)"
+    else
+        echo "MODEL_SIZE: $(echo ${MODEL_ID}|cut -d "-" -f4)"
+    fi
 else
     echo "BASE_MODEL_NAME: $(echo ${MODEL_ID}|cut -d "-" -f1)"
     echo "MODEL_SIZE: $(echo ${MODEL_ID}|cut -d "-" -f2)"
@@ -67,7 +76,7 @@ if [[ "${MODEL_ID}" == *"chatglm"* ]]; then
 fi
 
 if [[ "${USE_DEEPSPEED}" == "True" ]]; then
-    ./run_test_deepspeed.sh
+    ./../run_test_deepspeed.sh
 else
-    ./run_test_general.sh
+    ./../run_test_general.sh
 fi

@@ -1,0 +1,23 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app-name: memcached
+    deployPolicy: frontend
+  name: memcached
+spec:
+  ports:
+  - name: "11811"
+    port: {{ .Values.MEMCACHED_PORT }}
+    targetPort: 11811
+  selector:
+    app-name: memcached
+    deployPolicy: frontend
+status:
+  loadBalancer: {}

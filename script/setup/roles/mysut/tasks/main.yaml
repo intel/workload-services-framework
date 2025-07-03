@@ -1,0 +1,22 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Remove any existing terraform-config.tf
+  shell:
+    cmd: |
+      find '{{ playbook_dir }}/../terraform' -name 'terraform-config.{{ mysut_config_name | split(':') | first }}*.tf' -print -delete
+    executable: /bin/bash
+  ignore_errors: true
+
+- name: Create terraform-config.tf
+  template:
+    src: terraform-config.tf.j2
+    dest: "{{ playbook_dir }}/../terraform/terraform-config.{{ mysut_config_name | split(':') | first }}{{ (':' in mysut_config_name) | ternary(mysut_item[0]|string,'') }}.tf"
+  loop: "{{ range(mysut_config_name_1|split(':')|last|int) | zip_longest([],fillvalue=mysut_config_name_1|split(':')|first) | zip_longest([],fillvalue=mysut_config_name_1|split(':')|last|int) | map('flatten') }}"
+  loop_control:
+    loop_var: mysut_item
+  vars:
+    mysut_config_name_1: "{{ mysut_config_name }}{{ (':' in mysut_config_name) | ternary('',':1') }}"

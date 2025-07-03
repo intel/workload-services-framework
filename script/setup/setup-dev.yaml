@@ -42,8 +42,20 @@
       include_role:
         name: dataset
 
-    - name: ctest alias
+    - name: Install alias & functions
       include_role:
         name: alias
-        tasks_from: ctest
+
+    - name: Create Configuration
+      include_role:
+        name: mysut
+      when: (self_host != '')
+      vars:
+        cluster_hosts:
+          "worker-0":
+            ansible_user: "{{ self_host | regex_replace('@.*','') }}"
+            ansible_host: "{{ self_host | regex_replace('.*@','') | regex_replace(':.*','') }}"
+            private_ip: "{{ self_host | regex_replace('.*@','') | regex_replace(':.*','') }}"
+            ansible_port: "{{ self_host | regex_replace('.*:','') }}"
+        mysut_config_name: self
 

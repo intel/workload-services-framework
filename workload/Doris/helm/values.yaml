@@ -1,0 +1,22 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+### Gloabl Configuration ###
+REGISTRY: ""
+RELEASE: ""
+PLATFORM: ""
+BACKEND: ""
+
+### Workload Configuration ###
+WORKLOAD: "doris"
+TESTCASE: ""
+DEBUG: false
+IMAGEARCH: "linux/amd64"
+
+
+DORIS_BE_NUM: 1
+DATA_SIZE_FACTOR: 1
+DATA_GEN_THERADS: 4

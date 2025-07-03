@@ -185,6 +185,15 @@
           trace_module_names: "{{ trace_modules_on_vmhosts | map('regex_replace',':.*$','') }}"
           trace_module_groups: "{{ dict(trace_modules_on_vmhosts | zip(trace_module_names)) | dict2items | groupby('value') | map('last') | map('map',attribute='key') | map('join',':,') }}"
 
+      - name: Copy trace scripts for VM Linux hosts
+        include_role:
+          name: trace
+          tasks_from: trace-script-copy
+        vars:
+          trace_host: "{{ vmhost_host | default(inventory_hostname) }}"
+        when:
+        - ((hostvars[trace_host].ansible_connection | default('ssh')) == 'ssh')
+
       - name: Copy trace script for VM Windows hosts
         include_role:
           name: trace

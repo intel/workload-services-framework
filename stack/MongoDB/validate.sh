@@ -5,8 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-MONGODB_VERSION=${MONGODB_VERSION:="6.0.4"}
-INTEL_FEATURE=${INTEL_FEATURE:="base"}
+MONGODB_VERSION=${MONGODB_VERSION:="4.4.1"}             # 4.4.1/6.0.4/7.0.0/7.1.0 are enabled
+INTEL_FEATURE=${INTEL_FEATURE:="base"}                  # iaa is enabled, currently
 PLATFORM=${PLATFORM:="SPR"}
 
 case $PLATFORM in
@@ -18,12 +18,11 @@ case $PLATFORM in
         ;;
 esac
 
-OPTIONS="${ARCH}mongodb${MONGODB_VERSION//./}.${INTEL_FEATURE}"
-
 # Logs Setting
 DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
 . "$DIR/../../script/overwrite.sh"
 
+OPTIONS="${ARCH}mongodb${MONGODB_VERSION//./}.${INTEL_FEATURE}"
 # Workload Setting
 WORKLOAD_PARAMS=(OPTIONS)
 

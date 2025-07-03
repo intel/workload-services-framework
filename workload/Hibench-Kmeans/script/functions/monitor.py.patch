@@ -1,0 +1,138 @@
+--- ../HiBench/bin/functions/monitor.py	2022-04-07 15:36:12.916432322 -0400
++++ monitor.py	2022-04-06 18:42:28.019098541 -0400
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python2
++#!/usr/bin/python3
+ # Licensed to the Apache Software Foundation (ASF) under one or more
+ # contributor license agreements.  See the NOTICE file distributed with
+ # this work for additional information regarding copyright ownership.
+@@ -17,11 +17,12 @@
+ import threading, subprocess, re, os, sys, signal, socket
+ from time import sleep, time
+ from contextlib import closing
+-import traceback, thread
++import traceback, _thread
+ from datetime import datetime
+ from collections import namedtuple
+ from pprint import pprint
+ from itertools import groupby
++from functools import reduce
+ 
+ # Probe intervals, in seconds.
+ # Warning: a value too short may get wrong results due to lack of data when system load goes high.
+@@ -35,7 +36,7 @@
+     else: s= " ".join([str(x) for x in s])
+ #    with log_lock:
+ #        with open("/home/zhihui/monitor_proc.log", 'a') as f:
+-    log_str = str(thread.get_ident())+":"+str(s) +'\n'
++    log_str = str(_thread.get_ident())+":"+str(s) +'\n'
+     #        f.write( log_str )
+     sys.stderr.write(log_str)
+         
+@@ -262,7 +263,7 @@
+             self._last = stat
+ #            if header.startswith("net"):
+ #                print stat_delta
+-            stat_delta[header+'/total'] = reduce_patched(lambda a,b: a._add(b, 'total'), stat_delta.values())
++            stat_delta[header+'/total'] = reduce_patched(lambda a,b: a._add(b, 'total'), list(stat_delta.values()))
+             self.rproc.aggregate(timestamp, stat_delta)
+ 
+ 
+@@ -329,7 +330,7 @@
+ 
+     def feed(self, container, timestamp):
+         "parse /proc/net/dev"
+-        self.commit(timestamp, "net", dict(filter(lambda x:x, [self._parse_net_dev(line) for line in container])))
++        self.commit(timestamp, "net", dict([x for x in [self._parse_net_dev(line) for line in container] if x]))
+ 
+     def _parse_net_dev(self, line):
+         matched = self._filter.match(line)
+@@ -422,13 +423,13 @@
+                 f.write(repr(datas) + "\n")
+ 
+     def run(self):
+-        for v in self.node_pool.values():
++        for v in list(self.node_pool.values()):
+             v.start()
+ 
+     def stop(self):
+-        for v in self.node_pool.values():
++        for v in list(self.node_pool.values()):
+             v.stop()
+-        for v in self.node_pool.values():
++        for v in list(self.node_pool.values()):
+             v.join()
+ 
+ def round_to_base(v, b):
+@@ -451,7 +452,7 @@
+     return float(int(v * 10**i) / base * base) / (10**i)
+ 
+ def filter_dict_with_prefix(d, prefix, sort=True):
+-    keys = sorted(d.keys()) if sort else d.keys()
++    keys = sorted(d.keys()) if sort else list(d.keys())
+     if prefix[0]=='!':
+         return  dict([(x, d[x]) for x in keys if not x.startswith(prefix[1:])])
+     else:
+@@ -485,7 +486,7 @@
+     with p.ssh_client("localhost", "python -u -c \"{s}\"".format(s=s)) as f:
+         while 1:
+             l = f.readline()
+-            print l.rstrip()
++            print(l.rstrip())
+             if not l: break
+     p.ssh_close()
+ 
+@@ -631,7 +632,7 @@
+         data_by_all_hosts = [classed_by_host.get(h, {}) for h in all_hosts]
+ 
+         # all cpu cores, total cluster
+-        summed1 = [x['cpu/total'] for x in data_by_all_hosts if x.has_key('cpu/total')]
++        summed1 = [x['cpu/total'] for x in data_by_all_hosts if 'cpu/total' in x]
+         if summed1: 
+             summed = reduce_patched(lambda a,b: a._add(b), summed1) / len(summed1)
+             for x in data_by_all_hosts:
+@@ -659,7 +660,7 @@
+                                                host = x['hostname'], cpuid = y.label))
+ 
+         # all disk of each node, total cluster
+-        summed1=[x['disk/total'] for x in data_by_all_hosts if x.has_key('disk/total')]
++        summed1=[x['disk/total'] for x in data_by_all_hosts if 'disk/total' in x]
+         if summed1:
+             summed = reduce_patched(lambda a,b: a._add(b), summed1)
+             for x in data_by_all_hosts:
+@@ -693,7 +694,7 @@
+                                                diskid = y.label))
+ 
+         # memory of each node, total cluster
+-        summed1 = [x['memory/total'] for x in data_by_all_hosts if x.has_key('memory/total')]
++        summed1 = [x['memory/total'] for x in data_by_all_hosts if 'memory/total' in x]
+         if summed1:
+             summed = reduce_patched(lambda a,b: a._add(b), summed1)
+             for x in data_by_all_hosts:
+@@ -725,7 +726,7 @@
+ 
+ 
+         # proc of each node, total cluster
+-        summed1 = [x['proc'] for x in data_by_all_hosts if x.has_key('proc')]
++        summed1 = [x['proc'] for x in data_by_all_hosts if 'proc' in x]
+         if summed1: 
+             summed = reduce_patched(lambda a,b: a._add(b), summed1)
+             for x in data_by_all_hosts:
+@@ -751,7 +752,7 @@
+                                                     host = x['hostname']))
+ 
+         # all network interface, total cluster
+-        summed1 = [x['net/total'] for x in data_by_all_hosts if x.has_key('net/total')]
++        summed1 = [x['net/total'] for x in data_by_all_hosts if 'net/total' in x]
+ 
+         if summed1: 
+             summed = reduce_patched(lambda a,b: a._add(b), summed1)
+@@ -838,7 +839,7 @@
+     nodes_to_monitor = sys.argv[6:]
+     pid=os.fork()
+     if pid:                               #parent
+-        print pid
++        print(pid)
+     else:                                 #child
+         os.close(0)
+         os.close(1)

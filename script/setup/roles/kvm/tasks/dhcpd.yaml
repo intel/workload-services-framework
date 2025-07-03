@@ -1,0 +1,49 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Install isc-dhcp-server
+  package:
+    name: isc-dhcp-server
+    state: present
+  run_once: true
+
+- name: Get the IP subnet
+  shell:
+    cmd: |
+      set -o pipefail
+      ip -o -f inet addr show {{ item }} | sed -n '/scope global/{s|.*inet \([0-9./]*\).*|\1|;p}'
+    executable: /bin/bash
+  register: subnet_rc
+  loop: "{{ kvm_dhcpd_devs | split(',') | reject('==','') }}"
+
+- name: Configure dhcpd
+  blockinfile:
+    path: /etc/dhcp/dhcpd.conf
+    marker: "# {mark} KVM Settings"
+    create: true
+    block: |
+      {% for r in subnet_rc.results | selectattr('rc','==',0) %}
+      subnet {{ r.stdout | ipv4('network') }} netmask {{ r.stdout | ipaddr('netmask') }} {
+        range {{ r.stdout | ipaddr(kvm_dhcpd_dhcp_start) | ipaddr('address') }} {{ r.stdout | ipaddr(kvm_dhcpd_dhcp_end) | ipaddr('address') }};
+        #option routers {{ r.stdout | ipaddr('address') }};
+      }
+      {% endfor %}
+  run_once: true
+
+#- name: Configure isc-dhcp-server
+#  blockinfile:
+#    path: /etc/default/isc-dhcp-server
+#    marker: "# {mark} KVM Settings"
+#    create: true
+#    block: |
+#      INTERFACES="{{ kvm_dhcpd_devs | split(',') | join(' ') }}"
+#  run_once: true
+
+- name: Restart dhcpd
+  service:
+    name: isc-dhcp-server
+    state: restarted
+  run_once: true

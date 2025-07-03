@@ -20,3 +20,13 @@
     wl_namespace: "install-docker"
     k8s_node_labels: []
 
+- hosts: localhost
+  become: false
+  gather_facts: false
+  tasks:
+
+    - name: Create configuration
+      include_role:
+        name: mysut
+      vars:
+        cluster_hosts: "{{ dict(groups.cluster_hosts | zip(groups.cluster_hosts | map('extract',hostvars))) }}"

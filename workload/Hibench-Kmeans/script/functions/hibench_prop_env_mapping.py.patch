@@ -1,0 +1,53 @@
+--- ../HiBench/bin/functions/hibench_prop_env_mapping.py	2022-04-07 15:37:03.628430525 -0400
++++ hibench_prop_env_mapping.py	2022-04-06 18:42:28.019098541 -0400
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python2
++#!/usr/bin/python3
+ # Licensed to the Apache Software Foundation (ASF) under one or more
+ # contributor license agreements.  See the NOTICE file distributed with
+ # this work for additional information regarding copyright ownership.
+@@ -72,6 +72,7 @@
+     # For repartition
+     CACHE_IN_MEMORY="hibench.repartition.cacheinmemory",
+     DISABLE_OUTPUT="hibench.repartition.disableoutput",
++    FROM_HDFS="hibench.repartition.fromhdfs",
+ 
+     # For hive related workload, data scale
+     PAGES="hibench.workload.pages",
+@@ -84,6 +85,9 @@
+     DATATOOLS="hibench.hibench.datatool.dir",
+     BAYES_BASE_HDFS="hibench.bayes.base.hdfs",
+     NGRAMS="hibench.bayes.ngrams",
++    BAYES_USE_DENSE="hibench.bayes.use_dense",
++    BAYES_DENSE_EXAMPLES="hibench.bayes.dense.examples",
++    BAYES_DENSE_FEATURES="hibench.bayes.dense.features",
+     # For kmeans
+     INPUT_SAMPLE="hibench.kmeans.input.sample",
+     INPUT_CLUSTER="hibench.kmeans.input.cluster",
+@@ -168,6 +172,10 @@
+     REG_PARAM_LINEAR="hibench.linear.regularization_param",
+     ELASTICNET_PARAM_LINEAR="hibench.linear.elasticnet_param",
+     TOL_LINEAR="hibench.linear.tolerance",
++    # For Correlation
++    NUM_EXAMPLES_CORRELATION="hibench.correlation.examples",
++    NUM_FEATURES_CORRELATION="hibench.correlation.features",
++    CORR_TYPE="hibench.correlation.corrType",
+     # For LDA
+     NUM_DOCUMENTS_LDA="hibench.lda.num_of_documents",
+     NUM_VOCABULARY_LDA="hibench.lda.num_of_vocabulary",
+@@ -188,6 +196,7 @@
+     RD_FILE_SIZE="hibench.dfsioe.read.file_size",
+     WT_NUM_OF_FILES="hibench.dfsioe.write.number_of_files",
+     WT_FILE_SIZE="hibench.dfsioe.write.file_size",
++    READ_ONLY="hibench.dfsioe.read_only",
+     MAP_JAVA_OPTS="hibench.dfsioe.map.java_opts",
+     RED_JAVA_OPTS="hibench.dfsioe.red.java_opts",
+     # For NWeight
+@@ -240,5 +249,5 @@
+ 
+     )
+ 
+-HiBenchPropEnvMapping=dict([(v,k) for k, v in HiBenchEnvPropMapping.items()])
+-HiBenchPropEnvMappingMandatory=dict([(v,k) for k, v in HiBenchEnvPropMappingMandatory.items()])
++HiBenchPropEnvMapping=dict([(v,k) for k, v in list(HiBenchEnvPropMapping.items())])
++HiBenchPropEnvMappingMandatory=dict([(v,k) for k, v in list(HiBenchEnvPropMappingMandatory.items())])

@@ -1,0 +1,133 @@
+# dlrmv2-pytorch-epyc-zendnn
+ARG OS_VER="22.04"
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_IMAGE="ubuntu"
+ARG RELEASE
+ARG BASE_IMG="pytorch-intel-public-24.04${RELEASE}"
+
+FROM ai-common-img${RELEASE} as ai_common
+FROM dlrmv2-pytorch-epyc-base-zendnn${RELEASE} as benchmark
+
+FROM ${BASE_IMG}
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+# Install Python and system utilities
+RUN apt-get update && apt-get install -y \
+    python3 python3-pip python3-venv wget vim unzip \
+    bsdmainutils autoconf build-essential cmake \
+    numactl tar patch git curl libnuma-dev \
+    python3-dev libopenblas-dev libomp-dev \
+    libprotobuf-dev protobuf-compiler graphviz && \
+    rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip
+RUN pip install --upgrade pip
+
+SHELL ["/bin/bash", "-c"]
+
+# Copy common AI tools
+COPY --from=ai_common /home/ai_common /home/workspace/ai_common
+
+# Copy test runner
+COPY run_test.sh .
+
+# Create FIFO for logs
+RUN mkfifo /export-logs
+
+WORKDIR /home/workspace
+
+# Prepare ZenDNN virtual environment
+RUN python3 -m venv /home/workspace/zendnn/pt-zentorch
+
+COPY *.zip /home/workspace
+
+# Install IPEX, PyTorch, ZenTorch into venv
+RUN source /home/workspace/zendnn/pt-zentorch/bin/activate && \
+    pip install intel_extension_for_pytorch==2.4.0 && \
+    pip install torch==2.4.0 --index-url https://download.pytorch.org/whl/cpu && \
+    # unzip ZENTORCH_v5.0.0_Python_v3.10.zip && \
+    # cd ZENTORCH_v5.0.0_Python_v3.10 && \
+    pip install zentorch
+# Install required packages including venv
+RUN apt-get update && apt-get install -y \
+    python3 python3-pip python3-venv \
+    wget vim unzip bsdmainutils autoconf build-essential cmake \
+    numactl tar patch git curl libnuma-dev
+
+# Create virtual environment
+RUN python3 -m venv /home/workspace/zendnn/pt-zentorch
+
+# Upgrade pip and install packages using the venv's pip
+RUN /home/workspace/zendnn/pt-zentorch/bin/pip install --upgrade pip && \
+    /home/workspace/zendnn/pt-zentorch/bin/pip install \
+        onnx \
+        tensorboard==2.9.1 \
+        pydot==1.4.2 \
+        tqdm \
+        scikit-learn \
+        pandas \
+        psutil \
+        protobuf \
+        pybind11 \
+        mlperf-logging \
+        matplotlib
+
+# Setup workspace for DLRM
+RUN mkdir -p /home/ubuntu/workspace
+WORKDIR /home/ubuntu/workspace
+
+# Clone DLRM and MLPerf Logging
+ARG DLRM_VER="11afc52"
+ARG DLRM_BRANCH="main"
+ARG DLRM_COMMIT_ID="11afc52"
+ARG DLRM_REPO="https://github.com/facebookresearch/dlrm.git"
+
+ARG MLP_LOGGING_VER="v2.0"
+ARG MLP_LOGGING_COMMIT_ID="065e4ce"
+ARG MLP_LOGGING_REPO="https://github.com/mlcommons/logging"
+
+# official facebook dlrm repo
+RUN cd /home/ubuntu/workspace && \
+    git clone -b ${DLRM_BRANCH} ${DLRM_REPO} && \
+    cd dlrm && git reset --hard ${DLRM_COMMIT_ID} && \
+    git clone ${MLP_LOGGING_REPO} && \
+    cd logging && git reset --hard ${MLP_LOGGING_COMMIT_ID} && \
+    cd .. && cp -r logging/mlperf_logging ./.
+
+
+# Set the working directory
+ENV BENCHMARK_DIR=/home/ubuntu/workspace/dlrm
+WORKDIR ${BENCHMARK_DIR}
+
+ADD dlrm_patch.diff ${BENCHMARK_DIR}
+
+# Apply patch
+RUN git apply dlrm_patch.diff
+
+COPY run_test.sh .
+
+# Install extra Python modules inside venv
+RUN source /home/workspace/zendnn/pt-zentorch/bin/activate && \
+    pip install torchmetrics pyre_extensions torchrec \
+    fbgemm_gpu==0.3.2 iopath scikit-learn numpy==1.23.5 pillow==10.3.0 protobuf==3.20.3
+
+# ZenDNN environment variables
+ENV ZENDNN_PRIMITIVE_CACHE_CAPACITY=1024
+ENV ZENDNN_TENSOR_BUF_MAXSIZE_ENABLE=0
+ENV ZENDNN_LOG_OPTS=ALL:2
+ENV ZENDNN_GEMM_ALGO=3
+ENV ZENDNN_INFERENCE_ONLY=1
+ENV ZENDNN_ENABLE_MEMPOOL=2
+ENV ZENDNN_TENSOR_POOL_LIMIT=1024
+ENV ZENDNN_TF_CONV_ADD_FUSION_SAFE=0
+
+# Default command: run test
+CMD (source /home/workspace/zendnn/pt-zentorch/bin/activate && ./run_test.sh; \
+    echo $? > status) 2>&1 | tee benchmark_${MODE}_${TOPOLOGY}_${PRECISION}_${FUNCTION}_${DATA_TYPE}_$(date +"%m-%d-%y-%H-%M-%S").log && \
+    tar cf /export-logs status $(find . -name "*.log") && \
+    sleep infinity
