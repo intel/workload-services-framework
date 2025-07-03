@@ -70,10 +70,20 @@ elif [[ "${MODEL_NAME}" == *"opt-6.7b"* ]]; then
     MODEL_PATH=${MODEL_PATH:-"/opt/dataset/opt/6b7"}
 elif [[ "${MODEL_NAME}" == *"flan-t5-xl"* ]]; then
     MODEL_PATH=${MODEL_PATH:-"/opt/dataset/t5/flan-t5-xl"}
+elif [[ "${MODEL_NAME}" == *"DeepSeek-V2.5"* ]]; then
+    MODEL_PATH=${MODEL_PATH:-"/opt/dataset/deepseek-v25"}
+elif [[ "${MODEL_NAME}" == *"DeepSeek-R1-Distill-Llama-8B"* ]]; then
+    MODEL_PATH=${MODEL_PATH:-"/opt/dataset/deepseek-r1-distill/llama/8b"}
 elif [[ "${MODEL_NAME}" == *"Mistral"* ]]; then
     MODEL_PATH=${MODEL_PATH:-"/opt/dataset/mistral/$(echo ${MODEL_NAME}|cut -d "/" -f2| tr '[:upper:]' '[:lower:]')"}
 elif [[ "${MODEL_NAME}" == *"Llama-3"* ]]; then
-    MODEL_PATH=${MODEL_PATH:-"/opt/dataset/llama3/$(echo ${MODEL_NAME,,}|cut -d "/" -f2|cut -d "-" -f4)"}
+    if  [[ "${MODEL_NAME}" == *"Llama-3.1"* ]]; then
+        MODEL_PATH=${MODEL_PATH:-"/opt/dataset/llama31/$(echo ${MODEL_NAME,,}|cut -d "/" -f2|cut -d "-" -f4)"}
+    elif  [[ "${MODEL_NAME}" == *"Llama-3.2"* ]]; then
+        MODEL_PATH=${MODEL_PATH:-"/opt/dataset/llama32/$(echo ${MODEL_NAME,,}|cut -d "/" -f2|cut -d "-" -f3)"}
+    else
+        MODEL_PATH=${MODEL_PATH:-"/opt/dataset/llama3/$(echo ${MODEL_NAME,,}|cut -d "/" -f2|cut -d "-" -f4)"}
+    fi
 else
     LOWER_MODEL_NAME=$(echo $MODEL_NAME | tr '[:upper:]' '[:lower:]')
     MODEL_PATH=${MODEL_PATH:-"/opt/dataset/$(echo ${LOWER_MODEL_NAME}|cut -d "/" -f2|cut -d "-" -f1)/$(echo ${LOWER_MODEL_NAME}|cut -d "/" -f2|cut -d "-" -f2)"}
@@ -99,16 +109,20 @@ ALL_KEYS="MODE WORKLOAD PRECISION NUMA_NODES_USE FUNCTION DATA_TYPE BATCH_SIZE I
 WORKLOAD_PARAMS=($ALL_KEYS)
 
 # Docker Setting
-
 if [[ -e "$DIR/build_int.sh" ]]; then
     DOCKER_IMAGE="$DIR/Dockerfile.1.inference"
-else 
+else
     DOCKER_IMAGE="$DIR/Dockerfile.1.inference_24.04"
 fi
 
-#DOCKER_IMAGE="$DIR/Dockerfile.1.inference"
 DOCKER_ARGS=$(eval echo \"$(docker_settings $ALL_KEYS)\")
-DOCKER_OPTIONS="--network host --privileged $DOCKER_ARGS -v ${MODEL_PATH}:/root/.cache/huggingface/hub"
+
+DEST_DATASET_DIR="/root/.cache/huggingface/hub"
+if [[ "${USE_DEEPSPEED}" == "True" ]]; then
+    DEST_DATASET_DIR="/dev/shm"
+fi
+
+DOCKER_OPTIONS="--network host --privileged $DOCKER_ARGS -v ${MODEL_PATH}:${DEST_DATASET_DIR}"
 
 # Kubernetes Setting
 K8S_PARAMS=$(eval echo \"$(k8s_settings $ALL_KEYS)\")

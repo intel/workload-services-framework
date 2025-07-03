@@ -17,7 +17,7 @@ print_help () {
   echo "--worker       Specify a worker vm_group."
   echo "--client       Specify a client vm_group."
   echo "--controller   Specify a controller vm_group."
-  echo "--sut <file>   Specify the sut configuration file."
+  echo "--sut <file>[:#slices]   Specify the sut configuration file."
   echo ""
   exit 3
 }
@@ -74,7 +74,7 @@ done
 . <(sed '/^# BEGIN WSF Setup/,/^# END WSF Setup/{d}' /etc/environment) > /dev/null
 export http_proxy https_proxy no_proxy
 rm -f /tmp/wsf-setup-ssh-* 2> /dev/null || true
-ANSIBLE_ROLES_PATH=../terraform/template/ansible/docker/roles:../terraform/template/ansible/common/roles:../terraform/template/ansible/traces/roles ANSIBLE_INVENTORY_ENABLED=yaml ansible-playbook -vv -e wl_logs_dir="$DIR" -e compose=true -e my_ip_list=1.1.1.1 "${ansible_options[@]}" --inventory <(create_inventory) ./setup-sut-docker.yaml 2>&1 | tee -a setup-sut-docker.logs
+ANSIBLE_ROLES_PATH=../terraform/template/ansible/docker/roles:../terraform/template/ansible/common/roles:../terraform/template/ansible/traces/roles ANSIBLE_INVENTORY_ENABLED=yaml ansible-playbook -vv -e mysut_config_name="$sutname" -e wl_logs_dir="$DIR" -e compose=true -e my_ip_list=1.1.1.1 "${ansible_options[@]}" --inventory <(create_inventory) ./setup-sut-docker.yaml 2>&1 | tee -a setup-sut-docker.logs
 rm -f timing.yam
 
-create_tf_file 2>&1 | tee -a setup-sut-docker.logs
+show_tf_file 2>&1 | tee -a setup-sut-docker.logs

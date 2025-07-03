@@ -14,7 +14,7 @@ print_help () {
     echo "--port <port>    Specify the SUT ssh port."
     echo "--nointelcert    Do not install Intel certificates."
     echo "--no-password    Do not ask for password. Use DEV_SUDO_PASSWORD, SUT_SSH_PASSWORD and/or SUT_SUDO_PASSWORD instead."
-    echo "--sut <file>     Specify the sut configuration file."
+    echo "--sut <file>[:#slices]  Specify the sut configuration file."
     echo ""
     exit 3
 }
@@ -111,7 +111,7 @@ done 2>&1 | tee -a setup-sut-native.logs
 rm -f /tmp/wsf-setup-ssh-* 2> /dev/null || true
 . <(sed '/^# BEGIN WSF Setup/,/^# END WSF Setup/{d}' /etc/environment) > /dev/null
 export http_proxy https_proxy no_proxy
-ANSIBLE_ROLES_PATH=../terraform/template/ansible/common/roles:../terraform/template/ansible/traces/roles ANSIBLE_INVENTORY_ENABLED=yaml ansible-playbook --flush-cache -vv -e install_intelca=$intelcert -e wl_logs_dir="$DIR" -e my_ip_list=1.1.1.1 "${ansible_options[@]}" --inventory <(create_inventory) ./setup-sut-native.yaml 2>&1 | tee -a setup-sut-native.logs
+ANSIBLE_ROLES_PATH=../terraform/template/ansible/common/roles:../terraform/template/ansible/traces/roles ANSIBLE_INVENTORY_ENABLED=yaml ansible-playbook --flush-cache -vv -e mysut_config_name="$([[ "$(ps -p $(ps -o ppid= -p $$) -o comm=)" = "setup-"* ]] || echo "$sutname")" -e install_intelca=$intelcert -e wl_logs_dir="$DIR" -e my_ip_list=1.1.1.1 "${ansible_options[@]}" --inventory <(create_inventory) ./setup-sut-native.yaml 2>&1 | tee -a setup-sut-native.logs
 rm -f timing.yaml
 
-[[ "$(ps -p $(ps -o ppid= -p $$) -o comm=)" = "setup-"* ]] || create_tf_file 2>&1 | tee -a setup-sut-native.logs
+[[ "$(ps -p $(ps -o ppid= -p $$) -o comm=)" = "setup-"* ]] || show_tf_file 2>&1 | tee -a setup-sut-native.logs

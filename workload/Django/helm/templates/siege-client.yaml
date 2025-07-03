@@ -1,0 +1,69 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: benchmark
+  labels:
+    app: benchmark
+    deployPolicy: benchmark
+spec:
+  template:
+    metadata:
+      labels:
+        app: benchmark
+        deployPolicy: benchmark
+    spec:
+      containers:
+      - name: benchmark
+        image: {{ .Values.REGISTRY }}django_siege{{ .Values.IMARCH }}{{ .Values.OS_SUFFIX }}{{ .Values.RELEASE }}
+        imagePullPolicy: {{ include "imagepolicy" .Values }}
+        env:
+        - name: TLS
+          value: {{ .Values.TLS | quote }}
+        - name: TARGET_ENDPOINT
+          value: frontend
+        - name: ATTEMPT
+          value: {{ .Values.ATTEMPT | quote }}
+        - name: WORKER
+          value: {{ .Values.SIEGE_WORKER | quote }}
+        - name: DURATION
+          value: {{ .Values.DURATION | quote }}
+      initContainers:
+      - name: wait-for-front-ready
+        image: curlimages/curl:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh","-c","until nc -z -w5 frontend:{{ .Values.FRONTEND_PORT }};do echo Waiting...;sleep 1s;done"]
+      - name: sysctl
+        image: busybox
+        imagePullPolicy: Always
+        command:
+        - sysctl
+        - -w
+        - net.ipv4.tcp_tw_reuse=1
+        - net.ipv4.ip_local_port_range=1024 65535
+        - net.core.somaxconn=16384
+        securityContext:
+          privileged: true
+      restartPolicy: Never
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: deployPolicy
+                operator: In
+                values:
+                - frontend
+            topologyKey: "kubernetes.io/hostname"
+          - labelSelector:
+              matchExpressions:
+              - key: deployPolicy
+                operator: In
+                values:
+                - cassandra
+            topologyKey: "kubernetes.io/hostname"

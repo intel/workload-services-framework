@@ -36,6 +36,7 @@ WORKDIR /dataset
 # Therefore, we kindly request that you carefully read and accept the usage terms and conditions via the following link before proceeding with the download.
 # You can read and accept the use terms and conditions via the following link:
 # https://ailab.criteo.com/criteo-1tb-click-logs-dataset-for-mlperf/
+# Current link for dataset download: https://huggingface.co/datasets/criteo/CriteoClickLogs/tree/main
 # Thank you for your cooperation and understanding.
 
 # By exercising the Licensed Rights (defined on https://ailab.criteo.com/criteo-1tb-click-logs-dataset-for-mlperf/),

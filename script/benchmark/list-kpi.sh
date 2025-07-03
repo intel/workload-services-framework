@@ -13,9 +13,7 @@ print_help () {
     echo "--all                 List all KPIs."
     echo "--params              Print out all configuration parameters."
     echo "--sutinfo             Print out sutinfo."
-    echo "--format <format>     Specify the output format: list, xls-list."
-    echo "--file filename       Specify the spreadsheet filename."
-    echo "--uri                 Show WSF portal URI."
+    echo "--xls-list [filename] Generate the xls-list spreadsheet."
     echo "--intel_publish       Publish logs to the WSF dashboard."
     echo "--export-trace        Re-run the trace export routines."
     echo "--owner <name>        Set publisher owner."
@@ -42,7 +40,7 @@ get_recent_logs () {
   DIRPATH="$(pwd)"
   while [[ "$DIRPATH" = */* ]]; do
     if [ -r "$DIRPATH/.log_files" ]; then
-      cat "$DIRPATH/.log_files" | sort | uniq
+      sed 's| *#.*$||' "$DIRPATH/.log_files" 2> /dev/null | sort | uniq
       break
     fi
     DIRPATH="${DIRPATH%/*}"
@@ -56,7 +54,6 @@ format="list"
 xlsfile="kpi-report.xls"
 params=0
 sutinfo=0
-uri=0
 last_var=""
 intel_publish=0
 trace_export=0
@@ -83,11 +80,12 @@ for var in "$@"; do
     --format=*)
         format="${var#--format=}"
         ;;
-    --file=*)
-        xlsfile="${var#--file=}"
+    --xls-list=*)
+        format="xls-list"
+        xlsfile="${var#--xls-list=}"
         ;;
-    --uri)
-        uri=1
+    --xls-list)
+        format="xls-list"
         ;;
     --help)
         print_help
@@ -107,7 +105,7 @@ for var in "$@"; do
     --pretag=*)
         pretag="${var#--pretag=}"
         ;;
-    --file|--format|--owner|--tags|--pretag)
+    --format|--owner|--tags|--pretag)
         ;;
     --recent)
         IFS=$'\n' prefixes+=($(get_recent_logs))
@@ -117,7 +115,8 @@ for var in "$@"; do
         --format)
             format="$var"
             ;;
-        --file)
+        --xls-list)
+            format="xls-list"
             xlsfile="$var"
             ;;
         --owner)
@@ -224,9 +223,9 @@ for logsdir1 in "${prefixes[@]}"; do
                 echo
             fi
         done
-        for trace_file in "$logsdir1"/*-pcm/roi-*/power.records "$logsdir1"/*-pdu/pdu-*.logs "$logsdir1"/*-uprof/roi-*/timechart.csv "$logsdir1"/*-emon/emon-*-edp/__mpp_socket_view_details.csv "$logsdir1"/*-emon/emon-*-edp/__mpp_system_view_details.csv "$logsdir1"/*-perfspect/roi-*/*_metrics.csv "$logsdir1"/*-sar/sar-*.logs.txt "$logsdir1"/*-collectd/aggregation-cpu-average/cpu-user-* "$logsdir1"/*-igt/igt-card*-*.logs; do
+        for trace_file in "$logsdir1"/*-pcm/roi-*/power.records "$logsdir1"/*-pdu/pdu-*.logs "$logsdir1"/*-uprof/roi-*/timechart.csv "$logsdir1"/*-emon/emon-*-edp/__mpp_socket_view_details.csv "$logsdir1"/*-emon/emon-*-edp/__mpp_system_view_details.csv "$logsdir1"/*-perfspect/roi-*/*_metrics.csv "$logsdir1"/*-sar/sar-*.logs.txt "$logsdir1"/*-collectd/aggregation-cpu-average/cpu-user-* "$logsdir1"/*-igt/igt-card*-*.logs "$logsdir1"/*-turbostat/turbostat-*.txt; do
             if [ -r "$trace_file" ]; then
-                trace_module="$(echo "$trace_file" | sed -E 's|^.*/([^/]+[-])?logs[-][^/]+/[a-z]+[-][0-9]+([-][0-9]+)?[-]([a-z-]+)/.*$|\3|')"
+                trace_module="$(echo "${trace_file#"$logsdir1/"}" | sed -E 's|^[^/]+[-]([a-z-]+)/.*$|\1|')"
                 echo "#$trace_module: $trace_file"
                 sed "s/^/#$trace_module- /" "$trace_file"
                 echo "#$trace_module- "
@@ -288,7 +287,7 @@ for logsdir1 in "${prefixes[@]}"; do
         echo "$logsdir1:"
         echo "# status: failed"
     fi
-    if [ -r "$logsdir1/publish.logs" ] && [ "$uri" -eq 1 ]; then
+    if [ -r "$logsdir1/publish.logs" ]; then
         sed -n '/WSF Portal URL:/{s/^[^:]*:/# portal:/;p;q}' "$logsdir1/publish.logs"
     fi
 done | (

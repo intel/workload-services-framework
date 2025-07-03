@@ -1,0 +1,24 @@
+# llms-pytorch-epyc-zendnn-inference-lite
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+
+FROM llms-pytorch-epyc-zendnn-base${RELEASE}
+
+COPY --from=ai-common-img /home/ai_common ./ai_common
+
+COPY run_test_general.sh .
+COPY run_test.sh .
+
+# Ensure all scripts have execute permissions
+RUN chmod +x /home/workspace/run_test.sh /home/workspace/run_test_general.sh 
+
+RUN mkfifo /export-logs
+CMD ( ./run_test.sh; \
+    echo $? > status) 2>&1 | tee benchmark_${MODE}_${TOPOLOGY}_${PRECISION}_${FUNCTION}_${DATA_TYPE}_$(date +"%m-%d-%y-%H-%M-%S").log && \
+    tar cf /export-logs status $(find . -maxdepth 1 -name "*.log") && \
+    sleep infinity

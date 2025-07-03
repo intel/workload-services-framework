@@ -36,6 +36,10 @@
           build_commit_id: "{{ image_labels | selectattr('key', '==', 'BUILD_COMMIT_ID') | map(attribute='value') | unique | join(',') }}"
           build_branch: "{{ image_labels | selectattr('key', '==', 'BUILD_BRANCH') | map(attribute='value') | unique | join(',') }}"
           build_id: "{{ image_labels | selectattr('key', '==', 'BUILD_ID') | map(attribute='value') | unique | join(',') }}"
+          image_bom:
+          {% for kv in image_labels | selectattr('key','match','ARG_.*') | map(attribute='key') | zip(image_labels | selectattr('key','match','ARG_.*') | map(attribute='value')) | map('join',': "') %}
+            {{ kv | regex_replace('^ARG_','') }}"
+          {% endfor %}
       become: false
       vars:
         image_labels: "{{ inspect_l.results | map(attribute='stdout') | map('from_json') | flatten | map(attribute='Config') | map('default',[],true) | map(attribute='Labels') | union(inspect_r.results | default([]) | map(attribute='stdout') | map('default','[]',true) | map('from_json') | flatten | map(attribute='Labels')) | map('default',{},true) | map('dict2items') | flatten }}"

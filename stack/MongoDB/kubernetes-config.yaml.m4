@@ -27,7 +27,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
       - name: mongodb-server
-        image: IMAGENAME(Dockerfile.1.defn(`OPTIONS'))
+        image: IMAGENAME(Dockerfile.2.defn(`OPTIONS'))
         imagePullPolicy: IMAGEPOLICY(Always)
         ports:
           - containerPort: 27017
@@ -75,23 +75,10 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
       - name: unittest
-        image: IMAGENAME(Dockerfile.1.defn(`OPTIONS'))
+        image: IMAGENAME(Dockerfile.1.amd64mongodb710.iaa.unittest)
         imagePullPolicy: IMAGEPOLICY(Always)
         securityContext:
           privileged: true
-        command: ["/bin/bash", "-c", "/tests/unittest.sh"]
-        args:
-          - |
-            chmod +x /tests/unittest.sh
-            /tests/unittest.sh
-        volumeMounts:
-          - name: unittest-volume
-            mountPath: /tests
-      volumes:
-      - name: unittest-volume
-        configMap:
-          name: unittest-cm
-          defaultMode: 0744
       restartPolicy: Never
 
 ---
@@ -112,30 +99,3 @@ data:
     eval "touch $log_path"
     cd /usr/src/mongodb/bin
     ./mongod --port 27017 --bind_ip_all --fork --logpath $log_path --dbpath $db_path
-
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: unittest-cm
-data:
-  unittest.sh: |
-    #!/bin/bash
-
-    COUNTER=0
-    LIMIT=180
-    FLAG=1
-    nc -z -w5 mongodb-server-service 27017
-    FLAG=$?
-    until ((FLAG == 0)); do
-            ((COUNTER++))
-            echo "mongodb-server-service connection are unstable for $COUNTER seconds"
-            nc -z -w5 mongodb-server-service 27017
-            FLAG=$?
-            if [ $COUNTER -ge $LIMIT ]; then
-                echo "Connection FAILED after $COUNTER seconds"
-                exit 1 ;
-            fi
-            sleep 1
-        done
-    echo "SUCCESS"

@@ -1,0 +1,71 @@
+# syntax=docker/dockerfile:1
+# hibench-kmeans-worker
+ARG OS_VER=9.3
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_IMAGE=rockylinux
+
+FROM ${OS_IMAGE}:${OS_VER}
+RUN yum install -y dnf-plugins-core
+RUN dnf config-manager --set-enabled crb
+RUN yum install -y maven git bc patch zlib telnet wget openssh-clients openssh-server net-tools procps-ng
+
+# JDK
+ARG JDKVER
+ARG JDKARCH
+ARG BACKPORT_NUM
+ARG JDK_PACKAGE=https://github.com/adoptium/temurin8-binaries/releases/download/jdk${JDKVER}-${BACKPORT_NUM}/OpenJDK8U-jdk_${JDKARCH}_linux_hotspot_${JDKVER}${BACKPORT_NUM}.tar.gz
+RUN echo ${JDK_PACKAGE}
+RUN wget ${JDK_PACKAGE} && \
+    tar xf OpenJDK8U-jdk_${JDKARCH}_linux_hotspot_${JDKVER}${BACKPORT_NUM}.tar.gz && \
+    mv /jdk*/ /jdk
+
+ENV JAVA_HOME=/jdk
+
+ARG HADOOP_VER=3.4.1
+ARG HADOOP_PACKAGE=https://archive.apache.org/dist/hadoop/common/hadoop-${HADOOP_VER}/hadoop-${HADOOP_VER}.tar.gz
+RUN wget -O hadoop-${HADOOP_VER}.tar.gz ${HADOOP_PACKAGE} && \
+    tar -xf /hadoop-${HADOOP_VER}.tar.gz && \
+    mv /hadoop-${HADOOP_VER} /usr/local/hadoop && \
+    rm /hadoop-${HADOOP_VER}.tar.gz
+#hadoop-functions.sh to remove user use in hadoop-functions.sh
+RUN sed -i 's/sudo -u "${user}" -- "\$@"/"\$@"/' /usr/local/hadoop/libexec/hadoop-functions.sh
+
+COPY config/ /tmp/
+
+ENV JAVA_HOME=/jdk
+ENV HADOOP_HOME=/usr/local/hadoop 
+ENV PATH=$PATH:/usr/local/hadoop/bin:/usr/local/hadoop/sbin:$JAVA_HOME/bin
+ENV HDFS_NAMENODE_USER=root
+ENV HDFS_DATANODE_USER=root
+ENV HDFS_SECONDARYNAMENODE_USER=root
+ENV YARN_RESOURCEMANAGER_USER=root
+ENV YARN_NODEMANAGER_USER=root
+
+RUN mkdir -p ~/.ssh && \ 
+    ssh-keygen -t rsa -P '' -f /etc/ssh/ssh_host_rsa_key  && \ 
+    ssh-keygen -t rsa -P '' -f ~/.ssh/id_rsa && \ 
+    cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys && \ 
+    chmod 0600 ~/.ssh/authorized_keys && \  
+    mv /tmp/bashrc  ~/.ssh/.bashrc && \ 
+    mkdir -p ~/hdfs/namenode && \ 
+    mkdir -p ~/hdfs/datanode && \
+    mkdir $HADOOP_HOME/logs && \
+    mv /tmp/hadoop-env.sh /usr/local/hadoop/etc/hadoop/hadoop-env.sh && \
+    mv /tmp/hdfs-site.xml $HADOOP_HOME/etc/hadoop/hdfs-site.xml && \ 
+    mv /tmp/core-site.xml $HADOOP_HOME/etc/hadoop/core-site.xml && \
+    mv /tmp/start-hadoop.sh ~/start-hadoop.sh && \
+    chmod +x ~/start-hadoop.sh && \
+    chmod +x $HADOOP_HOME/sbin/start-dfs.sh && \
+    chmod +x $HADOOP_HOME/sbin/start-yarn.sh
+
+# COPY docker-entrypoint.sh /
+# EXPOSE 22 9870 9000
+# CMD /docker-entrypoint.sh  && \
+#      sleep infinity
+COPY script/run_test.sh /
+CMD  (/run_test.sh; echo $? > status) 2>&1 | tee output.logs && \
+     sleep infinity

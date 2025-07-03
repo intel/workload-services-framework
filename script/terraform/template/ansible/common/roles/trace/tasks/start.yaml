@@ -43,7 +43,7 @@
             sudo -E {{ trace_tmp_path }}/{{ wl_namespace }}-{{ h }}-trace/start-trace.sh {{ roi_index }} {{ itr | default(1) }} &
           {% endif %}
           {% if ((hostvars[h].ansible_connection|default('ssh'))=='ssh') %}
-            ssh -p {{ hostvars[h]['ansible_port'] | default(22) }} {{ hostvars[h]['ansible_user'] }}@{{ hostvars[h]['ansible_host'] }} {% if ansible_private_key_file is defined %}-i {{ ansible_private_key_file }}{% endif %} sudo -E {{ trace_tmp_path }}/{{ wl_namespace }}-{{ h }}-trace/start-trace.sh {{ roi_index }} {{ itr | default(1) }} {{ hostvars[h].WORKLOAD_METADATA | default([]) | join(' ') }} &
+            ssh -p {{ hostvars[h]['ansible_port'] | default(22) }} {{ hostvars[h]['ansible_user'] }}@{{ hostvars[h]['ansible_host'] }} {% if (hostvars[h].ansible_private_key_file is defined) and ((hostvars[h].vm_group|default('worker')) not in ['vmhost_hosts']) %}-i {{ hostvars[h].ansible_private_key_file }}{% endif %} sudo -E {{ trace_tmp_path }}/{{ wl_namespace }}-{{ h }}-trace/start-trace.sh {{ roi_index }} {{ itr | default(1) }} {{ hostvars[h].WORKLOAD_METADATA | default([]) | join(' ') }} &
           {% endif %}
           {% if ((hostvars[h].ansible_connection|default('ssh'))=='winrm') %}
             {% if (csp|default('static')) in ['kvm','hyperv'] %}no_proxy="$no_proxy,{{ hostvars[h].ansible_host }}"{% endif %} {{ role_path }}/scripts/runps1.py {{ h }} "& {{ trace_win_tmp_path }}\\\\{{ wl_namespace }}-{{ h }}-trace\\\\start-trace.ps1 {{ roi_index }} {{ itr | default(1) }}" &

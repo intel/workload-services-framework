@@ -1,0 +1,56 @@
+# gva-cnn-datasets
+ 
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+FROM ${OS_IMAGE}:${OS_VER} AS base-image
+ARG DEBIAN_FRONTEND=noninteractive
+ 
+WORKDIR /home/kpi
+COPY script/mobilenet_nncf.py /home/kpi/
+COPY script/model_quantization.sh /home/kpi/
+COPY datasets/* /home/kpi/
+ 
+RUN apt-get update && apt-get install libglib2.0-dev curl wget unzip git libgl1 -y
+ 
+ARG DOWNLOAD_URL="http://images.cocodataset.org/zips/val2017.zip"
+RUN if [ ! -f "/home/kpi/val2017.zip" ]; then \
+    echo "Downloading val2017.zip from remote..."; \
+    timeout 120s wget "$DOWNLOAD_URL" -O /home/kpi/val2017.zip --progress=bar:force || { \
+        echo "Please download val2017.zip from "$DOWNLOAD_URL" to datasets directory"; \
+        exit 1; \
+    }; \
+    fi
+ 
+RUN bash ./model_quantization.sh
+ 
+RUN mkdir -p datasets/model && \
+    mv /home/kpi/datasets/public/yolov10m/INT8/yolov10m.xml datasets/model/yolov10m.xml && \
+    mv /home/kpi/datasets/public/yolov10m/INT8/yolov10m.bin datasets/model/yolov10m.bin && \
+    mv /home/kpi/mobilenet-v2.xml datasets/model/mobilenet-v2-1.0-224.xml && \
+    mv /home/kpi/mobilenet-v2.bin datasets/model/mobilenet-v2-1.0-224.bin && \
+    mv /home/kpi/yolov5s_FP16/optimized/yolov5s_int8.xml datasets/model/yolov5s-v6-1.xml && \
+    mv /home/kpi/yolov5s_FP16/optimized/yolov5s_int8.bin datasets/model/yolov5s-v6-1.bin && \
+    mv /home/kpi/yolov5m_FP16/optimized/yolov5m_int8.xml datasets/model/yolov5m-v6-1.xml && \
+    mv /home/kpi/yolov5m_FP16/optimized/yolov5m_int8.bin datasets/model/yolov5m-v6-1.bin && \
+    rm -rf datasets/public yolov5s_FP16 yolov5m_FP16
+ 
+ARG MEDIA_VER=bbb_sunflower_1080p_60fps_4Mbps_38kframes
+ARG MEDIA_REPO=https://repositories.intel.com/media
+ARG DLSTREAMER_SRC_VER=v2025.0.1.3
+ARG DLSTREAMER_SRC_REPO=https://github.com/dlstreamer/dlstreamer
+ARG PIPELINE_ZOO_VER=ee73878abc6fb6d864e59a5cd80016de4fc1d194
+ARG PIPELINE_ZOO_REPO=https://github.com/dlstreamer/pipeline-zoo-models
+RUN mkdir -p datasets/video && \
+    curl --noproxy -fSL ${MEDIA_REPO}/${MEDIA_VER}.h265 -o datasets/video/intersection_1080p_30p_2M_loop10.h265 && \
+    curl -fSL ${PIPELINE_ZOO_REPO}/raw/${PIPELINE_ZOO_VER}/storage/resnet-50-tf_INT8/resnet-50-tf_i8.bin -o datasets/model/resnet-v1-50-tf.bin && \
+    curl -fSL ${PIPELINE_ZOO_REPO}/raw/${PIPELINE_ZOO_VER}/storage/resnet-50-tf_INT8/resnet-50-tf_i8.xml -o datasets/model/resnet-v1-50-tf.xml && \
+    curl -fSL ${DLSTREAMER_SRC_REPO}/raw/refs/tags/${DLSTREAMER_SRC_VER}/samples/gstreamer/model_proc/public/yolo-v5.json -o datasets/model/yolo-v5.json && \
+    echo '{"json_schema_version": "2.2.0","input_preproc": [{"format": "image","params": {"resize": "aspect-ratio", "crop": "central"}}],"output_postproc": [{"converter": "label","method": "max"}]}' > datasets/model/classification.json
+ 
+FROM ${OS_IMAGE}:${OS_VER} AS runner-image
+COPY --from=base-image /home/kpi/datasets /home/kpi/datasets

@@ -1,0 +1,102 @@
+--- ../HiBench/bin/functions/load_config.py	2022-04-07 15:36:12.916432322 -0400
++++ load_config.py	2022-04-06 18:42:28.019098541 -0400
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python2
++#!/usr/bin/python3
+ # Licensed to the Apache Software Foundation (ASF) under one or more
+ # contributor license agreements.  See the NOTICE file distributed with
+ # this work for additional information regarding copyright ownership.
+@@ -18,7 +18,7 @@
+ import os
+ import glob
+ import re
+-import urllib
++import urllib.request, urllib.parse, urllib.error
+ import socket
+ 
+ from contextlib import closing
+@@ -88,8 +88,8 @@
+         time.sleep(0.1)  # Wait a little
+         seconds_passed = time.time() - t_begin
+ 
+-        stdout += nonBlockRead(p.stdout)
+-        stderr += nonBlockRead(p.stderr)
++        stdout += str(nonBlockRead(p.stdout) or '')
++        stderr += str(nonBlockRead(p.stderr) or '')
+ 
+     if seconds_passed >= timeout and timeout > 0:
+         try:
+@@ -170,7 +170,7 @@
+ 
+ def override_conf_from_environment():
+     # override values from os environment variable settings
+-    for env_name, prop_name in HiBenchEnvPropMappingMandatory.items() + HiBenchEnvPropMapping.items():
++    for env_name, prop_name in list(HiBenchEnvPropMappingMandatory.items()) + list(HiBenchEnvPropMapping.items()):
+         # The overrides from environments has 2 premises, the second one is either
+         # the prop_name is not set in advance by config files or the conf line
+         # itself set an env variable to a hibench conf
+@@ -221,16 +221,16 @@
+     check_config()
+     #import pdb;pdb.set_trace()
+     # Export config to file, let bash script to import as local variables.
+-    print export_config(workload_name, framework_name)
++    print(export_config(workload_name, framework_name))
+ 
+ 
+ def check_config():             # check configures
+     # Ensure mandatory configures are available
+-    for _, prop_name in HiBenchEnvPropMappingMandatory.items():
++    for _, prop_name in list(HiBenchEnvPropMappingMandatory.items()):
+         assert HibenchConf.get(
+             prop_name, None) is not None, "Mandatory configure missing: %s" % prop_name
+     # Ensure all ref values in configure has been expanded
+-    for _, prop_name in HiBenchEnvPropMappingMandatory.items() + HiBenchEnvPropMapping.items():
++    for _, prop_name in list(HiBenchEnvPropMappingMandatory.items()) + list(HiBenchEnvPropMapping.items()):
+         assert "${" not in HibenchConf.get(prop_name, ""), "Unsolved ref key: %s. \n    Defined at %s:\n    Unsolved value:%s\n" % (
+             prop_name, HibenchConfRef.get(prop_name, "unknown"), HibenchConf.get(prop_name, "unknown"))
+ 
+@@ -272,7 +272,7 @@
+             if len(key.split("*")) == len(value.split("*")):
+                 key_searcher = re.compile("^" + "(.*)".join(key.split("*")) + "$")
+                 matched_keys_to_remove = []
+-                for k in HibenchConf.keys():
++                for k in list(HibenchConf.keys()):
+                     matched_keys = key_searcher.match(k)
+                     if matched_keys:
+                         matched_keys_to_remove.append(k)
+@@ -299,7 +299,7 @@
+     while True:
+         while not finish:
+             finish = True
+-            for key, value in HibenchConf.items():
++            for key, value in list(HibenchConf.items()):
+                 old_value = value
+                 old_key = key
+                 key = p.sub(process_replace, key)
+@@ -532,7 +532,7 @@
+                     worker_port = probe_spark_worker_webui_port()
+                     # Make the assumption that the master is in internal network, and force
+                     # not to use any proxies
+-                    with closing(urllib.urlopen('http://%s:%s' % (HibenchConf['hibench.masters.hostnames'], master_port), proxies={})) as page:
++                    with closing(urllib.request.urlopen('http://%s:%s' % (HibenchConf['hibench.masters.hostnames'], master_port), proxies={})) as page:
+                         worker_hostnames = []
+                         for x in page.readlines():
+                             matches = re.findall("http:\/\/([a-zA-Z\-\._0-9]+):%s" % worker_port, x)
+@@ -631,7 +631,7 @@
+ 
+     # generate configure for hibench
+     sources = defaultdict(list)
+-    for env_name, prop_name in HiBenchEnvPropMappingMandatory.items() + HiBenchEnvPropMapping.items():
++    for env_name, prop_name in list(HiBenchEnvPropMappingMandatory.items()) + list(HiBenchEnvPropMapping.items()):
+         source = HibenchConfRef.get(prop_name, 'None')
+         sources[source].append('%s=%s' % (env_name, HibenchConf.get(prop_name, '')))
+ 
+@@ -650,7 +650,7 @@
+ 
+     # generate properties for spark & sparkbench
+     sources = defaultdict(list)
+-    for prop_name, prop_value in HibenchConf.items():
++    for prop_name, prop_value in list(HibenchConf.items()):
+         source = HibenchConfRef.get(prop_name, 'None')
+         sources[source].append('%s\t%s' % (prop_name, prop_value))
+     # generate configure for sparkbench

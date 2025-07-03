@@ -1,0 +1,38 @@
+--- ../HiBench/bin/functions/execute_with_log.py	2022-04-07 15:36:12.915432322 -0400
++++ execute_with_log.py	2022-04-06 18:42:28.019098541 -0400
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python2
++#!/usr/bin/python3
+ # Licensed to the Apache Software Foundation (ASF) under one or more
+ # contributor license agreements.  See the NOTICE file distributed with
+ # this work for additional information regarding copyright ownership.
+@@ -89,7 +89,7 @@
+ 
+         try:
+             line = line.rstrip()
+-            log_file.write(line+"\n")
++            log_file.write(str(line) + "\n")
+             log_file.flush()
+         except KeyboardInterrupt:
+             proc.terminate()
+@@ -127,7 +127,7 @@
+             bypass_error_condition = table_not_found_in_log or database_default_exist_in_log(lline) or uri_with_key_not_found_in_log(lline)
+             if not bypass_error_condition:
+                 COLOR = "Red"
+-                sys.stdout.write((u"{%s}{line}{Color_Off}{ClearEnd}\n" % COLOR).format(line=line,**Color).encode('utf-8'))
++                sys.stdout.write(("{%s}{line}{Color_Off}{ClearEnd}\n" % COLOR).format(line=line,**Color))
+             
+         else:
+             if len(line) >= width:
+@@ -136,9 +136,9 @@
+             if progress is not None:
+                 show_with_progress_bar(line, progress, width)
+             else:
+-                sys.stdout.write(u"{line}{ClearEnd}{ret}".format(line=line, **Color).encode('utf-8'))
++                sys.stdout.write("{line}{ClearEnd}{ret}".format(line=line, **Color))
+         sys.stdout.flush()
+-    print
++    print()
+     log_file.close()
+     try:
+         proc.wait()

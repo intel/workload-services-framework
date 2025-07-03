@@ -23,30 +23,15 @@ validate_ansible_option () {
   fi
 }
 
-_create_tf_file () {
-  vmtype=$1
-  shift
-  if [ ${#@} -gt 0 ]; then
-    i=0
-    for h in $@; do
-      hh="${h/*@/}"
-      h1="${hh/:*/}"
-      h2="${hh/*:/}"
-      sed -i -e "/^variable *\"${vmtype}_profile\" *{/,/^}/{/^ *\"${vmtype}-0\": *{/{s/^\( *\)\(\"${vmtype}-0\": *{\)/\1\"${vmtype}-$i\": {\n\1  \"user_name\": \"${h/@*/}\",\n\1  \"public_ip\": \"$h1\",\n\1  \"private_ip\": \"${h2:-$h1}\",\n\1  \"ssh_port\": ${ssh_port:-22},\n\1},\n\1\2/}}" "$sutfile"
-      sed -i -e "/^variable *\"${vmtype}_profile\" *{/,/^}/{/^ *\"${vmtype}-0\": *{/,/^}/{/\"user_name\":/,/^}/{/^ *\"${vmtype}-0\": *{/,/^ *}/{d}}}}" "$sutfile"
-    done
+show_tf_file () {
+  if [[ "$sutname" = *:* ]]; then
+    echo -e "\033[31mA set of script/terraform/terraform-config.${sutname%:*}[0-$(( ${sutname#*:} - 1 ))].tf is created to match your SUT setup.\033[0m"
+  else
+    echo -e "\033[31mscript/terraform/terraform-config.$sutname.tf is created to match your SUT setup.\033[0m"
   fi
-}
-
-create_tf_file () {
-  cp -f "$DIR"/../terraform/terraform-config.static.tf "$sutfile"
-  _create_tf_file worker ${worker_hosts[@]}
-  _create_tf_file client ${client_hosts[@]}
-  _create_tf_file controller ${controller_hosts[@]}
-  echo -e "\033[31mscript/terraform/$(basename "$sutfile") is created to match your SUT setup.\033[0m"
   echo -e "\033[31mActivate it as follows:\033[0m"
   echo -e "\033[31m  cd build\033[0m"
-  echo -e "\033[31m  cmake -DTERRAFORM_SUT=$(basename "$sutfile" | cut -f2 -d.) ..\033[0m"
+  echo -e "\033[31m  wsf-config -DTERRAFORM_SUT=$sutname\033[0m"
 }
 
 create_inventory () {
@@ -144,7 +129,7 @@ EOF
 }
 
 parse_host_args () {
-  sutfile="$DIR/../terraform/terraform-config.mysut.tf"
+  sutname="mysut"
   ssh_port=22
   vm_group="worker"
   controller_hosts=()
@@ -163,7 +148,7 @@ parse_host_args () {
     --port)
       ;;
     --sut=*)
-      sutfile="$DIR/../terraform/terraform-config.${v#--sut=}.tf"
+      sutname="${v#--sut=}"
       ;;
     --sut)
       ;;
@@ -180,7 +165,7 @@ parse_host_args () {
       if [ "$last" = "--port" ]; then
         ssh_port="$v"
       elif [ "$last" = "--sut" ]; then
-        sutfile="$DIR/../terraform/terraform-config.${v}.tf"
+        sutname="$v"
       elif [[ "$v" = *"@"* ]]; then
         case "$vm_group" in
         worker)

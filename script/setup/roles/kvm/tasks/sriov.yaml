@@ -1,0 +1,51 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Invoke NVME tasks
+  include_tasks:
+    file: nvme.yaml
+  loop: "{{ kvm_sriov_devs | split(',') | reject('==','') | select('match','nvme.*') }}"
+  loop_control:
+    loop_var: nvme_device
+
+- name: set sriov_numvfs for network adaptors
+  shell:
+    cmd: |
+      [ -e /sys/class/net/{{ item[0] }}/device/sriov_numvfs ] || exit 3
+      echo 0 > /sys/class/net/{{ item[0] }}/device/sriov_numvfs
+      echo "{{ item[1] }}" > /sys/class/net/{{ item[0] }}/device/sriov_numvfs
+      [ "$(cat /sys/class/net/{{ item[0] }}/device/sriov_numvfs)" -ge {{ item[1] }} ]
+    executable: /bin/bash
+  loop: "{{ kvm_sriov_devs | split(',') | reject('==','') | reject('match','nvme.*') | map('split',':') }}"
+  register: netvf_rc
+  ignore_errors: true
+
+- name: Create udev rules for network adaptors
+  blockinfile:
+    path: "/etc/udev/rules.d/99-kvm-settings.rules"
+    block: |
+      {% for item in netvf_rc.results | selectattr('rc','==',0) | map(attribute='item') %}
+      {% if (item[1]|int) > 0 %}
+      ACTION=="add", SUBSYSTEM=="net", ENV{INTERFACE}=="{{ item[0] }}", ATTR{device/sriov_numvfs}="{{ item[1] }}"
+      {% endif %}
+      {% endfor %}
+    marker: "# {mark} ANSIBLE MANAGED BLOCK for KVM SETUP"
+    create: true
+
+- name: Create sriov network vf pools
+  shell:
+    cmd: |
+      {% for item in netvf_rc.results | selectattr('rc','==',0) | map(attribute='item') %}
+        virsh net-destroy {{ kvm_vfnet_prefix }}{{ loop.index0 }}
+        virsh net-undefine {{ kvm_vfnet_prefix }}{{ loop.index0 }}
+        {% if (item[1]|int) > 0 %}
+        virsh net-define <(echo "<network><name>{{ kvm_vfnet_prefix }}{{ loop.index0 }}</name><forward mode='hostdev' managed='yes'><pf dev='{{ item[0] }}'/></forward></network>")
+        virsh net-autostart {{ kvm_vfnet_prefix }}{{ loop.index0 }}
+        virsh net-start {{ kvm_vfnet_prefix }}{{ loop.index0 }}
+        {% endif %}
+      {% endfor %}
+    executable: /bin/bash
+  when: netvf_rc.results | selectattr('rc','==',0) | map(attribute='item') | length > 0

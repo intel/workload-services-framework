@@ -3,6 +3,7 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
+
 - name: Detect OS
   shell:
     cmd: ". /etc/os-release; echo $ID"
@@ -43,7 +44,7 @@
 
 - name: enable PCI passthrough
   set_fact:
-    kernel_args: "intel_iommu_on iommu=pt"
+    kernel_args: "intel_iommu=on iommu=pt"
 
 - name: Create hugepage mount point
   file:
@@ -107,7 +108,7 @@
     - name: add to grub.conf
       blockinfile:
         path: "{{ kvm_grub_actions[(os.stdout in ['ubuntu','debian']) | ternary('debian','centos')]['grub_path'] }}"
-        block: 'GRUB_CMDLINE_LINUX="$GRUB_CMDLINE_LINUX {{ kernel_args }}"'
+        block: 'GRUB_CMDLINE_LINUX="${GRUB_CMDLINE_LINUX} {{ kernel_args }}"'
         marker: "# {mark} ANSIBLE MANAGED BLOCK for KVM SETUP"
         create: true
       register: kargs
@@ -135,10 +136,41 @@
   include_tasks:
     file: default.yaml
 
-- name: reboot
-  command: "reboot"
-  ignore_errors: yes
+- name: Scan /mnt/disk?
+  shell: "find /mnt -maxdepth 1 -type d -name 'disk*' -print"
+  register: data_disks
+  when: ('default' in (kvm_disk_pool_spec | split(',')))
+
+- include_tasks:
+    file: pool.yaml
+  loop: "{{ (kvm_image_pool_spec+','+kvm_disk_pool_spec) | split(',') | reject('==','default') | union(('default' in (kvm_disk_pool_spec | split(',')))|ternary(data_disks.stdout_lines|default([])|map('regex_replace','/mnt/(disk.*)','\\1:/mnt/\\1'),[])) | unique | reject('==','') }}"
+  loop_control:
+    loop_var: pool_spec
+    index_var: pool_index
+
+- name: Check /proc/cmdline
+  command: cat /proc/cmdline
+  register: cmdline
+
+- include_tasks:
+    file: reboot.yaml
   when:
   - kvm_reboot | bool
-  - (kernel_args | trim | length > 0)
+  - kernel_args | split(' ') | reject('==','') | reject('in',cmdline.stdout) | length > 0
+
+- include_tasks:
+    file: sriov.yaml
+  when: kvm_sriov_devs | split(',') | reject('==','') | length > 0
+
+- include_tasks:
+    file: dhcpd.yaml
+  when: kvm_dhcpd_devs | split(',') | reject('==','') | length > 0
+
+- name: "Create terraform-config.{{ kvm_config_name }}.tf"
+  template:
+    src: terraform-config.tf.j2
+    dest: "{{ playbook_dir }}/../terraform/terraform-config.{{ kvm_config_name }}.tf"
+  delegate_to: localhost
+  run_once: true
+  become: false
 

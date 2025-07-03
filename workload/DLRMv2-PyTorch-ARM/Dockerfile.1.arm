@@ -1,0 +1,90 @@
+# dlrmv2-pytorch-arm-public
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_IMAGE="armswdev/pytorch-arm-neoverse"
+ARG OS_VER="r22.07-torch-1.12.0-openblas"
+FROM ${OS_IMAGE}:${OS_VER}
+USER root
+
+ARG TENSORBOARD_VER=2.9.1
+ARG TENSORBOARD_REPO=pip
+ARG PYDOT_VER=1.4.2
+ARG PYDOT_REPO=pip
+
+# Install missing system libraries
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    curl \
+    git \
+    numactl \
+    libnuma-dev \
+    python3-dev \
+    build-essential \
+    libopenblas-dev \
+    libomp-dev \
+    libprotobuf-dev \
+    protobuf-compiler \
+    graphviz \
+    && rm -rf /var/lib/apt/lists/*
+
+# Update pip
+RUN pip install --upgrade pip
+
+# Install Python dependencies
+RUN pip install \
+    tensorboard==${TENSORBOARD_VER} \
+    pydot==${PYDOT_VER} \
+    onnx \
+    tqdm \
+    scikit-learn \
+    pandas \
+    psutil \
+    protobuf \
+    pybind11 \
+    mlperf-logging \
+    matplotlib
+
+# Setup workspace
+RUN mkdir -p /home/ubuntu/workspace
+WORKDIR /home/ubuntu/workspace
+
+# Clone DLRM
+ARG DLRM_VER="main"
+ARG DLRM_COMMIT_ID="11afc52"
+ARG DLRM_REPO="https://github.com/facebookresearch/dlrm.git"
+
+ARG MLP_LOGGING_VER="v2.0"
+ARG MLP_LOGGING_COMMIT_ID="065e4ce"
+ARG MLP_LOGGING_REPO="https://github.com/mlcommons/logging"
+
+RUN git clone -b ${DLRM_VER} ${DLRM_REPO} && \
+    cd dlrm && git reset --hard ${DLRM_COMMIT_ID} && \
+    git clone ${MLP_LOGGING_REPO} && \
+    cd logging && git reset --hard ${MLP_LOGGING_COMMIT_ID} && \
+    cd .. && cp -r logging/mlperf_logging ./. && \
+    rm -rf logging
+
+# Define benchmark dir
+ENV BENCHMARK_DIR=/home/ubuntu/workspace/dlrm
+
+# Move into DLRM
+WORKDIR /home/ubuntu/workspace/dlrm
+
+# Add scripts and patches
+ADD main.sh ${BENCHMARK_DIR}
+ADD dlrm_arm.diff ${BENCHMARK_DIR}
+
+# Apply patch
+RUN cd ${BENCHMARK_DIR} && git apply dlrm_arm.diff
+
+# Create FIFO for logs
+RUN mkfifo /export-logs
+
+# Default command: Run the benchmark
+CMD ( ./main.sh; echo $? > status) 2>&1 | tee benchmark_$(date +"%m-%d-%y-%H-%M-%S").log && \
+    tar cf /export-logs status $(find . -maxdepth 1 -name "*.log") && \
+    sleep infinity

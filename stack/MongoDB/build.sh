@@ -27,15 +27,18 @@ MONGODB_VER=$(echo $STACK | cut -d_ -f1)
 
 BUILD_OPTIONS="$BUILD_OPTIONS  --build-arg CHARMARCH=$CHARMARCH --build-arg ARCHSETTING=$ARCHSETTING"
 
+DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
+if [[ "$USECASE" == *qat* ]]; then
+    STACK="qathw-ssl3-ubuntu-latest" "$DIR/../../stack/QAT/build.sh" $@
+fi
+
 case $PLATFORM in
     ARMv8 | ARMv9 )
-        FIND_OPTIONS="( -name Dockerfile.1.arm64${MONGODB_VER}.${USECASE} $FIND_OPTIONS )"
+        FIND_OPTIONS="( -name Dockerfile.?.arm64${MONGODB_VER}.${USECASE}* $FIND_OPTIONS )"
         ;;
     * )
-        FIND_OPTIONS="( -name Dockerfile.1.amd64${MONGODB_VER}.${USECASE} $FIND_OPTIONS )"
+        FIND_OPTIONS="( -name Dockerfile.?.amd64${MONGODB_VER}.${USECASE}* $FIND_OPTIONS )"
         ;;
 esac
 
-DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
 . "$DIR"/../../script/build.sh
-

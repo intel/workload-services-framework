@@ -1,0 +1,74 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: doris-be
+  labels:
+    app: doris-be
+spec:
+  replicas: {{ .Values.DORIS_BE_NUM }}
+  selector:
+    matchLabels:
+      app: doris-be
+  serviceName: "doris-be-service"
+  podManagementPolicy: Parallel 
+  template:
+    metadata:
+      labels:
+        app: doris-be
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: doris-be-container
+        image: {{ .Values.REGISTRY }}doris-be{{ .Values.RELEASE }}
+        imagePullPolicy:  {{ include "imagepolicy" .Values }}
+        env:
+          - name: K_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+      {{- $args := dict "key" "app" "value" "doris-fe" }}
+      {{- include "podAntiAffinity" $args }}
+      {{- $args := dict "key" "app" "value" "doris-be" }}
+      {{- include "podAntiAffinity" $args }}
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: doris-fe
+  labels:
+    app: doris-fe
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: doris-fe
+  serviceName: "doris-fe-service"
+  podManagementPolicy: Parallel 
+  template:
+    metadata:
+      labels:
+        app: doris-fe
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: doris-fe-container
+        image: {{ .Values.REGISTRY }}doris-fe{{ .Values.RELEASE }}
+        imagePullPolicy:  {{ include "imagepolicy" .Values }}
+        env:
+          - name: K_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+      {{- $args := dict "key" "app" "value" "doris-be" }}
+      {{- include "podAntiAffinity" $args }}
+      {{- $args := dict "key" "app" "value" "doris-fe" }}
+      {{- include "podAntiAffinity" $args }}
+

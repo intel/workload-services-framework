@@ -1,0 +1,25 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+### Gloabl Configuration ###
+REGISTRY: ""
+RELEASE: ""
+PLATFORM: ""
+BACKEND: ""
+
+### Workload Configuration ###
+FRONTEND_PORT: "8000"
+MEMCACHED_PORT: "11811"
+CASSANDRA_PORT: "9042"
+REPLICAS: "1"
+ATTEMPTS: ""
+SIEGE_WORKER: ""
+UWSGI_WORKER: ""
+MEMCACHE_THREAD: ""
+MEMCACHE_THREAD: ""
+CASSANDRA_CR: ""
+CASSANDRA_CW: ""
+CASSANDRA_CCW: ""

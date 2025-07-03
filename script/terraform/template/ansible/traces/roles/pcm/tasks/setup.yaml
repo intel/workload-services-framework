@@ -35,4 +35,5 @@
         kill $(lsof -t -i 4TCP:{{ pcm_sensor_server_port }})
         {% endif %}
         tail -f --pid=$(cat pcm.pid) /dev/null
+        killall {{ pcm_action }}
   

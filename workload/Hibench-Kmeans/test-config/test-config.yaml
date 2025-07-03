@@ -1,0 +1,72 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+*gcp_hibench_kmeans_gated:
+    # disk spec
+    GCP_CONTROLLER_OS_DISK_SIZE: 120
+    GCP_CLIENT_OS_DISK_SIZE: 120
+    GCP_WORKER_OS_DISK_SIZE: 120    
+    GCP_CONTROLLER_OS_DISK_TYPE: pd-standard
+    GCP_CLIENT_OS_DISK_TYPE: pd-standard
+    GCP_WORKER_OS_DISK_TYPE: pd-ssd
+    # platform
+    GCP_CLIENT_INSTANCE_TYPE: n2d-standard-8
+    GCP_WORKER_INSTANCE_TYPE: n2d-standard-8
+    GCP_WORKER_MIN_CPU_PLATFORM: AMD%20Milan
+    GCP_ZONE: us-east4-c
+    # workload config
+    HIBENCH_SCALE_PROFILE: tiny
+    WORKERNODE_NUM: 1
+    NODE_NUM: 2
+    ENABLE_MOUNT_DIR: false
+
+#This is a test config example that can saturate cpu utiliaztion on c3-highmem-44 instance
+#This is not bkc, please be aware that any Other Tunable Parameters can be defined and tuned here.
+*gcp_hibench_kmeans_default:
+    # disk spec
+    GCP_CONTROLLER_OS_DISK_SIZE: 120
+    GCP_CLIENT_OS_DISK_SIZE: 120
+    GCP_WORKER_OS_DISK_SIZE: 120
+    GCP_CONTROLLER_OS_DISK_TYPE: pd-balanced
+    GCP_CLIENT_OS_DISK_TYPE: pd-balanced
+    GCP_WORKER_OS_DISK_TYPE: pd-ssd
+    # platform
+    GCP_CLIENT_INSTANCE_TYPE: c3-highmem-44
+    GCP_WORKER_INSTANCE_TYPE: c3-highmem-44
+    GCP_WORKER_MIN_CPU_PLATFORM: Intel%20Sapphire%20Rapids
+    GCP_CLIENT_MIN_CPU_PLATFORM: Intel%20Sapphire%20Rapids
+    GCP_ZONE: us-east4-c
+    # workload config
+    HIBENCH_SCALE_PROFILE: bigdata
+    WORKERNODE_NUM: 3
+    NODE_NUM: 4
+
+
+#This is a test config example that shows how to enable multiple disk mount on gcp
+*gcp_hibench_kmeans_default:
+    # disk spec
+    GCP_CONTROLLER_OS_DISK_SIZE: 120
+    GCP_CLIENT_OS_DISK_SIZE: 120
+    GCP_WORKER_OS_DISK_SIZE: 120    
+    GCP_CONTROLLER_OS_DISK_TYPE: pd-standard
+    GCP_CLIENT_OS_DISK_TYPE: pd-standard
+    GCP_WORKER_OS_DISK_TYPE: pd-ssd
+    GCP_DISK_SPEC_1_DISK_COUNT: 2
+    GCP_DISK_SPEC_1_DISK_SIZE: 120
+    GCP_DISK_SPEC_1_DISK_TYPE: pd-ssd
+    # platform
+    GCP_CLIENT_INSTANCE_TYPE: n2d-standard-8
+    GCP_WORKER_INSTANCE_TYPE: n2d-standard-8
+    GCP_CLIENT_MIN_CPU_PLATFORM: AMD%20Milan
+    GCP_WORKER_MIN_CPU_PLATFORM: AMD%20Milan
+    GCP_ZONE: us-east4-c
+    # workload config
+    # DISK_COUNT needs to be equal to GCP_DISK_SPEC_1_DISK_COUNT
+    DISK_COUNT: 2
+    HIBENCH_SCALE_PROFILE: huge
+    WORKERNODE_NUM: 2
+    NODE_NUM: 3
+    ENABLE_MOUNT_DIR: true
+

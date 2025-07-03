@@ -1,0 +1,9 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+*clickhouse_xdr_*:
+  CLIENT_CORE_LIST: '0-0'
+  SERVER_CORE_LIST: '1-1'
+  SERVER_MAX_THREADS: '1'

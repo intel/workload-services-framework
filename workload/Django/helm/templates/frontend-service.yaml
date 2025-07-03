@@ -1,0 +1,23 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app-name: frontend
+    deployPolicy: frontend
+  name: frontend
+spec:
+  ports:
+  - name: "8000"
+    port: {{ .Values.FRONTEND_PORT }}
+    targetPort: 8000
+  selector:
+    app-name: frontend
+    deployPolicy: frontend
+status:
+  loadBalancer: {}

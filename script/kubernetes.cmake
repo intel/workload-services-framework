@@ -22,3 +22,4 @@ function(show_backend_settings)
     message("-- Setting: KUBERNETES_OPTIONS=${KUBERNETES_OPTIONS}")
 endfunction()
 
+file(WRITE "${CMAKE_BINARY_DIR}/.ansible_script_options" "--kubernetes\n--owner\n--nobomlist\n--nodockerconf\n--skip-app-status-check\n--upgrade-ingredients\n--run_stage_iterations\n")

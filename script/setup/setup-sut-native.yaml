@@ -38,3 +38,14 @@
 
       when: inventory_hostname in dict(play_hosts | map('extract',hostvars,['private_ip']) | zip(play_hosts)).values()
 
+- hosts: localhost
+  gather_facts: false
+  become: false
+  tasks:
+
+  - name: Create configuration file
+    include_role:
+      name: mysut
+    when: (mysut_config_name != "")
+    vars:
+      cluster_hosts: "{{ dict(groups.cluster_hosts | zip(groups.cluster_hosts | map('extract',hostvars))) }}"

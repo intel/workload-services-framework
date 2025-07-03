@@ -1,0 +1,21 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Detect home shell
+  getent:
+    database: passwd
+    key: "{{ ansible_user }}"
+
+- name: Install aliases & completion
+  blockinfile:
+    path: ~/.bashrc
+    block: |
+      . "{{ role_path | dirname | dirname | dirname }}/benchmark/cli.sh" _setup
+      alias ctest=./ctest.sh  # legacy
+    marker: "# {mark} WSF Aliases & Completion"
+    create: true
+  when: ('/bin/bash' in getent_passwd[ansible_user][-1])
+  become: no

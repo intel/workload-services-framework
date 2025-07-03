@@ -21,6 +21,8 @@ variable "instance_profiles" {
     vm_count = number
     cpu_core_count = number
     memory_size = number
+    cpu_set = string
+    node_set = string
 
     os_image = string
     os_type = string
@@ -30,6 +32,7 @@ variable "instance_profiles" {
       disk_count = number
       disk_size = number
       disk_format = string
+      disk_pool = string
     }))
 
     network_spec = list(object({
@@ -70,11 +73,6 @@ variable "winrm_lport" {
 variable "winrm_timeout" {
   type = number
   default = 60
-}
-
-variable "network_passthrough" {
-  type = bool
-  default = null
 }
 
 variable "mac_prefix" {

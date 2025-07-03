@@ -1,0 +1,177 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+#
+# reference: https://gist.github.com/roolebo/32ffdbdede0f3c5ada949973ec195a15
+#
+
+- set_fact:
+    device_name: "{{ nvme_device | split(':') | first | split('/') | last }}"
+    num_vfs: "{{ nvme_device | split(':') | last }}"
+
+- name: Make sure the device is not mounted
+  shell:
+    cmd: |
+      (df | grep -q -w -E '/dev/{{ device_name }}[ncp]*[0-9ncp]*') && exit 3 || true
+    executable: /bin/bash
+
+- name: Get primary ctrl caps
+  command: "nvme primary-ctrl-caps /dev/{{ device_name }} --output-format=json"
+  register: primary_ctrl_caps
+
+#- block:
+#
+#    - fail:
+#        msg: "Not enough VQ resources: need {{ vq_need }}, available {{ vq_avail }}"
+#      when: (vq_need|int) > (vq_avail|int)
+#      vars:
+#        vq_avail: "{{ (VQFRT|int) - (VQRFAP|int) }}"
+#        vq_need: "{{ (kvm_nvme_vq|int) * (num_vfs|int) }}"
+#
+#    - fail:
+#        msg: "Not enough VI resources: need {{ vi_need }}, available {{ vi_avail }}"
+#      when: (vi_need|int) > (vi_avail|int)
+#      vars:
+#        vi_avail: "{{ (VIFRT|int) - (VIRFAP|int) }}"
+#        vi_need: "{{ (kvm_nvme_vi|int) * (num_vfs|int) }}"
+#
+#  vars:
+#    VQFRT: "{{ (primary_ctrl_caps.stdout|from_json).vqfrt }}"
+#    VQRFAP: "{{ (primary_ctrl_caps.stdout|from_json).vqrfap }}"
+#    VIFRT: "{{ (primary_ctrl_caps.stdout|from_json).vifrt }}"
+#    VIRFAP: "{{ (primary_ctrl_caps.stdout|from_json).virfap }}"
+
+
+- name: Get the PF PCI address
+  shell:
+    cmd: |
+      basename "$(readlink -f /sys/class/nvme/{{ device_name }}/device)"
+    executable: /bin/bash
+  register: PF
+
+- name: Get device list
+  command: "nvme list-ns -a --output-format=json /dev/{{ device_name }}"
+  register: ns_list
+
+- name: Get Device Caps
+  command: "nvme id-ctrl -v --output-format=json /dev/{{ device_name }}"
+  register: ctrl_caps
+
+- name: Get Control IDs
+  command: "nvme list-ctrl --output-format=json /dev/{{ device_name }}"
+  register: ctrl_list
+
+- name: Get Secondary Controlls
+  command: "nvme list-secondary --output-format=json /dev/{{ device_name }}"
+  register: secondary_ctrl_list
+
+- name: Detach and delete namespaces
+  shell:
+    cmd: |
+      {% for ns in (ns_list.stdout|from_json).nsid_list|map(attribute='nsid') %}{% for id in (ctrl_list.stdout|from_json).ctrl_list | map(attribute='ctrl_id') %}
+      nvme detach-ns /dev/{{ device_name }} --namespace-id={{ ns }} --controllers={{ id }}
+      nvme delete-ns /dev/{{ device_name }} --namespace-id={{ ns }}
+      {% endfor %}{% endfor %}
+    executable: /bin/bash
+  ignore_errors: true
+
+- name: Create and attach namespaces
+  shell:
+    cmd: |
+      {% for i in range([num_vfs|int,1]|max) %}
+      nvme create-ns /dev/{{ device_name }} --nsze={{ ns_size_lba }} --ncap={{ ns_size_lba }} --block-size {{ kvm_nvme_block_size }}
+      {% if (num_vfs|int) == 0 %}
+      nvme attach-ns /dev/{{ device_name }} --namespace-id={{ i + 1 }} --controllers={{ (secondary_ctrl_list.stdout|from_json)['secondary-controllers'] | map(attribute='primary-controller-identifier') | unique | join(',') }}
+      {% endif %}
+      {% endfor %}
+    executable: /bin/bash
+  vars:
+    total_size: "{{ (ctrl_caps.stdout|from_json).tnvmcap }}"
+    ns_size: "{{ (total_size|int) // ([num_vfs|int,1]|max) }}"
+    ns_size_lba: "{{ (ns_size|int) // (kvm_nvme_block_size|int) }}"
+
+- name: Reset device
+  command: "nvme reset /dev/{{ device_name }}"
+
+- name: Preload driver
+  command: "modprobe {{ kvm_nvme_driver }}"
+
+- name: Disable autoprobe
+  shell:
+    cmd: "echo 0 > /sys/bus/pci/devices/{{ PF.stdout }}/sriov_drivers_autoprobe"
+    executable: /bin/bash
+
+- name: Make sure num_vfs <= max VFs
+  shell:
+    cmd: |
+      [ $(cat /sys/bus/pci/devices/{{ PF.stdout }}/sriov_totalvfs) -gt {{ num_vfs }} ]
+    executable: /bin/bash
+
+- name: Set sriov_numvfs
+  shell:
+    cmd: |
+      echo 0 > {{ sriov_numvfs_addr }}
+      echo {{ num_vfs }} > {{ sriov_numvfs_addr }}
+    executable: /bin/bash
+  vars:
+    sriov_numvfs_addr: "/sys/bus/pci/devices/{{ PF.stdout }}/sriov_numvfs"
+
+- name: Create udev rules
+  blockinfile:
+    path: "/etc/udev/rules.d/99-kvm-settings.rules"
+    block: |
+      ACTION=="add", SUBSYSTEM=="nvme", ENV{ID_SERIAL}=="{{ (ctrl_caps.stdout|from_json).sn }}", ATTR{device/sriov_numvfs}="{{ num_vfs }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK for KVM SETUP on /dev/{{ device_name }}"
+    state: "{{ ((num_vfs|int) > 0) | ternary('present','absent') }}"
+    create: true
+
+- set_fact:
+    VFS: "{% for i in range(num_vfs|int) %}{{ PF.stdout.split(':')[0:2]|join(':') }}:{{ '{:02x}'.format(((PF.stdout.split(':')[2].split('.')[0]|int(base=16)) + (secondary_controllers[i]['virtual-function-number']|int(base=16)) / 8)|int) }}.{{ '{:x}'.format(((secondary_controllers[i]['virtual-function-number']|int(base=16)) % 8)|int) }} {% endfor %}"
+  vars:
+    secondary_controllers: "{{ (secondary_ctrl_list.stdout|from_json)['secondary-controllers'] }}"
+
+- block:
+
+  - name: Setup VF secondary controller
+    shell:
+      cmd: |
+        [ -e /sys/bus/pci/devices/{{ VF }}/driver ] && echo "{{ VF }}" > /sys/bus/pci/devices/{{ VF }}/driver/unbind
+        nvme virt-mgmt /dev/{{ device_name }} -c {{ secondary_controllers[i]['secondary-controller-identifier'] }} -a 7
+        nvme virt-mgmt /dev/{{ device_name }} -c {{ secondary_controllers[i]['secondary-controller-identifier'] }} -r 0 -n {{ kvm_nvme_vq }} -a 8
+        nvme virt-mgmt /dev/{{ device_name }} -c {{ secondary_controllers[i]['secondary-controller-identifier'] }} -r 1 -n {{ kvm_nvme_vi }} -a 8
+        echo 1 > /sys/bus/pci/devices/{{ VF }}/reset
+        nvme virt-mgmt /dev/{{ device_name }} -c {{ secondary_controllers[i]['secondary-controller-identifier'] }} -a 9
+        echo "{{kvm_nvme_driver }}" > /sys/bus/pci/devices/{{ VF }}/driver_override
+      executable: /bin/bash
+    loop: "{{ VFS | split(' ') | reject('==','') }}"
+    loop_control:
+      loop_var: VF
+      index_var: i
+
+  - name: Wait for the driver to load
+    command: sleep 5s
+
+  - name: Attach namespace
+    shell:
+      cmd: |
+        nvme attach-ns /dev/{{ device_name }} --namespace-id={{ i+1 }} --controllers={{ secondary_controllers[i]['secondary-controller-identifier'] }}
+      executable: /bin/bash
+    loop: "{{ VFS | split(' ') | reject('==','') }}"
+    loop_control:
+      loop_var: VF
+      index_var: i
+
+  vars:
+    secondary_controllers: "{{ (secondary_ctrl_list.stdout|from_json)['secondary-controllers'] }}"
+
+- name: Enable autoprobe
+  shell:
+    cmd: |
+      echo 1 > /sys/bus/pci/devices/{{ PF.stdout }}/sriov_drivers_autoprobe
+      {% for VF in VFS|split(' ')|reject('==','') %}
+      echo "{{ VF }}" > "/sys/bus/pci/drivers/{{ kvm_nvme_driver }}/bind"
+      {% endfor %}
+    executable: /bin/bash

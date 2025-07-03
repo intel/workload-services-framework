@@ -1,0 +1,147 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: general-config
+data:
+  TESTCASE: {{ .Values.TESTCASE }}
+  ENGINE: {{ .Values.ENGINE }}
+  DISK_COUNT: "{{ .Values.DISK_COUNT }}"
+  WORKERNODE_NUM: "{{ .Values.WORKERNODE_NUM }}"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hibench-config
+data:
+  HIBENCH_SCALE_PROFILE: "{{ .Values.HIBENCH_SCALE_PROFILE }}"
+  HIBENCH_YARN_EXECUTOR_NUM: "{{ .Values.HIBENCH_YARN_EXECUTOR_NUM }}"
+  HIBENCH_YARN_EXECUTOR_CORES: "{{ .Values.HIBENCH_YARN_EXECUTOR_CORES }}"
+  HIBENCH_DEFAULT_MAP_PARALLELISM: "{{ .Values.HIBENCH_DEFAULT_MAP_PARALLELISM }}"
+  HIBENCH_DEFAULT_SHUFFLE_PARALLELISM: "{{ .Values.HIBENCH_DEFAULT_SHUFFLE_PARALLELISM }}"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hibench-spark-conf
+data:
+  SPARK_EXECUTOR_MEMORY: "{{ .Values.SPARK_EXECUTOR_MEMORY }}"
+  SPARK_EXECUTOR_MEMORYOVERHEAD: "{{ .Values.SPARK_EXECUTOR_MEMORYOVERHEAD }}"
+  SPARK_DRIVER_MEMORY: "{{ .Values.SPARK_DRIVER_MEMORY }}"
+  SPARK_DEFAULT_PARALLELISM: "{{ .Values.SPARK_DEFAULT_PARALLELISM }}"
+  SPARK_SQL_SHUFFLE_PARTITIONS: "{{ .Values.SPARK_SQL_SHUFFLE_PARTITIONS }}"
+  terasort.conf: |-
+    #datagen
+    hibench.terasort.tiny.datasize  200000000    
+    hibench.terasort.small.datasize 500000000  
+    hibench.terasort.large.datasize 1000000000 
+    hibench.terasort.huge.datasize  2000000000  
+    hibench.terasort.gigantic.datasize  5000000000
+    hibench.terasort.bigdata.datasize 10000000000 
+
+    hibench.workload.datasize		${hibench.terasort.${hibench.scale.profile}.datasize}
+
+    # export for shell script
+    hibench.workload.input			${hibench.hdfs.data.dir}/Terasort/Input
+    hibench.workload.output			${hibench.hdfs.data.dir}/Terasort/Output
+
+
+  spark.conf: |-
+    hibench.spark.home      /usr/local/spark
+    hibench.spark.master yarn
+    spark.driver.port 12345
+    spark.blockManager.port 12346
+    spark.port.maxRetries	65535
+    spark.serializer org.apache.spark.serializer.KryoSerializer 
+    hibench.yarn.executor.num     {{ .Values.HIBENCH_YARN_EXECUTOR_NUM }}
+    hibench.yarn.executor.cores   {{ .Values.HIBENCH_YARN_EXECUTOR_CORES }}
+    spark.executor.cores   {{ .Values.HIBENCH_YARN_EXECUTOR_CORES }}
+    spark.executor.memory  {{ .Values.SPARK_EXECUTOR_MEMORY }}
+    spark.executor.memoryOverhead	{{ .Values.SPARK_EXECUTOR_MEMORYOVERHEAD }}
+    spark.driver.memory    {{ .Values.SPARK_DRIVER_MEMORY }}
+    spark.default.parallelism     {{ .Values.SPARK_DEFAULT_PARALLELISM }}
+    spark.sql.shuffle.partitions  {{ .Values.SPARK_SQL_SHUFFLE_PARTITIONS }}
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: hibench-benchmark
+  namespace: {{ .Values.NAMESPACE }}
+spec:
+  template:
+    metadata:
+      labels:
+        name: hibench-cluster
+    spec:
+      hostname: node-master
+      subdomain: hibench-svc
+      containers:
+      - name:  hibench-benchmark
+        image: {{ .Values.REGISTRY }}hibench-client{{ .Values.RELEASE }}
+        imagePullPolicy: {{ include "imagepolicy" .Values }}
+        envFrom:
+          - configMapRef: 
+              name: general-config
+          - configMapRef: 
+              name: hibench-config
+          - configMapRef: 
+              name: hdfs-config
+          - configMapRef: 
+              name: yarn-config
+          - configMapRef: 
+              name: hibench-spark-conf
+        {{- $args := dict "value" "master" }}
+        {{- include "hadoopENV" $args | nindent 8 }} 
+        - name: HADOOP_USER_NAME
+          value: root
+        - name: WORKLOAD
+          value: "{{ .Values.WORKLOAD }}"
+        - name: HIBENCH_SCALE_PROFILE
+          value: "{{ .Values.HIBENCH_SCALE_PROFILE }}"
+        volumeMounts:
+        - name: data-hdfs
+          mountPath: /root/hdfs
+        - name: hibench-configmap-vol1
+          mountPath: /HiBench/conf/spark.conf_template
+          subPath: spark.conf
+        - name: hibench-configmap-vol2
+          mountPath: /HiBench/conf/workloads/micro/terasort.conf_template
+          subPath: terasort.conf
+        {{ include "hadoop-config-volumeMounts" . | nindent 8 }}
+      volumes:
+      - name: data-hdfs
+  {{- if $.Values.ENABLE_MOUNT_DIR }}
+        hostPath:
+          path: {{ .Values.MOUNT_DIR }}/node-master
+          type: DirectoryOrCreate
+  {{- else }}
+        emptyDir: {}
+  {{- end }}
+      - name: hibench-configmap-vol1
+        configMap:
+          name: hibench-spark-conf
+          items:
+            - key: spark.conf
+              path: spark.conf
+      - name: hibench-configmap-vol2
+        configMap:
+          name: hibench-spark-conf
+          items:
+            - key: terasort.conf
+              path: terasort.conf
+      {{ include "hadoop-config-volumes" . | nindent 6 }}
+      dnsConfig:
+        searches:
+        - hibench-svc.{{ .Values.NAMESPACE }}.svc.cluster.local
+      restartPolicy: Never
+      affinity:
+      {{- include "podAntiAffinity" . }}
+      {{- include "nodeAffinityClient" . }}
+

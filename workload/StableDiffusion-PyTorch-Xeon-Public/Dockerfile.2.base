@@ -1,0 +1,50 @@
+# stablediffusion-pytorch-xeon-public-base
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+
+FROM stablediffusion-pytorch-xeon-public-dataset AS dataset
+FROM pytorch-intel-public-24.04${RELEASE}
+
+WORKDIR /home/workspace
+
+COPY diffusers.patch /home/workspace
+COPY --from=dataset /dataset /home/workspace/coco
+
+ARG TRANSFORMERS_VER="4.36.0"
+ARG TRANSFORMERS_REPO="pip"
+ARG PEFT_VER="0.6.2"
+ARG PEFT_REPO="pip"
+RUN pip install torchmetrics pycocotools transformers==${TRANSFORMERS_VER} peft==${PEFT_VER}
+RUN pip install torch-fidelity --no-deps
+RUN pip install scipy 
+
+# Git clone from intelAI/models
+ARG INTEL_MODEL_ZOO_VER="pytorch-r2.3-models"
+ARG INTEL_MODEL_ZOO_REPO="https://github.com/intel/ai-reference-models.git"
+RUN git clone ${INTEL_MODEL_ZOO_REPO} pytorch_model && \
+    cd pytorch_model && \
+    git checkout ${INTEL_MODEL_ZOO_VER}
+
+# diffusion repo
+ARG DIFFUSERS_VER="v0.30.0"
+ARG DIFFUSERS_REPO="https://github.com/huggingface/diffusers.git"
+RUN git clone ${DIFFUSERS_REPO} && \
+    cd diffusers && \
+    git checkout ${DIFFUSERS_VER}
+
+# Download inception
+ARG INCEPTION_VER="v0.2.0"
+ARG INCEPTION_REPO="https://github.com/toshas/torch-fidelity/releases/download/${INCEPTION_VER}/weights-inception-2015-12-05-6726825d.pth"
+RUN mkdir -p /root/.cache/torch/hub/checkpoints && \
+    cd /root/.cache/torch/hub/checkpoints && \
+    wget ${INCEPTION_REPO}
+
+RUN pip install ninja
+ARG OPENVINO_VER="2025.0.0"
+ARG OPENVINO_REPO="pip"
+RUN pip install openvino==${OPENVINO_VER}

@@ -7,8 +7,6 @@
 
 # args: itr
 docker_run () {
-    [[ "$CTESTSH_OPTIONS" = *"--dry-run"* ]] && exit 0
-
     IFS=$'\n' images=($(sed -n "/^worker-0:/,/^worker-[0-9]*:/{/ image:/{s/.* image: *[\"']*\([^\"']*\)[\"']* *$/\1/;p}}" "$LOGSDIRH/docker-config.yaml"))
     IFS=$'\n' docker_options=($(sed -n "/^worker-0:/,/^worker-/{/ options:/,/(^ *[^:]*:|^ *$)/{/^ * [-] /{s/^ *[-] *[\"']*\([^\"']*\)[\"']* *$/\1/;p};/ options: [^ ]/{s/^.*options: *[\"']*\([^\"']*\)[\"']* *$/~\1/;p};/ options: *$/{s/.*/~/;p}}}" "$LOGSDIRH/docker-config.yaml" | tr '\n~' ' \n' | sed 1d))
     IFS=$'\n' export_logs=($(sed -n "/^worker-0:/,/^worker-/{/^ *[-] * [a-z-]*:/{s/.*/ export-logs: ~true/};/ export[-]logs:/{s/^.*export[-]logs: *//;p}}" "$LOGSDIRH/docker-config.yaml" | tr '\n~' ' \n'))
@@ -47,7 +45,7 @@ docker_run () {
 
     # invoke docker runs
     for i in $(seq 0 $(( ${#images[@]} - 1 ))); do
-        containers+=($(eval "docker run ${options1[@]} --rm --detach ${docker_options[$i]} $([[ " ${docker_options[$i]} " = *" ${images[$i]} "* ]] || echo "${images[$i]}") ${commands[$i]}"))
+        containers+=($(eval "docker run ${options1[@]} --rm --detach -e WORKER_0_HOST=$(hostname -i | cut -f1 -d' ') ${docker_options[$i]} $([[ " ${docker_options[$i]} " = *" ${images[$i]} "* ]] || echo "${images[$i]}") ${commands[$i]}"))
     done
 
     # Indicate workload beginning on the first log line
@@ -100,8 +98,6 @@ docker_run () {
 
 # args: itr
 docker_compose_run () {
-    [[ "$CTESTSH_OPTIONS" = *"--dry-run"* ]] && exit 0
-
     stop_docker_compose () {
         trap - ERR SIGINT EXIT
         (set -x; docker compose down --volumes)
@@ -162,6 +158,15 @@ docker_compose_run () {
     (set -x; docker compose down --volumes)
 }
 
+platform_report () {
+    if [[ "$DOCKER_CMAKE_OPTIONS $CTESTSH_OPTIONS" != *"--nosutinfo"* ]] && [[ "$DOCKER_CMAKE_OPTIONS $CTESTSH_OPTIONS" != *"--sutinfo=false"* ]]; then
+        if perfspect --version > /dev/null 2>&1; then
+            mkdir -p worker-0-sutinfo
+            perfspect report --output worker-0-sutinfo
+        fi
+    fi
+}
+
 print_workload_configurations 2>&1 | tee -a "$LOGSDIRH"/docker.logs
 . "$PROJECTROOT/script/docker/trace.sh"
 iterations="$(echo "x--run_stage_iterations=1 $DOCKER_CMAKE_OPTIONS $CTESTSH_OPTIONS" | sed 's/.*--run_stage_iterations=\([0-9]*\).*/\1/')"
@@ -170,11 +175,15 @@ if [[ "$DOCKER_CMAKE_OPTIONS $CTESTSH_OPTIONS " = *"--native "* ]]; then
     exit 3
 elif [[ "$DOCKER_CMAKE_OPTIONS $CTESTSH_OPTIONS " = *"--compose "* ]]; then
     rebuild_compose_config
+    [[ "$CTESTSH_OPTIONS" = *"--dry-run"* ]] && exit 0
+    platform_report 2>&1 | tee -a "$LOGSDIRH"/docker.logs
     for itr in $(seq 1 $iterations); do
         docker_compose_run $itr
     done 2>&1 | tee -a "$LOGSDIRH/docker.logs"
 else
     rebuild_docker_config
+    [[ "$CTESTSH_OPTIONS" = *"--dry-run"* ]] && exit 0
+    platform_report 2>&1 | tee -a "$LOGSDIRH"/docker.logs
     for itr in $(seq 1 $iterations); do
         docker_run $itr
     done 2>&1 | tee -a "$LOGSDIRH/docker.logs"
