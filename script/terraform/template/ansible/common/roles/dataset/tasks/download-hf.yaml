@@ -93,7 +93,7 @@
       shell:
         cmd: |
           {% for h in play_hosts %}
-            echo "nice -n 19 {% if (hostvars[h].ansible_connection|default('ssh'))!='local' %}ssh -p {{ hostvars[h].ansible_port | default(22) }} {{ hostvars[h].ansible_user }}@{{ hostvars[h].ansible_host }} {% if ansible_private_key_file is defined %}-i {{ ansible_private_key_file }}{% endif %}{% endif %} tail -f --pid={{ hostvars[h].download_process.stdout_lines | last }} /tmp/{{ wl_namespace }}-{{ h }}-hf-dataset.logs | stdbuf -oL sed 's|^|{{ h }}: |'" > /tmp/streaming-console
+            echo "nice -n 19 {% if (hostvars[h].ansible_connection|default('ssh'))!='local' %}ssh -p {{ hostvars[h].ansible_port | default(22) }} {{ hostvars[h].ansible_user }}@{{ hostvars[h].ansible_host }} {% if hostvars[h].ansible_private_key_file is defined %}-i {{ hostvars[h].ansible_private_key_file }}{% endif %}{% endif %} tail -f --pid={{ hostvars[h].download_process.stdout_lines | last }} /tmp/{{ wl_namespace }}-{{ h }}-hf-dataset.logs | stdbuf -oL sed 's|^|{{ h }}: |'" > /tmp/streaming-console
           {% endfor %}
         executable: /bin/bash
       delegate_to: localhost

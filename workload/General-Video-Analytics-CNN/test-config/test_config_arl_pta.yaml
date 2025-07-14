@@ -1,0 +1,61 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+*arl-light-igpu-bs1:
+  G_NumofVAStreams: 1
+  G_Bind: true
+  G_CPU_Bind: "6-13"
+*arl-light-igpu-bs8:
+  G_NumofVAStreams: 1
+  G_Bind: true
+  G_CPU_Bind: "6-13"
+*arl-medium-igpu-bs1:
+  G_NumofVAStreams: 1
+  G_Bind: true
+  G_CPU_Bind: "6-13"
+*arl-medium-igpu-bs8:
+  G_NumofVAStreams: 1
+  G_Bind: true
+  G_CPU_Bind: "6-13"
+*arl-heavy-igpu-bs1:
+  G_NumofVAStreams: 1
+  G_Bind: true
+  G_CPU_Bind: "6-13"
+*arl-heavy-igpu-bs8:
+  G_NumofVAStreams: 1
+  G_Bind: true
+  G_CPU_Bind: "6-13"
+*arl-light-igpu-bs1-ivpu-bs1:
+  G_NumofVAStreams: 1
+  G_Bind: true
+  G_CPU_Bind: "6-13"
+*arl-light-igpu-bs8-ivpu-bs1:
+  G_NumofVAStreams: 1
+  G_Bind: true
+  G_CPU_Bind: "6-13"
+*arl-medium-igpu-bs1-ivpu-bs1:
+  G_NumofVAStreams: 1
+  G_Bind: true
+  G_CPU_Bind: "6-13"
+*arl-medium-igpu-bs8-ivpu-bs1:
+  G_NumofVAStreams: 1
+  G_Bind: true
+  G_CPU_Bind: "6-13"
+*arl-heavy-igpu-bs1-ivpu-bs1:
+  G_NumofVAStreams: 1
+  G_Bind: true
+  G_CPU_Bind: "6-13"
+*arl-heavy-igpu-bs8-ivpu-bs1:
+  G_NumofVAStreams: 1
+  G_Bind: true
+  G_CPU_Bind: "6-13"
+*arl-light-igpu-bs8_pkm:
+  G_NumofVAStreams: 1
+  G_Bind: true
+  G_CPU_Bind: "6-13"
+*arl-light-igpu-bs1_gated:
+  G_NumofVAStreams: 1
+  G_Bind: true
+  G_CPU_Bind: "6-13"

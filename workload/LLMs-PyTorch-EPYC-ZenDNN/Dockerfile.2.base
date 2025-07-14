@@ -1,0 +1,102 @@
+## llms-pytorch-epyc-zendnn-base
+ARG OS_VER=22.04
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_IMAGE=ubuntu
+FROM ${OS_IMAGE}:${OS_VER}
+RUN apt update && \
+    apt full-upgrade -y && \
+    DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends -y \
+    sudo \
+    ca-certificates \
+    git \
+    curl \
+    wget \
+    unzip \
+    patch \
+    vim \
+    numactl \
+    gcc-12 \
+    g++-12 \
+    make
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100 && \
+    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100 && \
+    update-alternatives --install /usr/bin/cc cc /usr/bin/gcc 100 && \
+    update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++ 100
+
+# Prepare the Conda environment
+ARG PYTHON_VER="3.10"
+ARG PYTHON_REPO="conda"
+ARG MINIFORGE_VER="24.3.0-0"
+ARG MINIFORGE_REPO="https://github.com/conda-forge/miniforge/releases/download/24.3.0-0/Miniforge3-24.3.0-0-Linux-x86_64.sh"
+RUN wget --progress=bar:force:noscroll ${MINIFORGE_REPO} -O miniforge.sh && \
+    chmod +x miniforge.sh && \
+    ./miniforge.sh -b -p /root/miniforge && \
+    rm ./miniforge.sh
+ENV CONDA_PREFIX=/root/miniforge
+ENV PATH="/root/miniforge/bin:${PATH}"
+RUN conda env remove -n zen5
+RUN conda create -n zen5 python=${PYTHON_VER} -y
+
+RUN mkdir -p /home/workspace
+WORKDIR /home/workspace
+
+SHELL ["/bin/bash", "-c"]
+
+# Install IPEX
+ARG IPEX_REPO="https://github.com/intel/intel-extension-for-pytorch"
+ARG IPEX_VER="2.4.0"
+RUN source activate zen5 && pip install --no-cache-dir intel_extension_for_pytorch==${IPEX_VER} --extra-index-url ${IPEX_REPO}
+
+# get ZenDNN for PyTorch
+WORKDIR /home/workspace
+
+ARG PYTORCH_VER="2.6.0"
+ARG PYTORCH_REPO="https://download.pytorch.org/whl/cpu"
+RUN source activate zen5 && pip install torch==${PYTORCH_VER}
+
+ARG ZENDNN_PYTORCH_VER="v5.0.0"
+ARG ZENDNN_PYTORCH_REPO="pip"
+RUN source activate zen5 && \
+    pip install zentorch
+
+ARG IntelAI_MODELS_REPO="https://github.com/intel/ai-reference-models"
+ARG IntelAI_MODELS_VER="v3.3"
+ARG MODEL_ROOT="/home/workspace/pytorch_model"
+
+# Clone the repository and checkout the specified version
+RUN source activate zen5 && \
+    git clone ${IntelAI_MODELS_REPO} ${MODEL_ROOT} && \
+    cd ${MODEL_ROOT} && \
+    git checkout ${IntelAI_MODELS_VER}
+
+# Copy the patch file into the container
+COPY enable_zendnn_backend_inference.patch ${MODEL_ROOT}/models_v2/pytorch/gptj/inference/cpu/
+
+# Apply the patch
+RUN cd ${MODEL_ROOT}/models_v2/pytorch/gptj/inference/cpu/ && \
+    patch run_llm.py < enable_zendnn_backend_inference.patch  
+
+# Download the prompt.json file
+RUN source activate zen5 && \
+    wget -P ${MODEL_ROOT}/models_v2/pytorch/gptj/inference/cpu https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.json
+
+ARG TRANSFORMERS_SG_VER="0.0.5"
+ARG TRANSFORMERS_SG_REPO="pip"
+ARG TIKTOKEN_VER="0.6.0"
+ARG TIKTOKEN_REPO="pip"
+ARG BITSANDBYTES_VER="0.43.0"
+ARG BITSANDBYTES_REPO="pip"
+ARG NUMPY_VER="1.26.1"
+ARG NUMPY_REPO="pip"
+RUN source activate zen5 && pip install transformers_stream_generator==${TRANSFORMERS_SG_VER} \
+    tiktoken==${TIKTOKEN_VER} bitsandbytes==${BITSANDBYTES_VER} numpy==${NUMPY_VER}
+    
+# download lambada dataset in cache 
+RUN source activate zen5 && \
+    pip install datasets && \
+    python -c "from datasets import load_dataset; full_dataset = load_dataset(\"NeelNanda/pile-10k\",trust_remote_code=True)" && \
+    python -c "from datasets import load_dataset; full_dataset = load_dataset(\"EleutherAI/lambada_openai\",trust_remote_code=True)"

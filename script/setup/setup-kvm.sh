@@ -20,6 +20,12 @@ print_help () {
   echo "--vxlan                    Setup VXLAN"
   echo "--reset                    Reset VXLAN"
   echo "--no-password  Do not ask for password. Use DEV_SUDO_PASSWORD, SUT_SSH_PASSWORD and/or SUT_SUDO_PASSWORD instead."
+  echo "--image-pool [<name>]      Create a storage pool for caching OS images"
+  echo "--disk-pool [<name>:<mount>[,<name>:<mount>...]] Create storage pools for data disks. Scan /mnt/disk? if not specified"
+  echo "--kvm <file>               Specify the KVM configuration file"
+  echo "--sriov <dev>:<vfnum>[,...]   Setup a set of SRIOV vf devices"
+  echo "--default <net>            Specify the default network"
+  echo "--dhcpd <dev>[,...]        Install dhcpd on the first KVM host"
   echo ""
   exit 3
 }
@@ -42,6 +48,12 @@ dstport=20667
 vxlan="false"
 reset="false"
 dev="eno1"
+kvmtf="mykvm"
+image_pool_spec=""
+disk_pool_spec=""
+sriov_devs=""
+dhcpd_devs=""
+default="default"
 last=""
 for v in $@; do
   k1="$(echo "${v#--}" | cut -f1 -d=)"
@@ -57,6 +69,38 @@ for v in $@; do
     ssh_port="${v#--port=}"
     ;;
   --port)
+    ;;
+  --sriov=*)
+    sriov_devs="$sriov_devs,${v#--sriov=}"
+    ;;
+  --sriov)
+    ;;
+  --dhcpd=*)
+    dhcpd_devs="$dhcpd_devs,${v#--dhcpd=}"
+    ;;
+  --dhcpd)
+    ;;
+  --default=*)
+    default="${v#--default=}"
+    ;;
+  --default)
+    ;;
+  --kvm=*)
+    kvmtf="${v#--kvm=}"
+    ;;
+  --kvm)
+    ;;
+  --image-pool=*|--pool=*)
+    image_pool_spec="${v#*=}"
+    ;;
+  --image-pool|--pool)
+    image_pool_spec="os-images"
+    ;;
+  --disk-pool=*:*)
+    disk_pool_spec="$disk_pool_spec,${v#--disk-pool=}"
+    ;;
+  --disk-pool)
+    disk_pool_spec="$disk_pool_spec,default"
     ;;
   --hugepage=*)
     hugepages+=("${v#*=}")
@@ -81,6 +125,7 @@ for v in $@; do
     ;;
   --vxlan)
     vxlan="true"
+    default="wsfbr0,default"
     ;;
   --no-password)
     setup_ansible_options+=("$v")
@@ -110,6 +155,18 @@ for v in $@; do
       mtu="$v"
     elif [ "$last" = "--dev" ]; then
       dev="$v"
+    elif [ "$last" = "--kvm" ]; then
+      kvmtf="${v}"
+    elif [ "$last" = "--pool" ] || [ "$last" = "--os-pool" ]; then
+      image_pool_spec="$v"
+    elif [ "$last" = "--disk-pool" ] && [[ "$v" = *:* ]]; then
+      disk_pool_spec="${disk_pool_spec%,default},$v"
+    elif [ "$last" = "--sriov" ]; then
+      sriov_devs="$sriov_devs,$v"
+    elif [ "$last" = "--dhcpd" ]; then
+      dhcpd_devs="$dhcpd_devs,$v"
+    elif [ "$last" = "--default" ]; then
+      default="$v"
     elif [[ "$v" = *"@"* ]]; then
       hosts+=("$v")
     else
@@ -122,7 +179,7 @@ for v in $@; do
 done
 
 ./setup-ansible.sh python3-lxml python3-netaddr python3-libvirt "${setup_ansible_options[@]}" 2>&1 | tee setup-kvm.logs
-./setup-sut-native.sh --port $ssh_port ${hosts[@]} "${setup_native_options[@]}" 2>&1 | tee -a setup-kvm.logs
+./setup-sut-native.sh --port $ssh_port ${hosts[@]//:*/} "${setup_native_options[@]}" 2>&1 | tee -a setup-kvm.logs
 
 kvms="$(
   i=0
@@ -157,6 +214,10 @@ $kvms
       hosts:
 $kvms
 EOF
-) -e kvm_reboot=$reboot -e kvm_reset=$reset -e kvm_hugepages=$(echo "${hugepages[@]}" | tr 'A-Z ' 'a-z,') "${ansible_options[@]}" ./setup-kvm.yaml 2>&1 | tee -a setup-kvm.logs
+) -e kvm_reboot=$reboot -e kvm_reset=$reset -e kvm_hugepages=$(echo "${hugepages[@]}" | tr 'A-Z ' 'a-z,') "${ansible_options[@]}" -e kvm_image_pool_spec="$image_pool_spec" -e kvm_disk_pool_spec="${disk_pool_spec#,}" -e kvm_sriov_devs="${sriov_devs#,}" -e kvm_dhcpd_devs="${dhcpd_devs#,}" -e kvm_config_name="$kvmtf" -e kvm_default_network="$default" ./setup-kvm.yaml 2>&1 | tee -a setup-kvm.logs
 rm -f timing.yaml
 
+echo -e "\033[31mscript/terraform/terraform-config.$kvmtf.tf is created for your KVM setup.\033[0m"
+echo -e "\033[31mActivate it as follows:\033[0m"
+echo -e "\033[31m  cd build\033[0m"
+echo -e "\033[31m  wsf-config -DTERRAFORM_SUT=${kvmtf}\033[0m"

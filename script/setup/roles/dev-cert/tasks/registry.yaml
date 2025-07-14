@@ -6,11 +6,20 @@
 
 - name: Remove any existing registry
   command: "docker rm -f {{ dev_registry_name }}"
-  ignore_errors: yes
+  ignore_errors: true
 
-- name: Launch a docker registry
-  command: |
-    docker run -d -p {{ dev_registry_port }}:5000 --restart=always -v {{ dev_cert_conf_dir }}:/etc/wsf/certs:ro --name {{ dev_registry_name }} -e REGISTRY_HTTP_TLS_CERTIFICATE=/etc/wsf/certs/{{ dev_cert_host }}:{{ dev_registry_port }}.crt -e REGISTRY_HTTP_TLS_KEY=/etc/wsf/certs/{{ dev_cert_host }}:{{ dev_registry_port }}.key {{ dev_registry_image }}
+- block:
+
+    - name: Launch a docker registry
+      command: |
+        docker run -d -p {{ dev_registry_port }}:5000 --restart=always -v {{ dev_cert_conf_dir }}:/etc/wsf/certs:ro --name {{ dev_registry_name }} -e REGISTRY_HTTP_TLS_CERTIFICATE=/etc/wsf/certs/{{ dev_cert_host }}:{{ dev_registry_port }}.crt -e REGISTRY_HTTP_TLS_KEY=/etc/wsf/certs/{{ dev_cert_host }}:{{ dev_registry_port }}.key {{ dev_registry_image }}
+
+  rescue:
+
+    - name: Launch a docker registry
+      command: |
+        docker run -d -p {{ dev_registry_port }}:5000 --restart=always -v {{ dev_cert_conf_dir }}:/etc/wsf/certs:ro --name {{ dev_registry_name }} -e REGISTRY_HTTP_TLS_CERTIFICATE=/etc/wsf/certs/{{ dev_cert_host }}:{{ dev_registry_port }}.crt -e REGISTRY_HTTP_TLS_KEY=/etc/wsf/certs/{{ dev_cert_host }}:{{ dev_registry_port }}.key {{ dev_registry_image }}
+      become: false
 
 - name: Print the message
   debug:

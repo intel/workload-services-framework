@@ -1,0 +1,29 @@
+#!/bin/bash -e
+
+igt_options=""
+sudo_password_required
+
+igt_start () {
+    mkdir -p "$1-igt"
+    cd "$1-igt"
+    if is_roi igt $2 ${1##*-} TRACE_START; then
+        echo "$DEV_SUDO_PASSWORD" | sudo -S bash -c "for dev in \$(intel_gpu_top -L | grep 8086 | cut -f1 -d' ');do intel_gpu_top $igt_options -d drm:/dev/dri/\$dev -J > igt-\$dev-$roi.logs 2>&1 & echo \$! > igt-\$dev.pid; done"
+        echo "igt started"
+    fi
+}
+
+igt_stop () {
+    if [ -d "$1-igt" ]; then
+        cd "$1-igt"
+        if is_roi igt $2 ${1##*-} TRACE_STOP; then
+            echo "$DEV_SUDO_PASSWORD" | sudo -S kill -s SIGINT $(cat igt-*.pid 2> /dev/null) 2> /dev/null || true
+            echo "$DEV_SUDO_PASSWORD" | sudo -S chown -R $(id -u):$(id -g) "$1-igt"
+            rm -f igt-*.pid || true
+            echo "igt stopped"
+        fi
+    fi
+}
+
+igt_collect () {
+    cd "$1-igt"
+}

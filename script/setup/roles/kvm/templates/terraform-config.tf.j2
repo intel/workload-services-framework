@@ -1,0 +1,166 @@
+variable "disk_spec_1" {
+  default = {
+    disk_count = 1
+    disk_size = 100
+    disk_format = "ext4"
+    disk_pool = {% if ('default' in (kvm_disk_pool_spec | split(','))) %}"{{ data_disks.stdout_lines | map('replace','/mnt/disk','') | sort | map('regex_replace','^','disk') | join(',') }}"{% else %}null{% endif %}
+  }
+}
+
+variable "disk_spec_2" {
+  default = {
+    disk_count = 1
+    disk_size = 200
+    disk_format = "ext4"
+    disk_pool = {% if ('default' in (kvm_disk_pool_spec | split(','))) %}"{{ data_disks.stdout_lines | map('replace','/mnt/disk','') | sort | map('regex_replace','^','disk') | join(',') }}"{% else %}null{% endif %}
+  }
+}
+
+variable "network_spec_1" {
+  default = {
+    network_count = 1
+    network_type = null
+  }
+}
+
+variable "owner" {
+  default = ""
+}
+
+variable "wl_name" {
+  default = ""
+}
+
+variable "wl_namespace" {
+  default = ""
+}
+
+variable "wl_registry_map" {
+  default = ""
+}
+
+{% for p in ['worker','client','controller'] %}
+variable "{{ p }}_profile" {
+  default = {
+    name = "{{ p }}"
+    cpu_core_count = 2
+    memory_size = 2
+    cpu_set = null
+    node_set = null
+    vm_count = 1
+
+    os_image = null
+    os_type = "ubuntu2204"
+    os_disk_size = 50
+
+    data_disk_spec = null
+    network_spec = null
+
+    # Specifies which KVM host must be used to host
+    # different workers.
+{% if p in ['worker'] %}
+    kvm_hosts = [ {{ range(groups.kvm_hosts|length) | join(',') }}  ]
+{% else %}
+    kvm_hosts = [ {{ range((groups.kvm_hosts|length)-1,-1,-1) | join(',') }}  ]
+{% endif %}
+  }
+}
+
+{% endfor %}
+variable "kvm_hosts" {
+  default = [{
+{% for h in groups.kvm_hosts %}
+{% if (h!=groups.kvm_hosts|first) %}
+  }, {
+{% endif %}
+    user   = "{{ hostvars[h].ansible_user }}"
+    host   = "{{ hostvars[h].ansible_host }}"
+    port   = {{ hostvars[h].ansible_port }}
+    # DHCP must be enabled on the network interface
+    networks = [ "{{ kvm_default_network | replace(',','","') }}" ]
+    # if specified, os image will reuse the storage pool
+    # images (with same image names.)
+    pool   = {% if kvm_image_pool_spec=='' %}null{% else %}"{{ kvm_image_pool_spec | split(',') | first | split(':') | first }}"{% endif %}
+
+{% endfor %}
+  }]
+}
+
+terraform {
+  required_providers {
+    libvirt = {
+      source = "dmacvicar/libvirt"
+    }
+    external = {
+      source = "hashicorp/external"
+    }
+  }
+}
+
+data "external" "keyfile" {
+  count = length(var.kvm_hosts)
+  program = [ "bash", "-c",
+    "echo '{\"keyfile\":\"'$(ssh -S none -v -p ${var.kvm_hosts[count.index].port} ${var.kvm_hosts[count.index].user}@${var.kvm_hosts[count.index].host} echo 2>&1 | grep 'Server accepts key:' | cut -f5 -d' ')'\"}'"
+  ]
+}
+
+{% for i in range(groups.kvm_hosts|length) %}
+provider "libvirt" {
+  uri = "qemu+ssh://${var.kvm_hosts.{{ i }}.user}@${var.kvm_hosts.{{ i }}.host}:${var.kvm_hosts.{{ i }}.port}/system?keyfile=${data.external.keyfile.{{ i }}.result.keyfile}"
+  alias = "kvm{{ i }}"
+}
+
+{% endfor %}
+locals {
+  instance_profiles = [
+{% for p in ['worker','client','controller'] %}
+    merge(var.{{ p }}_profile, {
+      data_disk_spec: null,
+      network_spec: null,
+    }),
+{% endfor %}
+  ]
+}
+
+{% for i in range(groups.kvm_hosts|length) %}
+module "wsf_kvm{{ i }}" {
+  source = "./template/terraform/kvm/local"
+
+  job_id = var.wl_namespace
+  ssh_pub_key = file("${path.root}/ssh_access.key.pub")
+  instance_profiles = local.instance_profiles
+
+  kvm_index = {{ i }}
+  kvm_host  = var.kvm_hosts.{{ i }}
+  providers = {
+    libvirt = libvirt.kvm{{ i }}
+  }
+}
+
+{% endfor %}
+output "options" {
+  value = merge({
+    wl_name : var.wl_name,
+    wl_registry_map : var.wl_registry_map,
+    wl_namespace : var.wl_namespace,
+    k8s_enable_registry: true,
+{% for i in range(groups.kvm_hosts|length) %}
+  }, {
+    for k,v in try(module.wsf_kvm{{ i }}.options,{}): k => v
+{% endfor %}
+  })
+}
+
+output "instances" {
+  sensitive = true
+  value = merge({
+{% for i in range(groups.kvm_hosts|length) %}
+{% if i>0 %}
+  }, {
+{% endif %}
+    for k,v in module.wsf_kvm{{ i }}.instances : k => merge(v, {
+      csp = "kvm",
+    })
+{% endfor %}
+  })
+}

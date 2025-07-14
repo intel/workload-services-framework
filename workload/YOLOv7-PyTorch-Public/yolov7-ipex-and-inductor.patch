@@ -68,6 +68,19 @@ index 0000000..9a09238
 +
 +if __name__ == '__main__':
 +    main()
+diff --git a/models/experimental.py b/models/experimental.py
+index 735d7aa..a81196c 100644
+--- a/models/experimental.py
++++ b/models/experimental.py
+@@ -249,7 +249,7 @@ def attempt_load(weights, map_location=None):
+     model = Ensemble()
+     for w in weights if isinstance(weights, list) else [weights]:
+         attempt_download(w)
+-        ckpt = torch.load(w, map_location=map_location)  # load
++        ckpt = torch.load(w, map_location=map_location, weights_only=False)  # load
+         model.append(ckpt['ema' if ckpt.get('ema') else 'model'].float().fuse().eval())  # FP32 model
+     
+     # Compatibility updates
 diff --git a/models/yolo.py b/models/yolo.py
 index 95a019c..d58ec03 100644
 --- a/models/yolo.py

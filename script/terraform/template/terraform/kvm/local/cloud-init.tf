@@ -72,6 +72,7 @@ resource "libvirt_cloudinit_disk" "default" {
     no_proxy = data.external.env.0.result.no_proxy
     data_disks = [
       for k,v in local.ebs_disks : {
+        name = v.disk_pool==null?"":element(split(",",v.disk_pool),v.lun)
         device = v.device
         path = v.path
         format = v.disk_format

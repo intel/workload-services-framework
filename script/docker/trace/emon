@@ -56,7 +56,7 @@ emon_collect () {
             cd ${/.dat/-edp}
             metric_file="$(head -n200 ../$dat | grep -E '^EDP metric file:' | cut -f2 -d:)"
             chart_file="$(head -n200 ../$dat | grep -E '^EDP chart file:' | cut -f2 -d:)"
-            python3 -m pyedp.edp $emon_pyedp_options -i ../$dat -o summary.xlsx -m "$emon_bin_path/sep/config/edp/$(basename "$metric_file")" -f "$emon_bin_path/sep/config/edp/$(basename "$chart_file")" > pyedp.logs 2>&1
+            python3 -m pyedp.edp $emon_pyedp_options -i ../$dat -o summary.xlsx -m "$emon_bin_path/sep/config/edp/$(basename "$metric_file")" -f "$emon_bin_path/sep/config/edp/$(basename "$chart_file")" > pyedp.logs 2>&1 || true
         done
     )
     fi

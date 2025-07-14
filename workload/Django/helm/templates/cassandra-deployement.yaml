@@ -1,0 +1,65 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app-name: cassandra
+    deployPolicy: cassandra
+  name: cassandra
+spec:
+  replicas: {{ .Values.REPLICAS }}
+  selector:
+    matchLabels:
+      app-name: cassandra
+      deployPolicy: cassandra
+  strategy: {}
+  template:
+    metadata:
+      name: cassandra
+      labels:
+        app-name: cassandra
+        deployPolicy: cassandra
+      annotations:
+        sidecar.istio.io/inject: "true"
+    spec:
+      containers:
+      - image: {{ .Values.REGISTRY }}django_cassandra{{ .Values.IMARCH }}{{ .Values.OS_SUFFIX }}{{ .Values.RELEASE }}
+        name: django-cassandra
+        securityContext:
+          privileged: true
+        env:
+        - name: CASSANDRA_CR
+          value: {{ .Values.CASSANDRA_CR | quote }}
+        - name: CASSANDRA_CW
+          value: {{ .Values.CASSANDRA_CW | quote }}
+        - name: CASSANDRA_CCW
+          value: {{ .Values.CASSANDRA_CCW | quote }}
+        ports:
+        - containerPort: 9042
+        - containerPort: 7000
+        resources: {}
+        imagePullPolicy: {{ include "imagepolicy" .Values }}
+      restartPolicy: Always
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: deployPolicy
+                operator: In
+                values:
+                - frontend
+            topologyKey: "kubernetes.io/hostname"
+          - labelSelector:
+              matchExpressions:
+              - key: deployPolicy
+                operator: In
+                values:
+                - benchmark
+            topologyKey: "kubernetes.io/hostname"
+status: {}

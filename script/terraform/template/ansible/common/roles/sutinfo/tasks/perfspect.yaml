@@ -45,7 +45,7 @@
   ignore_errors: yes
 
 - name: Run perfspect report
-  command: "/tmp/perfspect/perfspect report {{ perfspect_report_options }} {% if ansible_host!='127.0.0.1' %} --target {{ ansible_host }} --port {{ ansible_port | default(22) }} --user {{ ansible_user }} {% if ansible_private_key_file is defined %}--key {{ ansible_private_key_file }} {% endif %}{% endif %} --output {{ wl_logs_dir }}/{{ inventory_hostname }}-sutinfo"
+  command: "/tmp/perfspect/perfspect report {{ perfspect_report_options }} {% if ansible_host!='127.0.0.1' %} --target {{ ansible_host }} --port {{ ansible_port | default(22) }} --user {{ ansible_user }} {% if (ansible_private_key_file is defined) and ((vm_group|default('worker')) not in ['vmhost_hosts']) %}--key {{ ansible_private_key_file }} {% endif %}{% endif %} --output {{ wl_logs_dir }}/{{ inventory_hostname }}-sutinfo"
   register: perfspect_rc
   until: perfspect_rc is success
   retries: 2

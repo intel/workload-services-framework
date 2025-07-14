@@ -1,0 +1,68 @@
+# hibench-client
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=9.3
+ARG OS_IMAGE=rockylinux
+
+FROM ${OS_IMAGE}:${OS_VER} AS build
+
+# Install necessary utilities
+RUN yum install -y dnf-plugins-core
+RUN dnf config-manager --set-enabled crb
+RUN yum install -y maven git bc wget patch
+
+# Install OpenJDK 8
+RUN yum install -y java-1.8.0-openjdk-devel
+
+# Set JAVA_HOME environment variable to JDK 8
+ENV JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk
+ENV PATH=$JAVA_HOME/bin:$PATH
+
+# Clone HiBench repository
+ARG HIBENCH_VER=6bc7214
+ARG HIBENCH_REPO=https://github.com/Intel-bigdata/HiBench.git
+RUN git clone ${HIBENCH_REPO} && cd HiBench && git checkout ${HIBENCH_VER}
+
+# Set proxy variables for Maven build
+ARG HTTP_PROXY_ADDRESS
+ARG HTTP_PROXY_PORT
+ARG HTTPS_PROXY_ADDRESS
+ARG HTTPS_PROXY_PORT
+
+# Set up HiBench Scala version and build with Maven, using proxies
+ARG SCALA_VER=2.12
+RUN cd HiBench && \
+    mvn -Psparkbench -Pml -Pmicro -Dmodules \
+    -Dscala=${SCALA_VER} \
+    -Dhttp.proxyHost=${HTTP_PROXY_ADDRESS} -Dhttp.proxyPort=${HTTP_PROXY_PORT} \
+    -Dhttps.proxyHost=${HTTPS_PROXY_ADDRESS} -Dhttps.proxyPort=${HTTPS_PROXY_PORT} clean package
+
+# Apply patches
+COPY script/functions/*.patch /HiBench/bin/functions
+RUN for f in /HiBench/bin/functions/*.patch; do \
+        patch $(echo $f | sed 's/\.patch//') < $f; \
+        rm $f; \
+    done
+
+FROM hibench
+
+RUN yum install -y telnet wget nmap python3 findutils bind-utils bc
+
+COPY --from=build /HiBench /HiBench
+
+ARG SPARK_VER=3.3.3
+ARG SPARK_PACKAGE=https://archive.apache.org/dist/spark/spark-${SPARK_VER}/spark-${SPARK_VER}-bin-without-hadoop.tgz
+RUN wget -O spark-${SPARK_VER}-bin-without-hadoop.tgz ${SPARK_PACKAGE} && \
+    tar -xf /spark-${SPARK_VER}-bin-without-hadoop.tgz && \
+    mv /spark-${SPARK_VER}-bin-without-hadoop /usr/local/spark && \
+    rm /spark-${SPARK_VER}-bin-without-hadoop.tgz
+
+RUN rm -rf /export-logs
+RUN mkfifo /export-logs
+CMD  (/run_test.sh; echo $? > status) 2>&1  && \
+     tar cf /export-logs status output.log /HiBench/report/hibench.report HiBench/conf/*.conf usr/local/hadoop/etc/hadoop/*-site.xml && \
+     sleep infinity

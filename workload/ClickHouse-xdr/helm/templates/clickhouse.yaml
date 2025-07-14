@@ -1,0 +1,29 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: clickhouse-xdr
+  labels:
+    application: "clickhouse-xdr"
+spec:
+  template:
+    metadata:
+      labels:
+        app: clickhouse-xdr
+    spec:
+      containers:
+      - name: clickhouse-xdr
+        image: {{ .Values.REGISTRY }}clickhouse-xdr-{{ .Values.IMAGE_TYPE }}{{ .Values.RELEASE }}
+        imagePullPolicy: {{ include "imagepolicy" .Values }}
+        env:
+        - name: CLIENT_CORE_LIST
+          value: "{{ .Values.CLIENT_CORE_LIST }}"
+        - name: SERVER_CORE_LIST
+          value: "{{ .Values.SERVER_CORE_LIST }}"
+        - name: SERVER_MAX_THREADS
+          value: "{{ .Values.SERVER_MAX_THREADS }}"
+      restartPolicy: Never

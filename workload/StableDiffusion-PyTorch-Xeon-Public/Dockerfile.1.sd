@@ -1,0 +1,24 @@
+# stablediffusion-pytorch-xeon-public-sd
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+FROM stablediffusion-pytorch-xeon-public-base${RELEASE}
+
+# diffusions repo
+RUN cd diffusers && \
+    git apply /home/workspace/diffusers.patch && \
+    python setup.py install
+
+WORKDIR /home/workspace/pytorch_model/models/diffusion/pytorch/stable_diffusion
+COPY run_test.sh .
+COPY inference.py .
+
+RUN mkfifo /export-logs
+CMD ( ./run_test.sh; echo $? > status ) 2>&1 | tee benchmark_${MODE}_${TOPOLOGY}_${PRECISION}_${FUNCTION}_${DATA_TYPE}_$(date +"%m-%d-%y-%H-%M-%S").log \
+    && if [ `grep -c '^Throughput\|^FID:\|^Latency' benchmark_*.log` -eq 0 ];then echo 1 > status; fi \
+    && tar cPf /export-logs status $(find . -name "*.log") \
+    && sleep infinity

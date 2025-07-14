@@ -6,4 +6,4 @@ foreach(cloud aws gcp azure tencent alicloud vsphere oracle)
 endforeach()
 
 execute_process(COMMAND ln -s -r -f "${CMAKE_CURRENT_SOURCE_DIR}/script/debug.sh" . WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")
-
+execute_process(COMMAND bash -c "find template/ansible -ipath '*/defaults/*' -name '*.yaml' -exec sed -n -E '/^[a-zA-Z_0-9-][a-zA-Z_0-9-]*:/{/: *[{][}]/{d};/: *\$/{d};/: *(true|false) *(|#.*)\$/{s/^(.*):.*\$/--\\1\\n--no\\1/};s/^([^:]*):.*\$/--\\1/;p}' '{}' \\;" OUTPUT_FILE "${CMAKE_BINARY_DIR}/.ansible_script_options" WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")

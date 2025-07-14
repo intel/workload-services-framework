@@ -1,0 +1,35 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: benchmark
+spec:
+  template:
+    metadata:
+      labels:
+        app: doris-benchmark
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: benchmark
+        image: {{ .Values.REGISTRY }}doris-benchmark{{ .Values.RELEASE }}
+        imagePullPolicy:  {{ include "imagepolicy" .Values }}
+        env:
+          - name: K_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: K_DORIS_BE_NUM
+            value: "{{ .Values.DORIS_BE_NUM }}"
+          - name: K_DATA_SIZE_FACTOR
+            value: "{{ .Values.DATA_SIZE_FACTOR }}"
+          - name: K_DATA_GEN_THERADS
+            value: "{{ .Values.DATA_GEN_THERADS }}"
+      restartPolicy: Never
+      {{- $args := dict "key" "app" "value" "doris-fe" }}
+      {{- include "podAffinity" $args }}

@@ -1,0 +1,28 @@
+# stablediffusion-pytorch-xeon-public-dataset
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+FROM ${OS_IMAGE}:${OS_VER} as build
+
+RUN apt update && apt install -y wget unzip
+
+WORKDIR /dataset
+
+ARG COCO_VER="2017"
+ARG COCO_REPO="http://images.cocodataset.org/zips/val2017.zip"
+RUN wget ${COCO_REPO} && \
+    unzip val2017.zip && \
+    rm -f val2017.zip
+
+ARG ANNOTATIONS_VER="2017"
+ARG ANNOTATIONS_REPO="http://images.cocodataset.org/annotations/annotations_trainval2017.zip"
+RUN wget ${ANNOTATIONS_REPO} && \
+    unzip annotations_trainval2017.zip && \
+    rm -f annotations_trainval2017.zip

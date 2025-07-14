@@ -1,0 +1,28 @@
+# hibench-kmeans-client
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG RELEASE
+ARG IMAGESUFFIX
+FROM hibench-kmeans-client-base${IMAGESUFFIX}${RELEASE} as builder
+FROM hibench-kmeans-worker${IMAGESUFFIX}${RELEASE}
+
+RUN yum install -y telnet wget nmap python3 findutils bind-utils bc
+
+COPY --from=builder /HiBench /HiBench
+
+ARG SPARK_VER=3.3.3
+ARG SPARK_PACKAGE=https://archive.apache.org/dist/spark/spark-${SPARK_VER}/spark-${SPARK_VER}-bin-without-hadoop.tgz
+RUN wget -O spark-${SPARK_VER}-bin-without-hadoop.tgz ${SPARK_PACKAGE} && \
+    tar -xf /spark-${SPARK_VER}-bin-without-hadoop.tgz && \
+    mv /spark-${SPARK_VER}-bin-without-hadoop /usr/local/spark && \
+    rm /spark-${SPARK_VER}-bin-without-hadoop.tgz
+
+RUN rm -rf /export-logs
+RUN mkfifo /export-logs
+CMD (/run_test.sh; echo $? > status) 2>&1 | tee client.logs \
+    && tar cf /export-logs status client.logs HiBench/report/hibench.report HiBench/conf/*.conf usr/local/hadoop/etc/hadoop/*-site.xml \
+    && sleep infinity

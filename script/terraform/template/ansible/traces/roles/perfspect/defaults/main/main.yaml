@@ -8,6 +8,6 @@ perfspect: false
 perfspect_reset: false
 perfspect_metrics_options: ""
 perfspect_metrics_cids: false
-perfspect_version: "3.4.0"
+perfspect_version: "3.6.1"
 perfspect_bin_path: "/usr/local/perfspect"
 

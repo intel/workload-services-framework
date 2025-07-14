@@ -17,6 +17,9 @@ TESTCASE_OVERWRITE_CUSTOMIZED=()
 if [ -r "$CTESTSH_CONFIG" ]; then
     _insection=0
     _prefix=undef
+    _route="${SOURCEROOT//*\//}"
+    _route="${_route//-/_}"
+    _route="${_route//./_}"
     [[ "$CTESTSH_CONFIG" = "${SOURCEROOT%/}/"* ]] && _overwrite="_withbkc" || _overwrite="_customized"
     while IFS= read _line; do
         _prefix1="$(echo "$_line" | sed 's/[^ ].*$//')"
@@ -42,6 +45,7 @@ if [ -r "$CTESTSH_CONFIG" ]; then
                 _insection=0;;
             esac
         elif [ $_insection -gt 0 ] && [ ${#_prefix1} -gt $_prefix ]; then
+            _k="${_k#"${_route^^}"__}"
             eval "_tmp=\"\$$_k\""
             if [ "$_v" != "$_tmp" ]; then
                 if [ "$_overwrite" = "_withbkc" ]; then

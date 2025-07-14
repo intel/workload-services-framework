@@ -13,7 +13,7 @@ shift
 read_ip_script () {
 cat << EOF1
   ip=""
-  dev="\$(virsh --connect qemu:///system net-info $NETWORK | sed -n '/Bridge:/{s/.*: *//;p}')"
+  dev="\$(virsh --connect qemu:///system net-dumpxml $NETWORK | sed -n '/<bridge name=/{p};/<pf dev=/{p}' | cut -f2 -d"'")"
   while [ -z "\$ip" ]; do
     ip="\$(virsh --connect qemu:///system net-dhcp-leases $NETWORK | grep -iF $MAC | sed -n '/ipv4/{s|^.*ipv4 *\([0-9.]*\).*|\1|;p;q}')"
     [ -z "\$ip" ] || continue

@@ -1,0 +1,20 @@
+--- ../HiBench/bin/functions/monitor_replot.py	2022-04-07 15:36:12.916432322 -0400
++++ monitor_replot.py	2022-04-06 18:42:28.019098541 -0400
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python2
++#!/usr/bin/python3
+ # Licensed to the Apache Software Foundation (ASF) under one or more
+ # contributor license agreements.  See the NOTICE file distributed with
+ # this work for additional information regarding copyright ownership.
+@@ -18,9 +18,9 @@
+ import sys
+ 
+ if len(sys.argv)<4:
+-    print """Usage:
++    print("""Usage:
+     monitor_replot.py <workload_name> <log_path.log> <bench_log_path.log> <report_path.html>
+-"""
++""")
+     sys.exit(1)
+ 
+ generate_report(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])

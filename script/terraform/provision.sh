@@ -211,6 +211,14 @@ for e in $(compgen -e); do
     esac
     if [ -n "$CSP" ]; then
         case "$line" in
+        # ./ctest.sh --set KVM_WORKER_CPU_SET=1-4
+        $CSP"_"*"_CPU_SET="*)
+            override_string worker _profile cpu_set CPU_SET
+            ;;
+        # ./ctest.sh --set KVM_WORKER_NODE_SET=1-2
+        $CSP"_"*"_NODE_SET="*)
+            override_string worker _profile node_set NODE_SET
+            ;;
         # ./ctest.sh --set ALICLOUD_WORKER_ACCELERATORS=vqat
         $CSP"_"*"_ACCELERATORS="*)
             override_string worker _profile accelerators ACCELERATORS
@@ -270,6 +278,10 @@ for e in $(compgen -e); do
         # ./ctest.sh --set AZURE_DISK_SPEC_1_DISK_FORMAT=ext4
         $CSP"_DISK_SPEC_"*"_DISK_FORMAT="*)
             override_string 1 disk_spec_ disk_format DISK_FORMAT
+            ;;
+        # ./ctest.sh --set KVM_DISK_SPEC_1_DISK_POOL=mypool
+        $CSP"_DISK_SPEC_"*"_DISK_POOL="*)
+            override_string 1 disk_spec_ disk_pool DISK_POOL
             ;;
         # ./ctest.sh --set AZURE_DISK_SPEC_1_DISK_TYPE=Premium_LRS
         $CSP"_DISK_SPEC_"*"_DISK_TYPE="*)

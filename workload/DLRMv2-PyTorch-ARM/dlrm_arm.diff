@@ -1,0 +1,138 @@
+diff --git a/dlrm_data_pytorch.py b/dlrm_data_pytorch.py
+index 852c577..72eb0b3 100644
+--- a/dlrm_data_pytorch.py
++++ b/dlrm_data_pytorch.py
+@@ -441,8 +441,8 @@ def make_criteo_data_and_loaders(args, offset_to_length_converter=False):
+                 max_ind_range=args.max_ind_range
+             )
+
+-            mlperf_logger.log_event(key=mlperf_logger.constants.TRAIN_SAMPLES,
+-                                    value=train_data.num_samples)
++            # mlperf_logger.log_event(key=mlperf_logger.constants.TRAIN_SAMPLES,
++            #                         value=train_data.num_samples)
+
+             train_loader = torch.utils.data.DataLoader(
+                 train_data,
+@@ -463,8 +463,8 @@ def make_criteo_data_and_loaders(args, offset_to_length_converter=False):
+                 max_ind_range=args.max_ind_range
+             )
+
+-            mlperf_logger.log_event(key=mlperf_logger.constants.EVAL_SAMPLES,
+-                                    value=test_data.num_samples)
++            # mlperf_logger.log_event(key=mlperf_logger.constants.EVAL_SAMPLES,
++            #                         value=test_data.num_samples)
+
+             test_loader = torch.utils.data.DataLoader(
+                 test_data,
+diff --git a/dlrm_s_pytorch.py b/dlrm_s_pytorch.py
+index ec3394b..91aadba 100644
+--- a/dlrm_s_pytorch.py
++++ b/dlrm_s_pytorch.py
+@@ -97,6 +97,8 @@ from tricks.md_embedding_bag import PrEmbeddingBag, md_solver
+ # quotient-remainder trick
+ from tricks.qr_embedding_bag import QREmbeddingBag
+
++from torch.utils import ThroughputBenchmark
++
+ with warnings.catch_warnings():
+     warnings.filterwarnings("ignore", category=DeprecationWarning)
+     try:
+@@ -746,6 +748,42 @@ def dash_separated_floats(value):
+
+     return value
+
++def trace_model(args, dlrm, test_ld):
++    dlrm.eval()
++    for j, inputBatch in enumerate(test_ld):
++        X, lS_o, lS_i, _, _, _ = unpack_batch(inputBatch)
++        if args.bf16:
++            dlrm.emb_l.bfloat16()
++            with torch.cpu.amp.autocast(enabled=args.bf16):
++                dlrm = torch.jit.trace(dlrm, (X, lS_o, lS_i), check_trace=True)
++                dlrm = torch.jit.freeze(dlrm)
++        else:
++            dlrm = torch.jit.trace(dlrm, (X, lS_o, lS_i), check_trace=True)
++            dlrm = torch.jit.freeze(dlrm)
++        dlrm(X, lS_o, lS_i)
++        dlrm(X, lS_o, lS_i)
++        return dlrm
++
++def run_throughput_benchmark(args, dlrm, test_ld):
++    bench= ThroughputBenchmark(dlrm)
++    for j, inputBatch in enumerate(test_ld):
++        X, lS_o, lS_i, T, W, CBPP = unpack_batch(inputBatch)
++        bench.add_input(X, lS_o, lS_i)
++        if j == 1000:
++            break
++
++    stats= bench.benchmark(
++        num_calling_threads=args.share_weight_instance,
++        num_warmup_iters=100,
++        num_iters=args.num_batches* args.share_weight_instance,
++    )
++
++    print(stats)
++    latency= stats.latency_avg_ms
++    print("Latency: {:.3f}".format(latency))
++    throughput= (1/ latency) * 1000 * args.mini_batch_size * args.share_weight_instance
++    print("Samples per second: {:.3f}".format(throughput))
++    sys.exit()
+
+ def inference(
+     args,
+@@ -763,6 +801,12 @@ def inference(
+     if args.mlperf_logging:
+         scores = []
+         targets = []
++
++    if args.inference_only:
++        dlrm = trace_model(args, dlrm, test_ld)
++
++    if args.share_weight_instance != 0:
++        run_throughput_benchmark(args, dlrm, test_ld)
+
+     for i, testBatch in enumerate(test_ld):
+         # early exit if nbatches was set by the user and was exceeded
+@@ -1007,6 +1051,8 @@ def run():
+     parser.add_argument("--lr-num-warmup-steps", type=int, default=0)
+     parser.add_argument("--lr-decay-start-step", type=int, default=0)
+     parser.add_argument("--lr-num-decay-steps", type=int, default=0)
++    parser.add_argument("--share-weight-instance", type=int, default=0)
++    parser.add_argument("--bf16", action="store_true", default=False)
+
+     global args
+     global nbatches
+@@ -1399,8 +1445,8 @@ def run():
+         ld_nbatches_test = ld_model["nbatches_test"]
+         ld_train_loss = ld_model["train_loss"]
+         ld_total_loss = ld_model["total_loss"]
+-        if args.mlperf_logging:
+-            ld_gAUC_test = ld_model["test_auc"]
++        #if args.mlperf_logging:
++        #    ld_gAUC_test = ld_model["test_auc"]
+         ld_acc_test = ld_model["test_acc"]
+         if not args.inference_only:
+             optimizer.load_state_dict(ld_model["opt_state_dict"])
+@@ -1422,14 +1468,14 @@ def run():
+                 ld_train_loss,
+             )
+         )
+-        if args.mlperf_logging:
+-            print(
+-                "Testing state: accuracy = {:3.3f} %, auc = {:.3f}".format(
+-                    ld_acc_test * 100, ld_gAUC_test
+-                )
+-            )
+-        else:
+-            print("Testing state: accuracy = {:3.3f} %".format(ld_acc_test * 100))
++        #if args.mlperf_logging:
++        #    print(
++        #        "Testing state: accuracy = {:3.3f} %, auc = {:.3f}".format(
++        #            ld_acc_test * 100, ld_gAUC_test
++        #        )
++        #    )
++        #else:
++        print("Testing state: accuracy = {:3.3f} %".format(ld_acc_test * 100))
+
+     if args.inference_only:
+         # Currently only dynamic quantization with INT8 and FP16 weights are

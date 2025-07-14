@@ -1,0 +1,14 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- include_tasks:
+    file: download-hf.yaml
+  vars:
+    dataset_model_path: "llama32/3b"
+    hfcli_model_id: "meta-llama/Llama-3.2-3B-Instruct"
+    dataset_size: 30
+    hfcli_exclude: []
+    hfcli_revision: []
+    hfcli_login: true

@@ -1,0 +1,180 @@
+diff --git a/models_v2/pytorch/gptj/inference/cpu/run_llm.py b/models_v2/pytorch/gptj/inference/cpu/run_llm.py
+index 12f4ae75..02e5d24c 100644
+--- a/models_v2/pytorch/gptj/inference/cpu/run_llm.py
++++ b/models_v2/pytorch/gptj/inference/cpu/run_llm.py
+@@ -32,10 +32,10 @@ from transformers import (
+ )
+ 
+ import torch
++import zentorch
+ from torch.nn.functional import pad
+ from torch.utils.data import DataLoader
+ 
+-
+ parser = argparse.ArgumentParser("LLM generation script", add_help=False)
+ parser.add_argument(
+     "-m",
+@@ -197,6 +197,11 @@ if args.dtype == "bf16" or args.dtype == "fp32":
+             inplace=True,
+             deployment_mode=True if args.jit and (not args.accuracy_only) else False,
+         )
++    else:
++        user_model = zentorch.llm.optimize(
++            user_model.eval(),
++            dtype=torch.bfloat16 if args.dtype == "bf16" else torch.float,
++        )
+     if args.inductor:
+         from torch._inductor import config as inductor_config
+ 
+@@ -210,8 +215,9 @@ if args.dtype == "bf16" or args.dtype == "fp32":
+                     user_model.forward, dynamic=True, backend="ipex"
+                 )
+             else:
+-                print("[Info] Running torch.compile() BFloat16 with default backend")
+-                user_model.forward = torch.compile(user_model.forward, dynamic=True)
++                torch._dynamo.reset()
++                print("[Info] Running torch.compile() BFloat16 with default zentorch backend")
++                user_model.forward = torch.compile(user_model.forward, dynamic=True, backend="zentorch")
+ elif args.dtype == "fp16":
+     if args.ipex:
+         user_model = ipex.llm.optimize(
+@@ -220,6 +226,11 @@ elif args.dtype == "fp16":
+             inplace=True,
+             deployment_mode=True if args.jit and (not args.accuracy_only) else False,
+         )
++    else:
++        user_model = zentorch.llm.optimize(
++            user_model.eval(),
++            dtype=torch.bfloat16 if args.dtype == "bf16" else torch.float,
++        )
+     if args.inductor:
+         from torch._inductor import config as inductor_config
+ 
+@@ -233,8 +244,9 @@ elif args.dtype == "fp16":
+                     user_model.forward, dynamic=True, backend="ipex"
+                 )
+             else:
+-                print("[Info] Running torch.compile() BFloat16 with default backend")
+-                user_model.forward = torch.compile(user_model.forward, dynamic=True)
++                torch._dynamo.reset()
++                print("[Info] Running torch.compile() BFloat16 with default zentorch backend")
++                user_model.forward = torch.compile(user_model.forward, dynamic=True, backend="zentorch")
+ elif args.dtype == "bf32":
+     ipex.set_fp32_math_mode(mode=ipex.FP32MathMode.BF32, device="cpu")
+     user_model = ipex.llm.optimize(
+@@ -484,6 +496,7 @@ class Evaluator:
+ 
+ 
+ if args.lambada:
++
+     full_dataset = load_dataset(args.dataset)
+     dataset = full_dataset["validation"]
+     calib_dataset = full_dataset["train"]
+@@ -612,7 +625,7 @@ if args.dtype == "int8" and args.ipex:
+                     )
+         prepared_model.save_qconf_summary(qconf_summary=args.int8_qconfig)
+         print("calibration Done!")
+-    else:
++    elif args.ipex:
+         user_model = ipex.llm.optimize(
+             user_model.eval(),
+             dtype=amp_dtype,
+@@ -621,7 +634,15 @@ if args.dtype == "int8" and args.ipex:
+             inplace=True,
+             deployment_mode=True,
+         )
+-        print("model quantization - Done!")
++        print("IPEX model quantization - Done!")
++    else:
++        user_model = zentorch.llm.optimize(
++            user_model.eval(),
++            dtype=amp_dtype,
++            quantization_config=qconfig,
++            qconfig_summary_file=args.int8_qconfig,
++        )
++        print("Zentorch model quantization - Done!")
+ elif args.dtype == "int8" and args.inductor:
+     from torch._inductor import config as inductor_config
+ 
+@@ -655,8 +676,9 @@ elif args.dtype == "int8" and args.inductor:
+                     converted_model, dynamic=True, backend="ipex"
+                 )
+             else:
++                torch._dynamo.reset()
+                 print("[Info] Running torch.compile() with default backend")
+-                user_model = torch.compile(converted_model, dynamic=True)
++                user_model = torch.compile(converted_model, dynamic=True, backend="zentorch")
+             user_model(**encoded_input)
+             user_model(**encoded_input)
+ elif args.dtype == "fp8":
+@@ -757,20 +779,42 @@ def benchmark_evaluate(prompt):
+             print(gen_text, flush=True)
+             total_time += toc - tic
+             if args.token_latency:
++                # Print debug information
++                print(f"Output: {output}")
++                print(f"Length of output: {len(output)}")
+                 total_list.append(output[1])
+ 
+     print("\n", "-" * 10, "Summary:", "-" * 10)
+     latency = total_time / (num_iter)
+-    print("inference-latency: %.3f sec." % latency)
++    print("Inference latency: %.3f sec." % latency)
+     if args.token_latency:
+         first_latency = np.mean([x[0] for x in total_list])
+         next_latency_list = list(chain(*[x[1:] for x in total_list]))
+         next_latency_list.sort()
+         average_next_latency = np.mean(next_latency_list)
++        p99_latency = np.percentile(next_latency_list, 99)
++        p95_latency = np.percentile(next_latency_list, 95)
+         p90_latency = np.percentile(next_latency_list, 90)
+-        print("first-token-latency: %.3f sec." % first_latency)
+-        print("rest-token-latency: %.3f sec." % average_next_latency)
+-        print("P90-rest-token-latency: %.3f sec." % p90_latency)
++        p50_latency = np.percentile(next_latency_list, 50)
++        print("First token average latency: %.3f sec." % first_latency)
++        print("rest token latency: %.3f sec." % average_next_latency)
++        print("P99 rest token latency: %.3f sec." % p99_latency)
++        print("P95 rest token latency: %.3f sec." % p95_latency)
++        print("P90 rest token latency: %.3f sec." % p90_latency)
++        print("P50 rest token latency: %.3f sec." % p50_latency)
++
++        # Calculate first_token_throughput
++        first_token_throughput = (1 / first_latency) * args.batch_size
++
++        # Calculate rest_token_throughput
++        rest_token_throughput = (1 / average_next_latency) * args.batch_size
++
++        # Calculate throughput
++        throughput = (1 / latency) * args.batch_size
++
++        print(f"First token throughput: {first_token_throughput}")
++        print(f"Rest token throughput: {rest_token_throughput}")
++        print(f"throughput: {throughput}")
+ 
+ 
+ if args.benchmark:
+@@ -779,7 +823,6 @@ if args.benchmark:
+     if args.use_share_weight and args.device == "cpu":
+         threads = []
+         import threading
+-
+         num_instances = args.ws_total_cores // args.ws_cores_per_instance
+         for i in range(0, num_instances):
+             t = threading.Thread(target=benchmark_evaluate, args=(prompt))
+@@ -789,6 +832,7 @@ if args.benchmark:
+             t.join()
+     else:
+         benchmark_evaluate(prompt)
++        exit(0)
+ 
+ if args.accuracy_only:
+     if not args.inductor:
+@@ -849,7 +893,6 @@ if args.accuracy_only:
+                 "past_key_values": tuple(global_past_key_value),
+             }
+         )
+-
+         with fp8_autocast(
+             enabled=True,
+             calibrating=False,

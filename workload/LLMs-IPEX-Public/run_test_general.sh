@@ -5,17 +5,17 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-# quantization for precision woq_int4 static_int8
+# quantization for precision woq_int4(local quantization script) static_int8
 quantization_model(){
-    if [[ "${PRECISION}" == "woq_int4" ]] || [[ "${PRECISION}" == "static_int8" ]]; then
+    if ([[ "${PRECISION}" == "woq_int4" ]] && [[ "${MODEL_NAME}" == *"gpt"* ]]) || [[ "${PRECISION}" == "static_int8" ]]; then
         OUTPUT_DIR="${TRANSFORMERS_CACHE}/public/saved_results_${PRECISION}"
         if [ ! -f "${OUTPUT_DIR}/best_model.pt" ]; then
             rm -rf ${OUTPUT_DIR}
             mkdir -p ${OUTPUT_DIR}
-            if [[ "${PRECISION}" == "woq_int4" ]]; then
+            if [[ "${PRECISION}" == "woq_int4" ]] && [[ "${MODEL_NAME}" == *"gpt"* ]]; then
                 # Step 1: Generate modified weights and quantization info and save as checkpoint
                 echo "Run quantization info: python run_gptq.py --model ${MODEL_NAME} --output-dir ${OUTPUT_DIR}"
-                eval python run_gptq.py --model ${MODEL_NAME} --output-dir ${OUTPUT_DIR}
+                eval python ../run_gptq.py --model ${MODEL_NAME} --output-dir ${OUTPUT_DIR}
 
                 # Step 2: Generate quantized model with INT4 weights
                 echo "Run quantization: python single_instance/run_quantization.py --ipex-weight-only-quantization \
@@ -107,6 +107,10 @@ if [[ "${PRECISION}" == "bfloat16" ]]; then
     EXEC_ARGS+=" --dtype bfloat16 --ipex"
 fi
 
+if [[ "${PRECISION}" == "float32" ]]; then
+    EXEC_ARGS+=" --dtype float32 --ipex"
+fi
+
 if [[ "${MODE}" == "accuracy" ]]; then
     if [[ "${PRECISION}" == *"int"* ]]; then 
         EXEC_ARGS+=" --dtype int8"
@@ -118,7 +122,11 @@ else
     if [[ "${PRECISION}" == "woq_int8" ]]; then
         EXEC_ARGS+=" --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp"
     elif [[ "${PRECISION}" == "woq_int4" ]]; then
-        EXEC_ARGS+=" --quant-with-amp --quantized-model-path ${OUTPUT_DIR}/best_model.pt"
+        if [[ "${MODEL_NAME}" == *"gpt"* ]]; then
+            EXEC_ARGS+=" --quant-with-amp --quantized-model-path ${OUTPUT_DIR}/best_model.pt"
+        else
+            EXEC_ARGS+=" --ipex-weight-only-quantization --weight-dtype INT4 --quant-with-amp"
+        fi
     elif [[ "${PRECISION}" == "static_int8" ]]; then
         EXEC_ARGS+=" --alpha auto --quantized-model-path ${OUTPUT_DIR}/best_model.pt"
     fi  
@@ -126,11 +134,13 @@ fi
 
 # script name
 if [ "${MODE}" == "accuracy" ]; then
-    EVAL_SCRIPT="single_instance/run_accuracy.py"
-elif [[ "${PRECISION}" == "woq_int4" ]] || [[ "${PRECISION}" == "static_int8" ]]; then
-    EVAL_SCRIPT="single_instance/run_quantization.py"
+    EVAL_SCRIPT="python single_instance/run_accuracy.py"
+elif [[ "${PRECISION}" == "static_int8" ]]; then
+    EVAL_SCRIPT="python single_instance/run_quantization.py"
+elif [[ "${PRECISION}" == "woq_int4" ]] && [[ "${MODEL_NAME}" == *"gpt"* ]]; then
+    EVAL_SCRIPT="python single_instance/run_quantization.py"
 else
-    EVAL_SCRIPT="run.py"
+    EVAL_SCRIPT="python run.py"
 fi
 
 # execute benchmarking script
@@ -138,15 +148,19 @@ echo "Start case topology"
 start_core=$(( $NUMA_NODES_USE * $CORES_PER_NUMA ))
 end_core=$(( $start_core + $CORES_PER_INSTANCE - 1 ))
 NUMA_ARGS="OMP_NUM_THREADS=${CORES_PER_INSTANCE} numactl -m ${NUMA_NODES_USE} -C ${start_core}-${end_core}"
-echo "Run benchmark: ${NUMA_ARGS} python ${EVAL_SCRIPT} ${EXEC_ARGS}"
-eval ${NUMA_ARGS} python ${EVAL_SCRIPT} ${EXEC_ARGS} ||
+EXEC_CMD="${NUMA_ARGS} ${EVAL_SCRIPT} ${EXEC_ARGS}"
+if [[ "${MODEL_NAME}" == *"deepseek"* ]]; then
+    EXEC_CMD="${EVAL_SCRIPT} ${EXEC_ARGS}"
+fi
+echo "Run benchmark: ${EXEC_CMD}"
+eval ${EXEC_CMD} ||
 if [ $? -ne 0 ]; then
-    if [[ "${PRECISION}" == "woq_int4" ]] || [[ "${PRECISION}" == "static_int8" ]]; then
+    if ([[ "${PRECISION}" == "woq_int4" ]] && [[ "${MODEL_NAME}" == *"gpt"* ]]) || [[ "${PRECISION}" == "static_int8" ]]; then
         echo "Run error, Try to delete the model and quantization it."
         rm -rf ${OUTPUT_DIR}/best_model.pt
         quantization_model
-        echo "Run benchmark again: ${NUMA_ARGS} python ${EVAL_SCRIPT} ${EXEC_ARGS}"
-        eval ${NUMA_ARGS} python ${EVAL_SCRIPT} ${EXEC_ARGS}
+        echo "Run benchmark again: ${EXEC_CMD}"
+        eval ${EXEC_CMD}
     fi
 fi
 echo "Finish case topology"

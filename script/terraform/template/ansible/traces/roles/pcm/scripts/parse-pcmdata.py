@@ -68,7 +68,7 @@ def read_pcm_power_logs(logs_dir):
         socket = "socket-" + (line[1:].split(";")[0])
         if socket not in this_record:
           this_record[socket] = {}
-        this_record[socket]["dram-energy"] = float(line.split(":")[-1].strip())
+        this_record[socket]["dram-energy"] = float(line.split(":")[-1].strip(';\n\t '))
 
   if this_record:
     pcm_data.append(this_record)

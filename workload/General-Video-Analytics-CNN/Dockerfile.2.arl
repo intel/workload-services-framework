@@ -1,0 +1,70 @@
+# gva-cnn-base-arl
+ARG OS_VER=24.04
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_IMAGE=ubuntu
+FROM ${OS_IMAGE}:${OS_VER} AS base-image
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends vim git gpg curl sudo ca-certificates wget numactl unzip libtbb12 ocl-icd-libopencl1
+
+# PPA
+ARG PPA_URL=https://download.01.org/intel-linux-overlay/ubuntu
+ARG PPA_KEY_URL=https://download.01.org/intel-linux-overlay/ubuntu/E6FA98203588250569758E97D176E3162086EE4C.gpg
+RUN echo "deb ${PPA_URL} noble main non-free multimedia kernels" > /etc/apt/sources.list.d/intel-arl.list \
+    && echo "deb-src ${PPA_URL} noble main non-free multimedia kernels" >> /etc/apt/sources.list.d/intel-arl.list
+RUN wget ${PPA_KEY_URL} -O /etc/apt/trusted.gpg.d/arl.gpg
+RUN echo "Package: *" > /etc/apt/preferences.d/intel-arl \
+    && echo "Pin: release o=intel-iot-linux-overlay-noble" >> /etc/apt/preferences.d/intel-arl \
+    && echo "Pin-Priority: 2000" >> /etc/apt/preferences.d/intel-arl
+
+RUN apt-get update -y && apt-get upgrade -y &&\
+    rm -rf /bin/sh && \
+    ln -s /bin/bash /bin/sh  && \
+    apt-get install -y --no-install-recommends \
+    libva-dev libdrm-dev intel-media-va-driver-non-free vainfo libvpl-dev mesa-vulkan-drivers
+
+# Install IGC and Compute Runtime
+ARG IGC_VER=v2.5.6
+ARG IGC_REPO=https://github.com/intel/intel-graphics-compiler/releases/download/${IGC_VER}
+ARG IGC_CORE_VER=2.5.6+18417
+ARG IGC_CORE_PKG=${IGC_REPO}/intel-igc-core-2_${IGC_CORE_VER}_amd64.deb
+
+ARG IGC_OPENCL_VER=2.5.6+18417
+ARG IGC_OPENCL_PKG=${IGC_REPO}/intel-igc-opencl-2_${IGC_OPENCL_VER}_amd64.deb
+
+ARG COMPUTE_RUNTIME_VER=24.52.32224.5
+ARG OPENCL_ICD_VER=24.52.32224.5
+ARG OPENCL_ICD_PKG=https://github.com/intel/compute-runtime/releases/download/${COMPUTE_RUNTIME_VER}/intel-opencl-icd_${OPENCL_ICD_VER}_amd64.deb
+
+ARG IGDGMM_VER=22.5.5
+ARG IGDGMM_PKG=https://github.com/intel/compute-runtime/releases/download/${COMPUTE_RUNTIME_VER}/libigdgmm12_${IGDGMM_VER}_amd64.deb
+
+RUN mkdir -p /workspace/neo && cd /workspace/neo && \
+    wget ${IGC_CORE_PKG} ${IGC_OPENCL_PKG} ${OPENCL_ICD_PKG} ${IGDGMM_PKG} && \
+    dpkg -i *.deb && \
+    rm -rf /workspace/neo
+
+# Install NPU driver
+
+ARG NPU_DRIVER_COMPILER_VER=1.17.0.20250508-14912879441_ubuntu24.04_amd64
+ARG NPU_DRIVER_PKG=https://github.com/intel/linux-npu-driver/releases/download
+
+ARG INTEL_DRIVER_COMPILER_NPU_PKG=${NPU_DRIVER_PKG}/v1.17.0/intel-driver-compiler-npu_${NPU_DRIVER_COMPILER_VER}.deb
+ARG INTEL_FW_NPU_PKG=${NPU_DRIVER_PKG}/v1.17.0/intel-fw-npu_${NPU_DRIVER_COMPILER_VER}.deb
+ARG INTEL_LEVEL_ZERO_NPU_PKG=${NPU_DRIVER_PKG}/v1.17.0/intel-level-zero-npu_${NPU_DRIVER_COMPILER_VER}.deb
+
+ARG LEVEL_ZERO_REPO=https://github.com/oneapi-src/level-zero/releases/download
+ARG LEVEL_ZERO_VER=1.21.9+u24.04_amd64
+ARG LEVEL_ZERO_PKG=${LEVEL_ZERO_REPO}/v1.21.9/level-zero_${LEVEL_ZERO_VER}.deb
+
+RUN mkdir -p /workspace/neo && cd /workspace/neo && \
+    wget ${INTEL_DRIVER_COMPILER_NPU_PKG} ${INTEL_FW_NPU_PKG} ${INTEL_LEVEL_ZERO_NPU_PKG} ${LEVEL_ZERO_PKG}&& \
+    dpkg -i *.deb && \
+    rm -rf /workspace/neo
+
+WORKDIR /home/kpi
+RUN mkdir -p /home/kpi/output/results

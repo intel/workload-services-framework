@@ -9,7 +9,7 @@ perf_start () {
     mkdir -p "$1-perf"
     cd "$1-perf"
     if is_roi perf $2 ${1##*-} TRACE_START; then
-        echo "$DEV_SUDO_PASSWORD" | sudo -S bash -c "perf record $perf_record_options --output perf-1.record -- sleep infinity & echo \$! > perf.pid"
+        echo "$DEV_SUDO_PASSWORD" | sudo -S bash -c "perf record $perf_record_options --output perf-$2.record -- sleep infinity & echo \$! > perf.pid"
         echo "perf started"
     fi
 }
@@ -21,7 +21,7 @@ perf_stop () {
             echo "$DEV_SUDO_PASSWORD" | sudo -S kill $(cat perf.pid) || true
             tail -f --pid=$(cat perf.pid) /dev/null || true
             echo "$DEV_SUDO_PASSWORD" | sudo -S chown -R $(id -u):$(id -g) "$1-perf"
-            rm -f perf.pid
+            rm -f perf.pid || true
             echo "perf stopped"
         fi
     fi
@@ -32,8 +32,8 @@ perf_collect () {
         cd "$1-perf"
         for record in perf-*.record; do
             [ -e $record ] || continue
-            perf report $perf_report_options -i $record > ${record/.record/.report}
-            perf script $perf_script_options -i $record > $record.out
+            perf report $perf_report_options -i $record > ${record/.record/.report} || true
+            perf script $perf_script_options -i $record > $record.out || true
         done
     fi
 }

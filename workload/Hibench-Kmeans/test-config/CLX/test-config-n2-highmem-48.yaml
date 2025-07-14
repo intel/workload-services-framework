@@ -1,0 +1,28 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+*gcp_hibench_kmeans_default:
+    # disk spec
+    GCP_CONTROLLER_OS_DISK_SIZE: 120
+    GCP_CLIENT_OS_DISK_SIZE: 120
+    GCP_WORKER_OS_DISK_SIZE: 120
+    GCP_CONTROLLER_OS_DISK_TYPE: pd-balanced
+    GCP_CLIENT_OS_DISK_TYPE: pd-balanced
+    GCP_WORKER_OS_DISK_TYPE: pd-balanced
+    # platform
+    GCP_CLIENT_INSTANCE_TYPE: n2-highmem-48
+    GCP_WORKER_INSTANCE_TYPE: n2-highmem-48
+    GCP_WORKER_MIN_CPU_PLATFORM: Intel%20Cascade%20Lake
+    GCP_CLIENT_MIN_CPU_PLATFORM: Intel%20Cascade%20Lake
+    GCP_ZONE: us-east4-c
+    # workload config
+    HIBENCH_SCALE_PROFILE: bigdata
+    WORKERNODE_NUM: 3
+    NODE_NUM: 4
+    GCP_DISK_SPEC_1_DISK_COUNT: 3
+    GCP_DISK_SPEC_1_DISK_SIZE: 120
+    GCP_DISK_SPEC_1_DISK_TYPE: pd-ssd
+    DISK_COUNT: 3
+    ENABLE_MOUNT_DIR: true

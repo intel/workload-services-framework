@@ -1,0 +1,49 @@
+# django_cassandra_ubuntu2404
+
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+ARG OS_VER=24.04
+ARG OS_IMAGE=ubuntu
+
+FROM ${OS_IMAGE}:${OS_VER}
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+ARG CASSANDRA_VER=4.1.9
+
+RUN apt-get update && \
+    apt-get install -y \
+    openjdk-11-jdk \
+    apt-transport-https \
+    curl \
+    gnupg \
+    lsb-release \
+    sudo \
+    && apt-get clean
+
+RUN curl https://downloads.apache.org/cassandra/KEYS | gpg --dearmor -o /usr/share/keyrings/cassandra-archive-keyring.gpg
+RUN echo "deb [signed-by=/etc/apt/keyrings/apache-cassandra.asc] https://debian.cassandra.apache.org 41x main" | sudo tee -a /etc/apt/sources.list.d/cassandra.sources.list
+RUN curl -o /etc/apt/keyrings/apache-cassandra.asc https://downloads.apache.org/cassandra/KEYS
+
+RUN apt-get update && \
+    apt-get install -y cassandra=${CASSANDRA_VER} && \
+    apt-get clean
+
+COPY ./cassandra/set_sysctl.conf ./cassandra/init_config.sh /scripts/
+
+COPY ./cassandra/jvm.options.128_GB /etc/cassandra/jvm.options
+
+RUN echo "Add nf_conntrack to modules ...\n"\
+    && echo "nf_conntrack" >> /etc/modules \
+    && echo "Add limits settings ...\n"\
+    && echo "* soft nofile 1000000" >> /etc/security/limits.conf \
+    && echo "* hard nofile 1000000" >> /etc/security/limits.conf
+
+RUN cp /scripts/set_sysctl.conf /etc/sysctl.conf
+
+ENV DEBIAN_FRONTEND=teletype
+
+CMD /scripts/init_config.sh cassandra

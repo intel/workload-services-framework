@@ -9,7 +9,7 @@ BEGIN {
     status="failed"
 }
 
-/^#(pcm|pdu|uprof|emon|perfspect): / {
+/^#(pcm|pdu|uprof|emon|perfspect|turbostat): / {
     nc=split($2,columns,"/")
     for(i=3;i<=nc-1;i++)
       if(columns[i]~/logs-/)break
@@ -22,7 +22,7 @@ BEGIN {
 /^#(pcm|uprof|perfspect): / {
     pwr_roi=columns[i+2]
 }
-/^#(pdu|emon): / {
+/^#(pdu|emon|turbostat): / {
     patsplit(columns[i+2],fields,/[0-9][0-9]*/)
     pwr_roi="roi-"fields[1]
 }
@@ -80,7 +80,17 @@ BEGIN {
     split($0,fields,",")
     perfspect_data[pwr_host][pwr_roi][++perfspect_count[pwr_host][pwr_roi]]+=fields[perfspect_package_power_column]
 }
-/^#(bom|timestamp|pdu|pcm|uprof|emon|perfspect|sar|collectd|igt|sutinfo|logsdir|terraform-config|.*[.]csv)[:-] / {
+/^#turbostat- / && /Time_Of_Day_Seconds/ {
+    for (i=2;i<=NF;i++)
+      turbostat_columns[$i]=i
+}
+/^#turbostat- / && $(turbostat_columns["Core"])=="-" && $(turbostat_columns["CPU"])=="-" {
+    turbostat_pkgwatt_data[pwr_host][pwr_roi][++turbostat_count[pwr_host][pwr_roi]]+=$(turbostat_columns["PkgWatt"])*1
+    turbostat_corwatt_data[pwr_host][pwr_roi][turbostat_count[pwr_host][pwr_roi]]+=$(turbostat_columns["CorWatt"])*1
+    turbostat_gfxwatt_data[pwr_host][pwr_roi][turbostat_count[pwr_host][pwr_roi]]+=$(turbostat_columns["GFXWatt"])*1
+    turbostat_ramwatt_data[pwr_host][pwr_roi][turbostat_count[pwr_host][pwr_roi]]+=$(turbostat_columns["RAMWatt"])*1
+}
+/^#(bom|timestamp|pdu|pcm|uprof|emon|perfspect|sar|collectd|igt|turbostat|sutinfo|logsdir|terraform-config|.*[.]csv)[:-] / {
     if (!sutinfo) next
 }
 { 
@@ -171,6 +181,34 @@ END {
         for (h in perfspect_data) {
             for (r in perfspect_data[h])
                 print "  "h" "r" avg "calc_avg(perfspect_data[h][r])" max "calc_max(perfspect_data[h][r])" med "calc_median(perfspect_data[h][r])
+        }
+    }
+    if (length(turbostat_pkgwatt_data)>0) {
+        print "turbostat packet power (w): "
+        for (h in turbostat_pkgwatt_data) {
+            for (r in turbostat_pkgwatt_data[h])
+                print "  "h" "r" avg "calc_avg(turbostat_pkgwatt_data[h][r])" max "calc_max(turbostat_pkgwatt_data[h][r])" med "calc_median(turbostat_pkgwatt_data[h][r])
+        }
+    }
+    if (length(turbostat_gfxwatt_data)>0) {
+        print "turbostat graphics power (w): "
+        for (h in turbostat_gfxwatt_data) {
+            for (r in turbostat_gfxwatt_data[h])
+                print "  "h" "r" avg "calc_avg(turbostat_gfxwatt_data[h][r])" max "calc_max(turbostat_gfxwatt_data[h][r])" med "calc_median(turbostat_gfxwatt_data[h][r])
+        }
+    }
+    if (length(turbostat_corwatt_data)>0) {
+        print "turbostat core power (w): "
+        for (h in turbostat_corwatt_data) {
+            for (r in turbostat_corwatt_data[h])
+                print "  "h" "r" avg "calc_avg(turbostat_corwatt_data[h][r])" max "calc_max(turbostat_corwatt_data[h][r])" med "calc_median(turbostat_corwatt_data[h][r])
+        }
+    }
+    if (length(turbostat_ramwatt_data)>0) {
+        print "turbostat RAM power (w): "
+        for (h in turbostat_ramwatt_data) {
+            for (r in turbostat_ramwatt_data[h])
+                print "  "h" "r" avg "calc_avg(turbostat_ramwatt_data[h][r])" max "calc_max(turbostat_ramwatt_data[h][r])" med "calc_median(turbostat_ramwatt_data[h][r])
         }
     }
 }

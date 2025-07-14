@@ -4,6 +4,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-pcm_public_version: "202409"
+pcm_public_version: "202502"
 pcm_public_repository: "https://github.com/intel/pcm/archive/refs/tags/{{ pcm_public_version }}.tar.gz"
 

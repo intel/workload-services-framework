@@ -47,7 +47,7 @@ WORKDIR /home/workspace
 SHELL ["/bin/bash", "-c"]
 
 # Install IPEX
-ARG IPEX_VER="v2.3.0+cpu"
+ARG IPEX_VER="v2.6.0+cpu"
 ARG IPEX_REPO="https://github.com/intel/intel-extension-for-pytorch.git"
 RUN source activate llm && \ 
     git clone ${IPEX_REPO} && \
@@ -56,9 +56,9 @@ RUN source activate llm && \
     git submodule sync && git submodule update --init --recursive
 
 # Get the example scripts with git command
-WORKDIR /home/workspace/intel-extension-for-pytorch/examples/cpu/inference/python/llm/
+WORKDIR /home/workspace/intel-extension-for-pytorch/examples/cpu/llm/
 
-RUN source activate llm && bash ./tools/env_setup.sh 7
+RUN source activate llm && bash ./tools/env_setup.sh 15
 
 ARG TRANSFORMERS_SG_VER="0.0.5"
 ARG TRANSFORMERS_SG_REPO="pip"
@@ -68,8 +68,12 @@ ARG BITSANDBYTES_VER="0.43.0"
 ARG BITSANDBYTES_REPO="pip"
 ARG NUMPY_VER="1.26.1"
 ARG NUMPY_REPO="pip"
+ARG PEFT_VER="0.11.1"
+ARG PEFT_REPO="pip"
+ARG DATASET_VER="2.20.0"
+ARG DATASET_REPO="pip"
 RUN source activate llm && pip install transformers_stream_generator==${TRANSFORMERS_SG_VER} \
-    tiktoken==${TIKTOKEN_VER} bitsandbytes==${BITSANDBYTES_VER} numpy==${NUMPY_VER}
+    tiktoken==${TIKTOKEN_VER} bitsandbytes==${BITSANDBYTES_VER} numpy==${NUMPY_VER} peft==${PEFT_VER} datasets==${DATASET_VER}
     
 # download lambada dataset in cache 
 RUN source activate llm && \
