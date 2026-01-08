@@ -54,7 +54,7 @@ RUN source activate zen5 && pip install --no-cache-dir intel_extension_for_pytor
 # get ZenDNN for PyTorch
 WORKDIR /home/workspace
 
-ARG PYTORCH_VER="2.6.0"
+ARG PYTORCH_VER="2.7.0"
 ARG PYTORCH_REPO="https://download.pytorch.org/whl/cpu"
 RUN source activate zen5 && pip install torch==${PYTORCH_VER}
 

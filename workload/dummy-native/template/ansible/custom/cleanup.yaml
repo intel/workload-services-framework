@@ -1,0 +1,18 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- hosts: workload_hosts
+  gather_facts: false
+  become: false
+  tasks:
+
+    - name: Remove workspace
+      include_role:
+        name: cleanup
+        tasks_from: "main{{ is_win | ternary('-win','') }}"
+      when: ((csp | default('static')) == 'static')
+      vars:
+        is_win: "{{ ((ansible_connection|default('ssh')) == 'winrm') }}"
+

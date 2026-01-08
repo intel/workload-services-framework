@@ -1,0 +1,36 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+  
+  - name: Set workspace
+    set_fact:
+      workspace: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-workspace"
+  
+  - name: Create workspace
+    file:
+      path: "{{ workspace }}"
+      state: directory
+  
+  - name: Create PI calculation script (run_test.sh)
+    copy:
+      dest: "{{ workspace }}/start-workload.sh"
+      mode: '0755'
+      content: |
+        #!/bin/sh -e
+        # This dummy workload calculates the PI sequence with workload-specific custom scale, return_value and sleep_time params
+        
+        # Parameters with defaults
+        ROI=${1:-3}
+        SCALE=${2:-10}
+        SLEEP_TIME=${3:-1}
+        RETURN_VALUE=${4:-0}
+        
+        for i in $(seq $ROI); do
+          echo "START-ROI-$i"
+          time -p sh -c "echo \"scale=$SCALE; 4*a(1)\" | bc -l; sleep $SLEEP_TIME"
+          echo "STOP-ROI-$i"
+        done
+        exit ${RETURN_VALUE}
+

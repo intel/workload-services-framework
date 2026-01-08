@@ -3,6 +3,15 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+- name: check variable names
+  shell: |
+    echo $workload_config.terraform_sut && echo {{ workload_config.terraform_sut }}
+
 - name: Set ANN-VectorDB Parameters
   set_fact:
     algorithm: "{{ wl_tunables['ALGORITHM'] }}"
@@ -72,6 +81,23 @@
       sed -i '3i\ENV https_proxy={{ lookup('env', 'https_proxy') }}' ann_benchmarks/algorithms/base/Dockerfile
       sed -i '4i\ENV http_proxy={{ lookup('env', 'http_proxy') }}' ann_benchmarks/algorithms/base/Dockerfile
     executable: /bin/bash
+  when: "{{ workload_config.terraform_sut in ['static'] }}"
+
+- name: Enable and start Docker service
+  systemd:
+    name: docker
+    enabled: true
+    state: started
+  become: true
+  when: "{{ workload_config.terraform_sut in ['aws', 'azure', 'gcp'] }}"
+
+- name: Add current user to docker group
+  user:
+    name: "{{ ansible_user | default('ubuntu') }}"
+    groups: docker
+    append: yes
+  become: true
+  when: "{{ workload_config.terraform_sut in ['aws', 'azure', 'gcp'] }}"
 
 - name: build image on worker
   shell:
@@ -80,3 +106,4 @@
       source venv/bin/activate
       python3 install.py --algorithm={{ algorithm }}
     executable: /bin/bash
+  become: true

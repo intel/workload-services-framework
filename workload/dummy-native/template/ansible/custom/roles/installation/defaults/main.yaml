@@ -3,7 +3,5 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
-
-perfspect_version: "3.9.1"
-perfspect_report_options: '--noupdate'
-
+dummy_version: "0.9"
+dummy_repository: "https://github.com/dummy/dummy.git"
