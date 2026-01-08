@@ -25,7 +25,7 @@ RUN git clone ${FLAMEGRAPH_REPO} flamegraph && \
 FROM ${OS_IMAGE}:${OS_VER} as go-dev
 RUN apt-get update && apt-get install -y git curl make gcc pkg-config libdevmapper-dev libgpgme-dev
 
-ARG GO_VER=1.24.1
+ARG GO_VER=1.25.1
 ARG GO_PKG=https://go.dev/dl/go${GO_VER}.linux-amd64.tar.gz
 ENV GOPATH=/home/go
 RUN curl --netrc-optional --retry 10 --retry-connrefused -fsSL ${GO_PKG} | tar xfz - -C /usr/local && \
@@ -34,7 +34,7 @@ ENV PATH=/usr/local/go/bin:$PATH
 
 FROM go-dev as goshu
 
-ARG GOSU_VER=1.17
+ARG GOSU_VER=1.18
 ARG GOSU_REPO=https://github.com/tianon/gosu
 RUN git clone ${GOSU_REPO} && \
     cd gosu && \
@@ -68,17 +68,6 @@ RUN mkdir -p $GOPATH/src/github.com/containers && \
     DISABLE_DOCS=1 make bin/skopeo && \
     DISABLE_DOCS=1 make install
 
-FROM ${OS_IMAGE}:${OS_VER} as kubectl
-RUN apt-get update && apt-get install -y curl gnupg
-
-ARG KUBECTL_VER=1.30
-ARG KUBECTL_REPO=https://pkgs.k8s.io/core:/stable:/v${KUBECTL_VER}/deb
-RUN mkdir -p /etc/apt/keyrings && \
-    curl --netrc-optional --retry 10 --retry-connrefused -fsSL ${KUBECTL_REPO}/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg && \
-    echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] ${KUBECTL_REPO}/ /" > /etc/apt/sources.list.d/kubernetes.list && \
-    apt-get update && \
-    apt-get install -y kubectl=${KUBECTL_VER}*
-
 FROM ${OS_IMAGE}:${OS_VER}
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends libdevmapper1.02.1 libgpgme11t64 sshpass zip unzip less gnupg ca-certificates curl gawk netcat-openbsd netcat-traditional ncat connect-proxy sudo openssh-client bzip2 jq git && \
@@ -108,9 +97,6 @@ COPY --from=packer /home/go/bin/packer /usr/local/bin/
 # Install docker CLI
 COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/
 COPY --from=dockercli /usr/local/libexec/docker/cli-plugins/docker-compose /usr/local/libexec/docker/cli-plugins/
-
-# Install kubectl
-COPY --from=kubectl /usr/bin/kubectl /usr/local/bin/
 
 # Copy FlameGraph utilities
 COPY --from=flamegraph /flamegraph/stackcollapse-perf.pl /usr/local/bin/

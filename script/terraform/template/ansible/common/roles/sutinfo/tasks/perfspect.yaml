@@ -31,9 +31,9 @@
 - name: Uncompress the perfspect package
   unarchive:
     src: "/tmp/perfspect-{{ perfspect_version }}.tgz"
-    dest: /tmp/
-    remote_src: true
-  delegate_to: localhost
+    dest: "/tmp/"
+    remote_src: "{{ ((ansible_connection|default('.ssh')) == 'self') | ternary(false,true) }}"
+  delegate_to: "{{ ((ansible_connection|default('.ssh')) == 'self') | ternary(omit,'localhost') }}"
   run_once: true
   become: false
 
@@ -50,6 +50,6 @@
   until: perfspect_rc is success
   retries: 2
   delay: 10
-  delegate_to: localhost
+  delegate_to: "{{ ((ansible_connection|default('.ssh')) == 'self') | ternary(omit,'localhost') }}"
   ignore_errors: yes
 

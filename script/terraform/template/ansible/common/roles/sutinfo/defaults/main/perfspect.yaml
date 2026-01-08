@@ -4,6 +4,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-perfspect_version: "3.6.1"
-perfspect_report_options: ''
+perfspect_version: "3.9.1"
+perfspect_report_options: '--noupdate'
 

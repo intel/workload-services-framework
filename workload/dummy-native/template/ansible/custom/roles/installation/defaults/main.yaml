@@ -1,0 +1,7 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+dummy_version: "0.9"
+dummy_repository: "https://github.com/dummy/dummy.git"

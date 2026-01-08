@@ -1,0 +1,23 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- hosts: workload_hosts
+  any_errors_fatal: true
+  gather_facts: false
+  become: false
+  tasks:
+
+    - name: run over iterations
+      include_role:
+        name: deployment
+        tasks_from: "main{{ is_win | ternary('-win','') }}"
+      loop: "{{ range(1, run_stage_iterations | default(1) |int+1, 1) | list }}"
+      loop_control:
+        loop_var: itr
+      vars:
+        is_win: "{{ (ansible_connection|default('ssh')) == 'winrm' }}"
+        workload_config: "{{ lookup('file', wl_logs_dir + '/workload-config.yaml') | from_yaml }}"
+ 

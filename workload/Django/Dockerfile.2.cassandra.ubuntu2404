@@ -12,7 +12,7 @@ FROM ${OS_IMAGE}:${OS_VER}
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-ARG CASSANDRA_VER=4.1.9
+ARG CASSANDRA_VER=4.1.10
 
 RUN apt-get update && \
     apt-get install -y \

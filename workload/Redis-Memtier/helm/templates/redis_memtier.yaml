@@ -5,6 +5,7 @@
 #
 {{- $startPort := .Values.REDIS_NATIVE_TRANSPORT_PORT -}}
 {{- $nInstance := .Values.CPU_USED -}}
+---
 apiVersion: batch/v1
 kind: Job
 metadata:

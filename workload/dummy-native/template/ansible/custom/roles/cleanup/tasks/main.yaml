@@ -1,0 +1,15 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Set workspace
+  set_fact:
+    workspace: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-workspace"
+
+- name: Remove workspace
+  file:
+    path: "{{ workspace }}"
+    state: absent
+

@@ -21,16 +21,107 @@
 
 - name: get memory information
   win_shell: |
-    Get-WmiObject Win32_PhysicalMemory
+    Get-WmiObject Win32_PhysicalMemory |ConvertTo-Json -Depth 3
   register: meminfo
+
+- name: Set Memory Channel info from meminfo
+  set_fact:
+    memchannelinfo: "{{ (meminfo.stdout | from_json | map(attribute='BankLabel') | select('defined') | map('regex_replace', '(DIMM.*)', '') | list | unique | length) }}"
+
+- name: Get CPU information
+  win_shell: |
+    Get-CimInstance Win32_Processor | Select-Object DeviceID, Name, Caption, NumberOfCores, NumberOfLogicalProcessors, MaxClockSpeed, Architecture, L2CacheSize, L3CacheSize, @{Name="NUMANode";Expression={(Get-CimInstance Win32_Processor | Select-Object -ExpandProperty DeviceID)}} | ConvertTo-Json
+  register: cpuinfo
+
+- name: Get Disk Information
+  win_shell: |
+    Get-PhysicalDisk | ConvertTo-Json
+  register: diskinfo
+
+- name: Get Chassis Information
+  win_shell: |
+    Get-WmiObject -Class Win32_SystemEnclosure | Select-Object ChassisTypes, Status, LockPresent, SecurityStatus, Manufacturer, Model, SerialNumber | ConvertTo-Json
+  register: chassisinfo
+
+- name: Get GPU information
+  win_shell: |
+    Get-WmiObject -Class Win32_VideoController | ConvertTo-Json
+  register: gpuinfo
+
+- name: Get PCIe device information
+  win_shell: |
+    Get-WmiObject Win32_PnPEntity | Where-Object { $_.PNPDeviceID -like "PCI*" } |
+    Select-Object Name, @{Name='BusAddress'; Expression={$_.PNPDeviceID}}, Manufacturer, PNPClass, Present, Status, Service |
+    ConvertTo-Json
+  register: pcieinfo
+
+- name: Get acclerators information
+  win_shell: |
+    Get-PnpDevice | Where-Object {
+    ($_.FriendlyName -match 'DLB|DSA|IAA|QAT|GNA|AI Boost|VPU|vRAN|AMX|FPGA|PAC|Arria|Stratix|NPU|TPU|AI Engine|Deep Learning|Inference|ML Accelerator|Edge TPU|GPU|Graphics|Video Controller|Compute Adapter|CUDA|Tensor|T4|A100|H100|RTX|Quadro|Tesla|Crypto|Compression|NVMe|Storage Accelerator|DPU|SmartNIC|Coprocessor|Accelerator|AI|Gaudi') -and
+    ($_.Class -ne "HIDClass")} | Select-Object Status, Class, @{Name='Name'; Expression={$_.FriendlyName}}, Manufacturer, Service, Present, Problem | ConvertTo-Json
+  register: acceleratorsinfo
+
+- name: Get Sensor Information
+  win_shell: |
+    Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature | Select-Object InstanceName, @{Name="CurrentTemperatureCelsius"; Expression={($_.CurrentTemperature - 2732) / 10}}, Active | ConvertTo-Json
+  register: sensorinfo
+  ignore_errors: true
+
+- name: Get Running Microcode Version
+  win_shell: |
+    $RegPath = "HKLM:\HARDWARE\DESCRIPTION\System\CentralProcessor\0"
+    $UpdateRevision = (Get-ItemProperty -Path $RegPath -Name "Update Revision")."Update Revision"
+    $RunningMicrocode = $UpdateRevision[0..4] -join ''
+    $MicrocodeHex = [String]::Format("{0:x2}", [int]($RunningMicrocode.ToString()).TrimStart('0'))
+    $MicrocodeHex.ToUpper()
+  register: microcodeinfo
+
+- name: Get Network Interfaces
+  win_shell: |
+    Get-NetAdapter | Select-Object Name, Status, MacAddress, LinkSpeed, MediaType, InterfaceDescription | ConvertTo-Json
+  register: netinfo
+
+- name: Get Base Board Information
+  win_shell: |
+    Get-WmiObject -Class Win32_BaseBoard | Select-Object Manufacturer, Product, SerialNumber, Version, PoweredOn | ConvertTo-Json
+  register: baseboardinfo
+
+- name: Get System Information
+  win_shell: |
+    Get-WmiObject -Class Win32_ComputerSystem | Select-Object Manufacturer, Model, Name, SystemType, TotalPhysicalMemory, NumberOfProcessors, NumberOfLogicalProcessors, Domain, Workgroup, BootupState | ConvertTo-Json
+  register: systeminfo
+
 
 - name: Generate svrinfo json
   template:
-    src: perfspect.json.j2
+    src: perfspect-win.json.j2
     dest: "{{ wl_logs_dir }}/{{ inventory_hostname }}-sutinfo/{{ private_ip | default(ansible_host) }}.json"
   delegate_to: localhost
   ignore_errors: true
   vars:
-    mem_spec: "{% for c in (meminfo.stdout_lines | select('match','^Capacity *:.*') | map('split',':') | map('last') | map('trim') | map('int')) %}{{ (c / (1024*1024)) | int }}MB {% endfor %}"
-    mem_spec_list: "{{ mem_spec | split(' ') | reject('==','') }}"
-
+    numainfo: "{{ numainfo }}"
+    memInfo: "{{ meminfo.stdout | from_json }}"
+    ansible_devices: "{{ hostvars[inventory_hostname].ansible_devices | default({}) }}"
+    ansible_mounts: "{{ hostvars[inventory_hostname].ansible_mounts | default([]) }}"
+    ansible_interfaces: "{{ hostvars[inventory_hostname].ansible_interfaces | default([]) }}"
+    cpuInfo: "{{ (cpuinfo.stdout | from_json) if (cpuinfo.stdout is defined and cpuinfo.stdout | length > 0) else [] }}"
+    memChannelCount: "{{ memchannelinfo | int }}"
+    disks: "{{ (diskinfo.stdout | from_json) if (diskinfo.stdout is defined and diskinfo.stdout | length > 0) else [] }}"
+    chassis: "{{ (chassisinfo.stdout | from_json) if (chassisinfo.stdout is defined and chassisinfo.stdout | length > 0) else [] }}"
+    gpus: "{{ (gpuinfo.stdout | from_json) if (gpuinfo.stdout is defined and gpuinfo.stdout | length > 0) else [] }}"
+    pcie_devices: "{{ (pcieinfo.stdout | from_json) if (pcieinfo.stdout is defined and pcieinfo.stdout | length > 0) else [] }}"
+    accelerators: "{{ (acceleratorsinfo.stdout | from_json) if (acceleratorsinfo.stdout is defined and acceleratorsinfo.stdout | length > 0) else [] }}"
+    microcode: "{{ microcodeinfo.stdout}}"
+    nicInfo: "{{ (netinfo.stdout | from_json) if (netinfo.stdout is defined and netinfo.stdout | length > 0) else [] }}"
+    baseboard: "{{ (baseboardinfo.stdout | from_json) if (baseboardinfo.stdout is defined and baseboardinfo.stdout | length > 0) else {} }}"
+    system: "{{ (systeminfo.stdout | from_json) if (systeminfo.stdout is defined and systeminfo.stdout | length > 0) else {} }}"
+    sensors: "{{ (sensorinfo.stdout | from_json) if (sensorinfo.stdout is defined and sensorinfo.stdout | length > 0) else [] }}"
+    kernellogs: "{{ (kernellogsinfo.stdout | from_json) if (kernellogsinfo.stdout is defined and kernellogsinfo.stdout | length > 0) else [] }}"
+    memTypeMap:
+      20: 'DDR'
+      21: 'DDR2'
+      24: 'DDR3'
+      26: 'DDR4'
+      34: 'DDR5'
+      0: 'Unknown'

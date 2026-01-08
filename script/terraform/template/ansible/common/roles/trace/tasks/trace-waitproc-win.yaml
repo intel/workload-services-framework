@@ -1,0 +1,18 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Invoke waitproc
+  ansible.windows.win_shell: |
+    Set-Content -Path "{{ trace_status_file }}" -Value "3" -Force -Encoding ascii
+    Invoke-WmiMethod -Path win32_process -Name create -ArgumentList "powershell.exe -NonInteractive -ExecutionPolicy Bypass -EncodedCommand {{ powershell_command | b64encode('utf-16-le') }}"
+  register: waitproc
+  vars:
+    powershell_command: |
+      {{ trace_start_command | trim }}
+      Set-Content -Path "{{ trace_status_file }}" -Value "$LastExitCode" -Force -Encoding ascii
+
+- set_fact:
+    trace_waitproc_pid: "{{ waitproc.stdout_lines | select('match','^ProcessId *:') | first | regex_replace('^.*: *','') }}"

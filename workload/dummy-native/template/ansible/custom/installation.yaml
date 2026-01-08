@@ -1,0 +1,28 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- hosts: workload_hosts
+  gather_facts: false
+  become: false
+  tasks:
+
+    - name: Record environment setup start time
+      import_role:
+        name: timing
+        tasks_from: start-setup
+
+    - name: Copy execution script
+      include_role:
+        name: installation
+        tasks_from: "main{{ is_win | ternary('-win','') }}"
+      vars:
+        is_win: "{{ (ansible_connection | default('ssh')) == 'winrm' }}"
+
+    - name: Record environment setup stop time
+      import_role:
+        name: timing
+        tasks_from: stop-setup
+

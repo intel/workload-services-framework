@@ -3,23 +3,37 @@
 # Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 - name: Install additional development packages
   package:
     name:
-      -  wget
-      -  curl
-      -  git
-      -  procps
-      -  net-tools
-      -  numactl
-      -  python3
-      -  kmod
-      -  sudo
-      -  vim
-#      -  iproute2
-#      -  iputils-ping
-#      -  dnsutils
-      -  nmap
-      -  netcat
+      - wget
+      - curl
+      - git
+      - procps
+      - net-tools
+      - numactl
+      - python3
+      - kmod
+      - sudo
+      - vim
+      - python3-pip
+      - python3-venv
+      - nmap
+      - netcat
     state: latest
-    update_cache: true 
+    update_cache: true
+  become: true
+  when: "{{ workload_config.terraform_sut in ['aws', 'azure', 'gcp'] }}"
+
+- name: Install Docker on cloud instance
+  apt:
+    name: docker.io
+    state: present
+    update_cache: true
+  become: true
+  when: "{{ workload_config.terraform_sut in ['aws', 'azure', 'gcp'] }}"

@@ -1,0 +1,123 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+  - name: Set workspace
+    set_fact:
+      workspace: "C:\\{{ wl_namespace }}-{{ inventory_hostname }}-workspace"
+
+  - name: Create workspace
+    ansible.windows.win_file:
+      path: "{{ workspace }}"
+      state: directory
+
+  - name: Create PI calculation script
+    ansible.windows.win_copy:
+      dest: "{{ workspace }}\\start_workload.ps1"
+      content: |
+        <#
+        .SYNOPSIS
+            Dummy workload that prints π to a chosen precision, sleeps,
+            and reports `real`, `user`, and `sys` timings for each ROI.
+
+        .NOTES
+            • Supports arbitrary precision (>= 100 digits) via Chudnovsky + BigInt.
+            • Environment variables override parameters, so the script still
+              behaves like the original sh version when called from Ansible.
+        #>
+
+        [CmdletBinding()]
+        param(
+            [int]$ROI          = 1,
+            [int]$SCALE        = 2000,
+            [int]$SLEEP_TIME   = 10,
+            [int]$RETURN_VALUE = 0
+        )
+
+        # ── Allow environment overrides ────────────────────────────────────────────────
+        if ($env:ROI)          { $ROI          = [int]$env:ROI }
+        if ($env:SCALE)        { $SCALE        = [int]$env:SCALE }
+        if ($env:SLEEP_TIME)   { $SLEEP_TIME   = [int]$env:SLEEP_TIME }
+        if ($env:RETURN_VALUE) { $RETURN_VALUE = [int]$env:RETURN_VALUE }
+
+        # ── π helper with arbitrary precision ─────────────────────────────────────────
+        function Get-PiString {
+            param([int]$Digits)
+
+            if ($Digits -le 99) {
+                $pi = 4 * [Math]::Atan(1)
+                return ("{0:F$Digits}" -f $pi)
+            }
+
+            function BigIntSqrt([bigint]$N) {
+                if ($N -lt 2) { return $N }
+                $x    = $N / 2
+                $last = 0
+                while ($x -ne $last) {
+                    $last = $x
+                    $x    = ($x + ($N / $x)) / 2
+                }
+                return $x
+            }
+
+            $guard    = 10
+            $prec     = $Digits + $guard
+            $scalePow = [bigint]::Pow(10, $prec)
+
+            # Chudnovsky constants
+            [bigint]$C = 426880
+            [bigint]$M = 1
+            [bigint]$L = 13591409
+            [bigint]$X = 1
+            [bigint]$K = 6
+            [bigint]$S = $L
+            $iter      = [math]::Ceiling(($prec + 13) / 14)
+
+            for ($n = 1; $n -lt $iter; $n++) {
+                $M = ($M * (($K * $K * $K) - 16 * $K)) / ($n * $n * $n)
+                $L += 545140134
+                $X *= -262537412640768000
+                $S += ($M * $L) / $X
+                $K += 12
+            }
+
+            $sqrt     = BigIntSqrt(10005 * $scalePow)
+            $piScaled = ($C * $sqrt * $scalePow) / $S
+
+            $str      = $piScaled.ToString()
+            return $str.Substring(0,1) + '.' + $str.Substring(1,$Digits)
+        }
+        
+        # ── Main loop ─────────────────────────────────────────────────────────────────
+        for ($i = 1; $i -le $ROI; $i++) {
+            Write-Output "START-ROI-$i"
+
+            # capture CPU counters before work
+            $proc = [Diagnostics.Process]::GetCurrentProcess()
+            $u0   = $proc.UserProcessorTime.TotalSeconds
+            $s0   = $proc.PrivilegedProcessorTime.TotalSeconds
+
+            $sw = [Diagnostics.Stopwatch]::StartNew()
+
+            Get-PiString -Digits $SCALE | Write-Output
+            Start-Sleep -Seconds $SLEEP_TIME
+
+            $sw.Stop()
+
+            # capture CPU counters after work
+            $proc.Refresh()
+            $u1 = $proc.UserProcessorTime.TotalSeconds
+            $s1 = $proc.PrivilegedProcessorTime.TotalSeconds
+
+            # emit timings in `time -p` format
+            "real {0:N3}" -f  $sw.Elapsed.TotalSeconds | Write-Output
+            "user {0:N3}" -f ($u1 - $u0)               | Write-Output
+            "sys  {0:N3}" -f ($s1 - $s0)               | Write-Output
+
+            Write-Output "STOP-ROI-$i"
+        }
+
+        exit $RETURN_VALUE
+
