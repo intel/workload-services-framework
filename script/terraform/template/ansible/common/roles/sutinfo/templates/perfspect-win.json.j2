@@ -1,0 +1,217 @@
+{
+    "BIOS": [
+        {
+            "Release Date": "{{ ansible_bios_date | default('') }}",
+            "Vendor": "{{ ansible_bios_vendor | default('') }}",
+            "Version": "{{ ansible_bios_version | default('') }}"
+        }
+    ],
+    "C-state": [],
+    "CPU": [
+        {
+            "Architecture": "{{ ansible_architecture2|string }}",
+            "Microarchitecture": "{{ ansible_architecture|string }}",
+            "Base Frequency": "{{ ansible_processor[2] | split('@') | last | trim }}",
+            "CPU Model": "{{ ansible_processor[2] }}",
+            "CPUs": "{{ ansible_processor_count*ansible_processor_cores }}",
+            "Cores per Socket": "{{ ansible_processor_cores }}",
+            "Family": "{{ cpuInfo[0].Caption | default('') }}",
+            "Hyperthreading": "{{ (ansible_processor_vcpus>(ansible_processor_cores*ansible_processor_count)) | ternary('Enabled','Disabled') }}",
+            "Model": "{{ ansible_processor[2] }}",
+            "NUMA Nodes": "{{ numainfo.stdout_lines | first }}",
+            "Sockets": "{{ ansible_processor_count | default('') }}",
+            "Stepping": "",
+            "All-core Maximum Frequency": "{{ cpuInfo | map(attribute='MaxClockSpeed') | max }} MHz",
+            "Maximum Frequency": "{{ cpuInfo | map(attribute='MaxClockSpeed') | max }} MHz",
+            "Intel Turbo Boost": "",
+            "L1d Cache": "",
+            "L1i Cache": "",
+            "L2 Cache": "{{ cpuInfo[0].L2CacheSize }} KB",
+            "L3 Cache": "{{ cpuInfo[0].L3CacheSize }} KB",
+            "L3 per Core": "{{ (cpuInfo[0].L3CacheSize / ansible_processor_cores) | round(2) }} KB",
+            "Memory Channels": "{{ memChannelCount }}",
+            "NUMA CPU List": "{{ cpuInfo[0].NUMANode.value | default([]) }}",
+            "On-line CPU List": "{{ cpuInfo[0].NUMANode.Count | default([]) }}",
+            "PPINs": "",
+            "Virtualization": "{{ ansible_virtualization_type | default('') }}"
+        }
+    ],
+    "CVE": [],
+    "CXL": [
+        {
+            "Class": "",
+            "Device": "",
+            "IOMMUGroup": "",
+            "NUMANode": "",
+            "ProgIf": "",
+            "Rev": "",
+            "Slot": "",
+            "Vendor": ""
+        }
+    ],
+    "Chassis Status": [
+        {
+            "Chassis Intrusion": "{{ ("inactive" if chassis.SecurityStatus in [None, 1] else "active") }}",
+            "Cooling/Fan Fault": "",
+            "Drive Fault": "",
+            "Front-Panel Lockout": "{{ ( "active" if chassis.LockPresent else "inactive" )}}",
+            "Last Power Event": "",
+            "Main Power Fault": "",
+            "Power Control Fault": "",
+            "Power Interlock": "",
+            "Power Overload": "",
+            "Power Restore Policy": "",
+            "System Power": "{{ ("off" if not baseboard.PoweredOn else "on") }}",
+            "Manufacturer": "{{ chassis.Manufacturer | default('') }}",
+            "Model": "{{ chassis.Model | default('') }}",
+            "Serial Number": "{{ chassis.SerialNumber | default('') }}",
+            "chassis_types": "{{ chassis.ChassisTypes | default([]) | join(', ') }}"
+    }
+    ],
+    "DIMM": [],
+    "Disk": [{% for disk in disks %}{% if not loop.first %}{
+            "Firmware Version": "{{ disk.FirmwareVersion | default('') }}",
+            "Link Speed": "",
+            "Link Width": "",
+            "Max Link Speed": "",
+            "Max Link Width": "",
+            "Minimum I/O Size": "{{ disk.PhysicalSectorSize | default('') }}",
+            "Model": "{{ disk.Model | default('') }}",
+            "Mount Point": "",
+            "NUMA Node": "",
+            "Name": "{{ disk.FriendlyName | default('') }}",
+            "PCIe Address": "{{ disk.PhysicalLocation | default('') }}",
+            "Request Queue Size": "",
+            "Size": "{{ disk.AllocatedSize | default('') }}",
+            "Type": "{{ disk.BusType | default('') }} {{ disk.MediaType | default('') }}",
+            "Status": "{{ disk.OperationalStatus | default('') }}"
+        }{% if not loop.last %},{% endif %}{% endif %}{% endfor %}],
+    "Filesystem": [
+        {% for mount in ansible_mounts %}
+        {
+            "Avail": "{{ (mount.size_available // (1024**3)) ~ 'G' if mount.size_available is defined else '' }}",
+            "Filesystem": "{{ mount.device | default('') }}",
+            "Mount Options": "{{ mount.options | default('') }}",
+            "Mounted on": "{{ mount.mount | default('') }}",
+            "Size": "{{ (mount.size_total // (1024**3)) ~ 'G' if mount.size_total is defined else '' }}",
+            "Use%": "",
+            "Used": "{{ (mount.size_total - mount.size_available) // (1024**3) ~ 'G' if mount.size_total is defined and mount.size_available is defined else '' }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ],
+    "GPU": [
+        {% set gpu_list = gpus | default([]) %}
+        {% for gpu in gpu_list %}
+        {
+            "Manufacturer": "{{ gpu.Name | default('') }}",
+            "Model": "{{ gpu.Caption | default('') }}",
+            "PCI ID": "{{ gpu.PNPDeviceID | default('') | replace('\\', '\\\\') }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ],
+    "Accelerators": {{ accelerators | to_json }},
+    "Host": [
+        {
+            "Time": "{{ ansible_date_time.iso8601 }}",
+            "System": "{{ system.Manufacturer | default('') }} {{ system.Model | default('') }}",
+            "Baseboard": "{{ baseboard.Manufacturer | default('') }} {{ baseboard.Product | default('') }} {{ baseboard.SerialNumber | default('') }} {{ baseboard.Version | default('') }}",
+            "Chassis": "{{ chassis.Manufacturer | default('') }} {{ chassis.Model | default('') }} {{ chassis.SerialNumber | default('') }}",
+            "Host Name": "{{ ansible_hostname | default('') }}"
+        }
+    ],
+    "ISA": [],
+    "Insights": [],
+    "Kernel Log": [],
+    "Memory": [
+        {
+            "MemAvailable": "{{ ansible_memfree_mb }} MB",
+            "MemFree": "{{ ansible_memfree_mb }} MB",
+            "MemTotal": "{{ ansible_memtotal_mb }} MB",
+            "Installed Memory": "{{ ( memInfo | map(attribute='Capacity') | map('int') | sum // (1024**3) ) ~ 'GB (' ~ (memInfo | length) ~ 'x' ~ ((memInfo[0].Capacity | int // (1024**3))) ~ 'GB ' ~ ( memTypeMap[memInfo[0]. SMBIOSMemoryType | int] | default('')) ~ ' ' ~ (memInfo[0].Speed | string) ~ 'MT/s [' ~ (memInfo[0].ConfiguredClockSpeed | string) ~ 'MT/s])' }}",
+            "Automatic NUMA Balancing": "",
+            "Buffers": "",
+            "Cached": "",
+            "Clustering Mode": "",
+            "HugePages_Total": "",
+            "Hugepagesize": "",
+            "Populated Memory Channels": "",
+            "Total Memory Encryption (TME)": "",
+            "Transparent Huge Pages": ""
+        }
+    ],
+    "NIC": {{ nicInfo | to_json }},
+    "Network IRQ Mapping": [],
+    "Operating System": [
+        {
+
+            "Kernel": "{{ ansible_kernel | default('') }}",
+            "Microcode": "{% if microcode is defined and microcode %}0x{{ microcode | trim }}{% else %}N/A{% endif %}",
+            "OS": "{{ ansible_distribution | default('') }} {{ ansible_distribution_version | default('') }}"
+        }
+    ],
+    "PCIe": {{ pcie_devices | to_json }},
+    "Process": [],
+    "Sensor":[{% for item in sensors %}
+            {
+              "Reading": "{{ (item.CurrentTemperatureCelsius|string + ' degrees C') if item.CurrentTemperatureCelsius is defined else 'no reading' }}     ",
+              "Sensor": "{{ item.InstanceName }}       ",
+              "Status": "{{ 'ok' if item.Active else 'ns' }}"
+            }{% if not loop.last %},{% endif %}
+          {% endfor %}],
+    "Software Version": [
+        {
+            "Binutils": "",
+            "GCC": "",
+            "GLIBC": "",
+            "Java": "",
+            "OpenSSL": "",
+            "Python": "{{ ansible_python_version | default('') }}",
+            "Python3": ""
+        }
+    ],
+    "System Event Log": [],
+    "System Summary": [
+        {
+            "Accelerators Available [used]": "{% if accelerators | length > 0 %}{% set acc_data = accelerators %}{% if acc_data | type_debug == 'list' %}{% for acc in acc_data %}{% if loop.index > 1 %}, {% endif %}{% if acc.Service != none and acc.Service | trim != '' %}{{ acc.Service }}{% else %}{{ acc.Name | default('Unknown Device') | trim }}{% endif %} [{% if acc.Present == true %}Present{% else %}Not Present{% endif %}/{{ acc.Status }}]{% endfor %}{% elif acc_data | type_debug == 'dict' %}{% if acc_data.Service != none and acc_data.Service | trim != '' %}{{ acc_data.Service }}{% else %}{{ acc_data.Name | default('Unknown Device') | trim }}{% endif %} [{% if acc_data.Present == true %}Present{% else %}Not Present{% endif %}/{{ acc_data.Status }}]{% endif %}{% else %}No accelerators found{% endif %}",
+            "All-core Maximum Frequency": "{{ cpuInfo | map(attribute='MaxClockSpeed') | max }} MHz",
+            "Architecture": "{{ ansible_architecture | default('') }}",
+            "Automatic NUMA Balancing": "",
+            "BIOS": "{{ ansible_bios_version | default('') }}",
+            "Base Frequency": "{{ ansible_processor[2] | split('@') | last | trim }}",
+            "Baseboard": "{{ baseboard.Manufacturer | default('') }} {{ baseboard.Product | default('') }} {{ baseboard.SerialNumber | default('') }} {{ baseboard.Version | default('') }}",
+            "C-states": "",
+            "CPU Model": "{{ ansible_processor[2] if ansible_processor|length > 2 else '' }}",
+            "CPUs": "{{ ansible_processor_count*ansible_processor_cores }}",
+            "CVEs": "",
+            "Chassis": "{{ chassis.Manufacturer | default('') }} {{ chassis.Model | default('') }} {{ chassis.SerialNumber | default('') }}",
+            "Cores per Socket": "{{ ansible_processor_cores | default('') }}",
+            "Disk": [ {% set models = {} %}{% for disk in disks %}{% set _ = models.update({disk.Model: (models.get(disk.Model, 0) + 1)}) %}{% endfor %}{% for model, count in models.items() %}"{{ count }}x {{ model }}"{% if not loop.last %}, {% endif %}{% endfor %} ],
+            "Efficiency Latency Control": "",
+            "Energy Performance Bias": "",
+            "Host Name": "{{ ansible_hostname | default('') }}",
+            "Hugepagesize": "",
+            "Hyperthreading": "{% if ansible_processor_threads_per_core|default(1) > 1 %}Enabled{% else %}Disabled{% endif %}",
+            "Installed Memory": "{{ ( memInfo | map(attribute='Capacity') | map('int') | sum // (1024**3) ) ~ 'GB (' ~ (memInfo | length) ~ 'x' ~ ((memInfo[0].Capacity | int // (1024**3))) ~ 'GB ' ~ (memTypeMap[memInfo[0]. SMBIOSMemoryType | int] | default('')) ~ ' ' ~ (memInfo[0].Speed | string) ~ 'MT/s [' ~ (memInfo[0].ConfiguredClockSpeed | string) ~ 'MT/s])' }}",
+            "Intel Turbo Boost": "",
+            "Kernel": "{{ ansible_kernel | default('') }}",
+            "L3 Cache": "{{ cpuInfo[0].L3CacheSize }} KB",
+            "Maximum Frequency": "{{ ansible_processor[2] | split('@') | last | trim }}",
+            "Microarchitecture": "{{ ansible_architecture |string }}",
+            "Microcode": "{% if microcode is defined and microcode %}0x{{ microcode | trim }}{% else %}N/A{% endif %}",
+            "NIC": "{% for adapter in nicInfo %}{{ adapter.Name | default('') }}[{{ adapter.Status | default('') }}]{% if not loop.last %}, {% endif %}{% endfor %}",
+            "NUMA Nodes": "{{ numainfo.stdout_lines | first }}",
+            "OS": "{{ ansible_distribution | default('') }} {{ ansible_distribution_version | default('') }}",
+            "PPINs": "",
+            "Prefetchers": "",
+            "Scaling Driver": "",
+            "Scaling Governor": "",
+            "Sockets": "{{ ansible_processor_count | default('') }}",
+            "System": "{{ system.Manufacturer | default('') }} {{ system.Model | default('') }}",
+            "System Summary": "{{ ansible_processor_count | default('') }}x {{ ansible_processor[2] if ansible_processor|length > 2 else '' }}, {{ (ansible_processor_cores * ansible_processor_count) | default('') }} cores, {{ cpuInfo[0].PowerManagementCapabilities | default('?') }} TDP, HT {{ 'On' if (ansible_processor_threads_per_core|default(1) > 1) else 'Off' }}, Turbo {{ 'On' if cpuInfo[0].TurboBoostEnabled|default(true) else 'Off' }}, Total Memory {{ ( memInfo | map(attribute='Capacity') | map('int') | sum // (1024**3) ) ~ 'GB (' ~ (memInfo | length) ~ 'x' ~ ((memInfo[0].Capacity | int // (1024**3))) ~ 'GB ' ~ ( memTypeMap[memInfo[0]. SMBIOSMemoryType | int] | default('')) ~ ' ' ~ (memInfo[0].Speed | string) ~ 'MT/s [' ~ (memInfo[0].ConfiguredClockSpeed | string) ~ 'MT/s])' }}, BIOS {{ ansible_bios_version | default('') }}, microcode {{ cpuInfo[0].Revision | default('N/A') }}, N/A, {% set models = {} %}{% for disk in disks %}{% set _ = models.update({disk.Model: (models.get(disk.Model, 0) + 1)}) %}{% endfor %}{% for model, count in models.items() %}{{ count }}x {{ disk.Size | default('') }} {{ model }}{% if not loop.last %}, {% endif %}{% endfor %}, {{ ansible_distribution | default('') }} {{ ansible_distribution_version | default('') }}, {{ ansible_kernel | default('') }}. Test by {{ ansible_system_vendor | default('') }} as of {{ ansible_date_time.date }} {{ ansible_date_time.time }}.",
+            "TDP": "",
+            "Time": "{{ ansible_date_time.iso8601 }}",
+            "Transparent Huge Pages": "",
+            "Name": "{{ system.Name | default('') }}"
+        }
+    ]
+}

@@ -1,0 +1,48 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Set workspace path
+  set_fact:
+    workspace: "C:\\{{ wl_namespace }}-{{ inventory_hostname }}-workspace"
+
+- name: invoke the trace procedure
+  include_role:
+    name: trace
+  vars:
+    trace_logs_scripts: ["cat {{ workspace }}\\output.logs"]
+    trace_status_file: "{{ workspace }}\\status"
+    trace_start_command: |
+      & {{ workspace }}\start_workload.ps1 -ROI {{ workload_config.tunables.ROI }} -SCALE {{ workload_config.tunables.SCALE }} -SLEEP_TIME {{ workload_config.tunables.SLEEP_TIME }} -RETURN_VALUE {{ workload_config.tunables.RETURN_VALUE }} 2>&1 | Set-Content -Path {{ workspace }}\output.logs -Encoding utf8
+
+- name: Create the logs folder
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ inventory_hostname }}"
+    state: directory
+    recurse: true
+  delegate_to: localhost
+
+- name: Fetch benchmark results and logs
+  fetch:
+    src: "{{ workspace }}\\{{ item }}"
+    dest: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ inventory_hostname }}/"
+    flat: true
+  loop: ["output.logs", "status"]
+  ignore_errors: true
+
+- name: Convert dos to unix
+  replace:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ inventory_hostname }}/{{ item }}"
+    regexp: '\r'
+    replace: ''
+  loop: ["output.logs", "status"]
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: collect trace data
+  include_role:
+    name: trace
+    tasks_from: collect
+

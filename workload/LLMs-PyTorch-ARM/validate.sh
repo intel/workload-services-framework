@@ -20,7 +20,7 @@ BATCH_SIZE=${BATCH_SIZE:-1}
 STEPS=${STEPS:-20} 
 INPUT_TOKENS=${INPUT_TOKENS:-1024}
 OUTPUT_TOKENS=${OUTPUT_TOKENS:-128}
-VM_IMAGE_NAME=${VM_IMAGE_NAME:-wsf-dataset-ai-gptj-paiv}
+# VM_IMAGE_NAME=${VM_IMAGE_NAME:-wsf-dataset-ai-gptj-paiv}
 GREEDY=${GREEDY:-False}
 NUMA_NODES_USE=${NUMA_NODES_USE:-0}
 USE_DEEPSPEED=${USE_DEEPSPEED:-False}
@@ -78,7 +78,8 @@ else
 fi
 
 . "$DIR/../../script/sut-info.sh" --csp-only
-[ -z "$SUTINFO_CSP" ] || CSP_NAME=$(echo $SUTINFO_CSP | tr '[:lower:]' '[:upper:]') && export ${CSP_NAME}_WORKER_OS_IMAGE=$VM_IMAGE_NAME
+[ -z "$SUTINFO_CSP" ] || CSP_NAME=$(echo $SUTINFO_CSP | tr '[:lower:]' '[:upper:]') 
+# && export ${CSP_NAME}_WORKER_OS_IMAGE=$VM_IMAGE_NAME
 
 TARGET_PLATFORM=${PLATFORM}
 WARMUP_STEPS=$(($STEPS/10))

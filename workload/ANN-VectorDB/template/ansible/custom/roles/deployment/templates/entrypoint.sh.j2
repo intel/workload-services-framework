@@ -100,6 +100,8 @@ esac
 
 echo "Begin performance testing"
 cd ${ann_home}
+mkdir -p data
+curl -L https://ann-benchmarks.com/glove-100-angular.hdf5 -o data/glove-100-angular.hdf5
 if [[ "${BATCH}" == "True" ]]; then
     #In ann function main.py::create_workers_and_execute(),
     # Batch mode uses all available CPU resources, --parallelism should be set to 1
@@ -108,7 +110,7 @@ elif [[ "${BATCH}" == "False" ]]; then
     python3 run.py --algorithm=${algorithm_run} --dataset=${DATASET}  --runs=1
 else
     echo "Error: Invalid input BATCH: '${BATCH}'. Please provide 'True' or 'False'."
-    echo "End performance testing"
+    echo "End performance testing due to error"
     echo 1 > ${workspace}/itr-1/benchmark/status
 fi
 echo 0 > ${workspace}/itr-1/benchmark/status

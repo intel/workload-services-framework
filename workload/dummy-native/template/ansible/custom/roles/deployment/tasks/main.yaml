@@ -1,0 +1,38 @@
+#
+# Apache v2 license
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+- name: Set workspace path
+  set_fact:
+    workspace: "/tmp/{{ wl_namespace }}-{{ inventory_hostname }}-workspace"
+
+- name: invoke the trace procedure
+  include_role:
+    name: trace
+  vars:
+    trace_status_file: "{{ workspace }}/status"
+    trace_logs_scripts: ["cat {{ workspace }}/output.logs"]
+    trace_start_command: |
+      {{ workspace }}/start-workload.sh {{ workload_config.tunables.ROI }} {{ workload_config.tunables.SCALE }} {{ workload_config.tunables.SLEEP_TIME }} {{ workload_config.tunables.RETURN_VALUE }} > {{ workspace }}/output.logs 2>&1
+
+- name: Create the logs folder
+  file:
+    path: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ inventory_hostname }}"
+    state: directory
+    recurse: true
+  delegate_to: localhost
+
+- name: Fetch benchmark results and logs
+  fetch:
+    src: "{{ workspace }}/{{ item }}"
+    dest: "{{ wl_logs_dir }}/itr-{{ itr }}/{{ inventory_hostname }}/{{ item }}"
+    flat: true
+  ignore_errors: true
+  loop: ['output.logs', 'status']
+
+- name: collect trace data
+  include_role:
+    name: trace
+    tasks_from: collect

@@ -20,7 +20,7 @@ WORKDIR /hpc_gemm
 
 RUN apt-get update && apt-get install -y unzip python3 wget
 RUN wget ${BLIS_PACKAGE} && unzip ${BLIS_VER}.zip
-RUN no_proxy=$(echo $no_proxy | tr ',' '\n' | grep -v -E '^\.?intel.com$' | tr '\n' ',')  wget -U "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1; GTB5)" ${GEMMBENCHMARK_PACKAGE}  && unzip gemm-benchmark.zip   
+RUN no_proxy=$(echo $no_proxy | tr ',' '\n' | grep -v -E '^\.?intel.com$' | tr '\n' ',')  wget -U "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1; GTB5)" --no-check-certificate ${GEMMBENCHMARK_PACKAGE} && unzip gemm-benchmark.zip
 
 WORKDIR /hpc_gemm/blis-${BLIS_VER}/config/skx
 

@@ -4,6 +4,14 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+- include_tasks:
+    file: trace-waitproc{{ win_suffix }}.yaml
+  when:
+  - trace_start_command is defined
+  - trace_waitproc_pid is not defined
+  vars:
+    win_suffix: "{{ ((hostvars[trace_logs_host|default(inventory_hostname)].ansible_connection|default('ssh'))=='winrm')|ternary('-win','') }}"
+
 - name: start the trace procedure
   block:
 
