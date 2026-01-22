@@ -26,5 +26,5 @@ termcolor==2.3.0
 easysettings==4.0.1
 pgrep==2020.12.3
 xlsxwriter==3.1.0
-wheel==0.38.1
+wheel==0.46.2
 mlperf-logging @ https://github.com/mlperf/logging/archive/9ea0afa.zip
