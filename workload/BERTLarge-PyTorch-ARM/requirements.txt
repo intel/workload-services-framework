@@ -9,7 +9,7 @@ pytest
 pytest-benchmark
 requests
 tabulate
-transformers==4.53.0
+transformers==5.0.0rc3
 MonkeyType
 psutil
 pyyaml
