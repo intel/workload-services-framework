@@ -26,7 +26,7 @@ setup(
           'Development Status :: 3 - Alpha',
       ],
       install_requires=[
-          'Django==5.2.14',
+          'Django==5.2.15',
           'django-cassandra-engine',
           'django-statsd-mozilla',
           'psutil',
