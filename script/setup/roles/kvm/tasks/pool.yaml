@@ -48,13 +48,13 @@
   - name: Create storage pool
     shell:
       cmd: |
-        virsh pool-destroy   {{ pool_name }}
-        virsh pool-undefine  {{ pool_name }}
-        virsh pool-define-as {{ pool_name }} dir --target "{{ pool_path }}"
-        virsh pool-build     {{ pool_name }}
-        virsh pool-start     {{ pool_name }}
-        virsh pool-autostart {{ pool_name }}
-        virsh pool-refresh   {{ pool_name }}
+        virsh pool-destroy   "{{ pool_name }}"
+        virsh pool-undefine  "{{ pool_name }}"
+        virsh pool-define-as "{{ pool_name }}" dir --target "{{ pool_path }}"
+        virsh pool-build     "{{ pool_name }}"
+        virsh pool-start     "{{ pool_name }}"
+        virsh pool-autostart "{{ pool_name }}"
+        virsh pool-refresh   "{{ pool_name }}"
       executable: /bin/bash
     ignore_errors: true
 
